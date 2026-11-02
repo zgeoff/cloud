@@ -35,7 +35,7 @@ async function setupTest() {
     printErr,
   };
 
-  return { tools, root, cacheDirectory, stub, printOut, printErr, dependencies };
+  return { directory, tools, root, cacheDirectory, stub, printOut, printErr, dependencies };
 }
 
 test('it runs the lint at the tools tag that the repo-sync caller pins, in the repo', async () => {
@@ -269,4 +269,119 @@ test('it fails with git s error for a tag tools lacks, and keeps no partial chec
   ]);
 
   expect(kept).toStrictEqual([]);
+});
+
+test("it leaves the pushing repo's HEAD and config alone when a worktree's pre-push hook runs it", async () => {
+  const ctx = await setupTest();
+
+  const pushing = join(ctx.directory, 'pushing');
+  const worktree = join(ctx.directory, 'worktree');
+
+  await writeFile(
+    join(ctx.tools.seed, 'packages', 'chex', 'src', 'run-workflows-check.ts'),
+    "process.stdout.write('linted the worktree\\n');\n",
+  );
+
+  await ctx.tools.git(['-C', ctx.tools.seed, 'add', '.']);
+  await ctx.tools.git(['-C', ctx.tools.seed, 'commit', '-qm', 'add the lint']);
+  await ctx.tools.git(['-C', ctx.tools.seed, 'tag', 'sync-v42']);
+  await ctx.tools.git(['-C', ctx.tools.seed, 'push', '-q', 'origin', 'main', 'sync-v42']);
+  await ctx.tools.git(['init', '-q', '-b', 'main', pushing]);
+  await ctx.tools.git(['-C', pushing, 'config', 'maintenance.auto', 'false']);
+
+  await mkdir(join(pushing, '.github', 'workflows'), { recursive: true });
+
+  await writeFile(
+    join(pushing, '.github', 'workflows', 'repo-sync.yml'),
+    'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v42\n',
+  );
+
+  await ctx.tools.git(['-C', pushing, 'add', '.']);
+  await ctx.tools.git(['-C', pushing, 'commit', '-qm', 'add the repo-sync caller']);
+  await ctx.tools.git(['-C', pushing, 'worktree', 'add', '-q', '-b', 'feature', worktree]);
+
+  const readRepoState = async () => ({
+    head: await ctx.tools.git(['-C', worktree, 'rev-parse', '--abbrev-ref', 'HEAD']),
+    config: await readFile(join(pushing, '.git', 'config'), 'utf8'),
+    hasWorktreeConfig: await Bun.file(join(pushing, '.git', 'config.worktree')).exists(),
+  });
+
+  const before = await readRepoState();
+
+  // git exports these two to a hook that a push from a worktree runs
+  const hookEnv = {
+    ...ctx.tools.env,
+    GIT_DIR: join(pushing, '.git', 'worktrees', 'worktree'),
+    GIT_PREFIX: '',
+  };
+
+  const status = await runWorkflowLint({
+    root: worktree,
+    toolsURL: `file://${ctx.tools.origin}`,
+    cacheDirectory: ctx.cacheDirectory,
+    env: hookEnv,
+    ...ctx.dependencies,
+  });
+
+  const after = await readRepoState();
+
+  expect(status).toBe(0);
+  expect(ctx.printOut.mock.calls).toStrictEqual([['linted the worktree\n']]);
+  expect(after).toStrictEqual(before);
+});
+
+test("it runs the checkout's git without the caller's repository variables, and the lint with them", async () => {
+  const ctx = await setupTest();
+
+  const caller = join(ctx.directory, 'caller');
+
+  await writeFile(
+    join(ctx.root, '.github', 'workflows', 'repo-sync.yml'),
+    'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v42\n',
+  );
+
+  await writeFile(
+    join(ctx.tools.seed, 'packages', 'chex', 'src', 'run-workflows-check.ts'),
+    "process.stdout.write('linted\\n');\n",
+  );
+
+  await ctx.tools.git(['-C', ctx.tools.seed, 'add', '.']);
+  await ctx.tools.git(['-C', ctx.tools.seed, 'commit', '-qm', 'add the lint']);
+  await ctx.tools.git(['-C', ctx.tools.seed, 'tag', 'sync-v42']);
+  await ctx.tools.git(['-C', ctx.tools.seed, 'push', '-q', 'origin', 'main', 'sync-v42']);
+
+  const gitEnv = { ...ctx.tools.env, GIT_CONFIG_PARAMETERS: "'core.abbrev'='12'" };
+
+  const callerEnv = {
+    ...gitEnv,
+    GIT_ALTERNATE_OBJECT_DIRECTORIES: join(caller, '.git', 'objects'),
+    GIT_CONFIG: join(caller, '.git', 'config'),
+    GIT_OBJECT_DIRECTORY: join(caller, '.git', 'objects'),
+    GIT_DIR: join(caller, '.git'),
+    GIT_WORK_TREE: caller,
+    GIT_IMPLICIT_WORK_TREE: '0',
+    GIT_GRAFT_FILE: join(caller, '.git', 'info', 'grafts'),
+    GIT_INDEX_FILE: join(caller, '.git', 'index'),
+    GIT_NO_REPLACE_OBJECTS: '1',
+    GIT_REPLACE_REF_BASE: 'refs/replace/',
+    GIT_PREFIX: 'scripts/',
+    GIT_SHALLOW_FILE: join(caller, '.git', 'shallow'),
+    GIT_COMMON_DIR: join(caller, '.git'),
+  };
+
+  await runWorkflowLint({
+    root: ctx.root,
+    toolsURL: `file://${ctx.tools.origin}`,
+    cacheDirectory: ctx.cacheDirectory,
+    env: callerEnv,
+    ...ctx.dependencies,
+  });
+
+  expect(ctx.stub.calls.map((call) => [call.argv[0], call.options.env])).toStrictEqual([
+    ['git', gitEnv],
+    ['git', gitEnv],
+    ['git', gitEnv],
+    ['git', gitEnv],
+    [process.execPath, callerEnv],
+  ]);
 });
