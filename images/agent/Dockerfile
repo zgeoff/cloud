@@ -306,6 +306,59 @@ RUN curl -fsSL ${CURL_RETRY} -o /tmp/actionlint.tar.gz \
  && install -m 0755 /tmp/actionlint /usr/local/bin/actionlint \
  && rm /tmp/actionlint.tar.gz /tmp/actionlint
 
+# Chrome for Testing, for a repo's browser lanes, which drive Chrome through Bun.WebView as CI's
+# runners do. Ubuntu packages Chromium only as a snap. The library pins hold every library that
+# `ldd /opt/chrome/chrome` lists and imp-base lacks, through their dependencies; Chrome loads GTK
+# only for a window, so headless runs need none. fonts-liberation gives a page its text fonts.
+# Google publishes no sum file, so the sum is taken after the zip's MD5 matches the md5 that
+# Google's storage lists for the object:
+#   V=$VERSION; U=https://storage.googleapis.com/chrome-for-testing-public/$V/linux64/chrome-linux64.zip
+#   curl -fsSI "$U" | grep 'x-goog-hash: md5='
+#   curl -fsSLO "$U" && openssl dgst -md5 -binary chrome-linux64.zip | base64 && sha256sum chrome-linux64.zip
+# A bump reads the stable version from
+# https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json, then checks
+# that the zip's deb.deps names no library the pins below lack.
+ARG CHROME_VERSION=156.0.8078.80
+ARG CHROME_SHA256=b711c720f774be355197f32edf37e0651418ba036d92446ee2da19ac017540a7
+ARG LIBNSS3_VERSION=2:3.98-1ubuntu0.2
+ARG LIBATK_BRIDGE_VERSION=2.52.0-1build1
+ARG LIBCUPS2_VERSION=2.4.7-1.2ubuntu7.14
+ARG LIBGBM1_VERSION=25.2.8-0ubuntu0.24.04.4
+ARG LIBASOUND2_VERSION=1.2.11-1ubuntu0.3
+ARG LIBXKBCOMMON0_VERSION=1.6.0-1build1
+ARG LIBXCOMPOSITE1_VERSION=1:0.4.5-1build3
+ARG LIBXDAMAGE1_VERSION=1:1.1.6-1build1
+ARG LIBXFIXES3_VERSION=1:6.0.0-2build1
+ARG LIBXRANDR2_VERSION=2:1.5.2-2build1
+ARG LIBPANGO_VERSION=1.52.1+ds-1build1
+ARG LIBCAIRO2_VERSION=1.18.0-3build1
+ARG FONTS_LIBERATION_VERSION=1:2.1.5-3
+COPY sbin/install-ubuntu-packages /tmp/install-ubuntu-packages
+RUN /tmp/install-ubuntu-packages "https://snapshot.ubuntu.com/ubuntu/$UBUNTU_SNAPSHOT/" \
+      "libnss3=$LIBNSS3_VERSION" "libatk-bridge2.0-0t64=$LIBATK_BRIDGE_VERSION" \
+      "libcups2t64=$LIBCUPS2_VERSION" "libgbm1=$LIBGBM1_VERSION" \
+      "libasound2t64=$LIBASOUND2_VERSION" "libxkbcommon0=$LIBXKBCOMMON0_VERSION" \
+      "libxcomposite1=$LIBXCOMPOSITE1_VERSION" "libxdamage1=$LIBXDAMAGE1_VERSION" \
+      "libxfixes3=$LIBXFIXES3_VERSION" "libxrandr2=$LIBXRANDR2_VERSION" \
+      "libpango-1.0-0=$LIBPANGO_VERSION" "libcairo2=$LIBCAIRO2_VERSION" \
+      "fonts-liberation=$FONTS_LIBERATION_VERSION" \
+ && rm /tmp/install-ubuntu-packages
+# A connection to Google's storage can run at about 50 KB/s while a new one runs at several MB/s, and
+# at 50 KB/s the 200 MB zip outlasts the host build's timeout. So a transfer under 1 MiB/s for 30
+# seconds ends with exit 28 and retries on a new connection.
+RUN echo "chrome: downloading" \
+ && curl -fsSL ${CURL_RETRY} --speed-limit 1048576 --speed-time 30 -o /tmp/chrome.zip \
+      "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chrome-linux64.zip" \
+ && echo "${CHROME_SHA256}  /tmp/chrome.zip" | sha256sum -c - \
+ && unzip -q /tmp/chrome.zip -d /tmp \
+ && mv /tmp/chrome-linux64 /opt/chrome \
+ && rm /tmp/chrome.zip
+
+# Bun.WebView starts Chrome through bin/chromium, which adds --no-sandbox for root. Bun reads
+# BUN_CHROME_PATH before it searches PATH.
+COPY bin/chromium /usr/local/bin/chromium
+ENV BUN_CHROME_PATH=/usr/local/bin/chromium
+
 # A boot service that sets vm.overcommit_memory=1 in the guest once at each
 # boot. oxlint's allocator reserves more address space than a 2 GiB imp holds
 # and aborts under the kernel's default heuristic; with overcommit it runs in
