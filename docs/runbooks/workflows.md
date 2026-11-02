@@ -131,10 +131,11 @@ bash scripts/switch-geoffcloud.sh --stop-ordinary-page-imps  # switch in the hug
    `k3s.service`, because nixie can stay down for minutes after k3s restarts. In a planned k3s
    window, run the switch again with `--allow-k3s-restart`: it prints the same lines and goes on.
 8. With `--stop-ordinary-page-imps`, it stops each running or sleeping imp whose guest is on 4 KiB
-   pages with `impz stop`, so the imp boots cold on the pool at its next use, because impd wakes a
-   snapshot on the pages it ran on and budgets those beside the reserved pool. Each imp keeps its
-   disk and loses its processes and sessions. The stop order is the names in `IMP_STOP_ORDER`, then
-   the other imps' names sorted, then the names in `IMP_STOP_LAST`.
+   pages with `impz stop`, so the imp boots cold on the pool at its next use. impd leaves guests on
+   4 KiB pages no budget once the pool is the whole budget, so it would sleep each one at a time it
+   picks and boot it cold on its next wake; the flag makes that move in a set order. Each imp keeps
+   its disk and loses its processes and sessions. The stop order is the names in `IMP_STOP_ORDER`,
+   then the other imps' names sorted, then the names in `IMP_STOP_LAST`.
    `bash scripts/stop-ordinary-page-imps.sh --plan <host>` prints the order and stops nothing, and
    `--check` fails naming each imp still on 4 KiB pages. It stops them after the last gate and
    before the activation reserves the pool, so a pool that comes up short leaves no guest on

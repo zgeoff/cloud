@@ -58,7 +58,9 @@ the kernel makes no huge page past it. The pool memory leaves the host's ordinar
 whether imps use it or not, so k3s, the ZFS cache and the host keep only what the budget left them
 before. Firecracker maps the pool without a reservation, so a guest that faults past an empty pool
 dies of SIGBUS. impd admits a boot or a wake only into free pool pages, and a pool made on demand
-would fail when memory fragments, so the pool is fixed.
+would fail when memory fragments, so the pool is fixed. impd gives a guest on base pages only the
+budget less the pool, which leaves such a guest no room here: impd sleeps it, and boots it cold onto
+the pool at its next wake.
 
 The imps yield CPU to the cluster rather than hold a cap. Rootful Podman starts its containers,
 imp-host the only one, in `machine.slice`, whose CPU weight of 10 sits below the weight of

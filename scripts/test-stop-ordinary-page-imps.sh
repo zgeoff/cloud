@@ -7,7 +7,7 @@
 # --plan prints the order and stops nothing, and --check fails naming each imp on 4 KiB pages, or
 # passes when none is left. It stops with ssh's exit code when the host refuses the connection. The
 # imps take the id, name and state fields of impd's ImpSchema (zgeoff/impz
-# packages/api/src/schemas/imp-schema.ts at v6.1.0), with invented values. ssh is the NixOS host
+# packages/api/src/schemas/imp-schema.ts at v6.3.2), with invented values. ssh is the NixOS host
 # stand-in from test-support/shell, which answers the imp listing and the page-size loop from the
 # case's STUB_IMPD_IMPS and STUB_IMPD_IMP_PAGES. Each case runs the script under `env -i` and
 # compares its stdout, stderr and ssh call log.
