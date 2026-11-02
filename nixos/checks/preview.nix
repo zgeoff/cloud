@@ -1001,6 +1001,7 @@ let
       script = ''
         cat > expected <<'EOF'
         ./apply-slot-evictions.ts
+        ./build-bun-pin-check.ts
         ./build-contract-imp-name.ts
         ./build-contract-status.ts
         ./build-forwarded-headers.ts
