@@ -5,7 +5,7 @@
 # exit code through. docs/runbooks/ops.md lists each verb, what it wraps and its preconditions.
 # Run a verb through its root package script:
 #
-#   bun run ops:switch-host [-- --build-only | --allow-k3s-restart]
+#   bun run ops:switch-host [-- --build-only | --allow-k3s-restart | --stop-ordinary-page-imps]
 #   bun run ops:deploy-prod -- <full commit>
 #   bun run ops:nixos-checks [-- [--force] <branch>]
 #   bun run ops:preview [-- <pulumi preview flag>…]

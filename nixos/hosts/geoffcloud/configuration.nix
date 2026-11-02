@@ -295,7 +295,16 @@ in
     settings.IMP_MCP_PUBLIC_URL = "https://${impdMCPRouteExposure.hostname}";
     settings.IMP_MCP_PUBLIC_PORT = impdMCPListenerExposure.port;
     publicPorts = [ "127.0.0.1:${impdMCPListenerPort}:${impdMCPListenerPort}" ];
+    # every imp of fixed memory runs on the host's pool of 2 MiB pages, restored and woken through
+    # a page handler (docs/architecture/host/imp.md)
+    settings.IMP_HUGE_PAGES = "2M";
   };
+
+  # the pool of 2 MiB pages that impd's huge pages run on: the whole imp RAM budget, since no imp
+  # here is elastic and only an elastic imp runs on ordinary pages. systemd-sysctl reserves it early
+  # in boot, before memory fragments; no page is made on demand past it, because Firecracker maps
+  # the pool without a reservation and a page the kernel cannot make kills the guest
+  boot.kernel.sysctl."vm.nr_hugepages" = config.services.imp.ramBudgetMiB / 2;
 
   # the TLS front on 443 for the registry's front routes (modules/public-front.nix). A hosted MCP
   # client signs in and calls imp's tools through it, so each address gets a limit of its own:
