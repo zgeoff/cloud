@@ -35,6 +35,18 @@ test('it reports failure with the exit code when the run ends before the suite r
   });
 });
 
+test("it reports failure with both releases when the repository pins another Bun than the run's", () => {
+  expect(
+    buildContractStatus(
+      { code: 1, output: 'the repository pins Bun 7.3.2, but the run installs Bun 7.3.1\n' },
+      600_000,
+    ),
+  ).toStrictEqual({
+    state: 'failure',
+    description: 'The repository pins Bun 7.3.2, but the run installs Bun 7.3.1',
+  });
+});
+
 test('it reports failure when a signal ends the run', () => {
   expect(buildContractStatus({ code: null, output: '' }, 600_000)).toStrictEqual({
     state: 'failure',

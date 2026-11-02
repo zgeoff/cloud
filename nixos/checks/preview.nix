@@ -1001,6 +1001,7 @@ let
       script = ''
         cat > expected <<'EOF'
         ./apply-slot-evictions.ts
+        ./build-bun-pin-check.ts
         ./build-contract-imp-name.ts
         ./build-contract-status.ts
         ./build-forwarded-headers.ts
@@ -1008,6 +1009,8 @@ let
         ./build-imp-name.ts
         ./build-impd-client.ts
         ./build-spend-proxy-io.ts
+        ./bun-release.ts
+        ./contract-script.ts
         ./counting-proxy-config-schema.ts
         ./create-preview-store.ts
         ./create-spend-proxies.ts

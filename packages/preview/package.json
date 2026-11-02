@@ -3,6 +3,11 @@
   "private": true,
   "description": "The preview service: one tailnet link per pull request to that pull request's code, running in its own imp",
   "type": "module",
+  "exports": {
+    "./build-bun-pin-check.ts": "./build-bun-pin-check.ts",
+    "./bun-release.ts": "./bun-release.ts",
+    "./contract-script.ts": "./contract-script.ts"
+  },
   "dependencies": {
     "@impz/client": "6.3.2",
     "@zgeoff/std": "0.3.1",
