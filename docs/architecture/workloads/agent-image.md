@@ -11,15 +11,18 @@ on it.
 ## What the image holds
 
 The Dockerfile pins every input. The base image is pinned by digest, and every download other than
-an Ubuntu package carries a checksum taken from its publisher's signed or attested release. apt
-resolves the Ubuntu packages and their dependencies against Ubuntu's snapshot archive at a fixed
-moment, so a build installs the same versions after Ubuntu replaces one in its live archive. apt
-fetches each package file from the live archive when it still holds that version, and from the
-snapshot archive otherwise. The build step fetches again after a wait when either archive answers
-with an error, because apt does not retry an HTTP error by itself. The tools are the coding agents,
-atc, auto-mode with its mod, GitHub's CLI, the language toolchains, 1Password's CLI, gitleaks, and
-the shell and workflow linters. Claude Code is installed with its own updates turned off, so a
-session runs the version the image pins.
+an Ubuntu package carries a checksum taken from its publisher's signed or attested release. Google
+publishes no checksum for Chrome for Testing, so its checksum is taken after the download matches
+the MD5 that Google's storage lists for it. apt resolves the Ubuntu packages and their dependencies
+against Ubuntu's snapshot archive at a fixed moment, so a build installs the same versions after
+Ubuntu replaces one in its live archive. apt fetches each package file from the live archive when it
+still holds that version, and from the snapshot archive otherwise. The build step fetches again
+after a wait when either archive answers with an error, because apt does not retry an HTTP error by
+itself. The tools are the coding agents, atc, auto-mode with its mod, GitHub's CLI, the language
+toolchains, 1Password's CLI, gitleaks, the shell and workflow linters, and Chrome for a repo's
+browser lanes. Chrome refuses to start as root without `--no-sandbox`, and a session runs as root,
+so `BUN_CHROME_PATH` names a script that adds the flag for root. Claude Code is installed with its
+own updates turned off, so a session runs the version the image pins.
 
 The build runs no tool, because a tool can write state the first time it runs: a version check alone
 can create a tool's config directory. That keeps the image free of anything a session could inherit

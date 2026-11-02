@@ -146,6 +146,26 @@ check_tool shellcheck "version: $SHELLCHECK_VERSION" \
   bash -o pipefail -c "shellcheck --version | sed -n '/^version: /p'"
 check_tool shfmt "v$SHFMT_VERSION" shfmt --version
 check_tool actionlint "$ACTIONLINT_VERSION" actionlint --version
+check_tool chromium "$CHROME_VERSION" chromium --version
+if [[ "${BUN_CHROME_PATH:-}" == /usr/local/bin/chromium && -x "$BUN_CHROME_PATH" ]]; then
+  pass BUN_CHROME_PATH "$BUN_CHROME_PATH"
+else
+  fail BUN_CHROME_PATH "'${BUN_CHROME_PATH:-}', want the executable /usr/local/bin/chromium"
+fi
+# a repo's browser lane starts Chrome headless through Bun.WebView, so the check does the same as
+# root and reads a page's text back; the timeout ends a Chrome that never answers
+webview_dir=$(mktemp -d /run/agent-image-webview.XXXXXX)
+cat > "$webview_dir/webview.ts" << 'EOF'
+await using view = new Bun.WebView({ backend: 'chrome' });
+await view.navigate('data:text/html,<h1>headless page</h1>');
+console.log(await view.evaluate('document.querySelector("h1").textContent'));
+EOF
+if out=$(timeout 120 env -C "$webview_dir" bun webview.ts 2>&1) && [[ "$out" == "headless page" ]]; then
+  pass webview "Bun.WebView read a page from headless Chrome"
+else
+  fail webview "Bun.WebView with the chrome backend gave '$out', want 'headless page'"
+fi
+rm -rf "$webview_dir"
 if auto-mode --help > /dev/null 2>&1; then
   pass auto-mode "auto-mode --help exits 0"
 else
