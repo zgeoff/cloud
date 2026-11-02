@@ -1,6 +1,7 @@
 import { topology } from '@zgeoff/cloud-topology';
 import { cloudflaredNames } from '../ingress/index.ts';
 import type { ATCDaemonEndpoint } from '../inputs/index.ts';
+import { nixieGitSyncNames } from '../shared/nixie-git-sync-names.ts';
 import { buildATCSignInRules } from './build-atc-sign-in-rules.ts';
 import { impHealthProbeTarget } from './imp-health-probe-target.ts';
 import { nixieProbeTargets } from './nixie-probe-targets.ts';
@@ -133,6 +134,7 @@ export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRul
       : [
           buildNixieTurnsRule(inputs.nixieReadinessURL),
           buildNixieDegradedRule(inputs.nixieReadinessURL),
+          buildNixieDefinitionsStaleRule(),
         ];
 
   return [
@@ -200,6 +202,26 @@ function buildNixieDegradedRule(readinessURL: string): AlertRule {
     labels: { severity: 'warning' },
     annotations: {
       summary: `nixie at ${readinessURL} reports degraded or unready, or does not answer; its body names the part.`,
+    },
+  };
+}
+
+function buildNixieDefinitionsStaleRule(): AlertRule {
+  const fetches = `git_sync_count_total{namespace="${nixieGitSyncNames.namespace}", container="${nixieGitSyncNames.container}", status=~"success|noop"}`;
+
+  // the last minute in a day that ended within 2 minutes of a good fetch; a series holds no
+  // timestamp of its last increase
+  const lastFetch = `max(max_over_time(timestamp(increase(${fetches}[2m]) > 0)[1d:1m]))`;
+
+  return {
+    // git-sync retries a failed fetch and stays ready while nixie serves its last checkout, so the
+    // chart's KubePodNotReady misses it
+    alert: 'NixieDefinitionsStale',
+    expr: `sum(increase(${fetches}[10m])) == 0 or absent(${fetches})`,
+    for: '5m',
+    labels: { severity: 'warning' },
+    annotations: {
+      summary: `nixie's git-sync reports no good fetch of the definitions in the last 10 minutes, so nixie serves the checkout of its last good fetch: {{ with query \`${lastFetch}\` }}{{ . | first | value | humanizeTimestamp }}{{ else }}none in the last day{{ end }}.`,
     },
   };
 }

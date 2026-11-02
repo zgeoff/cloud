@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildNixieSpec } from './build-nixie-spec.ts';
 
-test('it runs nixie as one replica that a rollout stops before it starts the next, even while it is unready, on a retained volume, with git-sync beside it holding the deploy key and nixie alone holding the age identity', () => {
+test('it runs nixie as one replica that a rollout stops before it starts the next, even while it is unready, on a retained volume, with git-sync beside it holding the deploy key, retrying each failed fetch, ready from its first good sync and serving its metrics, and nixie alone holding the age identity', () => {
   const serviceName = output('nixie');
   const configMap = output('nixie-config-0a1b2c3d');
   const secret = output('nixie-secrets-4e5f6a7b');
@@ -102,6 +102,7 @@ test('it runs nixie as one replica that a rollout stops before it starts the nex
             name: 'git-sync',
             image:
               'registry.k8s.io/git-sync/git-sync:v4.7.1@sha256:c5e1976da735bf0b53979f079a07475d77174c51863cd084e928ff6074480717',
+            ports: [{ name: 'git-sync', containerPort: 8081 }],
             env: [
               {
                 name: 'GITSYNC_REPO',
@@ -115,7 +116,11 @@ test('it runs nixie as one replica that a rollout stops before it starts the nex
               { name: 'GITSYNC_SSH_KEY_FILE', value: '/etc/git-secret/ssh' },
               { name: 'GITSYNC_SSH_KNOWN_HOSTS', value: 'true' },
               { name: 'GITSYNC_SSH_KNOWN_HOSTS_FILE', value: '/etc/git-secret/known_hosts' },
+              { name: 'GITSYNC_MAX_FAILURES', value: '-1' },
+              { name: 'GITSYNC_HTTP_BIND', value: ':8081' },
+              { name: 'GITSYNC_HTTP_METRICS', value: 'true' },
             ],
+            readinessProbe: { httpGet: { path: '/', port: 'git-sync' }, periodSeconds: 10 },
             volumeMounts: [
               { name: 'definitions', mountPath: '/etc/nixie/definitions' },
               { name: 'definitions-key', mountPath: '/etc/git-secret', readOnly: true },
