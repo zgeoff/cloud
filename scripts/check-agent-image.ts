@@ -44,7 +44,11 @@ function parseTarget(args: readonly string[]): Target {
 const guestTimeoutMs = 900_000;
 
 async function runCheck(options: Readonly<CheckAgentImageOptions>, target: Target, work: string) {
-  const pins = await loadAgentImagePins(join(options.repo, 'images/agent/Dockerfile'));
+  const imagePins = await loadAgentImagePins(join(options.repo, 'images/agent/Dockerfile'));
+  const checkoutBun = await readFile(join(options.repo, '.bun-version'), 'utf8');
+
+  const pins = { ...imagePins, CHECKOUT_BUN_VERSION: checkoutBun.trim() };
+
   const directory = await createAgentImageCheckDir(options, { work, repo: options.repo, pins });
   const body = await readFile(join(options.repo, 'scripts/agent-image-check-guest.sh'), 'utf8');
 

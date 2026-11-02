@@ -161,11 +161,14 @@ RUN echo "node: downloading" \
 # and the default without one. A repo that moves to a version no pin below
 # names adds a pin here. Each sum is bun-linux-x64.zip's line in the release's
 # SHASUMS256.txt.
-ARG BUN_VERSION=1.4.3
-ARG BUN_SHA256=3e730528d89775f03f87f05c06787c4df4099d0a37f3f252e7b829cb23816e18
-ARG BUN_OLDER_VERSION=1.4.2
-ARG BUN_OLDER_SHA256=36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913
-RUN for pin in "$BUN_VERSION $BUN_SHA256" "$BUN_OLDER_VERSION $BUN_OLDER_SHA256"; do \
+ARG BUN_VERSION=1.4.4
+ARG BUN_SHA256=bf8ccbfb2b0b80159e0f9a6d15c55317add8077534dbc6130a3edb52fccb395c
+ARG BUN_OLDER_VERSION=1.4.3
+ARG BUN_OLDER_SHA256=3e730528d89775f03f87f05c06787c4df4099d0a37f3f252e7b829cb23816e18
+ARG BUN_OLDEST_VERSION=1.3.13
+ARG BUN_OLDEST_SHA256=79c0771fa8b92c33aae41e15a0e0d307ea99d0e2f00317c71c6c53237a78e25a
+RUN for pin in "$BUN_VERSION $BUN_SHA256" "$BUN_OLDER_VERSION $BUN_OLDER_SHA256" \
+      "$BUN_OLDEST_VERSION $BUN_OLDEST_SHA256"; do \
       version=${pin% *} sum=${pin#* } \
    && curl -fsSL ${CURL_RETRY} -o /tmp/bun.zip \
         "https://github.com/oven-sh/bun/releases/download/bun-v${version}/bun-linux-x64.zip" \
@@ -289,6 +292,19 @@ RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/shfmt \
       "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64" \
  && echo "${SHFMT_SHA256}  /usr/local/bin/shfmt" | sha256sum -c - \
  && chmod 0755 /usr/local/bin/shfmt
+
+# actionlint, which the zgeoff repos' workflow checks run, at the version the
+# zgeoff/tools CI pins. The sum is the linux_amd64 tarball's line in the
+# release's actionlint_<version>_checksums.txt:
+#   gh release download v$VERSION -R rhysd/actionlint -p "actionlint_${VERSION}_checksums.txt"
+ARG ACTIONLINT_VERSION=1.7.12
+ARG ACTIONLINT_SHA256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/actionlint.tar.gz \
+      "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
+ && echo "${ACTIONLINT_SHA256}  /tmp/actionlint.tar.gz" | sha256sum -c - \
+ && tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint \
+ && install -m 0755 /tmp/actionlint /usr/local/bin/actionlint \
+ && rm /tmp/actionlint.tar.gz /tmp/actionlint
 
 # A boot service that sets vm.overcommit_memory=1 in the guest once at each
 # boot. oxlint's allocator reserves more address space than a 2 GiB imp holds

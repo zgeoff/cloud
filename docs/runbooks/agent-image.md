@@ -146,7 +146,8 @@ The check prints one line per item and exits non-zero on any failure:
 - **Secrets**: gitleaks 8.30.1 scans each top-level folder but `/proc`, `/sys`, `/dev` and `/run`,
   with `--redact`. It skips files over 50 MB: the pinned binaries, whose sums the build checks.
 - **Versions**: each tool answers with the version the Dockerfile pins, and each Ubuntu package is
-  installed at its pinned version.
+  installed at its pinned version. Under a `.bun-version` that holds this repo's own pin, `bun`
+  prints that version with nothing on stderr.
 
 `bun run test:agent-image` runs the same check on a local Docker build, before the host build. It
 then runs `scripts/test-agent-image-gitleaks.sh`, which scans planted files with the image's
