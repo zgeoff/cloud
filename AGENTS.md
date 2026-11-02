@@ -8,15 +8,15 @@ workload. `docs/architecture/overview.md` describes the system, and Linear holds
 
 The rules a task needs are not repeated here. Load the skill for the work before starting it.
 
-| Skill                | Load before                                                                        |
-| -------------------- | ---------------------------------------------------------------------------------- |
-| `code-style`         | writing, reviewing, or renaming any TypeScript — the shared function-verb taxonomy |
-| `project-code-style` | the same, beside `code-style` — the rules cloud replaces                           |
-| `testing`            | designing, writing, or reviewing tests                                             |
-| `project-testing`    | the same, beside `testing` — cloud's lanes, departures, harnesses and stand-ins    |
-| `ci-design`          | adding, changing, or reviewing a workflow or a job                                 |
-| `project-ci-design`  | the same, beside `ci-design` — cloud's test budget, required check and departures  |
-| `docs-writing`       | writing or editing any committed prose: `docs/`, READMEs, this file, skills        |
+| Skill                | Load before                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------ |
+| `code-style`         | writing, reviewing, or renaming any TypeScript — the shared function-verb taxonomy         |
+| `project-code-style` | the same as `code-style`: cloud adds and replaces no code-style rule                       |
+| `testing`            | designing, writing, or reviewing tests                                                     |
+| `project-testing`    | the same as `testing`: cloud's lanes, harnesses and stand-ins, and the rules it replaces   |
+| `ci-design`          | adding, changing, or reviewing a workflow or a job                                         |
+| `project-ci-design`  | the same as `ci-design`: cloud's test budget and required check, and the rules it replaces |
+| `docs-writing`       | writing or editing any committed prose: `docs/`, READMEs, this file, skills                |
 
 ## Repo structure
 
