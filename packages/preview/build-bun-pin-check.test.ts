@@ -77,6 +77,67 @@ test('it stops a repository whose packageManager names another release', async (
   });
 });
 
+test('it stops a repository whose packageManager names another release in any JSON layout', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    '{\n  "name": "greenhouse",\n  "packageManager" :\n    "bun@7.4.0"\n}\n',
+  );
+
+  const result = await $`sh -c ${buildBunPinCheck('7.3.1')}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: 'the repository pins Bun 7.4.0, but the run installs Bun 7.3.1\n',
+  });
+});
+
+test('it stops a repository whose bunfig.toml preloads a missing file and whose packageManager names another release', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'bunfig.toml'), 'preload = ["./missing-preload.ts"]\n');
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    '{\n  "name": "greenhouse",\n  "packageManager": "bun@7.4.0"\n}\n',
+  );
+
+  const result = await $`sh -c ${buildBunPinCheck('7.3.1')}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: 'the repository pins Bun 7.4.0, but the run installs Bun 7.3.1\n',
+  });
+});
+
+test('it passes a repository whose packageManager names another tool than Bun', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    '{\n  "name": "greenhouse",\n  "packageManager": "pnpm@9.1.0"\n}\n',
+  );
+
+  const result = await $`sh -c ${buildBunPinCheck('7.3.1')}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+});
+
 test('it reads a .bun-version with a v prefix and a CRLF ending as its bare release', async () => {
   const ctx = await setupTest();
 
