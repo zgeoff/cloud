@@ -94,6 +94,8 @@ async function createToolsCheckout(
 
   await options.removeTree(partial);
 
+  const env = buildCheckoutEnv(options.env);
+
   const steps = [
     ['git', 'init', '--quiet', partial],
     ['git', '-C', partial, 'sparse-checkout', 'set', lintFolder],
@@ -112,7 +114,7 @@ async function createToolsCheckout(
   ];
 
   for (const argv of steps) {
-    const result = await options.run(argv, { env: options.env, timeoutMs: 120_000 });
+    const result = await options.run(argv, { env, timeoutMs: 120_000 });
 
     if (result.exitCode !== 0) {
       await options.removeTree(partial);
@@ -126,6 +128,31 @@ async function createToolsCheckout(
   await options.renameTree(partial, checkout).catch(() => options.removeTree(partial));
 
   return undefined;
+}
+
+// git exports GIT_DIR to a hook that a push from a worktree runs, and GIT_DIR beats -C, so the checkout
+// would land in the pushing repo. These are `git rev-parse --local-env-vars`, less the two that carry
+// `git -c` settings.
+const repositoryVariables = new Set([
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_CONFIG',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_DIR',
+  'GIT_WORK_TREE',
+  'GIT_IMPLICIT_WORK_TREE',
+  'GIT_GRAFT_FILE',
+  'GIT_INDEX_FILE',
+  'GIT_NO_REPLACE_OBJECTS',
+  'GIT_REPLACE_REF_BASE',
+  'GIT_PREFIX',
+  'GIT_SHALLOW_FILE',
+  'GIT_COMMON_DIR',
+]);
+
+function buildCheckoutEnv(
+  env: Readonly<Record<string, string | undefined>>,
+): Record<string, string | undefined> {
+  return Object.fromEntries(Object.entries(env).filter(([name]) => !repositoryVariables.has(name)));
 }
 
 if (import.meta.main) {
