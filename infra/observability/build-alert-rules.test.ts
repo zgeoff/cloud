@@ -294,7 +294,7 @@ test('it alerts on each daemon in order, at its own severity, any but geoffcloud
   ]);
 });
 
-test("it alerts on nixie's failing turns and on a status other than ready from the nixie probes, after the imp health rule", () => {
+test("it alerts on nixie's failing turns and on a status other than ready from the nixie probes, and on git-sync's stale definitions, after the imp health rule", () => {
   expect(
     buildAlertRules({
       nixieReadinessURL: 'http://nixie.nixie.svc.cluster.local:8080/health/ready',
@@ -377,6 +377,16 @@ test("it alerts on nixie's failing turns and on a status other than ready from t
           annotations: {
             summary:
               'nixie at http://nixie.nixie.svc.cluster.local:8080/health/ready reports degraded or unready, or does not answer; its body names the part.',
+          },
+        },
+        {
+          alert: 'NixieDefinitionsStale',
+          expr: 'sum(increase(git_sync_count_total{namespace="nixie", container="git-sync", status=~"success|noop"}[10m])) == 0 or absent(git_sync_count_total{namespace="nixie", container="git-sync", status=~"success|noop"})',
+          for: '5m',
+          labels: { severity: 'warning' },
+          annotations: {
+            summary:
+              'nixie\'s git-sync reports no good fetch of the definitions in the last 10 minutes, so nixie serves the checkout of its last good fetch: {{ with query `max(max_over_time(timestamp(increase(git_sync_count_total{namespace="nixie", container="git-sync", status=~"success|noop"}[2m]) > 0)[1d:1m]))` }}{{ . | first | value | humanizeTimestamp }}{{ else }}none in the last day{{ end }}.',
           },
         },
         {

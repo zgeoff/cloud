@@ -71,8 +71,12 @@ promotes it to `live`, as
 [the definitions repo's readme](https://github.com/zgeoff/nixie-definitions#going-live) describes.
 git-sync swaps a `current` link to each new checkout in one rename, and nixie reads through that
 link, so a seed never sees half a checkout. On a first start the seed retries until the first clone
-arrives. The pod's file-system group is a supplementary group of both containers, which is what lets
-git-sync read its key and nixie read git-sync's checkout.
+arrives. git-sync retries a failed fetch every minute and never exits on one. Its readiness probe
+fails only until its first good sync, so a GitHub outage leaves the pod ready, and nixie serves the
+last checkout. The NixieDefinitionsStale alert reports that state with the time of the last good
+fetch ([alert rules](observability.md#alert-rules)). The pod's file-system group is a supplementary
+group of both containers, which is what lets git-sync read its key and nixie read git-sync's
+checkout.
 
 nixie never writes to that checkout. When nixie writes a skill, it opens a pull request in
 `zgeoff/nixie-definitions` with a token from its secrets file, and git-sync brings the skill back

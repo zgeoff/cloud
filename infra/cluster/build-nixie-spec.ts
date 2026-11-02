@@ -1,5 +1,6 @@
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
+import { nixieGitSyncNames } from '../shared/nixie-git-sync-names.ts';
 import { podLabels } from '../shared/pod-labels.ts';
 
 export const nixieLabels = podLabels.nixie;
@@ -150,8 +151,9 @@ const gitSyncImage =
 
 function buildGitSyncContainer(): input.core.v1.Container {
   return {
-    name: 'git-sync',
+    name: nixieGitSyncNames.container,
     image: gitSyncImage,
+    ports: [{ name: nixieGitSyncNames.httpPort, containerPort: nixieGitSyncNames.httpPortNumber }],
     env: [
       { name: 'GITSYNC_REPO', value: 'ssh://git@ssh.github.com:443/zgeoff/nixie-definitions.git' },
 
@@ -169,7 +171,20 @@ function buildGitSyncContainer(): input.core.v1.Container {
         name: 'GITSYNC_SSH_KNOWN_HOSTS_FILE',
         value: `/etc/git-secret/${definitionsKnownHostsKey}`,
       },
+
+      // git-sync's default of 0 exits on the first failed fetch, and the crash loop that follows
+      // makes the pod unready while nixie still serves the definitions it has
+      { name: 'GITSYNC_MAX_FAILURES', value: '-1' },
+      { name: 'GITSYNC_HTTP_BIND', value: `:${String(nixieGitSyncNames.httpPortNumber)}` },
+      { name: 'GITSYNC_HTTP_METRICS', value: 'true' },
     ],
+
+    // git-sync's endpoint answers 503 until its first good sync and 200 from then on, so the pod
+    // waits for a checkout and stays ready through a later failed fetch
+    readinessProbe: {
+      httpGet: { path: '/', port: nixieGitSyncNames.httpPort },
+      periodSeconds: 10,
+    },
     volumeMounts: [
       { name: 'definitions', mountPath: definitionsRoot },
       { name: 'definitions-key', mountPath: '/etc/git-secret', readOnly: true },
