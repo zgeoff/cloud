@@ -9,6 +9,7 @@
     { "match": "**/test-utils/**", "skills": ["testing", "project-testing"] },
     { "match": "nixos/checks/**", "skills": ["testing", "project-testing"] },
     { "match": "**/mocks/**", "skills": ["testing", "project-testing"] },
-    { "match": "e2e/**", "skills": ["testing", "project-testing"] }
+    { "match": "e2e/**", "skills": ["testing", "project-testing"] },
+    { "match": ".github/workflows/**", "skills": ["ci-design", "project-ci-design"] }
   ]
 }
