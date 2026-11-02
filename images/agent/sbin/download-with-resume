@@ -1,0 +1,50 @@
+#!/bin/sh
+# Build step: download a file with curl, and resume it after each failed attempt, so an attempt
+# that a speed floor ends keeps the bytes it fetched. The Dockerfile runs it with the curl options
+# that set the floor:
+#
+#   download-with-resume <file> <url> [<curl option>...]
+#
+# curl's own --retry starts each attempt from the first byte again, and curl 8.5, the image's
+# curl, does so with -C - too. So with --retry, a link that stays under a --speed-limit floor never
+# finishes a file, however long the build waits. Here each attempt runs
+# `curl -fsSL -C - -o <file> <curl option>... <url>`, which asks for the bytes after the ones
+# <file> holds, 2 seconds after the attempt before. An attempt that adds bytes starts the count
+# again, and after 5 failed attempts in a row that add none, the step fails with the last
+# attempt's curl status.
+set -eu
+
+if [ "$#" -lt 2 ]; then
+  echo "usage: download-with-resume <file> <url> [<curl option>...]" >&2
+  exit 2
+fi
+file=$1
+url=$2
+shift 2
+
+# print_size: the bytes <file> holds, 0 before the first attempt makes it
+print_size() {
+  if [ -f "$file" ]; then stat -c %s "$file"; else echo 0; fi
+}
+
+failures=0
+while :; do
+  before=$(print_size)
+  status=0
+  curl -fsSL -C - -o "$file" "$@" "$url" || status=$?
+  if [ "$status" -eq 0 ]; then
+    exit 0
+  fi
+  after=$(print_size)
+  if [ "$after" -gt "$before" ]; then
+    failures=0
+  else
+    failures=$((failures + 1))
+  fi
+  if [ "$failures" -ge 5 ]; then
+    echo "download-with-resume: curl exited $status with $after bytes, after 5 attempts that added none" >&2
+    exit "$status"
+  fi
+  echo "download-with-resume: curl exited $status with $after bytes, resuming in 2s" >&2
+  sleep 2
+done
