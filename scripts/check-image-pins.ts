@@ -102,6 +102,10 @@ const referencePattern =
 // an imp image lives in impd and no registry, so it has no digest to pin
 const agentImagePattern = /^agent-[\da-f]{7,40}$/u;
 
+// a runbook fills in a placeholder before it creates the manifest, and Docker refuses an uppercase
+// image name, so a placeholder left in place never pulls an unpinned image
+const placeholderPattern = /^[A-Z][A-Z\d_]*$/u;
+
 // the anchors make a digest with an extra digit fail, where a substring match would hold
 const pinPattern =
   /^(?<name>(?:[a-z\d][a-z\d.-]*(?::\d+)?\/)?[a-z\d][\w.-]*(?:\/[a-z\d][\w.-]*)*):(?<tag>\w[\w.-]{0,127})@(?<digest>sha256:[\da-f]{64})$/u;
@@ -134,7 +138,7 @@ function parseLine(prefix: string, file: string, line: string): Pin | string | u
       : undefined;
   }
 
-  if (agentImagePattern.test(reference)) {
+  if (agentImagePattern.test(reference) || placeholderPattern.test(reference)) {
     return undefined;
   }
 

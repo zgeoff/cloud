@@ -7,33 +7,45 @@
 # this repository only when they are listed. A name in `include` that is not an
 # opt-in entry fails the run.
 #
-# The `uses:` line pins a sync tag of zgeoff/tools, and a run syncs the files
-# that tag holds. A push to main that changes this file, such as the merge of
-# Renovate's bump to a newer tag, starts a run, so the new tag's files arrive
-# without waiting for the weekly run. scripts/pin-tools-ref.sh in zgeoff/tools
-# moves a repo to a tag by hand.
+# The `uses:` line pins a commit on main of zgeoff/tools. A green main there
+# that changes a synced file sends this repository a repository_dispatch event
+# with its commit, and the run syncs that commit's files. The sync pull request
+# moves the pin to that commit, and merges on green checks. A run from any other
+# trigger syncs the newest green commit on main there. Each run also opens an
+# issue when the sync pull request is red for more than a day.
 name: Repo sync
 
 on:
+  repository_dispatch:
+    types: [zgeoff-tools-sync]
   push:
     branches: [main]
     paths: [.github/workflows/repo-sync.yml]
   schedule:
-    # Monday 06:00 UTC
-    - cron: 0 6 * * 1
+    # 06:00 UTC
+    - cron: 0 6 * * *
   workflow_dispatch:
 
-# A newer run syncs every entry again, so it replaces an older run on the ref.
+# github.sha of a repository_dispatch run is this repository's main, so the
+# group names the dispatched commit. A newer run replaces only a pending run of
+# the same commit, or a pending run of another trigger, which syncs the newest
+# green commit as the newer run does. No run cancels a running one.
 concurrency:
-  group: repo-sync-caller-${{ github.ref }}
-  cancel-in-progress: true
+  group: repo-sync-caller-${{ github.event.client_payload.sha || github.sha }}
+  cancel-in-progress: false
 
 jobs:
   sync:
     permissions:
       contents: read
-    uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v30
+      issues: write
+      pull-requests: read
+      checks: read
+      statuses: read
+      actions: read
+    uses: zgeoff/tools/.github/workflows/repo-sync.yml@94cb4b531c6018c099d251e7bf7ded846416d910 # main
     with:
+      ref: ${{ github.event.client_payload.sha }}
       include:
         skill-testing, hook-skill-gate, skill-docs-writing, skill-code-style, skill-skill-writing,
         workflow-audit-fix, skill-ci-design

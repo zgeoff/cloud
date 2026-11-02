@@ -2,7 +2,8 @@
 # Tests scripts/agent-image-gitleaks.toml with the gitleaks that the agent image installs, run as
 # the image check runs it: `gitleaks dir /opt` in the image, here against a case tree mounted at
 # /opt in place of the image's own. What this proves: the auto-mode entry exempts the short-lived
-# Bedrock rule's pattern source in auto-mode's two rule files and nowhere else, and any other
+# Bedrock rule's pattern source in auto-mode's two rule files and nowhere else, the Chrome entry
+# exempts the extension key in Chrome's reading-mode manifest and nowhere else, and any other
 # finding in those files still fails. It needs the image that `bun run test:agent-image` builds,
 # which runs this group after its check; one case alone:
 #
@@ -142,21 +143,96 @@ EOF
   assert_status 1 "$status"
 }
 
-# The case tree's /opt with auto-mode's dist directory, where the image keeps auto-mode, and no
-# file in it: each case writes its own.
+it_passes_the_extension_key_in_chromes_reading_mode_manifest() {
+  local image="$1" config="$2" status=0
+  create_case_tree
+  setup_test "$tree"
+  printf '{\n  "key": "%s",\n  "manifest_version": 3\n}\n' "$CHROME_KEY" \
+    > "$tree/opt/chrome/resources/accessibility/reading_mode_gdocs_helper_manifest.json"
+
+  docker run --rm --network none --entrypoint gitleaks -v "$tree/opt:/opt:ro" \
+    -v "$config:/run/gitleaks.toml:ro" "$image" dir /opt --config /run/gitleaks.toml --no-banner \
+    --no-color --redact --report-format json --report-path - \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  jq -c '.[] | {RuleID, File, StartLine}' "$tree/out" > "$tree/findings"
+  diff /dev/null "$tree/findings"
+  sed -E 's/^[0-9]+:[0-9]{2}[AP]M //; s/scanned ~[0-9]+ bytes \([^)]*\) in .*$/scanned SIZE in T/' \
+    "$tree/err" > "$tree/err.normal"
+  diff - "$tree/err.normal" << 'EOF'
+INF scanned SIZE in T
+INF no leaks found
+EOF
+  assert_status 0 "$status"
+}
+
+it_fails_the_extension_key_in_another_chrome_manifest() {
+  local image="$1" config="$2" status=0
+  create_case_tree
+  setup_test "$tree"
+  printf '{\n  "key": "%s",\n  "manifest_version": 3\n}\n' "$CHROME_KEY" \
+    > "$tree/opt/chrome/resources/accessibility/other_manifest.json"
+
+  docker run --rm --network none --entrypoint gitleaks -v "$tree/opt:/opt:ro" \
+    -v "$config:/run/gitleaks.toml:ro" "$image" dir /opt --config /run/gitleaks.toml --no-banner \
+    --no-color --redact --report-format json --report-path - \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  jq -c '.[] | {RuleID, File, StartLine}' "$tree/out" > "$tree/findings"
+  diff - "$tree/findings" << 'EOF'
+{"RuleID":"generic-api-key","File":"/opt/chrome/resources/accessibility/other_manifest.json","StartLine":2}
+EOF
+  sed -E 's/^[0-9]+:[0-9]{2}[AP]M //; s/scanned ~[0-9]+ bytes \([^)]*\) in .*$/scanned SIZE in T/' \
+    "$tree/err" > "$tree/err.normal"
+  diff - "$tree/err.normal" << 'EOF'
+INF scanned SIZE in T
+WRN leaks found: 1
+EOF
+  assert_status 1 "$status"
+}
+
+it_fails_a_github_token_beside_the_extension_key_in_chromes_reading_mode_manifest() {
+  local image="$1" config="$2" status=0
+  create_case_tree
+  setup_test "$tree"
+  printf '{\n  "key": "%s",\n  "token": "%s"\n}\n' "$CHROME_KEY" "$GITHUB_TOKEN" \
+    > "$tree/opt/chrome/resources/accessibility/reading_mode_gdocs_helper_manifest.json"
+
+  docker run --rm --network none --entrypoint gitleaks -v "$tree/opt:/opt:ro" \
+    -v "$config:/run/gitleaks.toml:ro" "$image" dir /opt --config /run/gitleaks.toml --no-banner \
+    --no-color --redact --report-format json --report-path - \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  jq -c '.[] | {RuleID, File, StartLine}' "$tree/out" > "$tree/findings"
+  diff - "$tree/findings" << 'EOF'
+{"RuleID":"github-pat","File":"/opt/chrome/resources/accessibility/reading_mode_gdocs_helper_manifest.json","StartLine":3}
+EOF
+  sed -E 's/^[0-9]+:[0-9]{2}[AP]M //; s/scanned ~[0-9]+ bytes \([^)]*\) in .*$/scanned SIZE in T/' \
+    "$tree/err" > "$tree/err.normal"
+  diff - "$tree/err.normal" << 'EOF'
+INF scanned SIZE in T
+WRN leaks found: 1
+EOF
+  assert_status 1 "$status"
+}
+
+# The case tree's /opt with auto-mode's dist directory and Chrome's accessibility resources, where
+# the image keeps them, and no file in either: each case writes its own.
 setup_test() {
   local tree="$1"
-  mkdir -p "$tree/opt/auto-mode/dist"
+  mkdir -p "$tree/opt/auto-mode/dist" "$tree/opt/chrome/resources/accessibility"
 }
 
 # Boot data every case needs: the image that test:agent-image builds, the config under test by
 # absolute path for the bind mount, the Bedrock rule's pattern source (split here so the repo's
-# own scan does not match this file), and a GitHub token that matches gitleaks' github-pat rule,
-# derived from SEED.
+# own scan does not match this file), a GitHub token that matches gitleaks' github-pat rule, and
+# an extension key shaped like Chrome's that matches its generic-api-key rule, both derived from
+# SEED.
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 image="${AGENT_IMAGE:-cloud/agent-image}"
 SEED="${SEED:-$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')}"
 echo "SEED=$SEED"
 BEDROCK_PATTERN="bedrock-api-key-""YmVkcm9jay5hbWF6b25hd3MuY29t"
 GITHUB_TOKEN="ghp_$(printf '%s' "$SEED" | sha256sum | cut -c1-36)"
+CHROME_KEY="MIIEvgIBADANBgkqhkiG9w0BAQEFAASC$(printf '%s' "$SEED-key" | sha256sum | cut -c1-40)"
 run_cases "$image" "$repo/scripts/agent-image-gitleaks.toml"

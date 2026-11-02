@@ -436,7 +436,7 @@ let
             "op-connect": {
               "env": {
                 "OP_CONNECT_HOST": "https://op-connect.imp.internal",
-                "OP_CONNECT_TOKEN": "imp-broker-placeholder"
+                "OP_CONNECT_TOKEN": "broker-placeholder"
               },
               "header": "authorization",
               "host": "op-connect.imp.internal",
@@ -446,13 +446,12 @@ let
           },
           "defaultTarget": "geoffcloud",
           "principals": {
-            "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] },
-            "A0XlYU4QYnkWUgXnE20HPQAMskU1fzsX": { "targets": ["geoffcloud"] }
+            "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] }
           },
           "targets": {
             "geoffcloud": {
               "guestATC": "/usr/local/bin/atc",
-              "image": "agent-55e2666",
+              "image": "agent-da7d870",
               "impPrefix": "harness-",
               "provider": "imp",
               "tokenFile": "/run/credentials/atc-daemon.service/imp-token",

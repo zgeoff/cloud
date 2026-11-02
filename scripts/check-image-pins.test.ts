@@ -458,6 +458,51 @@ test('it skips an imp agent image name, which impd holds and no registry does', 
   );
 });
 
+test('it skips an image placeholder that a runbook fills in before it creates the manifest', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, 'deploy', 'nixie', 'restore-job.yaml'),
+    '        - name: restore\n          image: NIXIE_IMAGE\n',
+  );
+
+  const exitCode = await checkImagePins({
+    args: [ctx.root],
+    run: ctx.stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(0);
+  expect(ctx.printErr).not.toHaveBeenCalled();
+
+  expect(ctx.printOut).toHaveBeenCalledExactlyOnceWith(
+    'check-image-pins: 0 pins hold: 0 release tags name their pinned digests, and 0 upstream digests are still served\n',
+  );
+});
+
+test('it fails a lowercase image name without a digest, which a placeholder never is', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, 'deploy', 'nixie', 'restore-job.yaml'),
+    '          image: nixie_image\n',
+  );
+
+  const exitCode = await checkImagePins({
+    args: [ctx.root],
+    run: ctx.stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    'check-image-pins: deploy/nixie/restore-job.yaml:1: nixie_image pins no digest\n',
+  );
+});
+
 test('it fails an agent- name that is not a short sha, without a digest', async () => {
   const ctx = await setupTest();
 

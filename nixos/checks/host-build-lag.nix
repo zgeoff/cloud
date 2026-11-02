@@ -239,7 +239,7 @@ let
       '';
     }
     {
-      title = "it reports no lag and drops the lag state for a host that runs the latest green build";
+      title = "it reports no lag and drops the lag state for a host that runs the latest green build, even when its mounts predate the imp-host container";
       script = ''
         ${setupTest}
         ${writeGitHub null}
@@ -248,6 +248,7 @@ let
         printf '%s\n' "${running} $PWD/store/aaaa-nixos-system-geoffcloud" \
           "${green} $PWD/store/bbbb-nixos-system-geoffcloud" > state/switches
         echo 2.3.0 > impd/version
+        touch impd/stale-view
         echo "$PWD/store/aaaa-nixos-system-geoffcloud 1000" > state/system-lag
         echo "2.2.1 1000" > state/imp-lag
 
@@ -265,7 +266,7 @@ let
         ${metrics "0" "0"}
         EOF
         assert_equals switches "$(ls -A state)" "the state directory"
-        assert_equals '["exec","imp-host","impz","info"]' "$(cat impd/calls)" "the podman calls"
+        assert_equals '["exec","-e","HOME=/root","imp-host","impz","info"]' "$(cat impd/calls)" "the podman calls"
       '';
     }
     {

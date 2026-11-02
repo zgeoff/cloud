@@ -13,8 +13,9 @@
 # commit: the run leaves no record, exits 0 and names both container IDs, and the next run builds
 # the commit again. So does a run whose imp-host has no container once impd listed its images.
 #
-# To build, it copies imp's CLI out of the imp-host container, so the CLI always matches the impd it
-# calls, checks out main's head, and runs that head's scripts/build-agent-image.ts for the commit,
+# To build, it copies imp's CLI out of the imp-host container with its mode, so the CLI always
+# matches the impd it calls, checks out main's head, and runs that head's
+# scripts/build-agent-image.ts for the commit,
 # with $STATE_DIR/bin first on PATH and impd's token from $CREDENTIALS_DIRECTORY/imp-token in
 # IMP_TOKEN, never in an argv. The build prints its progress to stderr and its result line, such as
 # "agent-0123abc <digest> check passed", on stdout; the script prints that line after
@@ -51,7 +52,9 @@ err=$(mktemp)
 trap 'rm -f "$err"' EXIT
 try=1
 last=
-until images=$("$PODMAN" exec imp-host impz image ls --json 2> "$err"); do
+# root's home in imp-host, where impz finds impd's token: Podman reads a default HOME through this
+# unit's mounts, which a mount namespace from before imp-host's container started leaves empty
+until images=$("$PODMAN" exec -e HOME=/root imp-host impz image ls --json 2> "$err"); do
   if [ "$try" -ge "$tries" ]; then
     echo "agent-image-build: impd listed no images after $tries tries: $(cat "$err"); the next run tries again"
     exit 0
@@ -85,10 +88,16 @@ if [ "$container" = none ]; then
   exit 0
 fi
 mkdir -p "$STATE_DIR/bin"
-if ! "$PODMAN" cp "imp-host:$impz_in_container" "$STATE_DIR/bin/impz"; then
+# read in the container, not with podman cp, which reads through this unit's mounts, where a mount
+# namespace made before imp-host's container started shows none of the container's files
+if ! mode=$("$PODMAN" exec imp-host stat -c %a "$impz_in_container") ||
+  ! "$PODMAN" exec imp-host cat "$impz_in_container" > "$STATE_DIR/bin/impz.new"; then
+  rm -f "$STATE_DIR/bin/impz.new"
   leave_if_imp_host_changed "the copy of imp's CLI failed"
   exit 1
 fi
+chmod "$mode" "$STATE_DIR/bin/impz.new"
+mv "$STATE_DIR/bin/impz.new" "$STATE_DIR/bin/impz"
 git -C "$clone" checkout -q -f --detach origin/main
 token=$(cat "$CREDENTIALS_DIRECTORY/imp-token")
 

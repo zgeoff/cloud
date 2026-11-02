@@ -6,6 +6,7 @@ line budget: the total follows from the doc list.
 | Folder               | Holds                                                                     |
 | -------------------- | ------------------------------------------------------------------------- |
 | `docs/README.md`     | the index                                                                 |
+| `docs/vision.md`     | what the project is for, as [The vision doc](#the-vision-doc) shapes it   |
 | `docs/architecture/` | how the built system works, one doc per concept, with an overview         |
 | `docs/guides/`       | the steps a user does, one doc per user task                              |
 | `docs/runbooks/`     | operator and contributor procedures, development and releasing included   |
@@ -26,7 +27,7 @@ links `docs/reference/` once.
 - **A doc stays under 250 lines, and a runbook under 300.** Past the cap, cut points first, then
   split at a concept boundary. When the doc is still over, say so in the PR body. Never compress
   sentences to fit, never move the overflow into a README or code comments, and never split where
-  the concept has no boundary. `check-length.sh` warns on a doc over its cap.
+  the concept has no boundary. `chex length` warns on a doc over its cap.
 - **A design lives in `docs/design/<work>/`** while its code is unbuilt, with any spikes as runnable
   packages in `docs/design/<work>/spikes/<name>/` or wherever the repo's project skill keeps them.
   Each spike takes the structure in [Spikes](#spikes). A plan for work about to be built is no
@@ -40,8 +41,28 @@ links `docs/reference/` once.
   only when a new decision is made.
 - **Development and releasing live in runbooks.** `docs/runbooks/development.md` holds the
   contributor setup; `docs/runbooks/releasing.md` holds only the steps the release tooling doesn't
-  do, and is deleted when none remain. A folder README that documents its own folder stays beside
-  it.
+  do, and is deleted when none remain. A README stays beside the code only as one of the
+  [five kinds](./readmes.md#the-five-kinds-of-readme), such as a package's README beside its
+  `package.json`.
+
+## The vision doc
+
+`docs/vision.md` holds what the project is for. The README and the architecture docs cover what the
+code does and how it works, and neither holds the project's purpose. A design for a change in the
+repo starts from the vision doc, so the doc states each choice in a form that a design can quote. It
+holds these sections, in this order:
+
+1. An H1 with the project's name and one sentence on what the project is for.
+2. `## Goals`: what the project sets out to do, as bullets.
+3. `## Non-goals`: what the project leaves out on purpose, each with the reason in the same bullet.
+4. `## Who it serves`: the people or systems that use the project, and what each one needs from it.
+5. `## Trade-offs`: each trade-off the project makes, as what it gives up and what it gets for it.
+6. `## Current stage`: how far the project is from its goals, in 1 to 3 sentences.
+
+The doc fits one page: 60 lines at most. Write each goal as an outcome, never as a mechanism, which
+the architecture docs own. When the project changes direction, rewrite the section the change made
+false, as every other doc does. A repo whose `check:docs` script names `chex vision` fails its doc
+checks when its vision doc is missing or over 60 lines.
 
 ## Spikes
 
@@ -69,6 +90,6 @@ The README holds these sections, in this order:
 6. `## Untested`: 1 to 2 lines, with a link to the `## Untested` section of `results.md`.
 
 A spike that only reads sources, with no code, leaves out `Run it`. No other file in a spike is
-named `README.md`, because `check-length.sh` holds every README to a README limit. `results.md` and
-the spike's other files have no line cap, even under `docs/design/`, and `check-prose.sh` and
-`check-links.sh` read `results.md` wherever the spike sits.
+named `README.md`, because `chex length` holds every README to a README limit. `results.md` and the
+spike's other files have no line cap, even under `docs/design/`, and `chex prose` and `chex links`
+read `results.md` wherever the spike sits.

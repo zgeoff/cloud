@@ -1,7 +1,9 @@
 name: files image
 
 # Builds the files service's image and runs its image test on every push to main that changes the
-# service or the image, then publishes it as ghcr.io/zgeoff/cloud-files:<commit>. CI's checks job
+# service or the image, then publishes it as ghcr.io/zgeoff/cloud-files:<commit>. A newer push
+# cancels an older run's image test, and that run publishes nothing, since the newer commit's image
+# holds its changes. CI's checks job
 # runs the image test on a pull request, which never publishes. Pin a published digest in the stack
 # config's files.image to deploy it.
 on:
@@ -26,6 +28,9 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    concurrency:
+      group: files-image-check-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -42,6 +47,7 @@ jobs:
         run: bun run test:files-image
 
   publish:
+    name: Release the image
     needs: [check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest

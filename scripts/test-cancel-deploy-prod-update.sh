@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Test for cancel-deploy-prod-update.sh: while the run holds the prod lock, it runs
+# Test for cancel-deploy-prod-update.sh: after the cancel stopped the refresh or the apply, and
+# while the run holds the prod lock, it runs
 # `op run --env-file=../.env -- pulumi cancel --stack prod --yes` in the program checkout's infra/
 # and passes pulumi's status through, a lease that ran out with no takeover included; it cancels
 # nothing and exits 3 when a drift check holds the prod lock, and exits 1 when kubectl fails; it
-# does nothing when the job never wrote the kubeconfig; and it refuses a missing input.
+# does nothing when the cancel stopped neither step or the job never wrote the kubeconfig; and it
+# refuses a missing input.
 #
 # kubectl is create-stub-kubectl.sh, whose store holds the Lease, and op is
 # create-stub-scripted-command.sh, which logs each call's working directory, argv and the token it
@@ -34,7 +36,7 @@ EOF
   printf "The currently running update for 'prod' has been canceled!\n" > "$tree/op-answers/1.out"
 
   (cd "$tree/runner" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    STUB_LOG_ENV=OP_SERVICE_ACCOUNT_TOKEN RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" \
+    STUB_LOG_ENV=OP_SERVICE_ACCOUNT_TOKEN APPLY_OUTCOME=cancelled RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" \
     PROGRAM=program OP_SERVICE_ACCOUNT_TOKEN=example-op-token bash "$script") \
     > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -57,7 +59,7 @@ EOF
   echo 255 > "$tree/op-answers/1.status"
 
   (cd "$tree/runner" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" PROGRAM=program \
+    APPLY_OUTCOME=cancelled RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" PROGRAM=program \
     OP_SERVICE_ACCOUNT_TOKEN=example-op-token bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -78,7 +80,7 @@ it_cancels_nothing_while_a_drift_check_holds_the_prod_lock() {
 EOF
 
   (cd "$tree/runner" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" PROGRAM=program \
+    APPLY_OUTCOME=cancelled RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" PROGRAM=program \
     OP_SERVICE_ACCOUNT_TOKEN=example-op-token bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -101,7 +103,7 @@ EOF
   printf "The currently running update for 'prod' has been canceled!\n" > "$tree/op-answers/1.out"
 
   (cd "$tree/runner" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" PROGRAM=program \
+    REFRESH_OUTCOME=cancelled RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" PROGRAM=program \
     OP_SERVICE_ACCOUNT_TOKEN=example-op-token bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< "The currently running update for 'prod' has been canceled!"
@@ -118,7 +120,7 @@ it_cancels_nothing_and_exits_1_with_kubectl_s_error_when_the_api_refuses_the_rea
   echo 'system:serviceaccount:example-ns:example-account' > "$tree/store/forbidden"
 
   (cd "$tree/runner" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" PROGRAM=program \
+    APPLY_OUTCOME=cancelled RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" PROGRAM=program \
     OP_SERVICE_ACCOUNT_TOKEN=example-op-token bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -127,13 +129,49 @@ it_cancels_nothing_and_exits_1_with_kubectl_s_error_when_the_api_refuses_the_rea
   assert_status 1 "$status"
 }
 
+it_cancels_nothing_when_the_apply_failed_and_the_cancel_came_after() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  printf 'apiVersion: v1\nkind: Config\n' > "$tree/runner/kubeconfig"
+
+  (cd "$tree/runner" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    REFRESH_OUTCOME=success APPLY_OUTCOME=failure RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" \
+    PROGRAM=program OP_SERVICE_ACCOUNT_TOKEN=example-op-token bash "$script") \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'cancel-deploy-prod-update: the cancel stopped neither the refresh nor the apply, so no update of this run holds the Pulumi lock'
+  diff /dev/null "$tree/kubectl-calls"
+  diff /dev/null "$tree/op-calls"
+  assert_status 0 "$status"
+}
+
+it_cancels_nothing_when_the_cancel_came_before_the_refresh() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  printf 'apiVersion: v1\nkind: Config\n' > "$tree/runner/kubeconfig"
+
+  (cd "$tree/runner" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    REFRESH_OUTCOME=skipped APPLY_OUTCOME=skipped RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" \
+    PROGRAM=program OP_SERVICE_ACCOUNT_TOKEN=example-op-token bash "$script") \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'cancel-deploy-prod-update: the cancel stopped neither the refresh nor the apply, so no update of this run holds the Pulumi lock'
+  diff /dev/null "$tree/kubectl-calls"
+  diff /dev/null "$tree/op-calls"
+  assert_status 0 "$status"
+}
+
 it_does_nothing_when_the_job_never_wrote_the_kubeconfig() {
   local status=0
   create_case_tree
   setup_test "$tree"
 
   (cd "$tree/runner" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" PROGRAM=program \
+    APPLY_OUTCOME=cancelled RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" PROGRAM=program \
     OP_SERVICE_ACCOUNT_TOKEN=example-op-token bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -150,7 +188,7 @@ it_refuses_to_run_without_the_program_checkout() {
   printf 'apiVersion: v1\nkind: Config\n' > "$tree/runner/kubeconfig"
 
   (cd "$tree/runner" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" OP_SERVICE_ACCOUNT_TOKEN=example-op-token \
+    APPLY_OUTCOME=cancelled RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" OP_SERVICE_ACCOUNT_TOKEN=example-op-token \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"

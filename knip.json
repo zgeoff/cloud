@@ -27,7 +27,7 @@
     },
     ".": {
       "entry": ["scripts/build-agent-image.ts", "scripts/test-utils/run-stub-kubectl-proxy.ts"],
-      "project": ["scripts/**/*.ts", "integration/**/*.ts", "e2e/**/*.ts"]
+      "project": ["scripts/**/*.ts", "e2e/**/*.ts"]
     }
   },
   "ignoreDependencies": ["@stylistic/eslint-plugin", "@zgeoff/oxlint-config", "@zgeoff/skill-gate"],

@@ -131,7 +131,7 @@
       }
     ]
   },
-  "ignorePatterns": ["sdk/**", "provider/**", ".claude/**", "scripts/nixie-api/openapi.d.ts"],
+  "ignorePatterns": ["sdk/**", "provider/**", ".claude/**"],
   "overrides": [
     {
       "files": ["infra/**/*.ts", "workers/**/*.ts"],

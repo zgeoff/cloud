@@ -43,7 +43,7 @@ provider and the NixOS checks each have a reference.
 
 | Suite                                                     | Command                             | Runs in CI                                                     |
 | --------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------- |
-| TypeScript tests in `infra/`, `scripts/` and `integration/` | `bun run test`                      | `CI` → `checks`                                                |
+| TypeScript tests in `infra/` and `scripts/`               | `bun run test`                      | `CI` → `checks`                                                |
 | TypeScript journeys in `e2e/`                             | `bun run test:e2e`                  | `CI` → `checks`                                                |
 | The health-check Worker's tests                           | `bun run test:health-check`         | `CI` → `checks`                                                |
 | Go tests in `provider/`                                   | `bun run provider:check`            | `CI` → `checks`, if `provider/` changed                        |
@@ -83,12 +83,13 @@ provider and the NixOS checks each have a reference.
 
 ## Lanes in this repo
 
-The unit run, `bun run test`, holds `infra/`, `scripts/` and `integration/`, under the shared 5 s
-rule. `integration/` holds one flow across several scripts in process, such as
-[`deploy-prod.test.ts`](../../../integration/deploy-prod.test.ts), which runs the workflow's own
-steps against stand-ins. A check of config, such as which events start a workflow, is a script
-that `lint:actions` runs, as
-[`check-workflow-triggers.ts`](../../../scripts/check-workflow-triggers.ts) is, never a test.
+The unit run, `bun run test`, holds `infra/` and `scripts/`, under the shared 5 s rule. A
+workflow step's logic is tested through the script the step calls, as the testing skill's
+[workflows reference](../testing/references/workflows.md) describes. Only two checks read a
+workflow: the shared workflow lint, which
+[`run-workflow-lint.ts`](../../../scripts/workflows/run-workflow-lint.ts) runs at the zgeoff/tools
+tag that the repo-sync caller pins, and the repo fact check
+[`check-topology.ts`](../../../scripts/check-topology.ts).
 
 Each lane below needs a real system that the unit run cannot host, or tests a process from outside.
 

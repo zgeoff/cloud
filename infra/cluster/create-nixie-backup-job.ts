@@ -7,17 +7,24 @@ import type { Output } from '@pulumi/pulumi';
 import type { NixieBackupInputs } from '../inputs/index.ts';
 import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
 import { buildNixieBackupPodSpec } from './build-nixie-backup-pod-spec.ts';
+import { nixieConfigKey } from './build-nixie-spec.ts';
 import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
 
 interface NixieBackupJobInputs {
   readonly namespace: Output<string>;
   readonly statefulSet: StatefulSet;
+
+  // the image and the rendered config of the running nixie, whose backup command copies its data
+  readonly nixieImage: string;
+  readonly config: string;
+
   readonly backup: NixieBackupInputs;
 }
 
 export function createNixieBackupJob(cluster: Provider, inputs: NixieBackupJobInputs): CronJob {
   const env = createEnvSecret(cluster, inputs);
   const script = createScriptConfigMap(cluster, inputs.namespace);
+  const config = createConfigMap(cluster, inputs);
 
   const pull = createGHCRPullSecret(cluster, {
     resourceName: 'nixie-ghcr-pull',
@@ -41,12 +48,14 @@ export function createNixieBackupJob(cluster: Provider, inputs: NixieBackupJobIn
             template: {
               spec: buildNixieBackupPodSpec({
                 image: inputs.backup.image,
+                nixieImage: inputs.nixieImage,
 
                 // one node, so ReadWriteOnce allows the claim beside nixie
                 claim: 'data-nixie-0',
 
                 // fixed names, unlike nixie's own, because the restore Job's YAML names them
                 scriptConfigMap: 'nixie-backup-script',
+                configMap: 'nixie-backup-config',
                 envSecret: 'nixie-backup',
                 pullSecret: ghcrPullSecretName,
               }),
@@ -55,7 +64,7 @@ export function createNixieBackupJob(cluster: Provider, inputs: NixieBackupJobIn
         },
       },
     },
-    { provider: cluster, dependsOn: [env, script, pull, inputs.statefulSet] },
+    { provider: cluster, dependsOn: [env, script, config, pull, inputs.statefulSet] },
   );
 }
 
@@ -88,6 +97,18 @@ function createScriptConfigMap(cluster: Provider, namespace: Output<string>): Co
           'utf8',
         ),
       },
+    },
+    { provider: cluster },
+  );
+}
+
+function createConfigMap(cluster: Provider, inputs: NixieBackupJobInputs): ConfigMap {
+  return new ConfigMap(
+    'nixie-backup-config',
+    {
+      // a fixed name, as on the script, because the restore Job's YAML names it
+      metadata: { name: 'nixie-backup-config', namespace: inputs.namespace },
+      data: { [nixieConfigKey]: inputs.config },
     },
     { provider: cluster },
   );

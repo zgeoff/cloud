@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'bun:test';
 import { server } from '../mocks/node.ts';
 import { buildRealProgramHandler } from '../test-utils/build-real-program-handler.ts';
-import { buildStubNixieAPIContract } from '../test-utils/build-stub-nixie-api-contract.ts';
+import { buildStubBunInstall } from '../test-utils/build-stub-bun-install.ts';
 import { buildStubNPMRegistry } from '../test-utils/build-stub-npm-registry.ts';
 import { buildStubReleaseDocker } from '../test-utils/build-stub-release-docker.ts';
 import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
@@ -240,12 +240,15 @@ test('it flags a nixie bump with the migrations of a release between', async () 
   const checkout = await createCloudCheckout({
     'scripts/release/release-pins.json': '{}\n',
     'infra/Pulumi.prod.yaml': `  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
-    'scripts/nixie-api/openapi.json': '{"info":{"version":"v0.7.0"}}\n',
-    'scripts/nixie-api/openapi.d.ts': '// nixie v0.7.0\n',
+    'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
+    'bun.lock':
+      '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
   });
 
   const stub = buildStubRunner(
-    buildStubNixieAPIContract({}),
+    buildStubBunInstall({
+      lock: '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.2", "", {}, "sha512-new"],\n  },\n}\n',
+    }),
     buildStubReleaseGH({
       releases: {
         'zgeoff/nixie': [
@@ -271,7 +274,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
 
   const status = await runReleaseBump(
     { cwd: checkout.clone, env: checkout.env, run: stub.run, ...ctx },
-    ['nixie', '0.7.2', '0.7.0', '0.7.0'],
+    ['nixie', '0.7.2', '0.7.0', '0.7.0', '0.7.0'],
   );
 
   const stat = await checkout.git([
@@ -282,26 +285,26 @@ test('it flags a nixie bump with the migrations of a release between', async () 
     'release-check/nixie',
   ]);
 
-  const contract = await checkout.git([
+  const manifest = await checkout.git([
     `--git-dir=${checkout.origin}`,
     'show',
-    'release-check/nixie:scripts/nixie-api/openapi.json',
+    'release-check/nixie:package.json',
   ]);
 
   expect(status).toBe(0);
 
   expect(ctx.printOut.mock.calls).toStrictEqual([
-    ['pinned nixie 0.7.2\npinned nixie-web 0.7.2\n'],
+    ['pinned nixie 0.7.2\npinned nixie-web 0.7.2\npinned nixie-contract 0.7.2\n'],
     ['https://github.com/zgeoff/cloud/pull/200\n'],
   ]);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([]);
 
   expect(stat).toBe(
-    'infra/Pulumi.prod.yaml            |  4 ++--\n scripts/nixie-api/openapi.d.ts    |  2 +-\n scripts/nixie-api/openapi.json    |  2 +-\n scripts/release/release-pins.json | 11 ++++++++++-\n 4 files changed, 14 insertions(+), 5 deletions(-)',
+    'bun.lock                          |  2 +-\n infra/Pulumi.prod.yaml            |  4 ++--\n package.json                      |  2 +-\n scripts/release/release-pins.json | 14 +++++++++++++-\n 4 files changed, 17 insertions(+), 5 deletions(-)',
   );
 
-  expect(contract).toBe('{"info":{"version":"v0.7.2"}}');
+  expect(manifest).toBe('{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.2"\n  }\n}');
 
   expect(
     stub.calls
@@ -315,7 +318,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
     ['gh release view v0.7.0 -R zgeoff/nixie --json body', ''],
     ['gh release view v0.7.2 -R zgeoff/nixie --json body', ''],
     ['gh release view v0.7.1 -R zgeoff/nixie --json body', ''],
-    [`bun ${checkout.clone}/scripts/nixie-api/write-nixie-api-contract.ts v0.7.2`, ''],
+    ['bun install --lockfile-only', ''],
     [
       'gh pr list --repo zgeoff/cloud --head release-check/nixie --state open --json number,url,autoMergeRequest,labels,headRefOid,isCrossRepository',
       '',
@@ -334,7 +337,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
     ],
     [
       'gh pr create --repo zgeoff/cloud --base main --head release-check/nixie --title chore(nixie): bump nixie to 0.7.2 --body-file - --label update:patch,migrations,needs-review',
-      'Bumps nixie to [0.7.2](https://github.com/zgeoff/nixie/releases/tag/v0.7.2). The release check opened this pull request.\n\n| Pin | From | To |\n| --- | --- | --- |\n| nixie (`infra/Pulumi.prod.yaml`) | 0.7.0 | 0.7.2 |\n| nixie-web (`infra/Pulumi.prod.yaml`) | 0.7.0 | 0.7.2 |\n\nIt waits for a review, because:\n\n- a release in the bump adds database migrations, which a revert does not undo.\n\nAfter the merge: The `Deploy prod` workflow applies the stack config once CI passes on main, unless its guard holds the plan (`docs/runbooks/prod-apply.md`). Check the deploy (`docs/runbooks/nixie.md`).\n',
+      'Bumps nixie to [0.7.2](https://github.com/zgeoff/nixie/releases/tag/v0.7.2). The release check opened this pull request.\n\n| Pin | From | To |\n| --- | --- | --- |\n| nixie (`infra/Pulumi.prod.yaml`) | 0.7.0 | 0.7.2 |\n| nixie-web (`infra/Pulumi.prod.yaml`) | 0.7.0 | 0.7.2 |\n| the nixie contract package (`package.json`) | 0.7.0 | 0.7.2 |\n\nIt waits for a review, because:\n\n- a release in the bump adds database migrations, which a revert does not undo.\n\nAfter the merge: The `Deploy prod` workflow applies the stack config once CI passes on main, unless its guard holds the plan (`docs/runbooks/prod-apply.md`). Check the deploy (`docs/runbooks/nixie.md`).\n',
     ],
   ]);
 });
@@ -583,7 +586,7 @@ test('it fails without a pull request when the release list misses the pinned re
 
   const status = await runReleaseBump(
     { cwd: '/nonexistent/clone', env: {}, run: stub.run, ...ctx },
-    ['nixie', '0.7.2', '0.5.0', '0.5.0'],
+    ['nixie', '0.7.2', '0.5.0', '0.5.0', '0.5.0'],
   );
 
   expect(status).toBe(1);

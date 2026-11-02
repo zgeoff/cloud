@@ -266,7 +266,7 @@ in
     backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
     # pinned by digest: the module's default names only its release's tag, which a later push
     # could move
-    image = "ghcr.io/zgeoff/imp-host:6.1.0@sha256:37e06b3a3df6709982117046be71826df9bf0f64096ac8ca7e7d951190c2150c";
+    image = "ghcr.io/zgeoff/imp-host:6.3.2@sha256:e18de30479ec9b7e689497bcaed92b3a5ef7405c66c7458dc68f6a555cf9c55a";
     # the module's default ("imp") is taken in the tailnet
     settings.IMP_TAILSCALE_HOSTNAME = topology.tailnet.nodes.imp.hostname;
     # HTTPS on the tailnet only (imp#16): imps at <name>.imps.geoff.cloud, impd's API at
@@ -423,7 +423,7 @@ in
       impPrefix = "harness-";
       # the agent image (docs/runbooks/agent-image.md) built from the commit that pins this
       # daemon's atc release, so hooks run the image's atc and no spawn copies the daemon's in
-      image = "agent-55e2666";
+      image = "agent-da7d870";
       guestATC = "/usr/local/bin/atc";
     };
     defaultTarget = "geoffcloud";
@@ -451,7 +451,7 @@ in
         scheme = "bearer";
         env = {
           OP_CONNECT_HOST = "https://op-connect.imp.internal";
-          OP_CONNECT_TOKEN = "imp-broker-placeholder";
+          OP_CONNECT_TOKEN = "broker-placeholder";
         };
       };
     };
@@ -475,8 +475,6 @@ in
     principals = {
       # ChatGPT's connector, added 2026-10-04
       "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY".targets = [ "geoffcloud" ];
-      # a temporary Claude Code client for the gateway smoke spawn, added 2026-10-29
-      "A0XlYU4QYnkWUgXnE20HPQAMskU1fzsX".targets = [ "geoffcloud" ];
     };
   };
 
@@ -529,7 +527,7 @@ in
     contractRepos = [ "zgeoff/nixie" ];
     contractModelSecret = "preview-model";
     # the imp-base release that images/agent/Dockerfile builds on; the imp release pin moves both
-    impRegistryImage = "ghcr.io/zgeoff/imp-base:6.1.0@sha256:a2c8c66662a25602df2a8998eab39a52f6888343096c8e52ff3f9eed2c39f78a";
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:6.3.2@sha256:0bd114a1f8d1d635b547cf355a0de4073f2ae2ad1d2bafc41dfc15de13ca3897";
     webhookSecretFile = "/var/lib/tank-cloud/host-secrets/preview/webhook-secret";
     githubAppClientIDFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-client-id";
     githubAppKeyFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-key";

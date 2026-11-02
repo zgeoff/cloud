@@ -75,7 +75,9 @@ if [ -z "$green_imp" ]; then
   echo "host-build-lag: no imp-host image in configuration.nix at $green" >&2
   exit 1
 fi
-running_imp=$("$PODMAN" exec imp-host impz info | sed -n 's/^version  *//p') || running_imp=""
+# root's home in imp-host, where impz finds impd's token: Podman reads a default HOME through this
+# unit's mounts, which a mount namespace from before imp-host's container started leaves empty
+running_imp=$("$PODMAN" exec -e HOME=/root imp-host impz info | sed -n 's/^version  *//p') || running_imp=""
 if [ -n "$running_imp" ] && [ "$running_imp" = "$green_imp" ]; then
   imp_lags=0
 else

@@ -1,0 +1,7 @@
+#!/bin/sh
+# Starts the image's Chrome for Testing. Chrome exits at startup when it runs as root without
+# --no-sandbox, and an imp session runs as root, so the script adds the flag for root only.
+if [ "$(id -u)" = 0 ]; then
+  exec /opt/chrome/chrome --no-sandbox "$@"
+fi
+exec /opt/chrome/chrome "$@"

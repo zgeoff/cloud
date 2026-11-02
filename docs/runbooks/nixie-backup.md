@@ -1,14 +1,15 @@
 # nixie's backup
 
-The `nixie-backup` CronJob backs up `nixie.db` and `keys.db` every night with restic, encrypted on
-the cluster, to the repository `s3:<endpoint>/geoff-cloud-nixie/nixie` in R2. It copies each
-database with `sqlite3 .backup` while nixie runs, checks each copy with `PRAGMA integrity_check`,
-and uploads nothing else from the volume. It copies `nixie.db` before `keys.db`, and copies both
-again when nixie committed to `keys.db` from before the first copy to after the second, as
-`PRAGMA data_version` on one connection shows. So a snapshot never holds an item without its key
-unless it also holds the item's forget. The vault items `nixie-restic` and `r2-nixie-backup` hold
-the repository's password and R2 key. [nixie](./nixie.md#restore-from-a-backup) gives a real
-restore.
+The `nixie-backup` CronJob backs up nixie's data every night with restic, encrypted on the cluster,
+to the repository `s3:<endpoint>/geoff-cloud-nixie/nixie` in R2. Its first container runs nixie's
+own `nixie backup` command, from the running nixie's image, against nixie's volume while nixie runs.
+The command writes a matching copy of nixie's databases into a directory the pod shares, and restic
+uploads that directory and nothing else. Only nixie's command opens nixie's files, and
+[nixie's host commands](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/host-commands.md#backup-and-restore)
+describe how it keeps the two databases matched. The restore Job runs the same two steps in reverse:
+restic restores a snapshot into the shared directory, and `nixie restore` replaces nixie's databases
+with it. The vault items `nixie-restic` and `r2-nixie-backup` hold the repository's password and R2
+key. [nixie](./nixie.md#restore-from-a-backup) gives a real restore.
 
 ## Back up now
 
@@ -63,28 +64,29 @@ the live nixie keeps running. The second nixie has impd's address pointed at a d
 its recovery would otherwise remove the live nixie's sandboxes. It opens both databases, runs its
 migrations and integrity check, and listens, but never turns ready.
 
-1. Create the scratch claim, and restore into it with `claimName: nixie-restore-check` in
-   `deploy/nixie/restore-job.yaml`:
+1. Create the scratch claim, and restore into it with `claimName: nixie-restore-check` and the live
+   pod's image in `deploy/nixie/restore-job.yaml`:
 
    ```bash
    ssh root@geoffcloud k3s kubectl create -f - < deploy/nixie/restore-check-claim.yaml
-   sed 's/claimName: data-nixie-0/claimName: nixie-restore-check/' deploy/nixie/restore-job.yaml \
-     | ssh root@geoffcloud k3s kubectl create -f -
+   image=$(ssh root@geoffcloud 'k3s kubectl -n nixie get pod nixie-0 -o "jsonpath={.spec.containers[?(@.name==\"nixie\")].image}"')
+   sed -e 's/claimName: data-nixie-0/claimName: nixie-restore-check/' -e "s#NIXIE_IMAGE#$image#" \
+     deploy/nixie/restore-job.yaml | ssh root@geoffcloud k3s kubectl create -f -
+   ssh root@geoffcloud k3s kubectl -n nixie logs job/<job-name> -c restore
    ```
 
-   Expect both `integrity_check ok` lines in the Job's log.
+   Expect `nixie restored nixie.db and keys.db from /tmp/nixie-backup`.
 
-2. Start the scratch nixie, with the live pod's config, image and Secret. The config is the live
-   ConfigMap's, because infra adds its `imp` section from `packages/topology`, with impd's URL
-   pointed at a dead port. ssh joins its arguments into one remote command, so each command quotes
-   the whole of it, JSONPath included:
+2. Start the scratch nixie, with the live pod's config, the image of step 1, and the live Secret.
+   The config is the live ConfigMap's, because infra adds its `imp` section from
+   `packages/topology`, with impd's URL pointed at a dead port. ssh joins its arguments into one
+   remote command, so each command quotes the whole of it, JSONPath included:
 
    ```bash
    config=$(ssh root@geoffcloud 'k3s kubectl -n nixie get pod nixie-0 -o "jsonpath={.spec.volumes[?(@.name==\"config\")].configMap.name}"')
    ssh root@geoffcloud "k3s kubectl -n nixie get configmap $config -o 'jsonpath={.data.config\.yaml}'" \
      | sed 's#"url":"https://imps.geoff.cloud"#"url":"http://127.0.0.1:1"#' \
      | ssh root@geoffcloud k3s kubectl -n nixie create configmap nixie-restore-check --from-file=config.yaml=/dev/stdin
-   image=$(ssh root@geoffcloud 'k3s kubectl -n nixie get pod nixie-0 -o "jsonpath={.spec.containers[?(@.name==\"nixie\")].image}"')
    secrets=$(ssh root@geoffcloud 'k3s kubectl -n nixie get pod nixie-0 -o "jsonpath={.spec.volumes[?(@.name==\"secrets\")].secret.secretName}"')
    sed -e "s#NIXIE_IMAGE#$image#" -e "s#NIXIE_SECRETS#$secrets#" deploy/nixie/restore-check-pod.yaml \
      | ssh root@geoffcloud k3s kubectl create -f -

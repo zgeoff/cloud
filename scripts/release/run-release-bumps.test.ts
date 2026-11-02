@@ -25,6 +25,7 @@ test('it runs each bump in its own group from a clean tree', async () => {
         'atc-gateway': { version: '4.3.0', sum: '5'.repeat(64), tag: '4.3.0' },
         nixie: { version: '0.7.0', digest: `sha256:${'a'.repeat(64)}` },
         'nixie-web': { version: '0.7.0', digest: `sha256:${'b'.repeat(64)}` },
+        'nixie-contract': { version: '0.7.0' },
       },
       null,
       2,
@@ -33,6 +34,7 @@ test('it runs each bump in its own group from a clean tree', async () => {
     'nixos/packages/atc.nix': `  version = "4.3.0";\n  sha256 = "${'4'.repeat(64)}";\n`,
     'images/atc-gateway/versions.env': `ATC_RELEASE=@zgeoff/atc@4.3.0\nATC_ASSET=atc-gateway-linux-x64\nATC_ASSET_SHA256=${'5'.repeat(64)}\nGATEWAY_IMAGE_TAG=4.3.0\n`,
     'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
   });
 
   await Promise.all([
@@ -68,7 +70,7 @@ test('it runs each bump in its own group from a clean tree', async () => {
 
   const status = await runReleaseBumps({
     cwd: checkout.clone,
-    env: { ...checkout.env, BUMPS: 'atc 4.3.0 4.3.0 4.2.0 4.3.0\nnixie 0.7.0 0.6.2 0.6.2\n' },
+    env: { ...checkout.env, BUMPS: 'atc 4.3.0 4.3.0 4.2.0 4.3.0\nnixie 0.7.0 0.6.2 0.6.2 0.6.2\n' },
     run: stub.run,
     ...ctx,
   });
@@ -84,7 +86,7 @@ test('it runs each bump in its own group from a clean tree', async () => {
     ],
     ['::endgroup::\n'],
     ['::group::nixie 0.7.0\n'],
-    ['nixie already pins 0.7.0\nnixie-web already pins 0.7.0\n'],
+    ['nixie already pins 0.7.0\nnixie-web already pins 0.7.0\nnixie-contract already pins 0.7.0\n'],
     ['::endgroup::\n'],
   ]);
 
@@ -100,11 +102,13 @@ test('it runs every bump after a failed one then fails naming it', async () => {
       {
         nixie: { version: '0.7.0', digest: `sha256:${'a'.repeat(64)}` },
         'nixie-web': { version: '0.7.0', digest: `sha256:${'b'.repeat(64)}` },
+        'nixie-contract': { version: '0.7.0' },
       },
       null,
       2,
     )}\n`,
     'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
   });
 
   const stub = buildStubRunner(
@@ -128,7 +132,7 @@ test('it runs every bump after a failed one then fails naming it', async () => {
 
   const status = await runReleaseBumps({
     cwd: checkout.clone,
-    env: { ...checkout.env, BUMPS: 'atc 4.3.0 4.3.0 4.2.0 4.3.0\nnixie 0.7.0 0.6.2 0.6.2\n' },
+    env: { ...checkout.env, BUMPS: 'atc 4.3.0 4.3.0 4.2.0 4.3.0\nnixie 0.7.0 0.6.2 0.6.2 0.6.2\n' },
     run: stub.run,
     ...ctx,
   });
@@ -140,7 +144,7 @@ test('it runs every bump after a failed one then fails naming it', async () => {
     ['::error::the atc bump failed\n'],
     ['::endgroup::\n'],
     ['::group::nixie 0.7.0\n'],
-    ['nixie already pins 0.7.0\nnixie-web already pins 0.7.0\n'],
+    ['nixie already pins 0.7.0\nnixie-web already pins 0.7.0\nnixie-contract already pins 0.7.0\n'],
     ['::endgroup::\n'],
   ]);
 

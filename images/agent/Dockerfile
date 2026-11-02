@@ -11,7 +11,7 @@
 
 # imp-base, pinned to the multi-arch index digest. Check a bump with:
 #   gh attestation verify oci://ghcr.io/zgeoff/imp-base:X.Y.Z --repo zgeoff/impz
-FROM ghcr.io/zgeoff/imp-base:6.1.0@sha256:a2c8c66662a25602df2a8998eab39a52f6888343096c8e52ff3f9eed2c39f78a
+FROM ghcr.io/zgeoff/imp-base:6.3.2@sha256:0bd114a1f8d1d635b547cf355a0de4073f2ae2ad1d2bafc41dfc15de13ca3897
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -85,8 +85,8 @@ ENV DISABLE_UPDATES=1
 # own binary in. The sum is atc-linux-x64's line in the release's SHA256SUMS:
 #   gh release download "@zgeoff/atc@$VERSION" -R zgeoff/atc -p SHA256SUMS -p atc-linux-x64
 #   sha256sum -c --ignore-missing SHA256SUMS
-ARG ATC_VERSION=7.6.0
-ARG ATC_SHA256=5d825c8114b7dcc3457d1988599ed112b5a523ae93003d30d3bbb9525cbff971
+ARG ATC_VERSION=7.7.4
+ARG ATC_SHA256=493aada4b5573995f75f697805f5170a219eb685a033ad93aa913a7348556bda
 RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/atc \
       "https://github.com/zgeoff/atc/releases/download/%40zgeoff/atc%40${ATC_VERSION}/atc-linux-x64" \
  && echo "${ATC_SHA256}  /usr/local/bin/atc" | sha256sum -c - \
@@ -161,11 +161,14 @@ RUN echo "node: downloading" \
 # and the default without one. A repo that moves to a version no pin below
 # names adds a pin here. Each sum is bun-linux-x64.zip's line in the release's
 # SHASUMS256.txt.
-ARG BUN_VERSION=1.4.3
-ARG BUN_SHA256=3e730528d89775f03f87f05c06787c4df4099d0a37f3f252e7b829cb23816e18
-ARG BUN_OLDER_VERSION=1.4.2
-ARG BUN_OLDER_SHA256=36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913
-RUN for pin in "$BUN_VERSION $BUN_SHA256" "$BUN_OLDER_VERSION $BUN_OLDER_SHA256"; do \
+ARG BUN_VERSION=1.4.4
+ARG BUN_SHA256=bf8ccbfb2b0b80159e0f9a6d15c55317add8077534dbc6130a3edb52fccb395c
+ARG BUN_OLDER_VERSION=1.4.3
+ARG BUN_OLDER_SHA256=3e730528d89775f03f87f05c06787c4df4099d0a37f3f252e7b829cb23816e18
+ARG BUN_OLDEST_VERSION=1.3.13
+ARG BUN_OLDEST_SHA256=79c0771fa8b92c33aae41e15a0e0d307ea99d0e2f00317c71c6c53237a78e25a
+RUN for pin in "$BUN_VERSION $BUN_SHA256" "$BUN_OLDER_VERSION $BUN_OLDER_SHA256" \
+      "$BUN_OLDEST_VERSION $BUN_OLDEST_SHA256"; do \
       version=${pin% *} sum=${pin#* } \
    && curl -fsSL ${CURL_RETRY} -o /tmp/bun.zip \
         "https://github.com/oven-sh/bun/releases/download/bun-v${version}/bun-linux-x64.zip" \
@@ -244,8 +247,8 @@ RUN curl -fsSL ${CURL_RETRY} -o /tmp/op.zip \
 # for --plugin-dir. The sum is the tarball's. The release bump (scripts/release/) checks the
 # tarball against npm's dist.integrity, its sha512, and writes this pin:
 #   npm view auto-mode@$VERSION dist.tarball dist.integrity
-ARG AUTO_MODE_VERSION=3.1.5
-ARG AUTO_MODE_SHA256=c3ed8b12722ccbec4d66567eb6c69dd12f367925cc1dbf9688abd310efc9f67e
+ARG AUTO_MODE_VERSION=3.1.6
+ARG AUTO_MODE_SHA256=17e99b36697857a0d6bbcf20bb98a03a5b74c186b522d227e1c801c00766fe14
 RUN curl -fsSL ${CURL_RETRY} -o /tmp/auto-mode.tgz \
       "https://registry.npmjs.org/auto-mode/-/auto-mode-${AUTO_MODE_VERSION}.tgz" \
  && echo "${AUTO_MODE_SHA256}  /tmp/auto-mode.tgz" | sha256sum -c - \
@@ -289,6 +292,75 @@ RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/shfmt \
       "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64" \
  && echo "${SHFMT_SHA256}  /usr/local/bin/shfmt" | sha256sum -c - \
  && chmod 0755 /usr/local/bin/shfmt
+
+# actionlint, which the zgeoff repos' workflow checks run, at the version the
+# zgeoff/tools CI pins. The sum is the linux_amd64 tarball's line in the
+# release's actionlint_<version>_checksums.txt:
+#   gh release download v$VERSION -R rhysd/actionlint -p "actionlint_${VERSION}_checksums.txt"
+ARG ACTIONLINT_VERSION=1.7.12
+ARG ACTIONLINT_SHA256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/actionlint.tar.gz \
+      "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
+ && echo "${ACTIONLINT_SHA256}  /tmp/actionlint.tar.gz" | sha256sum -c - \
+ && tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint \
+ && install -m 0755 /tmp/actionlint /usr/local/bin/actionlint \
+ && rm /tmp/actionlint.tar.gz /tmp/actionlint
+
+# Chrome for Testing, for a repo's browser lanes, which drive Chrome through Bun.WebView as CI's
+# runners do. Ubuntu packages Chromium only as a snap. The library pins hold every library that
+# `ldd /opt/chrome/chrome` lists and imp-base lacks, through their dependencies; Chrome loads GTK
+# only for a window, so headless runs need none. fonts-liberation gives a page its text fonts.
+# Google publishes no sum file, so the sum is taken after the zip's MD5 matches the md5 that
+# Google's storage lists for the object:
+#   V=$VERSION; U=https://storage.googleapis.com/chrome-for-testing-public/$V/linux64/chrome-linux64.zip
+#   curl -fsSI "$U" | grep 'x-goog-hash: md5='
+#   curl -fsSLO "$U" && openssl dgst -md5 -binary chrome-linux64.zip | base64 && sha256sum chrome-linux64.zip
+# A bump reads the stable version from
+# https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json, then checks
+# that the zip's deb.deps names no library the pins below lack.
+ARG CHROME_VERSION=156.0.8078.80
+ARG CHROME_SHA256=b711c720f774be355197f32edf37e0651418ba036d92446ee2da19ac017540a7
+ARG LIBNSS3_VERSION=2:3.98-1ubuntu0.2
+ARG LIBATK_BRIDGE_VERSION=2.52.0-1build1
+ARG LIBCUPS2_VERSION=2.4.7-1.2ubuntu7.14
+ARG LIBGBM1_VERSION=25.2.8-0ubuntu0.24.04.4
+ARG LIBASOUND2_VERSION=1.2.11-1ubuntu0.3
+ARG LIBXKBCOMMON0_VERSION=1.6.0-1build1
+ARG LIBXCOMPOSITE1_VERSION=1:0.4.5-1build3
+ARG LIBXDAMAGE1_VERSION=1:1.1.6-1build1
+ARG LIBXFIXES3_VERSION=1:6.0.0-2build1
+ARG LIBXRANDR2_VERSION=2:1.5.2-2build1
+ARG LIBPANGO_VERSION=1.52.1+ds-1build1
+ARG LIBCAIRO2_VERSION=1.18.0-3build1
+ARG FONTS_LIBERATION_VERSION=1:2.1.5-3
+COPY sbin/install-ubuntu-packages /tmp/install-ubuntu-packages
+RUN /tmp/install-ubuntu-packages "https://snapshot.ubuntu.com/ubuntu/$UBUNTU_SNAPSHOT/" \
+      "libnss3=$LIBNSS3_VERSION" "libatk-bridge2.0-0t64=$LIBATK_BRIDGE_VERSION" \
+      "libcups2t64=$LIBCUPS2_VERSION" "libgbm1=$LIBGBM1_VERSION" \
+      "libasound2t64=$LIBASOUND2_VERSION" "libxkbcommon0=$LIBXKBCOMMON0_VERSION" \
+      "libxcomposite1=$LIBXCOMPOSITE1_VERSION" "libxdamage1=$LIBXDAMAGE1_VERSION" \
+      "libxfixes3=$LIBXFIXES3_VERSION" "libxrandr2=$LIBXRANDR2_VERSION" \
+      "libpango-1.0-0=$LIBPANGO_VERSION" "libcairo2=$LIBCAIRO2_VERSION" \
+      "fonts-liberation=$FONTS_LIBERATION_VERSION" \
+ && rm /tmp/install-ubuntu-packages
+# A connection to Google's storage can run at about 50 KB/s while a new one runs at several MB/s, and
+# at 50 KB/s the 200 MB zip outlasts the host build's timeout. So a transfer under 1 MiB/s for 30
+# seconds ends with exit 28 and goes on from its last byte on a new connection. The build's network
+# can stay under 1 MiB/s on every connection, so each attempt keeps the bytes it fetched.
+COPY sbin/download-with-resume /tmp/download-with-resume
+RUN echo "chrome: downloading" \
+ && /tmp/download-with-resume /tmp/chrome.zip \
+      "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chrome-linux64.zip" \
+      --connect-timeout 20 --speed-limit 1048576 --speed-time 30 \
+ && echo "${CHROME_SHA256}  /tmp/chrome.zip" | sha256sum -c - \
+ && unzip -q /tmp/chrome.zip -d /tmp \
+ && mv /tmp/chrome-linux64 /opt/chrome \
+ && rm /tmp/chrome.zip /tmp/download-with-resume
+
+# Bun.WebView starts Chrome through bin/chromium, which adds --no-sandbox for root. Bun reads
+# BUN_CHROME_PATH before it searches PATH.
+COPY bin/chromium /usr/local/bin/chromium
+ENV BUN_CHROME_PATH=/usr/local/bin/chromium
 
 # A boot service that sets vm.overcommit_memory=1 in the guest once at each
 # boot. oxlint's allocator reserves more address space than a 2 GiB imp holds

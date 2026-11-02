@@ -1,10 +1,10 @@
 # shellcheck shell=bash
 # The guest half of check-agent-image.ts, which runs it as `bash -s` inside a running copy of the
 # agent image: in an imp through the imp CLI's `exec`, or in `docker run`. check-agent-image.ts sends it
-# after a prelude that assigns every `ARG <NAME>_VERSION=` pin of images/agent/Dockerfile and
-# check_mode (imp or docker), and copies the gitleaks binary and its config to
-# /run/agent-image-check first. It prints one line per check, names only and never a value, and
-# exits 1 when any check fails.
+# after a prelude that assigns every `ARG <NAME>_VERSION=` pin of images/agent/Dockerfile,
+# CHECKOUT_BUN_VERSION from this repo's .bun-version and check_mode (imp or docker), and copies the
+# gitleaks binary and its config to /run/agent-image-check first. It prints one line per check,
+# names only and never a value, and exits 1 when any check fails.
 # shellcheck disable=SC2154 # the prelude assigns the pins
 set -uo pipefail
 failures=0
@@ -114,11 +114,20 @@ check_tool npm "" npm --version
 # version the image holds.
 bun_dir=$(mktemp -d /run/agent-image-bun.XXXXXX)
 check_tool bun "$BUN_VERSION" env -C "$bun_dir" bun --version
-for pinned in "$BUN_VERSION" "$BUN_OLDER_VERSION"; do
+for pinned in "$BUN_VERSION" "$BUN_OLDER_VERSION" "$BUN_OLDEST_VERSION"; do
   echo "$pinned" > "$bun_dir/.bun-version"
   check_tool "bun $pinned" "$pinned" env -C "$bun_dir" bun --version
   check_tool "bunx $pinned" "$pinned" env -C "$bun_dir" bunx --version
 done
+# the Bun that this repo pins runs with nothing on stderr: for a pin the image lacks, the shim writes
+# a note there, and a repo's tests that expect an empty stderr from a child bun fail
+echo "$CHECKOUT_BUN_VERSION" > "$bun_dir/.bun-version"
+if out=$(env -C "$bun_dir" bun --version 2> "$bun_dir/stderr") &&
+  [[ "$out" == "$CHECKOUT_BUN_VERSION" && ! -s "$bun_dir/stderr" ]]; then
+  pass "bun checkout" "$out with an empty stderr"
+else
+  fail "bun checkout" "a .bun-version of $CHECKOUT_BUN_VERSION gave '$out' and stderr '$(cat "$bun_dir/stderr")'; fix: add Bun $CHECKOUT_BUN_VERSION and its sum to the Bun pins in images/agent/Dockerfile, as docs/runbooks/agent-image.md's Bun versions section says. The sum is the bun-linux-x64.zip line of https://github.com/oven-sh/bun/releases/download/bun-v$CHECKOUT_BUN_VERSION/SHASUMS256.txt"
+fi
 rm -rf "$bun_dir"
 check_package build-essential "$BUILD_ESSENTIAL_VERSION"
 check_tool gcc "" gcc --version
@@ -136,6 +145,27 @@ check_tool gitleaks "$GITLEAKS_VERSION" gitleaks version
 check_tool shellcheck "version: $SHELLCHECK_VERSION" \
   bash -o pipefail -c "shellcheck --version | sed -n '/^version: /p'"
 check_tool shfmt "v$SHFMT_VERSION" shfmt --version
+check_tool actionlint "$ACTIONLINT_VERSION" actionlint --version
+check_tool chromium "$CHROME_VERSION" chromium --version
+if [[ "${BUN_CHROME_PATH:-}" == /usr/local/bin/chromium && -x "$BUN_CHROME_PATH" ]]; then
+  pass BUN_CHROME_PATH "$BUN_CHROME_PATH"
+else
+  fail BUN_CHROME_PATH "'${BUN_CHROME_PATH:-}', want the executable /usr/local/bin/chromium"
+fi
+# a repo's browser lane starts Chrome headless through Bun.WebView, so the check does the same as
+# root and reads a page's text back; the timeout ends a Chrome that never answers
+webview_dir=$(mktemp -d /run/agent-image-webview.XXXXXX)
+cat > "$webview_dir/webview.ts" << 'EOF'
+await using view = new Bun.WebView({ backend: 'chrome' });
+await view.navigate('data:text/html,<h1>headless page</h1>');
+console.log(await view.evaluate('document.querySelector("h1").textContent'));
+EOF
+if out=$(timeout 120 env -C "$webview_dir" bun webview.ts 2>&1) && [[ "$out" == "headless page" ]]; then
+  pass webview "Bun.WebView read a page from headless Chrome"
+else
+  fail webview "Bun.WebView with the chrome backend gave '$out', want 'headless page'"
+fi
+rm -rf "$webview_dir"
 if auto-mode --help > /dev/null 2>&1; then
   pass auto-mode "auto-mode --help exits 0"
 else

@@ -30,6 +30,7 @@ because a tool can write state when it runs (`codex --version` creates `~/.codex
 | `/opt/auto-mode/mods/auto-mode`       | the auto-mode mod in the guest, for `--plugin-dir`        |
 | `/usr/local/bin/atc`                  | atc in the guest, which the `cloud` target's hooks use    |
 | `/usr/local/bin/bun`                  | the shim that runs the Bun a checkout pins                |
+| `/usr/local/bin/chromium`             | the Chrome start script that `BUN_CHROME_PATH` names      |
 | `/etc/imp/services.d/overcommit.json` | the boot service that sets `vm.overcommit_memory=1`       |
 | `/etc/imp/services.d/swap.json`       | the boot service that runs `/usr/local/sbin/setup-swap`   |
 | `/etc/claude-code/managed-settings.d` | the SessionStart hook that installs a checkout's packages |
@@ -48,7 +49,9 @@ the shim runs the newest version the image holds.
 
 A pin the image lacks also runs the newest version, after a note on stderr that names both versions,
 so a session keeps working. When a repo moves its `.bun-version` to a version the image lacks, add
-that version to the Dockerfile's Bun pins, then build and switch the image.
+that version to the Dockerfile's Bun pins, then build and switch the image. For cloud's own
+`.bun-version`, CI's image check fails until the image holds the pinned version, so a Renovate bump
+of that pin adds the version in the same pull request.
 
 ## Locked packages
 
@@ -146,7 +149,11 @@ The check prints one line per item and exits non-zero on any failure:
 - **Secrets**: gitleaks 8.30.1 scans each top-level folder but `/proc`, `/sys`, `/dev` and `/run`,
   with `--redact`. It skips files over 50 MB: the pinned binaries, whose sums the build checks.
 - **Versions**: each tool answers with the version the Dockerfile pins, and each Ubuntu package is
-  installed at its pinned version.
+  installed at its pinned version. Under a `.bun-version` that holds this repo's own pin, `bun`
+  prints that version with nothing on stderr.
+- **Browser**: `BUN_CHROME_PATH` names `/usr/local/bin/chromium`, and a `Bun.WebView` with the
+  `chrome` backend starts Chrome headless as root and reads a page's text back, as a repo's browser
+  lane does.
 
 `bun run test:agent-image` runs the same check on a local Docker build, before the host build. It
 then runs `scripts/test-agent-image-gitleaks.sh`, which scans planted files with the image's

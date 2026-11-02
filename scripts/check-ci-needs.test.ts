@@ -20,8 +20,12 @@ test('it passes when every needed job succeeded or its gate skipped it', () => {
   });
 
   expect(status).toBe(0);
-  expect(ctx.printOut.mock.calls).toEqual([['check-ci-needs: 2 jobs passed or were skipped\n']]);
-  expect(ctx.printErr.mock.calls).toEqual([]);
+
+  expect(ctx.printOut.mock.calls).toStrictEqual([
+    ['check-ci-needs: 2 jobs passed or were skipped\n'],
+  ]);
+
+  expect(ctx.printErr.mock.calls).toStrictEqual([]);
 });
 
 test('it fails and names each needed job that failed or was cancelled', () => {
@@ -37,9 +41,9 @@ test('it fails and names each needed job that failed or was cancelled', () => {
   });
 
   expect(status).toBe(1);
-  expect(ctx.printOut.mock.calls).toEqual([]);
+  expect(ctx.printOut.mock.calls).toStrictEqual([]);
 
-  expect(ctx.printErr.mock.calls).toEqual([
+  expect(ctx.printErr.mock.calls).toStrictEqual([
     ['check-ci-needs: lint ended failure\ncheck-ci-needs: test-image ended cancelled\n'],
   ]);
 });
@@ -49,7 +53,10 @@ test('it fails a needed job that reports no result', () => {
   const status = checkCINeeds({ needs: JSON.stringify({ lint: { outputs: {} } }), ...ctx });
 
   expect(status).toBe(1);
-  expect(ctx.printErr.mock.calls).toEqual([['check-ci-needs: lint ended without a result\n']]);
+
+  expect(ctx.printErr.mock.calls).toStrictEqual([
+    ['check-ci-needs: lint ended without a result\n'],
+  ]);
 });
 
 test.each([
@@ -62,9 +69,9 @@ test.each([
   const status = checkCINeeds({ needs, ...ctx });
 
   expect(status).toBe(2);
-  expect(ctx.printOut.mock.calls).toEqual([]);
+  expect(ctx.printOut.mock.calls).toStrictEqual([]);
 
-  expect(ctx.printErr.mock.calls).toEqual([
+  expect(ctx.printErr.mock.calls).toStrictEqual([
     ['check-ci-needs: NEEDS must hold the toJSON(needs) of at least one job\n'],
   ]);
 });

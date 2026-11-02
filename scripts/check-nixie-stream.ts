@@ -108,7 +108,9 @@ async function readEnrolmentCode(
   return undefined;
 }
 
-function parseEnrolment(output: unknown): Required<NixieOutput<'sessions/enrol'>> | undefined {
+function parseEnrolment(
+  output: unknown,
+): (NixieOutput<'sessions/enrol'> & { readonly token: string }) | undefined {
   const sessionID = findJSONField(output, 'sessionID');
   const token = findJSONField(output, 'token');
 

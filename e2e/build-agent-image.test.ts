@@ -59,6 +59,9 @@ test.each([
 
     await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
     await writeFile(join(ctx.repo.seed, 'images/agent/Dockerfile'), 'FROM scratch\n');
+
+    // the build archives the pin; on an imp, bun under an empty pin runs the default with no note
+    await writeFile(join(ctx.repo.seed, '.bun-version'), '');
     await createStubAgentImageCheck(ctx.repo.seed);
 
     await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
@@ -127,6 +130,9 @@ test('it keeps the image on an interrupt with --keep, and still removes the chec
 
   await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
   await writeFile(join(ctx.repo.seed, 'images/agent/Dockerfile'), 'FROM scratch\n');
+
+  // the build archives the pin; on an imp, bun under an empty pin runs the default with no note
+  await writeFile(join(ctx.repo.seed, '.bun-version'), '');
   await createStubAgentImageCheck(ctx.repo.seed);
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
@@ -165,6 +171,9 @@ test('it lets a retry after an interrupt build and check the same commit', async
 
   await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
   await writeFile(join(ctx.repo.seed, 'images/agent/Dockerfile'), 'FROM scratch\n');
+
+  // the build archives the pin; on an imp, bun under an empty pin runs the default with no note
+  await writeFile(join(ctx.repo.seed, '.bun-version'), '');
   await createStubAgentImageCheck(ctx.repo.seed);
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);

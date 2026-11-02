@@ -5,16 +5,21 @@
 # `op run --env-file=../.env -- pulumi cancel --stack prod --yes` in PROGRAM/infra, the checkout of
 # the revision to apply. With no lock on the state, pulumi cancel changes nothing and exits 0.
 #
-# pulumi cancel ends whatever update holds the Pulumi lock, so the script cancels only while the
-# prod lock names this job as its holder (hold-prod-lock.sh check), which no other Deploy prod run
-# can be while it does. A lease that ran out counts, because a job that hits its timeout outlasts its
-# lease by seconds and no one has taken the lock over. When another holder took the prod lock, it
+# The step runs on any cancelled run, and REFRESH_OUTCOME and APPLY_OUTCOME carry the outcomes of
+# the refresh and apply steps. pulumi cancel ends whatever update holds the Pulumi lock, so the
+# script cancels only when one of them is cancelled, which means this run's own update held it;
+# otherwise it does nothing.
+#
+# For the same reason, it cancels only while the prod lock names this job as its holder
+# (hold-prod-lock.sh check), which no other Deploy prod run can be while it does. A lease that ran
+# out counts, because a job that hits its timeout outlasts its lease by seconds and no one has taken
+# the lock over. When another holder took the prod lock, it
 # cancels nothing and exits 3, and when kubectl fails, it cancels nothing and exits 1. With no
 # kubeconfig at KUBECONFIG, the job never reached the prod lock or any Pulumi step, and it does
 # nothing. A missing input is a usage error (exit 2).
 #
-#   RUN_ID=<id> KUBECONFIG=<file> PROGRAM=<dir> OP_SERVICE_ACCOUNT_TOKEN=<token> \
-#     bash scripts/cancel-deploy-prod-update.sh
+#   REFRESH_OUTCOME=<outcome> APPLY_OUTCOME=<outcome> RUN_ID=<id> KUBECONFIG=<file> \
+#     PROGRAM=<dir> OP_SERVICE_ACCOUNT_TOKEN=<token> bash scripts/cancel-deploy-prod-update.sh
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -25,6 +30,10 @@ for name in RUN_ID KUBECONFIG PROGRAM; do
   fi
 done
 
+if [ "${REFRESH_OUTCOME:-}" != cancelled ] && [ "${APPLY_OUTCOME:-}" != cancelled ]; then
+  echo "cancel-deploy-prod-update: the cancel stopped neither the refresh nor the apply, so no update of this run holds the Pulumi lock" >&2
+  exit 0
+fi
 if [ ! -f "$KUBECONFIG" ]; then
   echo "cancel-deploy-prod-update: no kubeconfig at $KUBECONFIG, so the job never took the prod lock" >&2
   exit 0

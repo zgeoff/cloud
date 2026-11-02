@@ -1,5 +1,2 @@
 # generated SDK: regenerate it, never format it
 sdk/**
-# nixie's contract document, vendored as nixie publishes it, and the types generated from it:
-# regenerate both with bun run nixie:openapi <tag>, never format them
-scripts/nixie-api/openapi.*

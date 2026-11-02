@@ -1,3 +1,4 @@
+import type { ContractClient, ContractInputs, ContractOutputs } from '@heynixie/contract';
 import { ORPCError } from '@orpc/client';
 import {
   StandardRPCJsonSerializer,
@@ -5,29 +6,33 @@ import {
   StandardRPCSerializer,
 } from '@orpc/client/standard';
 import { buildNixieHeaders } from '../build-nixie-headers.ts';
-import type { paths } from './openapi.d.ts';
 
-// The procedures and their types come from nixie's contract document, so a procedure that nixie
-// drops or renames fails the type check.
-type ToProcedure<Path> = Path extends `/${infer Procedure}` ? Procedure : never;
+// The procedures and their types come from nixie's contract package, so a procedure that nixie
+// drops or renames fails the type check. In the client type a procedure is a function and a
+// group is an object, which the input and output types cannot tell apart.
+type ToProcedure<Router, Prefix extends string = ''> = {
+  [Key in keyof Router & string]: Router[Key] extends (...args: never[]) => unknown
+    ? `${Prefix}${Key}`
+    : ToProcedure<Router[Key], `${Prefix}${Key}/`>;
+}[keyof Router & string];
 
-export type NixieProcedure = ToProcedure<keyof paths>;
+export type NixieProcedure = ToProcedure<ContractClient>;
 
-type Operation<Procedure extends NixieProcedure> = paths[`/${Procedure}`]['post'];
+type FindByPath<Router, Path extends string> = Path extends `${infer Group}/${infer Rest}`
+  ? Group extends keyof Router
+    ? FindByPath<Router[Group], Rest>
+    : never
+  : Path extends keyof Router
+    ? Router[Path]
+    : never;
 
 // it distributes over a union of procedures, so a request for any one of several procedures takes
 // any one of their inputs
 export type NixieInput<Procedure extends NixieProcedure> = Procedure extends NixieProcedure
-  ? Operation<Procedure>['requestBody'] extends { content: { 'application/json': infer Input } }
-    ? Input
-    : undefined
+  ? FindByPath<ContractInputs, Procedure>
   : never;
 
-// a stream's answer has no JSON output
-export type NixieOutput<Procedure extends NixieProcedure> =
-  Operation<Procedure>['responses'][200]['content'] extends { 'application/json': infer Output }
-    ? Output
-    : never;
+export type NixieOutput<Procedure extends NixieProcedure> = FindByPath<ContractOutputs, Procedure>;
 
 export interface NixieRequest<Procedure extends NixieProcedure> {
   readonly url: string;

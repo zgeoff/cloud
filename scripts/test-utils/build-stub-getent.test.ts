@@ -16,7 +16,7 @@ test('it prints a host it holds as glibc’s getent prints a hosts entry', async
   });
 });
 
-test('its print matches the real getent’s for a hosts-file entry', async () => {
+test('it prints a hosts-file entry as the real getent does', async () => {
   const stub = buildStubRunner(buildStubGetent({ localhost: '127.0.0.1' }));
 
   const stand = await stub.run(['getent', 'hosts', 'localhost']);

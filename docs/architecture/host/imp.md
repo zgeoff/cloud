@@ -32,9 +32,15 @@ host's own table therefore drops pod traffic to Podman's subnet
 the containers reach imp-host.
 
 The container gets no socket of a container engine, and the host runs no Docker: impd fetches its
-builder image from the registry itself. Host tools reach impd through `podman exec imp-host`. The
-module also loads the `inet imp-forward` table, which drops traffic from imp-host's bridge to the
-cluster's pod and service ranges, because an imp is an agent sandbox and must not reach a workload
+builder image from the registry itself. Host tools reach impd through `podman exec imp-host`. A host
+unit that calls imp's CLI this way names root's home with `-e HOME=/root`, where the CLI finds
+impd's token. Without it, Podman sets the home from imp-host's `/etc/passwd`, which it reads through
+the container's root filesystem as the calling unit's mounts show it. A unit's own mount namespace,
+such as one from `PrivateTmp`, made before imp-host's container started, never shows that
+filesystem, so the home would be empty and impd would refuse every call. For the same reason, a host
+unit reads a file of the container with `podman exec` rather than `podman cp`. The module also loads
+the `inet imp-forward` table, which drops traffic from imp-host's bridge to the cluster's pod and
+service ranges, because an imp is an agent sandbox and must not reach a workload
 ([firewalls](../network/firewalls.md)).
 
 impd holds the host's memory budget for imps and refuses a boot that would exceed it, while an idle

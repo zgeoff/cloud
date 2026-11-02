@@ -33,6 +33,7 @@ test('it writes each bump as the bumps output and lists them', async () => {
     'images/atc-gateway/versions.env': 'ATC_RELEASE=@zgeoff/atc@4.3.0\n',
     'nixos/hosts/geoffcloud/configuration.nix': `    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:${'1'.repeat(64)}";\n`,
     'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
   });
 
   const stub = buildStubRunner(
@@ -84,6 +85,7 @@ test('it says every pin is current and writes no output', async () => {
     'images/atc-gateway/versions.env': 'ATC_RELEASE=@zgeoff/atc@4.3.0\n',
     'nixos/hosts/geoffcloud/configuration.nix': `    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:${'1'.repeat(64)}";\n`,
     'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
   });
 
   const stub = buildStubRunner(
@@ -126,6 +128,7 @@ test('it fails with the search error and writes nothing', async () => {
     'images/atc-gateway/versions.env': 'ATC_RELEASE=@zgeoff/atc@4.3.0\n',
     'nixos/hosts/geoffcloud/configuration.nix': `    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:${'1'.repeat(64)}";\n`,
     'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
   });
 
   const stub = buildStubRunner(buildStubReleaseGH({ releases: {} }));

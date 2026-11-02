@@ -20,7 +20,7 @@ daemon.
 | ------------------ | ---------------------------------- | --------------------------------------------------------------------------- |
 | atc                | `release-check/atc`                | the agent image, the host's atc daemon, the atc-gateway images' release     |
 | imp                | `release-check/imp`                | imp's NixOS module and its lock with the imp-host image, the imp-base image |
-| nixie              | `release-check/nixie`              | the nixie and nixie-web images in the stack config                          |
+| nixie              | `release-check/nixie`              | the nixie and nixie-web images in the stack config, the contract package    |
 | auto-mode          | `release-check/auto-mode`          | the auto-mode tarball in the agent image                                    |
 | atc-gateway-images | `release-check/atc-gateway-images` | the atc-gateway and backup images in the stack config                       |
 
@@ -32,6 +32,13 @@ commit and the images' digests from GitHub and GHCR, and the auto-mode pin takes
 npm tarball, which it checks against npm's integrity hash and the release's version. Before it
 writes anything, it checks every pin line of the dependency, so a pin at the release with another
 sum fails the bump and changes no file. The bump never moves a pin back to an older release.
+
+The nixie bump moves nixie's contract package, `@heynixie/contract`, to the same release as the
+images, then runs `bun install --lockfile-only` and checks that `bun.lock` resolves the package at
+that release. The scripts' nixie calls type-check against the package, so CI on the bump pull
+request fails only when the release drops or changes a procedure that a script calls. The
+release-age gate in `bunfig.toml` excludes the package, so the lock resolves it on the day nixie
+publishes it, and Renovate leaves it to this bump, so the package never moves without the images.
 
 The pin table (`scripts/release/release-pins.json`) holds every registry pin's parts, and each bump
 writes its entries beside the pins. CI's release pin check (`bun run check:release-pins`) fails a
@@ -56,9 +63,13 @@ after a merge. The registry record `atc-gateway-images` holds their pins in the 
 the release check never reads it. Instead, the `atc-gateway images` workflow runs on each push to
 `main` that changes `images/atc-gateway/versions.env`, such as a merged atc bump:
 
-1. Its decide job compares the push with the commit before it. A pull request skips the job, and the
-   publish job refuses any ref other than `main`, so a pull request never publishes.
-2. Its publish job builds both images at the pins, pushes each tag that GHCR lacks, and reads both
+1. Its decide job looks up both pinned tags on GHCR, and the run publishes when GHCR lacks either
+   one, or when the stack config does not pin both yet. A re-run after a release that pushed both
+   tags but failed to open its pull request runs the release job again, which skips both pushes. A
+   newer push cancels an older run's fixture and decide jobs, and its own decide job still finds a
+   tag that the older run never published. A pull request skips the job, and the release job refuses
+   any ref other than `main`, so a pull request never publishes.
+2. Its release job builds both images at the pins, pushes each tag that GHCR lacks, and reads both
    tags' digests from GHCR.
 3. As the release check app, it opens or updates `release-check/atc-gateway-images`, which pins
    those digests and the pin table.

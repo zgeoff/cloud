@@ -29,6 +29,148 @@ test('it finds nothing to hold in a plan of creates, updates, refreshes and read
   ).toStrictEqual([]);
 });
 
+test.each([
+  [
+    'a Secret',
+    'urn:pulumi:prod::geoff-cloud::kubernetes:core/v1:Secret::nixie-secrets',
+    'data["secrets.yaml"]',
+  ],
+  [
+    'a ConfigMap',
+    'urn:pulumi:prod::geoff-cloud::kubernetes:core/v1:ConfigMap::nixie-config',
+    'data["config.yaml"]',
+  ],
+  [
+    'a ConfigMap by its binary data',
+    'urn:pulumi:prod::geoff-cloud::kubernetes:core/v1:ConfigMap::nixie-config',
+    'binaryData.logo',
+  ],
+])(
+  'it finds nothing to hold when new data replaces %s under a new name',
+  (_label: string, urn: string, reason: string) => {
+    expect(
+      collectPlanHolds({
+        steps: [
+          {
+            op: 'same',
+            urn: 'urn:pulumi:prod::geoff-cloud::pulumi:pulumi:Stack::geoff-cloud-prod',
+          },
+          {
+            op: 'replace',
+            urn,
+            replaceReasons: [reason],
+            oldState: { inputs: { metadata: { name: 'nixie-4c1d09ae', namespace: 'nixie' } } },
+            newState: { inputs: { metadata: { name: 'nixie-e83b5f27', namespace: 'nixie' } } },
+          },
+          {
+            op: 'update',
+            urn: 'urn:pulumi:prod::geoff-cloud::kubernetes:apps/v1:StatefulSet::nixie',
+            diffReasons: ['spec'],
+          },
+        ],
+        changeSummary: { same: 1, replace: 1, update: 1 },
+      }),
+    ).toStrictEqual([]);
+  },
+);
+
+test('it holds new data that replaces a Secret under the same name', () => {
+  expect(
+    collectPlanHolds({
+      steps: [
+        {
+          op: 'replace',
+          urn: 'urn:pulumi:prod::geoff-cloud::kubernetes:core/v1:Secret::files-backup',
+          replaceReasons: ['data.RESTIC_PASSWORD'],
+          oldState: { inputs: { metadata: { name: 'files-backup', namespace: 'files' } } },
+          newState: { inputs: { metadata: { name: 'files-backup', namespace: 'files' } } },
+        },
+      ],
+      changeSummary: { replace: 1 },
+    }),
+  ).toStrictEqual([
+    'replace urn:pulumi:prod::geoff-cloud::kubernetes:core/v1:Secret::files-backup',
+    "the plan's summary counts 1 replace",
+  ]);
+});
+
+test('it holds a replace of a Secret that changes more than its data', () => {
+  expect(
+    collectPlanHolds({
+      steps: [
+        {
+          op: 'replace',
+          urn: 'urn:pulumi:prod::geoff-cloud::kubernetes:core/v1:Secret::nixie-secrets',
+          replaceReasons: ['data["secrets.yaml"]', 'type'],
+          oldState: { inputs: { metadata: { name: 'nixie-4c1d09ae', namespace: 'nixie' } } },
+          newState: { inputs: { metadata: { name: 'nixie-e83b5f27', namespace: 'nixie' } } },
+        },
+      ],
+      changeSummary: { replace: 1 },
+    }),
+  ).toStrictEqual([
+    'replace urn:pulumi:prod::geoff-cloud::kubernetes:core/v1:Secret::nixie-secrets',
+    "the plan's summary counts 1 replace",
+  ]);
+});
+
+test('it holds a replace of a Secret that names no reason', () => {
+  expect(
+    collectPlanHolds({
+      steps: [
+        {
+          op: 'replace',
+          urn: 'urn:pulumi:prod::geoff-cloud::kubernetes:core/v1:Secret::nixie-secrets',
+          replaceReasons: [],
+          oldState: { inputs: { metadata: { name: 'nixie-4c1d09ae', namespace: 'nixie' } } },
+          newState: { inputs: { metadata: { name: 'nixie-e83b5f27', namespace: 'nixie' } } },
+        },
+      ],
+      changeSummary: { replace: 1 },
+    }),
+  ).toStrictEqual([
+    'replace urn:pulumi:prod::geoff-cloud::kubernetes:core/v1:Secret::nixie-secrets',
+    "the plan's summary counts 1 replace",
+  ]);
+});
+
+test('it holds a data replace of a resource that is no Secret or ConfigMap', () => {
+  expect(
+    collectPlanHolds({
+      steps: [
+        {
+          op: 'replace',
+          urn: 'urn:pulumi:prod::geoff-cloud::kubernetes:apiextensions.k8s.io:CustomResource::bundle',
+          replaceReasons: ['data.ca'],
+          oldState: { inputs: { metadata: { name: 'bundle-4c1d09ae', namespace: 'nixie' } } },
+          newState: { inputs: { metadata: { name: 'bundle-e83b5f27', namespace: 'nixie' } } },
+        },
+      ],
+      changeSummary: { replace: 1 },
+    }),
+  ).toStrictEqual([
+    'replace urn:pulumi:prod::geoff-cloud::kubernetes:apiextensions.k8s.io:CustomResource::bundle',
+    "the plan's summary counts 1 replace",
+  ]);
+});
+
+test('it holds a summary that counts more replaces than the data replaces it passes', () => {
+  expect(
+    collectPlanHolds({
+      steps: [
+        {
+          op: 'replace',
+          urn: 'urn:pulumi:prod::geoff-cloud::kubernetes:core/v1:Secret::nixie-secrets',
+          replaceReasons: ['data["secrets.yaml"]'],
+          oldState: { inputs: { metadata: { name: 'nixie-4c1d09ae', namespace: 'nixie' } } },
+          newState: { inputs: { metadata: { name: 'nixie-e83b5f27', namespace: 'nixie' } } },
+        },
+      ],
+      changeSummary: { replace: 2 },
+    }),
+  ).toStrictEqual(["the plan's summary counts 2 replace"]);
+});
+
 test('it holds each replace step of a plan', () => {
   expect(
     collectPlanHolds({

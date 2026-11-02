@@ -3,22 +3,23 @@ import { decideGatewayPublish } from './decide-gateway-publish.ts';
 
 test.each([
   [
-    'a pull request that changes the pins',
-    {
-      eventName: 'pull_request',
-      ref: 'refs/pull/412/merge',
-      pushInput: '',
-      changedFiles: ['images/atc-gateway/versions.env'],
-    },
+    'a pull request',
+    { eventName: 'pull_request', ref: 'refs/pull/412/merge', pushInput: '', pinnedImages: [] },
     { action: 'skip', reason: 'refs/pull/412/merge is not main, and only main publishes' },
   ],
   [
-    'a push to another branch that changes the pins',
+    'a push to another branch whose pinned tag is missing',
     {
       eventName: 'push',
       ref: 'refs/heads/geo-31-gateway',
       pushInput: '',
-      changedFiles: ['images/atc-gateway/versions.env'],
+      pinnedImages: [
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway:7.2.0',
+          answer: { missing: true },
+          isPinnedInStack: false,
+        },
+      ],
     },
     { action: 'skip', reason: 'refs/heads/geo-31-gateway is not main, and only main publishes' },
   ],
@@ -28,36 +29,129 @@ test.each([
       eventName: 'workflow_dispatch',
       ref: 'refs/heads/geo-31-gateway',
       pushInput: 'true',
-      changedFiles: [],
+      pinnedImages: [],
     },
     { action: 'skip', reason: 'refs/heads/geo-31-gateway is not main, and only main publishes' },
   ],
   [
-    'a push to main that changes the pins',
+    'a push to main whose gateway tag the registry lacks',
     {
       eventName: 'push',
       ref: 'refs/heads/main',
       pushInput: '',
-      changedFiles: ['images/atc-gateway/versions.env', 'scripts/release/release-pins.json'],
+      pinnedImages: [
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway:7.2.0',
+          answer: { missing: true },
+          isPinnedInStack: false,
+        },
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2',
+          answer: { digest: `sha256:${'3'.repeat(64)}` },
+          isPinnedInStack: true,
+        },
+      ],
     },
-    { action: 'publish', reason: 'the push to main changes images/atc-gateway/versions.env' },
+    { action: 'publish', reason: 'the registry lacks ghcr.io/zgeoff/atc-gateway:7.2.0' },
   ],
   [
-    'a push to main that changes only the image test',
+    'a push to main whose two tags the registry lacks',
     {
       eventName: 'push',
       ref: 'refs/heads/main',
       pushInput: '',
-      changedFiles: ['images/atc-gateway/test-atc-gateway-image.sh'],
+      pinnedImages: [
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway:7.2.0',
+          answer: { missing: true },
+          isPinnedInStack: false,
+        },
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway-backup:2.25.0-r1',
+          answer: { missing: true },
+          isPinnedInStack: false,
+        },
+      ],
     },
     {
-      action: 'skip',
-      reason: 'the push to main leaves images/atc-gateway/versions.env as it was',
+      action: 'publish',
+      reason:
+        'the registry lacks ghcr.io/zgeoff/atc-gateway:7.2.0 and ghcr.io/zgeoff/atc-gateway-backup:2.25.0-r1',
+    },
+  ],
+  [
+    'a push to main whose tags are published but not yet pinned in the stack config',
+    {
+      eventName: 'push',
+      ref: 'refs/heads/main',
+      pushInput: '',
+      pinnedImages: [
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway:7.2.0',
+          answer: { digest: `sha256:${'2'.repeat(64)}` },
+          isPinnedInStack: false,
+        },
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2',
+          answer: { digest: `sha256:${'3'.repeat(64)}` },
+          isPinnedInStack: true,
+        },
+      ],
+    },
+    {
+      action: 'publish',
+      reason: 'the stack config does not pin ghcr.io/zgeoff/atc-gateway:7.2.0 yet',
+    },
+  ],
+  [
+    'a push to main whose tags are published and pinned in the stack config',
+    {
+      eventName: 'push',
+      ref: 'refs/heads/main',
+      pushInput: '',
+      pinnedImages: [
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway:7.1.0',
+          answer: { digest: `sha256:${'2'.repeat(64)}` },
+          isPinnedInStack: true,
+        },
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2',
+          answer: { digest: `sha256:${'3'.repeat(64)}` },
+          isPinnedInStack: true,
+        },
+      ],
+    },
+    { action: 'skip', reason: 'the registry holds every pinned tag, and the stack config pins it' },
+  ],
+  [
+    'a push to main whose tag lookup failed',
+    {
+      eventName: 'push',
+      ref: 'refs/heads/main',
+      pushInput: '',
+      pinnedImages: [
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway:7.2.0',
+          answer: { missing: true },
+          isPinnedInStack: false,
+        },
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2',
+          answer: { error: 'the registry answered 503' },
+          isPinnedInStack: true,
+        },
+      ],
+    },
+    {
+      action: 'unknown',
+      reason:
+        'cannot tell whether a pinned tag is published: ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2 (the registry answered 503)',
     },
   ],
   [
     'a manual run with push: true on main',
-    { eventName: 'workflow_dispatch', ref: 'refs/heads/main', pushInput: 'true', changedFiles: [] },
+    { eventName: 'workflow_dispatch', ref: 'refs/heads/main', pushInput: 'true', pinnedImages: [] },
     { action: 'publish', reason: 'a manual run on main asked to push' },
   ],
   [
@@ -66,18 +160,13 @@ test.each([
       eventName: 'workflow_dispatch',
       ref: 'refs/heads/main',
       pushInput: 'false',
-      changedFiles: [],
+      pinnedImages: [],
     },
     { action: 'skip', reason: 'a manual run without push: true only tests the images' },
   ],
   [
     'a scheduled run on main',
-    {
-      eventName: 'schedule',
-      ref: 'refs/heads/main',
-      pushInput: '',
-      changedFiles: ['images/atc-gateway/versions.env'],
-    },
+    { eventName: 'schedule', ref: 'refs/heads/main', pushInput: '', pinnedImages: [] },
     { action: 'skip', reason: 'a schedule event never publishes' },
   ],
 ] as const)('it decides %s', (_label, input, decision) => {
