@@ -45,7 +45,16 @@ async function createImageSource(io: Readonly<ScriptIO>, build: Readonly<AgentIm
   const tarball = join(build.work, 'src.tar');
 
   // a git archive keeps the clone's working tree out of the image
-  const archive = ['git', 'archive', '--output', tarball, build.sha, 'images/agent', 'scripts'];
+  const archive = [
+    'git',
+    'archive',
+    '--output',
+    tarball,
+    build.sha,
+    'images/agent',
+    'scripts',
+    '.bun-version',
+  ];
 
   await mkdir(source);
   await runOrExit(io, archive, { cwd: build.cwd });
