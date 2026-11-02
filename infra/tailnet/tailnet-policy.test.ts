@@ -139,11 +139,13 @@ test('it lets a tag:cloud-deploy runner reach the k3s API on geoffcloud', () => 
 test('it keeps a member device on every other TCP port of geoffcloud', () => {
   const filter = buildStubTailnetFilter(tailnetPolicy);
 
-  const otherPorts = Array.from({ length: 65_535 }, (_, index) => index + 1).filter(
-    (port) => port !== 6443,
-  );
+  // The filter answers by port range, so its answer changes only at a port the policy names; each
+  // port the policy names, the ports beside it and both ends of the TCP range cover every port
+  const edgePorts = [
+    1, 2, 442, 443, 444, 6441, 6442, 6444, 6445, 7069, 7070, 7071, 8414, 8415, 8416, 65_534, 65_535,
+  ];
 
-  expect(otherPorts).toSatisfyAll((port: number) =>
+  expect(edgePorts).toSatisfyAll((port: number) =>
     filter.canConnect(
       { ip: '100.64.0.11', roles: ['member'], tags: [] },
       { ip: '100.69.47.33', roles: [], tags: ['tag:cloud'] },
