@@ -215,8 +215,8 @@ step of a run.
 
 ### Check a run live
 
-Do these steps after [Set the service up](#set-the-service-up) and a host switch. Run `host_imp`,
-which the top of this page defines, from a machine on the tailnet.
+Do these steps after [Set the service up](#set-the-service-up) and a host switch. Run the
+[`host_imp`](#previews) helper from a machine on the tailnet.
 
 1. Open a pull request that changes the SDK's version, in a repository that
    `services.preview.contractRepos` lists. Expect the head commit's `sdk-contract` status to read
@@ -224,19 +224,25 @@ which the top of this page defines, from a machine on the tailnet.
    `pv-sdk-<run_hash>` imp, where `<run_hash>` is a hash of the repository and the commit.
 2. Wait for the run to end, about 5 minutes. Expect the status to turn success or failure with the
    suite's counts, such as `18 pass, 0 fail`, and `host_imp ls` to show no `pv-sdk-` imp.
-3. Push a commit that leaves the SDK's version alone. Expect the new head to get no `sdk-contract`
-   status.
+3. Open a pull request that leaves the SDK's version alone. Expect its head commit to get no
+   `sdk-contract` status.
+
+The service compares the whole pull request with its base branch, so each push to a pull request
+that changes the SDK's version starts a run on the new head.
 
 ### Move the run's Bun release
 
-Each run's imp installs the Bun release that
-[`run-contract-suite.ts`](../../packages/preview/run-contract-suite.ts) pins in `bunVersion`. The
-run reads the repository's own pin from `.bun-version` and from the `packageManager` field of
-`package.json`. When either names another release, the run stops before `bun install`, and its
-status reads `The repository pins Bun <repo_version>, but the run installs Bun <service_version>`.
+Move the run's Bun release when a run's status reads
+`The repository pins Bun <repo_version>, but the run installs Bun <service_version>`. The run reads
+the repository's pin from `.bun-version` and from the `packageManager` field of `package.json`, and
+stops before `bun install` when either pin differs from the release the service installs. The
+service installs one release for every repository in `services.preview.contractRepos`, so a
+repository that keeps the old pin fails its next run after the move.
 
-1. Set `bunVersion` in `run-contract-suite.ts` to `<repo_version>`.
-2. Set `bunSHA256` to the sha256 of that release's tarball, from this command's output:
+1. Set `bunVersion` in [`run-contract-suite.ts`](../../packages/preview/run-contract-suite.ts) to
+   `<repo_version>`.
+2. Set `bunSHA256` in the same file to the sha256 of the npm tarball that the run downloads, from
+   this command's output:
 
    ```bash
    curl -fsSL https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-<repo_version>.tgz | sha256sum
@@ -244,16 +250,16 @@ status reads `The repository pins Bun <repo_version>, but the run installs Bun <
 
 3. Merge the change.
 4. Switch the host with [`bun run ops:switch-host`](./ops.md#bun-run-opsswitch-host).
-5. Push a commit that changes the SDK's version. Expect its `sdk-contract` status to report the
-   suite's counts, such as `18 pass, 0 fail`.
+5. Push a commit to the pull request whose run stopped. Expect its new head's `sdk-contract` status
+   to report the suite's counts, such as `18 pass, 0 fail`.
 
 ### Read a run that waits or fails
 
 A run waits while every preview slot is taken: `services.preview.slots` sets the number of imps the
 service runs at once. A waiting run's status reads `Waiting for a free preview slot`, and the
-service tries the run again each minute. A try that finds a preview unused for
-`services.preview.contractIdleMinutes`, 5 by default, puts that preview to sleep and starts the run
-in its slot. A preview in use keeps its slot until it goes unused that long.
+service tries the run again each minute. On each try, the service puts to sleep a preview that
+nobody used for `services.preview.contractIdleMinutes`, and starts the run in its slot.
+[Slots and sleep](../architecture/workloads/preview.md#slots-and-sleep) defines a preview's use.
 
 The service's journal holds the tail of each run's output, and the line
 `asleep to free a slot for the SDK contract run` for each preview that a run put to sleep. Read it
@@ -263,9 +269,9 @@ with:
 ssh root@geoffcloud journalctl -u preview -n 100 --no-pager
 ```
 
-When the status reads `The run's imp did not start`, read impd's refusal at its end. A refused grant
-means the service's imp token lacks `preview-model` in its `--grantable` list: set the list with
-step 3 of [Set the service up](#set-the-service-up).
+When the status reads `The run's imp did not start`, read impd's refusal at the end of the status. A
+refused grant means the service's imp token lacks `preview-model` in its `--grantable` list: set the
+list with step 3 of [Set the service up](#set-the-service-up).
 
 When the status reports an exit code and no counts, the run failed before the suite printed its
 counts. Read the run's output in the journal for the step that failed, such as the `git fetch` of
@@ -274,9 +280,10 @@ the head commit, or a `bun.lock` that `bun install --frozen-lockfile` refuses.
 When a journal line ends `(the App needs statuses=write)`, the preview GitHub App lacks Commit
 statuses write, which GitHub needs for every status the service sets. Add that permission on the
 App's Permissions page, as in step 5 of [Set the service up](#set-the-service-up), then accept the
-new permission on the installation's page. A run whose final status GitHub refuses this way ends at
-once. Its last journal line holds the run's result, then `the status was not posted`, then GitHub's
-refusal, and the commit's `sdk-contract` status stays as it was.
+new permission on the installation's page. The service never retries a final status that GitHub
+refuses this way: it removes the run's imp and ends the run. The run's last journal line holds the
+run's result, then `the status was not posted`, then GitHub's refusal, and the commit's
+`sdk-contract` status stays as it was.
 
 ## Check a preview live
 
