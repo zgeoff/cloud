@@ -539,21 +539,24 @@ test.skipIf(Bun.which('docker') === null)(
       },
     );
 
+    // `docker compose config` has taken from 0.2 s to over 3.5 s on CI runners, and the guest
+    // script's git work from under 0.1 s to over 0.5 s on a small host, so the two steps share one
+    // budget that keeps the case under its 5 s limit
+    const budgetEndsAt = processDeps.now() + 4800;
+
     await runBoundedProcess(processDeps, {
       name: "the boot's guest script",
       argv: [...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout],
       env: { ...gitEnv, PATH: `${join(ctx.directory, 'bin')}:${gitEnv.PATH}`, HOME: ctx.directory },
-      timeoutMs: 500,
+      timeoutMs: budgetEndsAt - processDeps.now(),
     });
 
-    // `docker compose config` has taken from 0.2 s to over 3.5 s on CI runners, while the guest
-    // script's local git work takes under 0.1 s; the two bounds keep the case under its 5 s limit
     const composeConfig = await runBoundedProcess(processDeps, {
       name: 'docker compose config',
       argv: ['docker', 'compose', 'config', '--format', 'json'],
       cwd: join(checkout, 'preview'),
       env: { PATH: process.env['PATH'] ?? '', HOME: ctx.directory },
-      timeoutMs: 4400,
+      timeoutMs: budgetEndsAt - processDeps.now(),
     });
 
     const config: unknown = JSON.parse(composeConfig.stdout);
