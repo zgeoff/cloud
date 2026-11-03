@@ -39,10 +39,9 @@ The value matters because of how the kernel serves a page fault in a mapped file
 read-ahead size around the faulting page, and it charges every page it reads to the memory cgroup of
 the process that faulted. Alloy ships the host journal to Loki
 ([observability](../workloads/observability.md)), and reads the journal through sd-journal, which
-maps each journal file in 8 MiB windows and keeps about 65 of them mapped at once. At 8 MiB of
-read-ahead, a fault in any of those windows can read the whole window, so the pages from Alloy's
-journal faults do not fit in Alloy's 384 MiB memory limit. The kernel evicts them, Alloy faults them
-in again, and Alloy's readiness probe times out.
+maps each journal file in 8 MiB windows. At 8 MiB of read-ahead, a fault in any of those windows can
+read the whole window, so each fault reads up to 8 MiB into Alloy's memory cgroup where 128 KiB
+would do.
 
 The second disk, vdb, keeps the read-ahead the kernel derives, because ZFS does its own prefetch.
 

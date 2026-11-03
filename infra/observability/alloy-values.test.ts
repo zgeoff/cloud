@@ -22,7 +22,7 @@ test("it runs Alloy's config from the ConfigMap it names, without the chart crea
       ],
       mounts: { varlog: true, extra: [{ name: 'storage', mountPath: '/var/lib/alloy' }] },
       extraEnv: [{ name: 'GOMEMLIMIT', value: '300MiB' }],
-      resources: { requests: { cpu: '20m', memory: '128Mi' }, limits: { memory: '384Mi' } },
+      resources: { requests: { cpu: '20m', memory: '128Mi' }, limits: { memory: '1Gi' } },
     },
     serviceMonitor: { enabled: true },
     controller: {
