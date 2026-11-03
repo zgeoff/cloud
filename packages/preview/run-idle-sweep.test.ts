@@ -148,7 +148,7 @@ test('it keeps a preview awake after a request through the proxy resets its idle
     name: 'pv-0a1b2c3d-17',
     state: 'running',
     createdAt: '2026-10-15T07:00:00.000Z',
-    lastActiveAt: '2026-10-15T09:00:00.000Z',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
