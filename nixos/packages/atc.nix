@@ -15,9 +15,9 @@
   fetchurl,
 }:
 let
-  version = "7.7.4";
+  version = "7.8.0";
   # the release's SHA256SUMS line for atc-linux-x64
-  sha256 = "493aada4b5573995f75f697805f5170a219eb685a033ad93aa913a7348556bda";
+  sha256 = "c586420f18e5bf8c84c1f261ab8536f06ab6aebf0a4546214ee138c23ff0a438";
 in
 stdenvNoCC.mkDerivation {
   pname = "atc";
