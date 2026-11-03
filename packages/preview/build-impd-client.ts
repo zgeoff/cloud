@@ -130,7 +130,9 @@ async function withImpdErrors<T>(call: () => Promise<T>): Promise<T> {
 }
 
 function toImpActivity(imp: Imp): ImpActivity {
-  return { name: imp.name, state: imp.state, lastActiveAt: imp.lastActiveAt };
+  // an impd before 6.4.0 returns no lastRequestAt, so a preview there keeps its old idle signal
+  // rather than reading idle while in use; a boot's health probe sets it on a newer impd
+  return { name: imp.name, state: imp.state, lastUsedAt: imp.lastRequestAt ?? imp.lastActiveAt };
 }
 
 async function readImpActivity(client: ImpClient, name: string): Promise<ImpActivity | null> {

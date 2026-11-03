@@ -19,15 +19,15 @@ export function planContractEvictions(
     return [];
   }
 
-  // impd moves lastActiveAt while a request through its wake proxy or a guest session is open, so a
-  // preview in use never reads as idle; another run's imp never sleeps, as its suite would stop
+  // impd moves lastRequestAt while a proxied stream or WebSocket stays open, so a preview in use
+  // never reads as idle; another run's imp never sleeps, as its suite would stop
   const idle = live
     .filter(
       (imp) =>
         !imp.name.startsWith(contractImpPrefix) &&
-        rule.now.getTime() - imp.lastActiveAt.getTime() >= rule.idleMs,
+        rule.now.getTime() - imp.lastUsedAt.getTime() >= rule.idleMs,
     )
-    .toSorted((left, right) => left.lastActiveAt.getTime() - right.lastActiveAt.getTime());
+    .toSorted((left, right) => left.lastUsedAt.getTime() - right.lastUsedAt.getTime());
 
   return idle.length >= needed ? idle.slice(0, needed).map((imp) => imp.name) : null;
 }

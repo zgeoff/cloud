@@ -22,7 +22,9 @@ test('#createImp creates an imp outside every backup, with the HTTP port it name
   expect(ctx.impd.imps.get('pv-0a1b2c3d-7')).toStrictEqual({
     name: 'pv-0a1b2c3d-7',
     state: 'running',
+    createdAt: expect.toSatisfy((value: string) => !Number.isNaN(Date.parse(value))),
     lastActiveAt: expect.toSatisfy((value: string) => !Number.isNaN(Date.parse(value))),
+    lastRequestAt: null,
     httpPort: 3000,
     image: 'base',
     memoryMib: 2048,
@@ -31,13 +33,40 @@ test('#createImp creates an imp outside every backup, with the HTTP port it name
   });
 });
 
-test('#readImp reads an imp with its last activity as a date', async () => {
+test('#readImp reads an imp with no proxied request, as an impd before 6.4.0 reports it, as last used at its last activity', async () => {
+  const ctx = setupTest();
+
+  ctx.impd.imps.set('pv-0a1b2c3d-7', {
+    name: 'pv-0a1b2c3d-7',
+    state: 'running',
+    createdAt: '2026-10-01T08:00:00.000Z',
+    lastActiveAt: '2026-10-01T09:00:00.000Z',
+    lastRequestAt: null,
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: [],
+  });
+
+  const result = await ctx.client.readImp('pv-0a1b2c3d-7');
+
+  expect(result).toStrictEqual({
+    name: 'pv-0a1b2c3d-7',
+    state: 'running',
+    lastUsedAt: new Date('2026-10-01T09:00:00.000Z'),
+  });
+});
+
+test('#readImp reads an imp as last used at its last proxied request, whatever its last activity', async () => {
   const ctx = setupTest();
 
   ctx.impd.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'sleeping',
-    lastActiveAt: '2026-10-01T08:30:00.000Z',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    lastActiveAt: '2026-10-01T09:00:00.000Z',
+    lastRequestAt: '2026-10-01T08:30:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -50,7 +79,7 @@ test('#readImp reads an imp with its last activity as a date', async () => {
   expect(result).toStrictEqual({
     name: 'pv-0a1b2c3d-7',
     state: 'sleeping',
-    lastActiveAt: new Date('2026-10-01T08:30:00.000Z'),
+    lastUsedAt: new Date('2026-10-01T08:30:00.000Z'),
   });
 });
 
@@ -90,7 +119,9 @@ test('#installGrant adds the secret to an imp that lacks it', async () => {
   ctx.impd.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -109,7 +140,9 @@ test('#installGrant leaves an imp that holds the secret without a second grant',
   ctx.impd.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -128,7 +161,9 @@ test('#removeGrantsExcept removes every grant of the imp outside the kept secret
   ctx.impd.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -147,7 +182,9 @@ test('#removeGrantsExcept leaves an imp that holds only kept secrets without a r
   ctx.impd.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -166,7 +203,9 @@ test('#installPathGrant narrows a grant the imp already holds to the paths it na
   ctx.impd.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -191,7 +230,9 @@ test('#runCommand returns the exit code and output of a guest command that requi
   ctx.impd.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -218,7 +259,9 @@ test('#runCommand returns the output of both streams in the order impd sent them
   ctx.impd.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -243,7 +286,9 @@ test('#runCommand starts no command once its signal has aborted', async () => {
   ctx.impd.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,

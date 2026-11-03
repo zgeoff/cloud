@@ -7,7 +7,7 @@ test('it sleeps nothing when a slot is free', () => {
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-17',
       state: 'sleeping',
-      lastActiveAt: new Date('2026-10-15T08:00:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:00:00Z'),
     }),
   ];
 
@@ -25,7 +25,7 @@ test('it sleeps the preview in the slot once it has gone unused for the idle tim
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-17',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:55:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:55:00Z'),
     }),
   ];
 
@@ -43,7 +43,7 @@ test('it waits rather than sleep a preview used within the idle time', () => {
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-17',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:55:01Z'),
+      lastUsedAt: new Date('2026-10-15T08:55:01Z'),
     }),
   ];
 
@@ -61,7 +61,7 @@ test("it waits rather than sleep another run's imp, however long ago it was used
     buildMockImpActivity({
       name: 'pv-sdk-fedcba9876543210',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T07:00:00Z'),
+      lastUsedAt: new Date('2026-10-15T07:00:00Z'),
     }),
   ];
 
@@ -79,7 +79,7 @@ test("it leaves the run's own imp out of the slot count", () => {
     buildMockImpActivity({
       name: 'pv-sdk-0123456789abcdef',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:59:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:59:00Z'),
     }),
   ];
 
@@ -97,22 +97,22 @@ test('it sleeps the least recently used idle previews, as many as the run needs'
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-17',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:30:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:30:00Z'),
     }),
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-18',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:58:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:58:00Z'),
     }),
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-19',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:10:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:10:00Z'),
     }),
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-20',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:40:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:40:00Z'),
     }),
   ];
 
@@ -130,17 +130,17 @@ test('it waits when too few previews are idle to free a slot', () => {
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-17',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:30:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:30:00Z'),
     }),
     buildMockImpActivity({
       name: 'pv-sdk-fedcba9876543210',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:00:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:00:00Z'),
     }),
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-18',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:58:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:58:00Z'),
     }),
   ];
 

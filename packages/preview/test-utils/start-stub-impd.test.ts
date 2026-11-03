@@ -8,7 +8,9 @@ test('it answers a procedure in the oRPC envelope, with each date named in meta'
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -34,16 +36,21 @@ test('it answers a procedure in the oRPC envelope, with each date named in meta'
         image: 'base',
         state: 'running',
         httpPort: 8080,
+        createdAt: '2026-09-01T00:00:00.000Z',
         lastActiveAt: '2026-10-15T08:00:00.000Z',
+        lastRequestAt: '2026-10-15T08:00:00.000Z',
       },
     ],
-    meta: [[1, 0, 'lastActiveAt']],
+    meta: [
+      [1, 0, 'createdAt'],
+      [1, 0, 'lastActiveAt'],
+      [1, 0, 'lastRequestAt'],
+    ],
   });
 });
 
-test('it creates an imp active from its creation, as impd does', async () => {
-  const impd = startStubImpd();
-  const before = Date.now();
+test('it creates an imp active from its creation and with no request, as impd does', async () => {
+  const impd = startStubImpd({ now: () => new Date('2026-10-15T08:00:00.000Z') });
 
   const response = await fetch(`${impd.url}/rpc/imps/create`, {
     method: 'POST',
@@ -53,9 +60,42 @@ test('it creates an imp active from its creation, as impd does', async () => {
 
   const body = await response.json();
 
-  const result = z.object({ json: z.object({ lastActiveAt: z.string() }) }).parse(body);
+  expect(body).toStrictEqual({
+    json: {
+      id: 'imp-pv-0a1b2c3d-17',
+      name: 'pv-0a1b2c3d-17',
+      image: 'base',
+      state: 'running',
+      httpPort: 8080,
+      createdAt: '2026-10-15T08:00:00.000Z',
+      lastActiveAt: '2026-10-15T08:00:00.000Z',
+    },
+    meta: [
+      [1, 'createdAt'],
+      [1, 'lastActiveAt'],
+    ],
+  });
+});
 
-  expect(new Date(result.json.lastActiveAt)).toBeBetween(new Date(before), new Date());
+test('it records the time of each request through the wake proxy as the imp’s last request', async () => {
+  const impd = startStubImpd({ now: () => new Date('2026-10-15T08:30:00.000Z') });
+
+  impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'sleeping',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: null,
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: [],
+  });
+
+  await fetch(`https://pv-0a1b2c3d-17.${impd.impDomain}/`);
+
+  expect(impd.imps.get('pv-0a1b2c3d-17')?.lastRequestAt).toBe('2026-10-15T08:30:00.000Z');
 });
 
 test('it reports a version and the exec requirement check from system.info, which takes no body', async () => {
@@ -77,7 +117,9 @@ test('it lists the secrets granted to an imp, as impd grants.list does', async (
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -102,7 +144,9 @@ test('it grants a secret once and records the path filter of each later grant, a
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -135,7 +179,9 @@ test('it refuses a grant whose host another grant of the imp covers, as impd gra
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -175,7 +221,9 @@ test('it removes a grant and its path filter, as impd grants.delete does', async
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -202,7 +250,9 @@ test('it answers the removal of a grant the imp lacks with oRPC NOT_FOUND error 
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -266,7 +316,9 @@ test('it fails closed on a procedure it does not model', async () => {
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -310,7 +362,9 @@ test('it redeems an exec ticket once and refuses it with a 401 after', async () 
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -355,7 +409,9 @@ test('it runs a guest command opened with a ticket, with both streams, and wakes
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'sleeping',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -421,7 +477,9 @@ test('it runs a guest command opened with the bearer token', async () => {
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'sleeping',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -476,7 +534,9 @@ test('it refuses an exec start whose argv is not a list of strings, and records 
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -518,7 +578,9 @@ test('it holds a command open without an exit until its imp is destroyed', async
   impd.imps.set('pv-sdk-0123456789abcdef', {
     name: 'pv-sdk-0123456789abcdef',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -575,7 +637,9 @@ test("it serves impd's wake proxy under its domain through MSW", async () => {
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'sleeping',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 3000,
     image: 'base',
     memoryMib: 2048,

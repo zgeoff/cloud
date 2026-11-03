@@ -25,7 +25,9 @@ async function setupTest() {
     store.close();
   });
 
-  const impd = startStubImpd();
+  const nowAt = new Date('2026-10-15T09:00:00Z');
+
+  const impd = startStubImpd({ now: () => nowAt });
   const log = mock<(message: string) => void>();
 
   const deps: PreviewDeps = {
@@ -54,7 +56,7 @@ async function setupTest() {
     pendingRuns: new Set(),
     withSlotLock: makeSlotLock(),
 
-    now: () => new Date('2026-10-15T09:00:00Z'),
+    now: () => nowAt,
     sleep: async () => {},
     log,
   };
@@ -68,7 +70,9 @@ test('it sleeps the preview unused for the idle timeout and keeps the one in use
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -79,7 +83,9 @@ test('it sleeps the preview unused for the idle timeout and keeps the one in use
   ctx.impd.imps.set('pv-0a1b2c3d-18', {
     name: 'pv-0a1b2c3d-18',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:59:00.000Z',
+    lastRequestAt: '2026-10-15T08:59:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -93,13 +99,81 @@ test('it sleeps the preview unused for the idle timeout and keeps the one in use
   expect(ctx.impd.imps.get('pv-0a1b2c3d-18')?.state).toBe('running');
 });
 
+test('it sleeps a preview whose busy stack keeps impd counting it active once no request has come through the proxy for the idle timeout', async () => {
+  const ctx = await setupTest();
+
+  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    createdAt: '2026-10-15T07:00:00.000Z',
+    lastActiveAt: '2026-10-15T09:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh'],
+  });
+
+  await runIdleSweep(ctx.deps);
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('sleeping');
+});
+
+test('it keeps a preview in use awake past the idle timeout from its creation on an impd that reports no request time', async () => {
+  const ctx = await setupTest();
+
+  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    createdAt: '2026-10-15T08:00:00.000Z',
+    lastActiveAt: '2026-10-15T08:59:00.000Z',
+    lastRequestAt: null,
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh'],
+  });
+
+  await runIdleSweep(ctx.deps);
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
+});
+
+test('it keeps a preview awake after a request through the proxy resets its idle time', async () => {
+  const ctx = await setupTest();
+
+  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    createdAt: '2026-10-15T07:00:00.000Z',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh'],
+  });
+
+  ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
+
+  await fetch(`https://pv-0a1b2c3d-17.${ctx.impd.impDomain}/`);
+  await runIdleSweep(ctx.deps);
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
+});
+
 test('it waits for a running boot to settle before it sleeps an idle preview', async () => {
   const ctx = await setupTest();
 
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -132,7 +206,9 @@ test('it sleeps the other idle previews when impd refuses one', async () => {
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -143,7 +219,9 @@ test('it sleeps the other idle previews when impd refuses one', async () => {
   ctx.impd.imps.set('pv-0a1b2c3d-18', {
     name: 'pv-0a1b2c3d-18',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,

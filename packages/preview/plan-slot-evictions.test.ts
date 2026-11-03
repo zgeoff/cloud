@@ -7,7 +7,7 @@ test('it sleeps the running preview when one slot must take the opening one', ()
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-17',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:00:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:00:00Z'),
     }),
   ];
 
@@ -19,17 +19,17 @@ test('it sleeps the least recently active previews first', () => {
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-17',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:30:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:30:00Z'),
     }),
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-19',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:10:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:10:00Z'),
     }),
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-20',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T07:00:00Z'),
+      lastUsedAt: new Date('2026-10-15T07:00:00Z'),
     }),
   ];
 
@@ -44,7 +44,7 @@ test('it never sleeps the opening preview', () => {
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-18',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T07:00:00Z'),
+      lastUsedAt: new Date('2026-10-15T07:00:00Z'),
     }),
   ];
 
@@ -56,12 +56,12 @@ test('it counts only running previews against the slots', () => {
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-17',
       state: 'sleeping',
-      lastActiveAt: new Date('2026-10-15T07:00:00Z'),
+      lastUsedAt: new Date('2026-10-15T07:00:00Z'),
     }),
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-19',
       state: 'stopped',
-      lastActiveAt: new Date('2026-10-15T07:00:00Z'),
+      lastUsedAt: new Date('2026-10-15T07:00:00Z'),
     }),
   ];
 
@@ -73,12 +73,12 @@ test("it never sleeps a contract run's imp, though it holds a slot", () => {
     buildMockImpActivity({
       name: 'pv-sdk-0123456789abcdef',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T07:00:00Z'),
+      lastUsedAt: new Date('2026-10-15T07:00:00Z'),
     }),
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-17',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:00:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:00:00Z'),
     }),
   ];
 
@@ -90,7 +90,7 @@ test("it sleeps nothing when a contract run's imp holds the only slot", () => {
     buildMockImpActivity({
       name: 'pv-sdk-0123456789abcdef',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T07:00:00Z'),
+      lastUsedAt: new Date('2026-10-15T07:00:00Z'),
     }),
   ];
 

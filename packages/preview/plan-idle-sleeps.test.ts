@@ -7,7 +7,7 @@ test('it sleeps a running preview unused for the idle timeout', () => {
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-17',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:30:00Z'),
+      lastUsedAt: new Date('2026-10-15T08:30:00Z'),
     }),
   ];
 
@@ -21,7 +21,7 @@ test('it keeps a running preview used within the idle timeout', () => {
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-17',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T08:30:01Z'),
+      lastUsedAt: new Date('2026-10-15T08:30:01Z'),
     }),
   ];
 
@@ -33,7 +33,7 @@ test("it never sleeps a contract run's imp, which the wake proxy never sees in u
     buildMockImpActivity({
       name: 'pv-sdk-0123456789abcdef',
       state: 'running',
-      lastActiveAt: new Date('2026-10-15T07:00:00Z'),
+      lastUsedAt: new Date('2026-10-15T07:00:00Z'),
     }),
   ];
 
@@ -45,7 +45,7 @@ test('it leaves a preview that already sleeps alone', () => {
     buildMockImpActivity({
       name: 'pv-0a1b2c3d-17',
       state: 'sleeping',
-      lastActiveAt: new Date('2026-10-15T07:00:00Z'),
+      lastUsedAt: new Date('2026-10-15T07:00:00Z'),
     }),
   ];
 

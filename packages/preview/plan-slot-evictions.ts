@@ -1,8 +1,11 @@
 import type { Imp } from '@impz/client';
 import { contractImpPrefix } from './build-contract-imp-name.ts';
 
-// impd sets lastActiveAt when it creates the imp, and moves it on each use.
-export type ImpActivity = Readonly<Pick<Imp, 'name' | 'state' | 'lastActiveAt'>>;
+export interface ImpActivity extends Readonly<Pick<Imp, 'name' | 'state'>> {
+  // the last request through impd's wake proxy; impd's lastActiveAt also moves for the guest's
+  // own connections and CPU, so a preview's stack would never read idle by it
+  readonly lastUsedAt: Date;
+}
 
 export function planSlotEvictions(
   imps: readonly ImpActivity[],
@@ -14,7 +17,7 @@ export function planSlotEvictions(
   // a contract run's imp holds a slot but never sleeps, since its suite would stop halfway
   const previews = live
     .filter((imp) => !imp.name.startsWith(contractImpPrefix))
-    .toSorted((left, right) => left.lastActiveAt.getTime() - right.lastActiveAt.getTime());
+    .toSorted((left, right) => left.lastUsedAt.getTime() - right.lastUsedAt.getTime());
 
   return previews.slice(0, Math.max(0, live.length - (slots - 1))).map((imp) => imp.name);
 }

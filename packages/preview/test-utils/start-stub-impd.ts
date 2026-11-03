@@ -14,8 +14,13 @@ interface StubImp {
   readonly name: string;
   state: 'creating' | 'running' | 'sleeping' | 'stopped' | 'error';
 
-  // an ISO time; impd sets it when it creates the imp, so it is never empty
+  // ISO times; impd sets both when it creates the imp, so neither is ever empty
+  readonly createdAt: string;
   lastActiveAt: string;
+
+  // an ISO time; impd sets it on each request through its wake proxy, and returns no time before
+  // the first
+  lastRequestAt: string | null;
   httpPort: number;
   readonly image: string;
   readonly memoryMib: number;
@@ -52,6 +57,8 @@ export interface StubImpd {
   // every request through the wake proxy, as `<method> <url>`, in order
   readonly proxied: string[];
 
+  readonly now: () => Date;
+
   // every procedure call, as `<router>/<procedure> <name>`, or the procedure alone for one that
   // names no imp, in order
   readonly calls: string[];
@@ -76,7 +83,11 @@ export interface StubImpd {
 
 const procedureBodySchema = z.object({ json: z.record(z.string(), z.unknown()).optional() });
 
-export function startStubImpd(): StubImpd {
+interface StubImpdOptions {
+  readonly now?: () => Date;
+}
+
+export function startStubImpd(options: StubImpdOptions = {}): StubImpd {
   const token = 'imp_stubpreview.stub-secret';
 
   const stub: StubImpd = {
@@ -86,6 +97,7 @@ export function startStubImpd(): StubImpd {
     impDomain: 'imps.example.test',
     apps: new Map(),
     proxied: [],
+    now: options.now ?? (() => new Date()),
     calls: [],
     commands: [],
     held: new Map(),
@@ -204,10 +216,14 @@ function buildProcedureResponse(
       return buildRPCError(409, 'CONFLICT', `an imp named ${name} exists`);
     }
 
+    const createdAt = stub.now().toISOString();
+
     const created: StubImp = {
       name: String(name),
       state: 'running',
-      lastActiveAt: new Date().toISOString(),
+      createdAt,
+      lastActiveAt: createdAt,
+      lastRequestAt: null,
       httpPort: Number(input['httpPort'] ?? 8080),
       image: String(input['image']),
       memoryMib: Number(input['memoryMib']),
@@ -344,7 +360,9 @@ function toImpRecord(imp: StubImp) {
     image: imp.image,
     state: imp.state,
     httpPort: imp.httpPort,
+    createdAt: new Date(imp.createdAt),
     lastActiveAt: new Date(imp.lastActiveAt),
+    ...(imp.lastRequestAt !== null && { lastRequestAt: new Date(imp.lastRequestAt) }),
   };
 }
 
