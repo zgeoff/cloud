@@ -17,7 +17,7 @@
 # impd-restore, every other check named impd-restore-*, tank-cloud-unlock, tank-cloud-host-secrets,
 # tank-cloud-rancher, imp-dataset-key, geoffcloud-no-pool, network-policy, imp-cpu-weight,
 # host-cgroup-cpu-vm, drift-check-vm, public-front-vm, atc-daemon-vm, onepassword-connect-relay-vm,
-# preview-image-vm and agent-image-build-switch-vm boot a NixOS VM, so they need KVM: unless
+# preview-image-vm, agent-image-build-switch-vm and disk-read-ahead-vm boot a NixOS VM, so they need KVM: unless
 # /dev/kvm (or KVM_DEVICE, which the script's own test sets) is readable and writable, the script
 # builds every other check it was asked for and then fails, naming those checks. Each such check itself fails if QEMU still falls
 # back to emulation. A container for each check evaluates it to its derivation, and one more
@@ -144,7 +144,7 @@ for check in "${checks[@]}"; do
     impd-restore | impd-restore-* | tank-cloud-unlock | tank-cloud-host-secrets | tank-cloud-rancher | \
       imp-dataset-key | geoffcloud-no-pool | network-policy | imp-cpu-weight | host-cgroup-cpu-vm | \
       drift-check-vm | public-front-vm | atc-daemon-vm | onepassword-connect-relay-vm | \
-      preview-image-vm | agent-image-build-switch-vm)
+      preview-image-vm | agent-image-build-switch-vm | disk-read-ahead-vm)
       # QEMU opens the device read-write, and falls back to emulation when it cannot; an
       # evaluation alone needs no KVM
       if [ -z "$derivations_out" ] && { [ ! -r "$kvm_device" ] || [ ! -w "$kvm_device" ]; }; then

@@ -28,6 +28,17 @@ host's kernel, so a NixOS upgrade can wait on ZFS. The reinstall runs `nixos-any
 the VM's Secure Boot blocks, so Secure Boot stays off
 ([the reinstall runbook](../../runbooks/reinstall-geoffcloud.md)).
 
+### Read-ahead on the root disk
+
+The root disk's read-ahead is 128 KiB, the kernel's default. The kernel sets a disk's read-ahead
+from the optimal I/O size the disk reports, and the root disk gets 8 MiB from it. A page fault on a
+mapped file reads that much around the page, and the memory cgroup of the process that faulted pays
+for it. Alloy reads the host journal through sd-journal, which maps each journal file in 8 MiB
+windows. With 8 MiB of read-ahead, Alloy's 384 MiB cgroup cannot hold the pages its journal reads
+fault in, so it evicts them and reads them again, until its readiness probe times out. A udev rule
+sets the read-ahead at each device event of the disk, and a unit sets it at each switch. The second
+disk keeps the kernel's value, because ZFS prefetches on its own.
+
 ## Services
 
 - **Tailscale** joins the host to the tailnet as `tag:cloud` and serves Tailscale SSH, which
