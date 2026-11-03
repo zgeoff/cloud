@@ -120,14 +120,14 @@ test('it sleeps a preview whose busy stack keeps impd counting it active once no
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('sleeping');
 });
 
-test('it sleeps a busy preview that no request has reached once the idle timeout passes from its creation', async () => {
+test('it keeps a preview in use awake past the idle timeout from its creation on an impd that reports no request time', async () => {
   const ctx = await setupTest();
 
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
     createdAt: '2026-10-15T08:00:00.000Z',
-    lastActiveAt: '2026-10-15T09:00:00.000Z',
+    lastActiveAt: '2026-10-15T08:59:00.000Z',
     lastRequestAt: null,
     httpPort: 8080,
     image: 'base',
@@ -138,7 +138,7 @@ test('it sleeps a busy preview that no request has reached once the idle timeout
 
   await runIdleSweep(ctx.deps);
 
-  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('sleeping');
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
 });
 
 test('it keeps a preview awake after a request through the proxy resets its idle time', async () => {

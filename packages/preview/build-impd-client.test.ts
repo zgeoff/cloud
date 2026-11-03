@@ -33,7 +33,7 @@ test('#createImp creates an imp outside every backup, with the HTTP port it name
   });
 });
 
-test('#readImp reads an imp with no proxied request as last used at its creation', async () => {
+test('#readImp reads an imp with no proxied request, as an impd before 6.4.0 reports it, as last used at its last activity', async () => {
   const ctx = setupTest();
 
   ctx.impd.imps.set('pv-0a1b2c3d-7', {
@@ -54,7 +54,7 @@ test('#readImp reads an imp with no proxied request as last used at its creation
   expect(result).toStrictEqual({
     name: 'pv-0a1b2c3d-7',
     state: 'running',
-    lastUsedAt: new Date('2026-10-01T08:00:00.000Z'),
+    lastUsedAt: new Date('2026-10-01T09:00:00.000Z'),
   });
 });
 

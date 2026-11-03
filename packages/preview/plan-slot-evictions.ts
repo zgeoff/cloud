@@ -2,8 +2,8 @@ import type { Imp } from '@impz/client';
 import { contractImpPrefix } from './build-contract-imp-name.ts';
 
 export interface ImpActivity extends Readonly<Pick<Imp, 'name' | 'state'>> {
-  // the last request through impd's wake proxy, or the imp's creation before the first; impd's
-  // lastActiveAt also moves for the guest's own connections and CPU, so a stack never reads idle
+  // the last request through impd's wake proxy; impd's lastActiveAt also moves for the guest's
+  // own connections and CPU, so a preview's stack would never read idle by it
   readonly lastUsedAt: Date;
 }
 
