@@ -33,8 +33,7 @@ in
       ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="${cfg.device}", ATTR{queue/read_ahead_kb}="${toString cfg.kibibytes}"
     '';
 
-    # a switch, which needs no device event; the unit changes with the value, so a switch to a new
-    # value starts it again
+    # boot, and a switch that adds the unit or changes its value, with no device event needed
     systemd.services.disk-read-ahead = {
       description = "${cfg.device} read-ahead of ${toString cfg.kibibytes} KiB";
       wantedBy = [ "multi-user.target" ];
