@@ -108,11 +108,11 @@ owner's approval, and in order: a token without the new names fails every new sa
 
 ## Pin nixie's sandbox images
 
-nixie adds its sandbox images with its own token, which cannot pin an image. Delivery pins them with
-`impz image pin` as impd's root at each nixie release that adds sandbox images, which the release
-check labels `sandbox-images-changed` on its bump, so impd's image eviction never makes a sandbox
-create pull its image again. nixie adds an evicted image again before it creates a sandbox on it, so
-an image that misses its pin costs a pull, not a failed create.
+nixie adds its sandbox images with its own token, which cannot pin an image. `z-release` pins them
+with `impz image pin` as impd's root at each nixie release that adds sandbox images, which the
+release check labels `sandbox-images-changed` on its bump, so impd's image eviction never makes a
+sandbox create pull its image again. nixie adds an evicted image again before it creates a sandbox
+on it, so an image that misses its pin costs a pull, not a failed create.
 
 Once the release reports ready, pin each of its sandbox images by the name nixie gives it:
 
