@@ -9,7 +9,7 @@ export function planIdleSleeps(imps: readonly ImpActivity[], idleMs: number, now
       (imp) =>
         imp.state === 'running' &&
         !imp.name.startsWith(contractImpPrefix) &&
-        now.getTime() - imp.lastActiveAt.getTime() >= idleMs,
+        now.getTime() - imp.lastUsedAt.getTime() >= idleMs,
     )
     .map((imp) => imp.name);
 }

@@ -5,7 +5,7 @@ export function buildMockImpActivity(overrides: Partial<ImpActivity> = {}): ImpA
   return {
     name: `pv-${faker.string.hexadecimal({ length: 8, casing: 'lower', prefix: '' })}-${String(faker.number.int({ min: 1, max: 9999 }))}`,
     state: 'running',
-    lastActiveAt: faker.date.recent(),
+    lastUsedAt: faker.date.recent(),
     ...overrides,
   };
 }

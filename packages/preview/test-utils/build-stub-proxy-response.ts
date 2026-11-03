@@ -8,6 +8,7 @@ export interface StubApp {
 interface StubProxyImp {
   readonly name: string;
   state: string;
+  lastRequestAt: string | null;
   readonly httpPort: number;
 }
 
@@ -16,6 +17,7 @@ interface StubProxy {
   readonly imps: Map<string, StubProxyImp>;
   readonly apps: Map<string, StubApp>;
   readonly proxied: string[];
+  readonly now: () => Date;
 }
 
 // impd's wake proxy at https://<name>.<domain> (zgeoff/imp v2.0.3 packages/daemon/src/proxy/): it
@@ -35,6 +37,7 @@ export function buildStubProxyResponse(proxy: StubProxy, request: Request): Resp
   }
 
   imp.state = 'running';
+  imp.lastRequestAt = proxy.now().toISOString();
 
   return buildForwardedResponse(proxy, imp);
 }

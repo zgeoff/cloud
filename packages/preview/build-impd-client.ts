@@ -130,7 +130,7 @@ async function withImpdErrors<T>(call: () => Promise<T>): Promise<T> {
 }
 
 function toImpActivity(imp: Imp): ImpActivity {
-  return { name: imp.name, state: imp.state, lastActiveAt: imp.lastActiveAt };
+  return { name: imp.name, state: imp.state, lastUsedAt: imp.lastRequestAt ?? imp.createdAt };
 }
 
 async function readImpActivity(client: ImpClient, name: string): Promise<ImpActivity | null> {

@@ -7,17 +7,24 @@ function setupTest() {
 
   const proxy = {
     impDomain: 'imps.example.test',
-    imps: new Map([
-      ['pv-0a1b2c3d-17', { name: 'pv-0a1b2c3d-17', state: 'sleeping', httpPort: 3000 }],
+    imps: new Map<
+      string,
+      { name: string; state: string; lastRequestAt: string | null; httpPort: number }
+    >([
+      [
+        'pv-0a1b2c3d-17',
+        { name: 'pv-0a1b2c3d-17', state: 'sleeping', lastRequestAt: null, httpPort: 3000 },
+      ],
     ]),
     apps: new Map<string, StubApp>(),
     proxied,
+    now: () => new Date('2026-10-15T08:30:00.000Z'),
   };
 
   return { proxy };
 }
 
-test("it forwards to an app on the imp's own address and HTTP port, waking the imp", async () => {
+test("it forwards to an app on the imp's own address and HTTP port, waking the imp and recording the request", async () => {
   const ctx = setupTest();
 
   ctx.proxy.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 3000 });
@@ -32,7 +39,13 @@ test("it forwards to an app on the imp's own address and HTTP port, waking the i
     body: 'ok\n',
   });
 
-  expect(ctx.proxy.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
+  expect(ctx.proxy.imps.get('pv-0a1b2c3d-17')).toStrictEqual({
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastRequestAt: '2026-10-15T08:30:00.000Z',
+    httpPort: 3000,
+  });
+
   expect(ctx.proxy.proxied).toStrictEqual(['GET https://pv-0a1b2c3d-17.imps.example.test/healthz']);
 });
 

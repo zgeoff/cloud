@@ -182,11 +182,14 @@ names.
 
 The service runs at most a set number of previews at once, one by default, because each preview's
 imp holds memory from impd's budget while it runs. Before a preview boots or wakes, the service
-lists the running preview imps and puts the least recently active to sleep until the opening one
-fits. A sleeping imp keeps its memory on disk, so its next open resumes it where it stopped. A sweep
-on a timer puts every preview to sleep that nobody used for the idle timeout. impd records an imp's
-last use, and counts as use a request through its wake proxy, a guest session, an open TCP
-connection to or from the guest, or CPU load above its idle threshold.
+lists the running preview imps and puts the least recently used to sleep until the opening one fits.
+A sleeping imp keeps its memory on disk, so its next open resumes it where it stopped. A sweep on a
+timer puts every preview to sleep that nobody used for the idle timeout. A preview's last use is the
+last request through impd's wake proxy, which impd returns as `lastRequestAt` and keeps current
+while a proxied stream or WebSocket stays open. Before its first request, a preview counts as last
+used at its imp's creation. The service never reads impd's `lastActiveAt`, because a preview's own
+stack holds connections and CPU in the guest, which keep that time current while nobody uses the
+preview.
 
 The slot rule runs under one lock, so two opens at once never both find a free slot. A boot holds
 the lock until it settles, because its build's guest commands would wake an imp that another open

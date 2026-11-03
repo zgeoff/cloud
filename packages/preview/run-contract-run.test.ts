@@ -237,7 +237,9 @@ test('it posts pending with the reason, starts no imp, and leaves the preview aw
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:59:00.000Z',
+    lastRequestAt: '2026-10-15T08:59:00.000Z',
     httpPort: 8080,
     image: 'pv-base',
     memoryMib: 4096,
@@ -284,7 +286,9 @@ test('it posts nothing new when a retry still finds every slot taken', async () 
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:59:00.000Z',
+    lastRequestAt: '2026-10-15T08:59:00.000Z',
     httpPort: 8080,
     image: 'pv-base',
     memoryMib: 4096,
@@ -313,13 +317,15 @@ test('it posts nothing new when a retry still finds every slot taken', async () 
   expect(commitStatuses).toStrictEqual([]);
 });
 
-test('it puts a preview unused for the idle time to sleep and runs a waiting run in its slot', async () => {
+test('it puts a preview unused for the idle time to sleep, however busy its stack, and runs a waiting run in its slot', async () => {
   const ctx = await setupTest();
 
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
-    lastActiveAt: '2026-10-15T08:55:00.000Z',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    lastActiveAt: '2026-10-15T09:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:55:00.000Z',
     httpPort: 8080,
     image: 'pv-base',
     memoryMib: 4096,
@@ -367,7 +373,9 @@ test('it keeps the run waiting and starts no imp when impd refuses to sleep the 
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'pv-base',
     memoryMib: 4096,
@@ -432,7 +440,9 @@ test('it runs a waiting run once a slot is free', async () => {
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'sleeping',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'pv-base',
     memoryMib: 4096,
@@ -500,7 +510,9 @@ test('it removes an imp that a stopped service left behind and runs on a new one
   ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
     name: 'pv-sdk-0123456789abcdef',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'pv-base',
     memoryMib: 4096,
@@ -584,7 +596,9 @@ test('it ends a queued run with an error and removes its imp once the contract s
   ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
     name: 'pv-sdk-0123456789abcdef',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'pv-base',
     memoryMib: 4096,
@@ -729,7 +743,9 @@ test('it keeps the result settling and the status unset when impd fails to remov
   ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
     name: 'pv-sdk-0123456789abcdef',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'pv-base',
     memoryMib: 4096,
@@ -772,7 +788,9 @@ test('it settles a settling run on its next try: removes the imp, posts the stor
   ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
     name: 'pv-sdk-0123456789abcdef',
     state: 'running',
+    createdAt: '2026-09-01T00:00:00.000Z',
     lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'pv-base',
     memoryMib: 4096,
