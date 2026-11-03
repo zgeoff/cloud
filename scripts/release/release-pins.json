@@ -13,8 +13,8 @@
     "tag": "7.8.0"
   },
   "atc-gateway-image": {
-    "version": "7.7.4",
-    "digest": "sha256:d422f211d6acef1c97ae852ab745b86c6176c44dea13379d44b661c27155877d"
+    "version": "7.8.0",
+    "digest": "sha256:04fc8a4b0816de40f6043e22cb5db2cfff3332836215e5b014ec7feae8c09990"
   },
   "atc-gateway-backup-image": {
     "tag": "2.24.0-r2",
