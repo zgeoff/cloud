@@ -57,7 +57,6 @@ export interface StubImpd {
   // every request through the wake proxy, as `<method> <url>`, in order
   readonly proxied: string[];
 
-  // the clock impd stamps a created imp and a proxied request with
   readonly now: () => Date;
 
   // every procedure call, as `<router>/<procedure> <name>`, or the procedure alone for one that
