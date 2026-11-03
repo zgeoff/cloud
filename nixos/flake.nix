@@ -31,6 +31,7 @@
         ./modules/host-build-lag.nix
         ./modules/agent-image-build.nix
         ./modules/host-cgroup-cpu.nix
+        ./modules/disk-read-ahead.nix
         ./modules/drift-check.nix
         ./modules/atc-daemon.nix
         ./modules/cloud-host-firewall.nix
@@ -69,7 +70,8 @@
       # the host does, and onepassword-connect-relay-vm, which switches the Connect relay to another
       # bridge, and preview-image-vm, which starts the preview-image unit under real Podman before
       # a stand-in imp-host container exists, and agent-image-build-switch-vm, which starts the agent image
-      # build while a switch recreates imp-host. onidel-provider-vendor builds the provider's vendored Go modules, which CI's
+      # build while a switch recreates imp-host, and disk-read-ahead-vm, which sets a disk's read-ahead
+      # through sysfs. onidel-provider-vendor builds the provider's vendored Go modules, which CI's
       # checks job also runs on a Go change
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -143,6 +145,9 @@
         inherit nixpkgs imp;
       };
       checks.x86_64-linux.host-cgroup-cpu-vm = import ./checks/host-cgroup-cpu-vm.nix {
+        inherit nixpkgs;
+      };
+      checks.x86_64-linux.disk-read-ahead-vm = import ./checks/disk-read-ahead-vm.nix {
         inherit nixpkgs;
       };
       checks.x86_64-linux.onidel-provider-vendor = import ./checks/onidel-provider-vendor.nix {

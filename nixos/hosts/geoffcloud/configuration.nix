@@ -306,6 +306,14 @@ in
   # the pool without a reservation and a page the kernel cannot make kills the guest
   boot.kernel.sysctl."vm.nr_hugepages" = config.services.imp.ramBudgetMiB / 2;
 
+  # the root disk's read-ahead at the kernel's default, in place of the 8 MiB the kernel derives
+  # from what vda reports, at which Alloy's journal reads thrash its memory cgroup
+  # (docs/architecture/host/host.md#read-ahead-on-the-root-disk). vdb keeps its own: ZFS prefetches
+  services.disk-read-ahead = {
+    enable = true;
+    device = "vda";
+  };
+
   # the TLS front on 443 for the registry's front routes (modules/public-front.nix). A hosted MCP
   # client signs in and calls imp's tools through it, so each address gets a limit of its own:
   # impd counts its limits per client and grant, never per address
