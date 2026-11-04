@@ -110,8 +110,8 @@ models:
     opus-5-5:
       profile: opus-5-5
       description:
-        Claude Opus 5.5, released September 2026, the same model you run on. Good for a second
-        opinion or a longer conversation.
+        Claude Opus 5.5, released September 2026. Good for a second opinion or a longer
+        conversation.
     opus-4-5:
       profile: opus-4-5
       description:
