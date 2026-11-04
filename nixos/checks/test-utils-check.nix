@@ -403,7 +403,7 @@ let
       '';
     }
     {
-      title = "it run-stub-impd holds to the pinned imp: its /health handler and its empty warnings, the default 404 of Elysia, Elysia 1.4.30 and Bun 1.4.3 at the hashes of this check";
+      title = "it run-stub-impd holds to the pinned imp: its /health handler and its empty warnings, the default 404 of Elysia, Elysia 1.4.30 and Bun 1.4.4 at the hashes of this check";
       script = ''
         handlers=$(grep -cxF "    .get('/health', () => ({" ${imp}/packages/daemon/src/surface/create-app.ts || true)
         grep -xF -A4 "    .get('/health', () => ({" ${imp}/packages/daemon/src/surface/create-app.ts > handler || true
@@ -413,7 +413,7 @@ let
         # an Elysia onError hook would replace the default 404; create-app.ts's onError is oRPC's
         error_hooks=$(grep -cF '.onError(' ${imp}/packages/daemon/src/surface/create-app.ts || true)
         elysia=$(jq -r '.workspaces.catalog.elysia' ${imp}/package.json)
-        bun=$(grep -c '^FROM oven/bun:1\.4\.3@' ${imp}/host/Dockerfile || true)
+        bun=$(grep -c '^FROM oven/bun:1\.4\.4@' ${imp}/host/Dockerfile || true)
         grep -oE '"(elysia|@sinclair/typebox|cookie|exact-mirror|fast-decode-uri-component|memoirist)": \["[^"]+".*"sha512-[^"]+"\]' \
           ${imp}/bun.lock | sed -E 's/^"([^"]+)": \["([^"]+)".*"(sha512-[^"]+)"\]$/\2 \3/' | sort > locked
 
@@ -437,7 +437,7 @@ let
         EOF
         assert_equals 0 "$error_hooks" "create-app.ts's Elysia onError hooks"
         assert_equals 1.4.30 "$elysia" "imp's Elysia version"
-        assert_equals 1 "$bun" "host/Dockerfile's oven/bun:1.4.3 stages"
+        assert_equals 1 "$bun" "host/Dockerfile's oven/bun:1.4.4 stages"
         cat > expected <<'EOF'
         @sinclair/typebox@0.34.52 sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==
         cookie@1.1.1 sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==
@@ -452,13 +452,13 @@ let
     }
     (
       let
-        # the Bun the pinned imp runs (host/Dockerfile's oven/bun:1.4.3), from its release
+        # the Bun the pinned imp runs (host/Dockerfile's oven/bun:1.4.4), from its release
         pinnedBun = pkgs.stdenv.mkDerivation {
           pname = "bun";
-          version = "1.4.3";
+          version = "1.4.4";
           src = pkgs.fetchurl {
-            url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.3/bun-linux-x64.zip";
-            hash = "sha256-PnMFKNiXdfA/h/BcBnh8TfQJnQo38/JS57gpyyOBbhg=";
+            url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64.zip";
+            hash = "sha256-v4zL+ysLgBWeD5ptFcVTF63YB3U028YTCj7bUvzLOVw=";
           };
           nativeBuildInputs = [
             pkgs.unzip
@@ -526,7 +526,7 @@ let
         '';
       in
       {
-        title = "it run-stub-impd answers /health and an unknown route as the Elysia 1.4.30 of imp on Bun 1.4.3 does";
+        title = "it run-stub-impd answers /health and an unknown route as the Elysia 1.4.30 of imp on Bun 1.4.4 does";
         script = ''
           mkdir home tmp
           mkfifo real.fifo stub-health.fifo stub-missing.fifo
