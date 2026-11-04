@@ -133,6 +133,10 @@ async function startReadyImp(deps: PreviewDeps, preview: Preview): Promise<boole
     return false;
   }
 
+  // an imp keeps the egress policy it was created with, so a running or waking guest gets the
+  // public policy here, as a rebuilt one does
+  await deps.impd.updatePublicEgress(preview.imp);
+
   await applySlotEvictions(deps, preview.imp);
 
   if (imp.state === 'running') {

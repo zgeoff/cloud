@@ -340,6 +340,58 @@ test('it wakes a sleeping ready preview, checks its health and redirects to its 
   expect(ctx.impd.commands).toStrictEqual([]);
 });
 
+test.each(['running', 'sleeping'] as const)(
+  'it puts a %s ready preview under the public egress policy before it redirects or wakes it',
+  async (state) => {
+    const ctx = await setupTest();
+
+    composeFiles.set(
+      'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'x-preview:\n  health: /healthz\nservices: {}\n',
+    );
+
+    ctx.store.upsertHead({
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    });
+
+    ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+      phase: 'booting',
+    });
+
+    ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['booting'], {
+      phase: 'ready',
+      builtSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    });
+
+    ctx.impd.imps.set('pv-0a1b2c3d-17', {
+      name: 'pv-0a1b2c3d-17',
+      state,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      lastActiveAt: '2026-10-15T08:00:00.000Z',
+      lastRequestAt: '2026-10-15T08:00:00.000Z',
+      httpPort: 8080,
+      image: 'base',
+      memoryMib: 2048,
+      backup: false,
+      grants: ['gh'],
+    });
+
+    ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
+
+    await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17'));
+
+    expect(ctx.impd.calls.slice(0, 2)).toStrictEqual([
+      'imps/get pv-0a1b2c3d-17',
+      'imps/setPolicy pv-0a1b2c3d-17',
+    ]);
+
+    expect(ctx.impd.egressModes).toStrictEqual(new Map([['pv-0a1b2c3d-17', 'public']]));
+  },
+);
+
 test('it boots a woken preview again when its stack never answers', async () => {
   const ctx = await setupTest();
 

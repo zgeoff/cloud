@@ -1037,6 +1037,7 @@ let
         ./run-contract-retries.ts
         ./run-contract-run.ts
         ./run-contract-suite.ts
+        ./run-egress-update.ts
         ./run-idle-sweep.ts
         ./run-preview-boot.ts
         ./start-contract-run.ts

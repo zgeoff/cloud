@@ -9,6 +9,7 @@ import { makeSlotLock } from './make-slot-lock.ts';
 import { makeSpendHandler } from './make-spend-handler.ts';
 import { makeWebhookHandler } from './make-webhook-handler.ts';
 import { runContractRetries } from './run-contract-retries.ts';
+import { runEgressUpdate } from './run-egress-update.ts';
 import { runIdleSweep } from './run-idle-sweep.ts';
 import type { PreviewDeps } from './types.ts';
 
@@ -44,6 +45,8 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
     sleep: (durationMs) => Bun.sleep(durationMs),
     log: writeLog,
   };
+
+  const egressUpdate = runEgressUpdate(deps);
 
   // two listeners, so the public route reaches the webhook alone: the link listener on the tailnet,
   // and the webhook listener that the cluster's tunnel dials
@@ -89,7 +92,7 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
       clearInterval(sweep);
 
       await Promise.all([linkServer.stop(), webhookServer.stop(), spendServer?.stop()]);
-      await Promise.allSettled([...deps.pendingBoots, ...deps.pendingRuns]);
+      await Promise.allSettled([...deps.pendingBoots, ...deps.pendingRuns, egressUpdate]);
       await spendProxies?.removeAll();
 
       store.close();

@@ -173,8 +173,10 @@ no model call.
 Only the broker reaches the listener. imp-host masquerades each guest's traffic to its own address
 on the bridge, so neither the host's firewall nor the listener can tell a guest from the broker.
 impd's `public` egress policy, which every imp of the service runs under, refuses the guest every
-private address, the bridge included. The broker dials from imp-host itself, outside that policy, so
-the guest's model calls still go out through the broker.
+private address, the bridge included. An imp keeps the policy it was created with, so the service
+sets it on every imp at each start of the service, and on an existing imp before a boot or an open
+wakes it. The broker dials from imp-host itself, outside that policy, so the guest's model calls
+still go out through the broker.
 
 Each proxy counts in a file of its own in the service's state, and the count lasts for the pull
 request's life. A proxy with no reply under way that went unused for the sleep time stops and keeps
