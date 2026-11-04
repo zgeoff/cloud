@@ -2,6 +2,7 @@ import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { buildSpendProxyIO } from './build-spend-proxy-io.ts';
 import { createPreviewStore } from './create-preview-store.ts';
+import type { SpendProxies } from './create-spend-proxies.ts';
 import { createSpendProxies } from './create-spend-proxies.ts';
 import type { PreviewConfig } from './load-preview-config.ts';
 import { makeLinkHandler } from './make-link-handler.ts';
@@ -46,28 +47,14 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
     log: writeLog,
   };
 
-  const egressUpdate = runEgressUpdate(deps);
+  const egressStop = new AbortController();
+
+  const spendServer = startSpendServer(config.spend, spendProxies, deps, egressStop.signal);
 
   // two listeners, so the public route reaches the webhook alone: the link listener on the tailnet,
   // and the webhook listener that the cluster's tunnel dials
   const linkServer = Bun.serve({ ...config.linkListener, fetch: makeLinkHandler(deps) });
   const webhookServer = Bun.serve({ ...config.webhookListener, fetch: makeWebhookHandler(deps) });
-
-  // a third on the docker bridge, which imp-host's broker dials with each preview's model calls; a
-  // streamed reply can sit quiet for longer than Bun's idle timeout while the model thinks
-  const spendServer =
-    config.spend === null || spendProxies === null
-      ? null
-      : Bun.serve({
-          ...config.spend.listener,
-          idleTimeout: 0,
-          fetch: makeSpendHandler({
-            store,
-            proxies: spendProxies,
-            sendRequest: fetch,
-            log: writeLog,
-          }),
-        });
 
   const sweep = setInterval(() => {
     void runIdleSweep(deps);
@@ -81,18 +68,16 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
     `previews: links on ${config.linkListener.hostname}:${config.linkListener.port}, webhook on ${config.webhookListener.hostname}:${config.webhookListener.port}`,
   );
 
-  if (config.spend !== null) {
-    deps.log(
-      `previews: model routes on ${config.spend.listener.hostname}:${config.spend.listener.port}, $${config.spend.settings.limitDollars} each`,
-    );
-  }
-
   return {
     stop: async () => {
       clearInterval(sweep);
 
-      await Promise.all([linkServer.stop(), webhookServer.stop(), spendServer?.stop()]);
-      await Promise.allSettled([...deps.pendingBoots, ...deps.pendingRuns, egressUpdate]);
+      egressStop.abort();
+
+      const spend = await spendServer;
+
+      await Promise.all([linkServer.stop(), webhookServer.stop(), spend?.stop()]);
+      await Promise.allSettled([...deps.pendingBoots, ...deps.pendingRuns]);
       await spendProxies?.removeAll();
 
       store.close();
@@ -106,4 +91,32 @@ function readNow(): Date {
 
 function writeLog(line: string): void {
   console.log(line);
+}
+
+// The third listener, on the docker bridge, which imp-host's broker dials with each preview's model
+// calls. A guest outside the public policy reaches it as the broker does, so it opens only once
+// every imp has that policy. A streamed reply can sit quiet for longer than Bun's idle timeout.
+async function startSpendServer(
+  spend: PreviewConfig['spend'],
+  proxies: SpendProxies | null,
+  deps: PreviewDeps,
+  signal: AbortSignal,
+): Promise<Bun.Server<undefined> | null> {
+  const isUpdated = await runEgressUpdate(deps, signal);
+
+  if (!isUpdated || spend === null || proxies === null) {
+    return null;
+  }
+
+  const server = Bun.serve({
+    ...spend.listener,
+    idleTimeout: 0,
+    fetch: makeSpendHandler({ store: deps.store, proxies, sendRequest: fetch, log: writeLog }),
+  });
+
+  writeLog(
+    `previews: model routes on ${spend.listener.hostname}:${spend.listener.port}, $${spend.settings.limitDollars} each`,
+  );
+
+  return server;
 }
