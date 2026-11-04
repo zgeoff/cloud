@@ -44,15 +44,19 @@ test('it renders a 1-hour cache lifetime on the conversation profile only', asyn
 
   expect(rendered).toMatchObject({
     models: {
-      roles: { conversation: 'opus', 'memory-writer': 'haiku', checker: 'sonnet' },
+      roles: {
+        conversation: 'opus-5-5',
+        'memory-writer': 'haiku-5-5-low',
+        checker: 'sonnet-5-5-high',
+      },
       profiles: {
-        opus: { cache_ttl: '1h' },
-        haiku: expect.toBeObject(),
-        sonnet: expect.toBeObject(),
+        'opus-5-5': { cache_ttl: '1h' },
+        'haiku-5-5-low': expect.toBeObject(),
+        'sonnet-5-5-high': expect.toBeObject(),
       },
     },
   });
 
-  expect(rendered).not.toHaveProperty(['models', 'profiles', 'haiku', 'cache_ttl']);
-  expect(rendered).not.toHaveProperty(['models', 'profiles', 'sonnet', 'cache_ttl']);
+  expect(rendered).not.toHaveProperty(['models', 'profiles', 'haiku-5-5-low', 'cache_ttl']);
+  expect(rendered).not.toHaveProperty(['models', 'profiles', 'sonnet-5-5-high', 'cache_ttl']);
 });

@@ -10,7 +10,13 @@ server:
   secrets_file: /etc/nixie/secrets.yaml
 models:
   profiles:
-    opus:
+    # A profile's ID names its model and, when a role needs another effort, that effort. Each profile
+    # needs its own model secret in impd, whose name hashes the ID (docs/runbooks/nixie.md). A
+    # selectable model's profile needs prices, in dollars per million tokens, from the Claude API
+    # pricing page.
+    #
+    # the conversation's profile, and the selectable opus-5-5
+    opus-5-5:
       base_url: https://api.anthropic.com
       credential: deployment:anthropic
       auth_header: bearer
@@ -18,26 +24,115 @@ models:
       effort: medium
       # compact a long conversation at 400k tokens instead of near the full window
       context_tokens: 400000
-      # keep the conversation's cached prompt for an hour; every other profile keeps the 5m default
+      # keep the cached prompt for an hour, for the conversation and for a task on opus-5-5; every
+      # other profile keeps the 5m default
       cache_ttl: 1h
+      prices: { input: 4, cache_write: 5, cache_write_1h: 8, cached_input: 0.2, output: 20 }
     # the memory writer extracts and files memories from each batch of messages
-    haiku:
+    haiku-5-5-low:
       base_url: https://api.anthropic.com
       credential: deployment:anthropic
       auth_header: bearer
       model: claude-haiku-5-5
       effort: low
-    # high is Sonnet 5.5's default effort, and the schema needs a value
-    sonnet:
+    # the checker; high is Sonnet 5.5's default effort, and the schema needs a value
+    sonnet-5-5-high:
       base_url: https://api.anthropic.com
       credential: deployment:anthropic
       auth_header: bearer
       model: claude-sonnet-5-5
       effort: high
+    haiku-5-5:
+      base_url: https://api.anthropic.com
+      credential: deployment:anthropic
+      auth_header: bearer
+      model: claude-haiku-5-5
+      effort: medium
+      prices:
+        input: 0.1
+        cache_write: 0.125
+        cache_write_1h: 0.2
+        cached_input: 0.01
+        output: 0.5
+        # Haiku 5.5 prices a whole request at these rates once its prompt passes 100k tokens
+        long_prompt:
+          over_tokens: 100000
+          input: 0.5
+          cache_write: 0.625
+          cache_write_1h: 1
+          cached_input: 0.05
+          output: 2.5
+    sonnet-5-5:
+      base_url: https://api.anthropic.com
+      credential: deployment:anthropic
+      auth_header: bearer
+      model: claude-sonnet-5-5
+      effort: medium
+      prices: { input: 2, cache_write: 2.5, cache_write_1h: 4, cached_input: 0.1, output: 10 }
+    opus-4-5:
+      base_url: https://api.anthropic.com
+      credential: deployment:anthropic
+      auth_header: bearer
+      model: claude-opus-4-5
+      effort: medium
+      prices: { input: 5, cache_write: 6.25, cache_write_1h: 10, cached_input: 0.5, output: 25 }
+    opus-4-6:
+      base_url: https://api.anthropic.com
+      credential: deployment:anthropic
+      auth_header: bearer
+      model: claude-opus-4-6
+      effort: medium
+      prices: { input: 5, cache_write: 6.25, cache_write_1h: 10, cached_input: 0.5, output: 25 }
+    fable-5-1:
+      base_url: https://api.anthropic.com
+      credential: deployment:anthropic
+      auth_header: bearer
+      model: claude-fable-5-1
+      effort: medium
+      prices: { input: 10, cache_write: 12.5, cache_write_1h: 20, cached_input: 0.25, output: 50 }
   roles:
-    conversation: opus
-    memory-writer: haiku
-    checker: sonnet
+    conversation: opus-5-5
+    memory-writer: haiku-5-5-low
+    checker: sonnet-5-5-high
+  # the models a started task can choose in place of the task role's profile; the conversation sees
+  # each name and its description
+  selectable:
+    haiku-5-5:
+      profile: haiku-5-5
+      description:
+        Claude Haiku 5.5, released October 2026. Small, quick and almost free. Good for a fast
+        answer, a quick check or a light chat.
+    sonnet-5-5:
+      profile: sonnet-5-5
+      description:
+        Claude Sonnet 5.5, released September 2026. Quick and sharp. A good second mind for most
+        conversations, at a fraction of the cost of a larger model.
+    opus-5-5:
+      profile: opus-5-5
+      description:
+        Claude Opus 5.5, released September 2026. Good for a second opinion or a longer
+        conversation.
+    opus-4-5:
+      profile: opus-4-5
+      description:
+        Claude Opus 4.5, released November 2025. An Opus from an earlier generation. Talk with it to
+        hear how an older Claude sees something.
+    opus-4-6:
+      profile: opus-4-6
+      description:
+        Claude Opus 4.6, released February 2026. An Opus from an earlier generation. Talk with it to
+        hear how an older Claude sees something.
+    fable-5-1:
+      profile: fable-5-1
+      description:
+        Claude Fable 5.1, released August 2026. Anthropic's most capable model, and the most
+        expensive. For a hard question, or a conversation that deserves the deepest thought.
+  # a started task's dollar limits; nixie's defaults are $2 and $10, which Fable 5.1 spends in a few
+  # turns. The turn limits keep nixie's defaults of 25 and 100
+  limits:
+    taskRun:
+      default: { dollars: 5 }
+      max: { dollars: 25 }
 definitions:
   source:
     kind: path
