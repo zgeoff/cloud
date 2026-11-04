@@ -32,8 +32,12 @@ The stack runs in the `observability` namespace:
   kubelet replaced while Alloy was stopped leaves, so Alloy reads the new file from its first line.
   Alloy drops the lines older than the hour Loki still accepts, because each line Loki rejects first
   counts against Loki's ingestion rate limit. Alloy also counts the gateway's sign-in events for
-  Prometheus, which scrapes Alloy ([sign-in alerts](#sign-in-alerts)). Alloy's journal reads fit its
-  memory limit only at the host's root disk read-ahead
+  Prometheus, which scrapes Alloy ([sign-in alerts](#sign-in-alerts)). Alloy reads the journal
+  through sd-journal, which maps the journal files in 8 MiB windows and reuses a window only once it
+  has 64, so it keeps about 520 MiB mapped. Alloy's 1 GiB memory limit holds that page cache beside
+  its 300 MiB `GOMEMLIMIT`. Under a smaller limit, the kernel evicts the window pages that Alloy
+  faults in, Alloy faults them in again, and its readiness probe times out. Each fault reads only
+  the host's root disk read-ahead
   ([read-ahead on the root disk](../host/host.md#read-ahead-on-the-root-disk)).
 - **Three blackbox exporters** run the probes that need a network path: one opens a TCP connection
   to each atc daemon on the gateway's path to it, one fetches impd's health over HTTPS on the

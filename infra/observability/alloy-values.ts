@@ -25,7 +25,11 @@ export function buildAlloyValues(configMapName: Input<string>) {
 
       // the Go runtime collects garbage harder as the heap nears GOMEMLIMIT, below the limit
       extraEnv: [{ name: 'GOMEMLIMIT', value: '300MiB' }],
-      resources: { requests: { cpu: '20m', memory: '128Mi' }, limits: { memory: '384Mi' } },
+
+      // sd-journal keeps 64 journal windows of 8 MiB mapped before it reuses one, and prod mapped
+      // 65. Below their 520 MiB beside GOMEMLIMIT, the kernel evicts the window pages Alloy faults
+      // in, and Alloy faults them again until its readiness probe times out
+      resources: { requests: { cpu: '20m', memory: '128Mi' }, limits: { memory: '1Gi' } },
     },
     serviceMonitor: { enabled: true },
     controller: {
