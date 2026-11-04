@@ -81,7 +81,9 @@ function createEnvSecret(cluster: Provider, inputs: NixieBackupJobInputs): Secre
         AWS_DEFAULT_REGION: 'auto',
       },
     },
-    { provider: cluster },
+
+    // as on the script ConfigMap: a change to its data replaces it under the same name
+    { provider: cluster, deleteBeforeReplace: true },
   );
 }
 
@@ -89,7 +91,8 @@ function createScriptConfigMap(cluster: Provider, namespace: Output<string>): Co
   return new ConfigMap(
     'nixie-backup-script',
     {
-      // Pulumi updates the script in place, and the CronJob's next run reads it
+      // a fixed name, because the CronJob and the restore Job's YAML name it; the CronJob's next run
+      // reads the new script
       metadata: { name: 'nixie-backup-script', namespace },
       data: {
         'backup.sh': readFileSync(
@@ -98,7 +101,10 @@ function createScriptConfigMap(cluster: Provider, namespace: Output<string>): Co
         ),
       },
     },
-    { provider: cluster },
+
+    // Pulumi replaces a ConfigMap whose data changes, and a create under the same name fails while
+    // the old one exists
+    { provider: cluster, deleteBeforeReplace: true },
   );
 }
 
@@ -110,6 +116,8 @@ function createConfigMap(cluster: Provider, inputs: NixieBackupJobInputs): Confi
       metadata: { name: 'nixie-backup-config', namespace: inputs.namespace },
       data: { [nixieConfigKey]: inputs.config },
     },
-    { provider: cluster },
+
+    // as on the script: each change to config.yaml replaces it
+    { provider: cluster, deleteBeforeReplace: true },
   );
 }

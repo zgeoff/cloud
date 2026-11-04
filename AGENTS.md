@@ -155,11 +155,13 @@ docs/
     the gateway's Access policy
   - a failed drift check, for a manual dispatch
 
-  A merge that changes only `deploy/nixie/secrets.sops.yaml` or `deploy/nixie/config.yaml` applies
-  with no manual dispatch. Its plan replaces a Secret or a ConfigMap whose name Pulumi generates,
-  because the infra code sets no `metadata.name` on it, and the guard passes a replace of such an
-  object when only its data changed. The guard holds the same change to an object whose
-  `metadata.name` the code sets.
+  A merge that changes only `deploy/nixie/secrets.sops.yaml` applies with no manual dispatch. Its
+  plan replaces a Secret whose name Pulumi generates, because the infra code sets no `metadata.name`
+  on it, and the guard passes a replace of such an object when only its data changed. The guard
+  holds the same change to an object whose `metadata.name` the code sets, so it holds every change
+  to `deploy/nixie/config.yaml`: nixie's backup job keeps a copy of that file in
+  `nixie-backup-config`, a ConfigMap with a fixed name. Give such an object
+  `deleteBeforeReplace: true`, or its replacement fails on the taken name.
   [The apply job](docs/architecture/infrastructure-as-code.md#the-apply-job) gives the reason.
 
 - Never run `bun run up` while a `Deploy prod` run is in progress.
