@@ -31,13 +31,9 @@ let
     "op://vault/item/field" = "a value with spaces";
     "op://vault/item/other" = "other";
   };
-  # the Bun of the pinned imp's host/Dockerfile, from the releases its pins have named: the image
+  # the Bun of the pinned imp's host/Dockerfile, from the release of the Bun it pins: the image
   # digest of the oven/bun stage and the hash of the release's bun-linux-x64.zip
   impBunRelease = findBunRelease {
-    "1.4.3" = {
-      digest = "sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598";
-      hash = "sha256-PnMFKNiXdfA/h/BcBnh8TfQJnQo38/JS57gpyyOBbhg=";
-    };
     "1.4.4" = {
       digest = "sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d";
       hash = "sha256-v4zL+ysLgBWeD5ptFcVTF63YB3U028YTCj7bUvzLOVw=";
