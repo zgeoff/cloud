@@ -16,7 +16,7 @@ secret the file ever held. Never print a decrypted value, and never put one on a
 | vault `cloud`, item `nixie-age-host`                 | the age identity that the pod holds; its public half is in sops                                                     |
 | vault `cloud`, item `nixie-age-recovery`             | the age identity that stays off the host; restores need only it                                                     |
 | vault `cloud`, item `nixie-deployment-key`           | the deployment key, 32 random bytes in base64                                                                       |
-| vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind the model profile `opus`                                                              |
+| vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind every model profile                                                                   |
 | vault `cloud`, item `nixie-definitions-deploy-key`   | git-sync's read-only deploy key for `zgeoff/nixie-definitions`                                                      |
 | vault `nixie`, item `nixie-definitions-export-token` | the token nixie opens skill pull requests in `zgeoff/nixie-definitions` with                                        |
 | vault `cloud`, item `nixie-restic`                   | the restic password of nixie's backup repository                                                                    |
@@ -56,8 +56,9 @@ Every profile uses the same credential, and the profile goes into the hash, so e
 own name:
 
 ```bash
+profiles=$(bun -e 'const c = Bun.YAML.parse(await Bun.file("deploy/nixie/config.yaml").text()); console.log(Object.keys(c.models.profiles).join(" "))')
 secrets=
-for profile in opus haiku sonnet; do
+for profile in $profiles; do
   hash=$(op read op://cloud/nixie-model-credential/credential \
     | { IFS= read -r c; printf '%s\nbearer\napi.anthropic.com\n%s' "$profile" "$c"; } \
     | sha256sum | cut -c1-19)
