@@ -18,3 +18,15 @@ test('it fails when the condition never holds before the timeout', () => {
     'the condition did not hold before the wait timed out',
   );
 });
+
+test('it resolves once an async condition resolves true', async () => {
+  const state = { ready: false };
+
+  setTimeout(() => {
+    state.ready = true;
+  }, 30);
+
+  await waitForCondition(() => Promise.resolve(state.ready));
+
+  expect(state.ready).toBe(true);
+});

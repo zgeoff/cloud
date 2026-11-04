@@ -1037,6 +1037,7 @@ let
         ./run-contract-retries.ts
         ./run-contract-run.ts
         ./run-contract-suite.ts
+        ./run-egress-update.ts
         ./run-idle-sweep.ts
         ./run-preview-boot.ts
         ./start-contract-run.ts
@@ -1064,7 +1065,7 @@ let
 
         HOME="$PWD" ${pkgs.bun}/bin/bun --no-install run load.ts > out 2> err
 
-        assert_equals "createImp readImp readImps sleepImp wakeImp updateHTTPPort removeImp installGrant installPathGrant removeGrantsExcept runCommand" "$(cat out)" "the client's calls"
+        assert_equals "createImp readImp readImps sleepImp wakeImp updateHTTPPort updatePublicEgress removeImp installGrant installPathGrant removeGrantsExcept runCommand" "$(cat out)" "the client's calls"
         assert_equals "" "$(cat err)" "bun's errors"
       '';
     }

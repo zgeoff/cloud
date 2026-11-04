@@ -77,6 +77,53 @@ test('it creates an imp active from its creation and with no request, as impd do
   });
 });
 
+test('it records the egress mode that a create names, as impd imps.create does', async () => {
+  const impd = startStubImpd();
+
+  await fetch(`${impd.url}/rpc/imps/create`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${impd.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      json: {
+        name: 'pv-0a1b2c3d-17',
+        image: 'base',
+        memoryMib: 2048,
+        policy: { mode: 'public', allow: [] },
+      },
+    }),
+  });
+
+  expect(impd.egressModes).toStrictEqual(new Map([['pv-0a1b2c3d-17', 'public']]));
+});
+
+test('it changes the egress mode of an imp and answers with the policy, as impd imps.setPolicy does', async () => {
+  const impd = startStubImpd();
+
+  impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'sleeping',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    lastRequestAt: null,
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: [],
+  });
+
+  const response = await fetch(`${impd.url}/rpc/imps/setPolicy`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${impd.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ json: { name: 'pv-0a1b2c3d-17', policy: { mode: 'public' } } }),
+  });
+
+  const body = await response.json();
+
+  expect(body).toStrictEqual({ json: { mode: 'public', allow: [] } });
+  expect(impd.egressModes).toStrictEqual(new Map([['pv-0a1b2c3d-17', 'public']]));
+});
+
 test('it records the time of each request through the wake proxy as the imp’s last request', async () => {
   const impd = startStubImpd({ now: () => new Date('2026-10-15T08:30:00.000Z') });
 

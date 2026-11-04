@@ -76,6 +76,10 @@ export interface StubImpd {
   // replaces it, as impd's does
   readonly grantPaths: Map<string, readonly string[]>;
 
+  // the egress mode of each imp whose create or policy change named one; impd gives any other its
+  // default, open
+  readonly egressModes: Map<string, string>;
+
   // the host each secret gives a credential for; impd refuses a grant whose host another of the
   // imp's grants already covers, and a secret with no host here clashes with none
   readonly secretHosts: Map<string, string>;
@@ -104,6 +108,7 @@ export function startStubImpd(options: StubImpdOptions = {}): StubImpd {
     answerCommand: () => ({ code: 0 }),
     tickets: new Map(),
     grantPaths: new Map(),
+    egressModes: new Map(),
     secretHosts: new Map(),
   };
 
@@ -191,6 +196,11 @@ function buildRPCError(status: number, code: string, message: string): Response 
 const stubImpdVersion = '2.3.0';
 const grantFilterSchema = z.object({ paths: z.array(z.string()).optional() });
 
+const egressPolicySchema = z.object({
+  mode: z.enum(['open', 'public', 'box', 'none']),
+  allow: z.array(z.string()).default([]),
+});
+
 function buildProcedureResponse(
   stub: StubImpd,
   procedure: string,
@@ -231,7 +241,13 @@ function buildProcedureResponse(
       grants: [],
     };
 
+    const policy = egressPolicySchema.safeParse(input['policy']);
+
     stub.imps.set(created.name, created);
+
+    if (policy.success) {
+      stub.egressModes.set(created.name, policy.data.mode);
+    }
 
     return buildRPCResult(toImpRecord(created));
   }
@@ -257,8 +273,16 @@ function buildProcedureResponse(
 
       return buildRPCResult(toImpRecord(imp));
     })
+    .with('imps/setPolicy', () => {
+      const policy = egressPolicySchema.parse(input['policy']);
+
+      stub.egressModes.set(imp.name, policy.mode);
+
+      return buildRPCResult(policy);
+    })
     .with('imps/destroy', () => {
       stub.imps.delete(imp.name);
+      stub.egressModes.delete(imp.name);
 
       for (const socket of stub.held.get(imp.name) ?? []) {
         socket.close();

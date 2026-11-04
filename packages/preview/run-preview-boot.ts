@@ -57,6 +57,9 @@ async function startImpInSlot(
       httpPort: contract.port,
     });
   } else {
+    // an imp keeps the egress policy it was created with, so the policy goes on before the guest
+    // wakes, as it does on a new imp
+    await deps.impd.updatePublicEgress(preview.imp);
     await deps.impd.updateHTTPPort(preview.imp, contract.port);
 
     await (imp.state === 'running' ? Promise.resolve() : deps.impd.wakeImp(preview.imp));
