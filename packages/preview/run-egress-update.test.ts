@@ -2,7 +2,7 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { HttpResponse, http, passthrough } from 'msw';
+import { HttpResponse, http } from 'msw';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
@@ -11,6 +11,7 @@ import { githubAPIURL } from './mocks/github-api-url.ts';
 import { stubApp } from './mocks/github-app.ts';
 import { server } from './mocks/node.ts';
 import { runEgressUpdate } from './run-egress-update.ts';
+import { createImpdRefusalHandler } from './test-utils/create-impd-refusal-handler.ts';
 import { startStubImpd } from './test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
 
@@ -181,30 +182,16 @@ test('it updates the other imps, then tries again the imp whose update impd refu
     grants: ['gh'],
   });
 
-  const refused: string[] = [];
-
   server.use(
-    http.post(`${ctx.impd.url}/rpc/imps/setPolicy`, async (info) => {
-      const body = await info.request.clone().text();
-
-      if (!body.includes('pv-4e5f6a7b-3') || refused.length > 0) {
-        return passthrough();
-      }
-
-      refused.push('pv-4e5f6a7b-3');
-
-      return HttpResponse.json(
-        {
-          json: {
-            defined: true,
-            code: 'MOVING',
-            status: 409,
-            message: 'The imp is moving between hosts',
-            data: { retryAfterS: 5 },
-          },
-        },
-        { status: 409 },
-      );
+    createImpdRefusalHandler({
+      impdURL: ctx.impd.url,
+      procedure: 'imps/setPolicy',
+      imp: 'pv-4e5f6a7b-3',
+      times: 1,
+      code: 'MOVING',
+      status: 409,
+      message: 'The imp is moving between hosts',
+      data: { retryAfterS: 5 },
     }),
   );
 
