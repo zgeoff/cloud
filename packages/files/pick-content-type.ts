@@ -50,10 +50,7 @@ function pickISOMediaType(brand: string): string {
 
 // the metadata names SVG and HTML, though the service serves both as a download whatever this finds
 function pickMarkupType(text: string): string {
-  const start = text
-    .replace(/^ï»¿/u, '')
-    .trimStart()
-    .toLowerCase();
+  const start = text.replace(/^ï»¿/u, '').trimStart().toLowerCase();
 
   if (start.startsWith('<svg') || (start.startsWith('<?xml') && start.includes('<svg'))) {
     return 'image/svg+xml';
