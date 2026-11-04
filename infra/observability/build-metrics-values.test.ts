@@ -17,8 +17,7 @@ test("it disables the chart's TargetDown, drops the kubelet's copy of the contro
           {
             action: 'drop',
             sourceLabels: ['__name__', 'le'],
-            regex:
-              '(csi_operations|storage_operation_duration)_seconds_bucket;(0.25|2.5|15|25|120|600)(\\.0)?',
+            regex: String.raw`(csi_operations|storage_operation_duration)_seconds_bucket;(0.25|2.5|15|25|120|600)(\.0)?`,
           },
           {
             action: 'drop',
