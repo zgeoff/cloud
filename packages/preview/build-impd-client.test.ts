@@ -33,6 +33,40 @@ test('#createImp creates an imp outside every backup, with the HTTP port it name
   });
 });
 
+test('#createImp creates the imp under the public egress policy, which keeps its guest off private addresses', async () => {
+  const ctx = setupTest();
+
+  await ctx.client.createImp({
+    name: 'pv-0a1b2c3d-7',
+    image: 'base',
+    memoryMib: 2048,
+    httpPort: 3000,
+  });
+
+  expect(ctx.impd.egressModes).toStrictEqual(new Map([['pv-0a1b2c3d-7', 'public']]));
+});
+
+test('#updatePublicEgress puts an existing imp under the public egress policy', async () => {
+  const ctx = setupTest();
+
+  ctx.impd.imps.set('pv-0a1b2c3d-7', {
+    name: 'pv-0a1b2c3d-7',
+    state: 'sleeping',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    lastActiveAt: '2026-10-01T09:00:00.000Z',
+    lastRequestAt: null,
+    httpPort: 3000,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: [],
+  });
+
+  await ctx.client.updatePublicEgress('pv-0a1b2c3d-7');
+
+  expect(ctx.impd.egressModes).toStrictEqual(new Map([['pv-0a1b2c3d-7', 'public']]));
+});
+
 test('#readImp reads an imp with no proxied request, as an impd before 6.4.0 reports it, as last used at its last activity', async () => {
   const ctx = setupTest();
 

@@ -33,6 +33,7 @@ export interface ImpdClient {
   readonly sleepImp: (name: string) => Promise<void>;
   readonly wakeImp: (name: string) => Promise<void>;
   readonly updateHTTPPort: (name: string, httpPort: number) => Promise<void>;
+  readonly updatePublicEgress: (name: string) => Promise<void>;
   readonly removeImp: (name: string) => Promise<void>;
   readonly installGrant: (name: string, secret: string) => Promise<void>;
 
@@ -50,6 +51,11 @@ export interface ImpdClient {
   ) => Promise<CommandResult>;
 }
 
+// impd's default policy, open, lets a guest reach imp-host's bridge, where the host's listeners
+// take only the broker's calls; imp-host masquerades the guest, so no listener can tell the two
+// apart. public refuses the guest every private range, and the broker dials from outside it.
+const publicEgress = { mode: 'public', allow: [] } as const;
+
 export function buildImpdClient(baseURL: string, token: string): ImpdClient {
   // imp's typed client, so a change to impd's contract fails the type check here
   const client = createImpClient({ url: baseURL, token, connect: (url) => new WebSocket(url) });
@@ -57,7 +63,7 @@ export function buildImpdClient(baseURL: string, token: string): ImpdClient {
   return {
     createImp: (options) =>
       withImpdErrors(async () => {
-        const imp = await client.imps.create({ ...options, backup: false });
+        const imp = await client.imps.create({ ...options, backup: false, policy: publicEgress });
 
         return toImpActivity(imp);
       }),
@@ -79,6 +85,10 @@ export function buildImpdClient(baseURL: string, token: string): ImpdClient {
     updateHTTPPort: (name, httpPort) =>
       withImpdErrors(async () => {
         await client.imps.update({ name, httpPort });
+      }),
+    updatePublicEgress: (name) =>
+      withImpdErrors(async () => {
+        await client.imps.setPolicy({ name, policy: publicEgress });
       }),
     removeImp: (name) =>
       withImpdErrors(async () => {

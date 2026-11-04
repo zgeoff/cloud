@@ -127,12 +127,12 @@ previews and the agents run one release of imp's base image.
 
 1. The service reads the head commit's Compose file again, since the head may have moved, and takes
    the app's port and health path from its `x-preview` block, a top-level key that Compose ignores.
-2. A new imp gets that port as impd's HTTP port and no backup. An imp from an earlier build keeps
-   its disk and takes the new commit's port. Either way, the boot adds the grants of the broker's
-   GitHub secret and model secret when the imp lacks them, so an imp whose grant failed gets it on
-   the next boot. Before it adds them, the boot removes every other grant. An imp holds one
-   credential per host, so impd refuses the current model secret while one granted under an earlier
-   setting remains.
+2. A new imp gets that port as impd's HTTP port, no backup and impd's `public` egress policy. An imp
+   from an earlier build keeps its disk, takes the new commit's port and gets the `public` policy
+   before it wakes. Either way, the boot adds the grants of the broker's GitHub secret and model
+   secret when the imp lacks them, so an imp whose grant failed gets it on the next boot. Before it
+   adds them, the boot removes every other grant. An imp holds one credential per host, so impd
+   refuses the current model secret while one granted under an earlier setting remains.
 3. A guest command installs Docker Compose's pinned release binary, checked against its sha256, when
    the image lacks the Compose plugin, as imp's base image does. It then fetches the head commit
    into a checkout in the imp, takes down the stack of the previous build with its volumes, and runs
@@ -169,6 +169,12 @@ puts that segment on its model address when the boot passes it the route. The li
 imp's proxy on loopback on the first call, waits for the port the proxy names, and forwards the call
 unchanged. A proxy that fails to start gets the call a 503, so a preview without its counter makes
 no model call.
+
+Only the broker reaches the listener. imp-host masquerades each guest's traffic to its own address
+on the bridge, so neither the host's firewall nor the listener can tell a guest from the broker.
+impd's `public` egress policy, which every imp of the service runs under, refuses the guest every
+private address, the bridge included. The broker dials from imp-host itself, outside that policy, so
+the guest's model calls still go out through the broker.
 
 Each proxy counts in a file of its own in the service's state, and the count lasts for the pull
 request's life. A proxy with no reply under way that went unused for the sleep time stops and keeps
@@ -221,8 +227,8 @@ runs the suite once however many deliveries name it, and each push to a new head
    contract idle time, which is shorter than the idle timeout. A preview in use keeps its slot, so
    when too few previews are idle, or impd refuses a sleep, the run waits. Its `sdk-contract` status
    turns pending with that reason, and the sweep's timer tries the run again on each pass.
-2. With a slot free, the service starts a new imp from the preview image, grants it the model secret
-   and the GitHub secret, and sets the status to pending.
+2. With a slot free, the service starts a new imp from the preview image under the `public` egress
+   policy, grants it the model secret and the GitHub secret, and sets the status to pending.
 3. A guest command installs Bun's pinned build, checked against its sha256, since imp's base image
    lacks Bun. It fetches the head commit, installs the dependencies from the lockfile, and runs the
    suite. impd starts the command only when the broker reaches the guest. The command stops before
