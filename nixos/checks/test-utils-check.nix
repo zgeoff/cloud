@@ -14,6 +14,7 @@ let
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   collectCaseRejections = import ./test-utils/collect-case-rejections.nix { inherit lib; };
   collectFailedAssertions = import ./test-utils/collect-failed-assertions.nix;
+  findBunRelease = import ./test-utils/find-bun-release.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
   stubSqlite3 = import ./test-utils/build-stub-sqlite3.nix { inherit pkgs; };
   stubIntegritySqlite3 = import ./test-utils/build-stub-integrity-sqlite3.nix { inherit pkgs; };
@@ -30,6 +31,18 @@ let
     "op://vault/item/field" = "a value with spaces";
     "op://vault/item/other" = "other";
   };
+  # the Bun of the pinned imp's host/Dockerfile, from the releases its pins have named: the image
+  # digest of the oven/bun stage and the hash of the release's bun-linux-x64.zip
+  impBunRelease = findBunRelease {
+    "1.4.3" = {
+      digest = "sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598";
+      hash = "sha256-PnMFKNiXdfA/h/BcBnh8TfQJnQo38/JS57gpyyOBbhg=";
+    };
+    "1.4.4" = {
+      digest = "sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d";
+      hash = "sha256-v4zL+ysLgBWeD5ptFcVTF63YB3U028YTCj7bUvzLOVw=";
+    };
+  } (builtins.readFile "${imp}/host/Dockerfile");
 
   cases = [
     {
@@ -98,6 +111,129 @@ let
         }
 
         assert_equals '[]' "$failed" "the failed assertions"
+      '';
+    }
+    {
+      title = "it findBunRelease gives the version and zip hash of the release at the digest of the oven/bun stage";
+      script = ''
+        release=${
+          lib.escapeShellArg (
+            builtins.toJSON (
+              findBunRelease
+                {
+                  "9.1.0" = {
+                    digest = "sha256:1111111111111111111111111111111111111111111111111111111111111111";
+                    hash = "sha256-oldZipHash=";
+                  };
+                  "9.2.0" = {
+                    digest = "sha256:2222222222222222222222222222222222222222222222222222222222222222";
+                    hash = "sha256-newZipHash=";
+                  };
+                }
+                ''
+                  FROM oven/bun:9.2.0@sha256:2222222222222222222222222222222222222222222222222222222222222222 AS bun
+                  FROM debian:trixie-slim@sha256:3333333333333333333333333333333333333333333333333333333333333333 AS runtime
+                  FROM bun AS compile
+                ''
+            )
+          )
+        }
+
+        assert_equals '{"hash":"sha256-newZipHash=","version":"9.2.0"}' "$release" "the release"
+      '';
+    }
+    {
+      title = "it findBunRelease names a Bun version it holds no release of";
+      script = ''
+        release=${
+          lib.escapeShellArg (
+            builtins.toJSON (
+              findBunRelease
+                {
+                  "9.1.0" = {
+                    digest = "sha256:1111111111111111111111111111111111111111111111111111111111111111";
+                    hash = "sha256-oldZipHash=";
+                  };
+                }
+                ''
+                  FROM oven/bun:9.3.0@sha256:4444444444444444444444444444444444444444444444444444444444444444 AS bun
+                ''
+            )
+          )
+        }
+
+        assert_equals '{"error":"no release of Bun 9.3.0: add its image digest and the hash of its zip"}' "$release" "the release"
+      '';
+    }
+    {
+      title = "it findBunRelease names the digest of an oven/bun stage at another digest than its release";
+      script = ''
+        release=${
+          lib.escapeShellArg (
+            builtins.toJSON (
+              findBunRelease
+                {
+                  "9.1.0" = {
+                    digest = "sha256:1111111111111111111111111111111111111111111111111111111111111111";
+                    hash = "sha256-oldZipHash=";
+                  };
+                }
+                ''
+                  FROM oven/bun:9.1.0@sha256:5555555555555555555555555555555555555555555555555555555555555555 AS bun
+                ''
+            )
+          )
+        }
+
+        assert_equals '{"error":"the Dockerfile pins Bun 9.1.0 at sha256:5555555555555555555555555555555555555555555555555555555555555555, not at sha256:1111111111111111111111111111111111111111111111111111111111111111"}' "$release" "the release"
+      '';
+    }
+    {
+      title = "it findBunRelease counts the oven/bun stages of a Dockerfile with two";
+      script = ''
+        release=${
+          lib.escapeShellArg (
+            builtins.toJSON (
+              findBunRelease
+                {
+                  "9.1.0" = {
+                    digest = "sha256:1111111111111111111111111111111111111111111111111111111111111111";
+                    hash = "sha256-oldZipHash=";
+                  };
+                }
+                ''
+                  FROM oven/bun:9.1.0@sha256:1111111111111111111111111111111111111111111111111111111111111111 AS bun
+                  FROM oven/bun:9.1.0@sha256:1111111111111111111111111111111111111111111111111111111111111111 AS tools
+                ''
+            )
+          )
+        }
+
+        assert_equals '{"error":"the Dockerfile has 2 oven/bun stages pinned by digest, not 1"}' "$release" "the release"
+      '';
+    }
+    {
+      title = "it findBunRelease counts no oven/bun stage in a Dockerfile without one, or with an unpinned one";
+      script = ''
+        release=${
+          lib.escapeShellArg (
+            builtins.toJSON (
+              findBunRelease
+                {
+                  "9.1.0" = {
+                    digest = "sha256:1111111111111111111111111111111111111111111111111111111111111111";
+                    hash = "sha256-oldZipHash=";
+                  };
+                }
+                ''
+                  FROM oven/bun:9.1.0 AS bun
+                  FROM debian:trixie-slim@sha256:3333333333333333333333333333333333333333333333333333333333333333 AS runtime
+                ''
+            )
+          )
+        }
+
+        assert_equals '{"error":"the Dockerfile has 0 oven/bun stages pinned by digest, not 1"}' "$release" "the release"
       '';
     }
     {
@@ -403,7 +539,7 @@ let
       '';
     }
     {
-      title = "it run-stub-impd holds to the pinned imp: its /health handler and its empty warnings, the default 404 of Elysia, Elysia 1.4.30 and Bun 1.4.3 at the hashes of this check";
+      title = "it run-stub-impd holds to the pinned imp: its /health handler and its empty warnings, the default 404 of Elysia, Elysia 1.4.30 and a Bun at the hashes of this check";
       script = ''
         handlers=$(grep -cxF "    .get('/health', () => ({" ${imp}/packages/daemon/src/surface/create-app.ts || true)
         grep -xF -A4 "    .get('/health', () => ({" ${imp}/packages/daemon/src/surface/create-app.ts > handler || true
@@ -413,7 +549,6 @@ let
         # an Elysia onError hook would replace the default 404; create-app.ts's onError is oRPC's
         error_hooks=$(grep -cF '.onError(' ${imp}/packages/daemon/src/surface/create-app.ts || true)
         elysia=$(jq -r '.workspaces.catalog.elysia' ${imp}/package.json)
-        bun=$(grep -c '^FROM oven/bun:1\.4\.3@' ${imp}/host/Dockerfile || true)
         grep -oE '"(elysia|@sinclair/typebox|cookie|exact-mirror|fast-decode-uri-component|memoirist)": \["[^"]+".*"sha512-[^"]+"\]' \
           ${imp}/bun.lock | sed -E 's/^"([^"]+)": \["([^"]+)".*"(sha512-[^"]+)"\]$/\2 \3/' | sort > locked
 
@@ -437,7 +572,7 @@ let
         EOF
         assert_equals 0 "$error_hooks" "create-app.ts's Elysia onError hooks"
         assert_equals 1.4.30 "$elysia" "imp's Elysia version"
-        assert_equals 1 "$bun" "host/Dockerfile's oven/bun:1.4.3 stages"
+        assert_equals "" ${lib.escapeShellArg (impBunRelease.error or "")} "host/Dockerfile's Bun release"
         cat > expected <<'EOF'
         @sinclair/typebox@0.34.52 sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==
         cookie@1.1.1 sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==
@@ -450,123 +585,126 @@ let
         assert_files_equal expected-sorted locked
       '';
     }
-    (
-      let
-        # the Bun the pinned imp runs (host/Dockerfile's oven/bun:1.4.3), from its release
-        pinnedBun = pkgs.stdenv.mkDerivation {
-          pname = "bun";
-          version = "1.4.3";
-          src = pkgs.fetchurl {
-            url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.3/bun-linux-x64.zip";
-            hash = "sha256-PnMFKNiXdfA/h/BcBnh8TfQJnQo38/JS57gpyyOBbhg=";
-          };
-          nativeBuildInputs = [
-            pkgs.unzip
-            pkgs.autoPatchelfHook
-          ];
-          installPhase = "install -Dm755 bun $out/bin/bun";
-          # stripping breaks the bun binary
-          dontStrip = true;
+  ]
+  # with no release for the pinned imp's Bun, the case above fails with the message that names it
+  ++ lib.optional (impBunRelease ? hash) (
+    let
+      # the Bun the pinned imp runs (host/Dockerfile's oven/bun stage), from its release
+      pinnedBun = pkgs.stdenv.mkDerivation {
+        pname = "bun";
+        inherit (impBunRelease) version;
+        src = pkgs.fetchurl {
+          url = "https://github.com/oven-sh/bun/releases/download/bun-v${impBunRelease.version}/bun-linux-x64.zip";
+          inherit (impBunRelease) hash;
         };
+        nativeBuildInputs = [
+          pkgs.unzip
+          pkgs.autoPatchelfHook
+        ];
+        installPhase = "install -Dm755 bun $out/bin/bun";
+        # stripping breaks the bun binary
+        dontStrip = true;
+      };
 
-        # Elysia and its runtime dependencies at the versions and hashes of the pinned imp's bun.lock,
-        # with an app that serves imp's /health handler and nothing else
-        pinnedElysiaApp = pkgs.runCommand "pinned-elysia-app" { } ''
-          unpack() {
-            mkdir -p "$out/node_modules/$1"
-            tar -xzf "$2" -C "$out/node_modules/$1" --strip-components=1
+      # Elysia and its runtime dependencies at the versions and hashes of the pinned imp's bun.lock,
+      # with an app that serves imp's /health handler and nothing else
+      pinnedElysiaApp = pkgs.runCommand "pinned-elysia-app" { } ''
+        unpack() {
+          mkdir -p "$out/node_modules/$1"
+          tar -xzf "$2" -C "$out/node_modules/$1" --strip-components=1
+        }
+        unpack elysia ${
+          pkgs.fetchurl {
+            url = "https://registry.npmjs.org/elysia/-/elysia-1.4.30.tgz";
+            hash = "sha512-S2qqV0CbM4faB1hQQ5IYoeYnAUinjHlzRduxaBc4OoNqh0GjOc8k6tt3hv5ozWcG6Svr6hugw6JL4zNke4jwfA==";
           }
-          unpack elysia ${
-            pkgs.fetchurl {
-              url = "https://registry.npmjs.org/elysia/-/elysia-1.4.30.tgz";
-              hash = "sha512-S2qqV0CbM4faB1hQQ5IYoeYnAUinjHlzRduxaBc4OoNqh0GjOc8k6tt3hv5ozWcG6Svr6hugw6JL4zNke4jwfA==";
-            }
+        }
+        unpack @sinclair/typebox ${
+          pkgs.fetchurl {
+            url = "https://registry.npmjs.org/@sinclair/typebox/-/typebox-0.34.52.tgz";
+            hash = "sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==";
           }
-          unpack @sinclair/typebox ${
-            pkgs.fetchurl {
-              url = "https://registry.npmjs.org/@sinclair/typebox/-/typebox-0.34.52.tgz";
-              hash = "sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==";
-            }
+        }
+        unpack cookie ${
+          pkgs.fetchurl {
+            url = "https://registry.npmjs.org/cookie/-/cookie-1.1.1.tgz";
+            hash = "sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==";
           }
-          unpack cookie ${
-            pkgs.fetchurl {
-              url = "https://registry.npmjs.org/cookie/-/cookie-1.1.1.tgz";
-              hash = "sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==";
-            }
+        }
+        unpack exact-mirror ${
+          pkgs.fetchurl {
+            url = "https://registry.npmjs.org/exact-mirror/-/exact-mirror-0.2.7.tgz";
+            hash = "sha512-+MeEmDcLA4o/vjK2zujgk+1VTxPR4hdp23qLqkWfStbECtAq9gmsvQa3LW6z/0GXZyHJobrCnmy1cdeE7BjsYg==";
           }
-          unpack exact-mirror ${
-            pkgs.fetchurl {
-              url = "https://registry.npmjs.org/exact-mirror/-/exact-mirror-0.2.7.tgz";
-              hash = "sha512-+MeEmDcLA4o/vjK2zujgk+1VTxPR4hdp23qLqkWfStbECtAq9gmsvQa3LW6z/0GXZyHJobrCnmy1cdeE7BjsYg==";
-            }
+        }
+        unpack fast-decode-uri-component ${
+          pkgs.fetchurl {
+            url = "https://registry.npmjs.org/fast-decode-uri-component/-/fast-decode-uri-component-1.0.1.tgz";
+            hash = "sha512-WKgKWg5eUxvRZGwW8FvfbaH7AXSh2cL+3j5fMGzUMCxWBJ3dV3a7Wz8y2f/uQ0e3B6WmodD3oS54jTQ9HVTIIg==";
           }
-          unpack fast-decode-uri-component ${
-            pkgs.fetchurl {
-              url = "https://registry.npmjs.org/fast-decode-uri-component/-/fast-decode-uri-component-1.0.1.tgz";
-              hash = "sha512-WKgKWg5eUxvRZGwW8FvfbaH7AXSh2cL+3j5fMGzUMCxWBJ3dV3a7Wz8y2f/uQ0e3B6WmodD3oS54jTQ9HVTIIg==";
-            }
+        }
+        unpack memoirist ${
+          pkgs.fetchurl {
+            url = "https://registry.npmjs.org/memoirist/-/memoirist-0.4.0.tgz";
+            hash = "sha512-zxTgA0mSYELa66DimuNQDvyLq36AwDlTuVRbnQtB+VuTcKWm5Qc4z3WkSpgsFWHNhexqkIooqpv4hdcqrX5Nmg==";
           }
-          unpack memoirist ${
-            pkgs.fetchurl {
-              url = "https://registry.npmjs.org/memoirist/-/memoirist-0.4.0.tgz";
-              hash = "sha512-zxTgA0mSYELa66DimuNQDvyLq36AwDlTuVRbnQtB+VuTcKWm5Qc4z3WkSpgsFWHNhexqkIooqpv4hdcqrX5Nmg==";
-            }
-          }
-          cat > $out/app.ts <<'EOF'
-          import { Elysia } from 'elysia';
+        }
+        cat > $out/app.ts <<'EOF'
+        import { Elysia } from 'elysia';
 
-          // packages/daemon/src/surface/create-app.ts's /health handler, with impd ready, no reboot
-          // reason and no storage warnings
-          const app = new Elysia()
-            .get('/health', () => ({ status: 'ok', ready: true, warnings: [] }))
-            .listen({ hostname: '127.0.0.1', port: 0 });
+        // packages/daemon/src/surface/create-app.ts's /health handler, with impd ready, no reboot
+        // reason and no storage warnings
+        const app = new Elysia()
+          .get('/health', () => ({ status: 'ok', ready: true, warnings: [] }))
+          .listen({ hostname: '127.0.0.1', port: 0 });
 
-          console.log(app.server?.port);
-          EOF
-        '';
-      in
-      {
-        title = "it run-stub-impd answers /health and an unknown route as the Elysia 1.4.30 of imp on Bun 1.4.3 does";
-        script = ''
-          mkdir home tmp
-          mkfifo real.fifo stub-health.fifo stub-missing.fifo
-          exec 3<>real.fifo 4<>stub-health.fifo 5<>stub-missing.fifo
-          real_pid=
-          health_pid=
-          missing_pid=
-          trap '[ -n "$real_pid" ] && kill "$real_pid" || true; [ -n "$health_pid" ] && kill "$health_pid" || true; [ -n "$missing_pid" ] && kill "$missing_pid" || true' EXIT
-          env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${pinnedBun}/bin/bun ${pinnedElysiaApp}/app.ts >&3 &
-          real_pid=$!
-          env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/health.requests" >&4 &
-          health_pid=$!
-          env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-            /missing 404 'text/plain;charset=utf-8' NOT_FOUND "$PWD/missing.requests" >&5 &
-          missing_pid=$!
-          read -r -t 30 -u 3 real_port
-          read -r -t 5 -u 4 health_port
-          read -r -t 5 -u 5 missing_port
+        console.log(app.server?.port);
+        EOF
+      '';
+    in
+    {
+      title = "it run-stub-impd answers /health and an unknown route as the Elysia 1.4.30 of imp on Bun ${impBunRelease.version} does";
+      script = ''
+        mkdir home tmp
+        mkfifo real.fifo stub-health.fifo stub-missing.fifo
+        exec 3<>real.fifo 4<>stub-health.fifo 5<>stub-missing.fifo
+        real_pid=
+        health_pid=
+        missing_pid=
+        trap '[ -n "$real_pid" ] && kill "$real_pid" || true; [ -n "$health_pid" ] && kill "$health_pid" || true; [ -n "$missing_pid" ] && kill "$missing_pid" || true' EXIT
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${pinnedBun}/bin/bun ${pinnedElysiaApp}/app.ts >&3 &
+        real_pid=$!
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
+          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/health.requests" >&4 &
+        health_pid=$!
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
+          /missing 404 'text/plain;charset=utf-8' NOT_FOUND "$PWD/missing.requests" >&5 &
+        missing_pid=$!
+        read -r -t 30 -u 3 real_port
+        read -r -t 5 -u 4 health_port
+        read -r -t 5 -u 5 missing_port
 
-          curl -s -D real-health.headers -o real-health.body "http://127.0.0.1:$real_port/health"
-          curl -s -D real-missing.headers -o real-missing.body "http://127.0.0.1:$real_port/missing"
-          curl -s -D stub-health.headers -o stub-health.body "http://127.0.0.1:$health_port/health"
-          curl -s -D stub-missing.headers -o stub-missing.body "http://127.0.0.1:$missing_port/missing"
+        curl -s -D real-health.headers -o real-health.body "http://127.0.0.1:$real_port/health"
+        curl -s -D real-missing.headers -o real-missing.body "http://127.0.0.1:$real_port/missing"
+        curl -s -D stub-health.headers -o stub-health.body "http://127.0.0.1:$health_port/health"
+        curl -s -D stub-missing.headers -o stub-missing.body "http://127.0.0.1:$missing_port/missing"
 
-          assert_equals "HTTP/1.1 200 OK" "$(head -1 real-health.headers | tr -d '\r')" "imp's /health status line"
-          assert_equals "HTTP/1.1 200 OK" "$(head -1 stub-health.headers | tr -d '\r')" "the stand-in's /health status line"
-          assert_equals "$(grep -i '^content-type:' real-health.headers | cut -d: -f2- | tr -d '\r')" \
-            "$(grep -i '^content-type:' stub-health.headers | cut -d: -f2- | tr -d '\r')" "the /health content type"
-          assert_files_equal real-health.body stub-health.body
-          assert_equals "HTTP/1.1 404 Not Found" "$(head -1 real-missing.headers | tr -d '\r')" "imp's unknown route's status line"
-          assert_equals "HTTP/1.1 404 Not Found" "$(head -1 stub-missing.headers | tr -d '\r')" "the stand-in's unknown route's status line"
-          assert_equals "$(grep -i '^content-type:' real-missing.headers | cut -d: -f2- | tr -d '\r')" \
-            "$(grep -i '^content-type:' stub-missing.headers | cut -d: -f2- | tr -d '\r')" "the unknown route's content type"
-          assert_files_equal real-missing.body stub-missing.body
-          assert_equals "GET /health" "$(cat health.requests)" "the /health stand-in's requests"
-          assert_equals "GET /missing" "$(cat missing.requests)" "the unknown route stand-in's requests"
-        '';
-      }
-    )
+        assert_equals "HTTP/1.1 200 OK" "$(head -1 real-health.headers | tr -d '\r')" "imp's /health status line"
+        assert_equals "HTTP/1.1 200 OK" "$(head -1 stub-health.headers | tr -d '\r')" "the stand-in's /health status line"
+        assert_equals "$(grep -i '^content-type:' real-health.headers | cut -d: -f2- | tr -d '\r')" \
+          "$(grep -i '^content-type:' stub-health.headers | cut -d: -f2- | tr -d '\r')" "the /health content type"
+        assert_files_equal real-health.body stub-health.body
+        assert_equals "HTTP/1.1 404 Not Found" "$(head -1 real-missing.headers | tr -d '\r')" "imp's unknown route's status line"
+        assert_equals "HTTP/1.1 404 Not Found" "$(head -1 stub-missing.headers | tr -d '\r')" "the stand-in's unknown route's status line"
+        assert_equals "$(grep -i '^content-type:' real-missing.headers | cut -d: -f2- | tr -d '\r')" \
+          "$(grep -i '^content-type:' stub-missing.headers | cut -d: -f2- | tr -d '\r')" "the unknown route's content type"
+        assert_files_equal real-missing.body stub-missing.body
+        assert_equals "GET /health" "$(cat health.requests)" "the /health stand-in's requests"
+        assert_equals "GET /missing" "$(cat missing.requests)" "the unknown route stand-in's requests"
+      '';
+    }
+  )
+  ++ [
     {
       title = "it run-stub-hung-impd takes a connection and never answers it, and buildStubCurl answers the call of the probe as curl then does";
       script = ''

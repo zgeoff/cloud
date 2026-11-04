@@ -7,8 +7,8 @@
 # It listens on an ephemeral port on 127.0.0.1 and prints that port on one line once it accepts.
 # A request it does not expect, any other method or path, is recorded too and answered with a
 # failure: 500, text/plain, "unexpected request: <method> <path>"; to a HEAD, as HTTP has it,
-# with the headers alone. The shapes the check passes
-# are impd's, as the pinned imp answers them (Elysia 1.4.30 on Bun 1.4.3): /health is 200,
+# with the headers alone. The shapes the check passes are impd's, as the pinned imp answers them
+# (Elysia 1.4.30 on the Bun of its host/Dockerfile): /health is 200,
 # "application/json;charset=utf-8", {"status":"ok","ready":true,"warnings":[]} with no reboot
 # reason and no storage warnings (packages/daemon/src/surface/create-app.ts,
 # buildHealthWarnings), and a route no handler matches is 404,
