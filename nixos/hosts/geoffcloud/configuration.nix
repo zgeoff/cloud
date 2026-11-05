@@ -27,6 +27,7 @@ let
   impdMCPListenerExposure = getHostPort "impd-mcp-listener";
   impdMCPRouteExposure = builtins.head (builtins.filter (entry: entry.name == "impd-mcp") exposure);
   impdMCPListenerPort = toString impdMCPListenerExposure.port;
+  filesExposure = builtins.head (builtins.filter (entry: entry.name == "files") exposure);
   # atc's daemon listens on the host's tailnet address; the gateway pod dials it there
   atcDaemonAddress = topology.tailnet.nodes.geoffcloud.address;
   atcDaemonPort = topology.atc.daemonPort;
@@ -464,16 +465,25 @@ in
       };
     };
     agents = {
-      claude.auth = {
-        profiles = [
-          "claude"
-          "github"
-          "linear"
-          "op-connect"
-        ];
-        mcpServers.linear = {
-          url = "https://mcp.linear.app/mcp";
-          profile = "linear";
+      claude = {
+        auth = {
+          profiles = [
+            "claude"
+            "github"
+            "linear"
+            "op-connect"
+          ];
+          mcpServers.linear = {
+            url = "https://mcp.linear.app/mcp";
+            profile = "linear";
+          };
+        };
+        # the pr-evidence skill uploads to the files service with these: its API address, and
+        # the reference of its agent token that `op read` resolves through the op-connect profile.
+        # They sit on the entry because atc takes only the profile's own host as a profile URL.
+        env = {
+          PR_EVIDENCE_URL = "https://${filesExposure.hostname}/api/files";
+          PR_EVIDENCE_TOKEN_REF = "op://imp/files-agent-token/credential";
         };
       };
       # atc refuses a Codex auth without an oauth profile for chatgpt.com, which this daemon

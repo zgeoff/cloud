@@ -18,7 +18,9 @@ leaving it unset keeps the service out of the cluster.
 
 The prod apply job reads the same items from the `cloud-deploy` vault, so each item has a copy there
 under the same name. Agents read their copy of the agent token from the `imp` vault on an imp, and
-from the `zgeoff` vault on a workstation.
+from the `zgeoff` vault on a workstation. On an imp, the atc daemon's `claude` entry sets two
+variables in each Claude session: `PR_EVIDENCE_URL`, the service's `/api/files` address, and
+`PR_EVIDENCE_TOKEN_REF`, the `op://` reference of the `imp` copy.
 
 ## Deploy the first time
 
@@ -81,9 +83,8 @@ change until the owner approves it, as [the prod apply job](./prod-apply.md) des
 An agent on an imp uploads with `curl`, which sends the token as a bearer token:
 
 ```bash
-FILES_TOKEN="$(op read op://imp/files-agent-token/credential)"
-curl -sS --oauth2-bearer "$FILES_TOKEN" -F file=@shot.png -F expires=7d \
-  https://files.geoff.cloud/api/files
+FILES_TOKEN="$(op read "$PR_EVIDENCE_TOKEN_REF")"
+curl -sS --oauth2-bearer "$FILES_TOKEN" -F file=@shot.png -F expires=7d "$PR_EVIDENCE_URL"
 ```
 
 Expect a JSON body with the file's `url`. `expires` takes `7d` (the default), `30d`, a date such as

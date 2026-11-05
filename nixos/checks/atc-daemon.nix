@@ -406,7 +406,7 @@ let
         '';
     }
     {
-      title = "it links geoffcloud a config.json whose target names the agent image and its atc, and whose claude signs in through the claude, github, linear and op-connect profiles of the broker";
+      title = "it links geoffcloud a config.json whose target names the agent image and its atc, and whose claude signs in through the claude, github, linear and op-connect profiles of the broker and gets the pr-evidence file host address and token reference";
       script = ''
         jq -S . > expected <<'EOF'
         {
@@ -415,6 +415,10 @@ let
               "auth": {
                 "mcpServers": { "linear": { "profile": "linear", "url": "https://mcp.linear.app/mcp" } },
                 "profiles": ["claude", "github", "linear", "op-connect"]
+              },
+              "env": {
+                "PR_EVIDENCE_TOKEN_REF": "op://imp/files-agent-token/credential",
+                "PR_EVIDENCE_URL": "https://files.geoff.cloud/api/files"
               }
             },
             "codex": {}
