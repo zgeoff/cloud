@@ -13,7 +13,7 @@ secret the file ever held. Never print a decrypted value, and never put one on a
 
 | Where                                                | Holds                                                                                         |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| vault `cloud`, item `nixie-age-host`                 | the age identity that the pod holds; its public half is in sops                               |
+| vault `cloud`, item `nixie-age-host`                 | the age identity that the pod holds; its public half is in `deploy/nixie/.sops.yaml`          |
 | vault `cloud`, item `nixie-age-recovery`             | the age identity that stays off the host; restores need only it                               |
 | vault `cloud`, item `nixie-deployment-key`           | the deployment key, 32 random bytes in base64                                                 |
 | vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind every model profile; impd's model secrets hold copies of it     |
@@ -45,15 +45,17 @@ journal.
 ## Add nixie's model secrets to impd
 
 nixie reaches its models through impd's broker, which adds the model credential to each request a
-sandbox sends to `api.anthropic.com`. impd keeps one model secret per profile in `config.yaml`,
-under the name that
+sandbox sends to `api.anthropic.com`. impd keeps one model secret for each profile that
+`config.yaml` lists, under the name that
 [nixie's names in impd](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/impd-names.md#model-secrets)
-defines. The name leaves the credential out, so it never changes when the credential does. nixie's
-token cannot add a secret, so `host_imp` adds each one as impd's root user inside imp-host.
+defines. nixie derives the name from the profile, the header and the host, never from the
+credential, so the name stays the same when the credential changes. nixie's token cannot add a
+secret, so `host_imp` adds each one as impd's root user inside imp-host.
 
 Before the first deploy, and after a profile joins `config.yaml`, add the model secrets:
 
-1. Set the names, one per line in `secret_names` and comma-separated in `secrets`:
+1. Set the names, one per line in `secret_names` for the loops, and comma-separated in `secrets` for
+   [nixie's token](#mint-nixies-impd-token):
 
    ```bash
    secret_names=$(bun -e 'const c = Bun.YAML.parse(await Bun.file("deploy/nixie/config.yaml").text()); for (const id of Object.keys(c.models.profiles)) console.log(id)' \
@@ -72,7 +74,9 @@ Before the first deploy, and after a profile joins `config.yaml`, add the model 
    done
    ```
 
-   impd refuses a name it already holds, and the loop goes on to the next one.
+   Expect a table row for each new name. For each name impd already holds, expect
+
+   `impz: CONFLICT: secret <name> already exists`, and the loop goes on to the next name.
 
 3. List the secrets:
 
@@ -102,10 +106,10 @@ writes into its real memory.
    op read op://cloud/nixie-model-credential/credential | tr -d '\n' | sha256sum | cut -c1-8
    ```
 
-   Expect the same digest as the source of the new token, such as the account's own item in
-   1Password.
+   Expect the digest of the new token, which `op read` of the item you copied it from prints with
+   the same pipeline.
 
-3. Record the model secrets and the imps that hold each one:
+3. Record the model secrets, and in the `IMPS` column the imps each one is granted to:
 
    ```bash
    host_imp secret ls < /dev/null | grep '^nixie-model-'
@@ -128,7 +132,8 @@ writes into its real memory.
 
    Expect the same names, with the same imps.
 
-7. Wait for production nixie's next model call.
+7. Wait for production nixie's next model call. Each conversation turn and each memory write makes
+   one, so the wait lasts until the owner next talks to nixie.
 
 8. Read the requests that impd's broker sent with a model secret:
 
@@ -172,9 +177,9 @@ name outside both releases' manifests loses its pin.
 
 ## Mint nixie's impd token
 
-The token manages only nixie's imps, grants only the model secrets, and adds only images from refs
-under `ghcr.io/zgeoff/nixie-`, under names that start with `nixie-`. With the prefix, nixie adds its
-own sandbox images at start.
+With this token, nixie manages only its own imps, grants only the model secrets, and adds only
+images from refs under `ghcr.io/zgeoff/nixie-`, under names that start with `nixie-`. The image ref
+prefix lets nixie add its own sandbox images at start.
 
 1. Set `secrets` with step 1 of
    [Add nixie's model secrets to impd](#add-nixies-model-secrets-to-impd).
@@ -187,13 +192,15 @@ own sandbox images at start.
      | tr -d '\n' | jq -Rs . | sops_nixie set --value-stdin secrets.sops.yaml '["impd_token"]'
    ```
 
-3. If the sops step fails, remove the token with `host_imp token rm nixie < /dev/null`.
+   Expect the command to exit 0 and print nothing.
 
-4. Mint it again with step 2. impd prints a token's value only once, at the mint.
+3. If the sops step fails, remove the token with `host_imp token rm nixie < /dev/null`, then run
+   step 2 again. impd prints a token's value only once, at the mint, so a failed write loses it.
 
-After a profile joins `config.yaml`, set `secrets` again and point the token at the new list with
-`host_imp token set nixie --grantable "$secrets" < /dev/null`. The flag takes the whole list, and a
-secret left out loses its grants on nixie's imps.
+After a profile joins `config.yaml`, add its secret first, as
+[Add nixie's model secrets to impd](#add-nixies-model-secrets-to-impd) describes. Then point the
+token at the new list with `host_imp token set nixie --grantable "$secrets" < /dev/null`. The flag
+takes the whole list, and a secret left out loses its grants on nixie's imps.
 
 ## Change a secret
 
@@ -216,7 +223,8 @@ secrets file.
 
    Expect `["definitions_export_token","deployment_key","impd_token","settings"]`.
 
-3. Commit the file through a PR.
+3. Commit the file through a PR. Once CI passes on `main`, the `Deploy prod` workflow applies it
+   ([prod apply](./prod-apply.md)).
 
 When the pod's age identity changes, put its public half in `deploy/nixie/.sops.yaml`, then run
 `sops_nixie updatekeys -y secrets.sops.yaml`.
