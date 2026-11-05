@@ -20,7 +20,7 @@
         "@zgeoff/cloud-topology": "workspace:*",
         "@zgeoff/format-codemod": "0.3.5",
         "@zgeoff/oxlint-config": "0.8.5",
-        "@zgeoff/skill-gate": "0.2.19",
+        "@zgeoff/skill-gate": "0.2.21",
         "knip": "6.43.0",
         "lefthook": "2.2.2",
         "msw": "3.0.3",
@@ -653,7 +653,7 @@
 
     "@typescript/typescript-win32-x64": ["@typescript/typescript-win32-x64@7.0.2", "", { "os": "win32", "cpu": "x64" }, "sha512-0BQ3HkAHHlKLSp1qRvf3SUhGpGsDuhB/jgFw75guyqbxJqEaS0Cw/VFO8i2nHglJUzQCRtMMR/IBAKE3ETMC4g=="],
 
-    "@zgeoff/agent-hooks": ["@zgeoff/agent-hooks@0.2.3", "", { "bin": { "agent-hooks": "dist/cli.js" } }, "sha512-yg4STSYyLtiFS9rWJUxXJuU6a3+ibUYqlangMsZDno/ZJSAADxV3dt81+kNpc7LAWUrkYQwShZ9uAuaEEMvs2w=="],
+    "@zgeoff/agent-hooks": ["@zgeoff/agent-hooks@0.2.5", "", { "bin": { "agent-hooks": "dist/cli.js" } }, "sha512-szItKE8CnDB8MVx2zFh5jpKBOWQtG5UdnAlIClh2jb+kKLpkzm0neFgOzUM0pEloA4978Zuta5DDP6L7aV2qyA=="],
 
     "@zgeoff/bun-test-extended": ["@zgeoff/bun-test-extended@0.2.3", "", { "dependencies": { "jest-extended": "7.0.0", "jest-matcher-utils": "30.5.2" } }, "sha512-4ZNPft3LunVKp+s2esoJXSe64EaEywsu3z6Cg5/s/MJcdygmrQeAyfECioePCo5RuAIcaPfgF3lhYsPKcmVJ4w=="],
 
@@ -673,7 +673,7 @@
 
     "@zgeoff/pulumi-onidel": ["@zgeoff/pulumi-onidel@workspace:sdk/onidel"],
 
-    "@zgeoff/skill-gate": ["@zgeoff/skill-gate@0.2.19", "", { "dependencies": { "@zgeoff/agent-hooks": "0.2.3" } }, "sha512-r04itCLxsdvUx7thggMaFx34bRYfULmi3BsJ64EhymR88zs3D34yO6rJUIrVFFvLcomYOIr9Jny+j/xAqattfA=="],
+    "@zgeoff/skill-gate": ["@zgeoff/skill-gate@0.2.21", "", { "dependencies": { "@zgeoff/agent-hooks": "0.2.5" } }, "sha512-qYrErtpK84JX6E8iJyQ9Cfk8lCxcMc8gdnZOm098+aItyRp7wh/YICp/yGHdKlpELp5zknrdaBZwybZS4u7xjA=="],
 
     "@zgeoff/std": ["@zgeoff/std@0.4.1", "", {}, "sha512-Vr0Y8ZeRjaTmJAT0K+llbXpf5EazkGhL0zV8yRoACbbfqJdR+9Cql2MHqnr96uUSgu5vdqbknrRQtcsJYIa7oA=="],
 
