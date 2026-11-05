@@ -23,6 +23,7 @@ umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-one-of-outputs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-op-read.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-bash-ssh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-remote-tools.sh"
@@ -252,8 +253,13 @@ it_fails_with_exit_1_and_leaves_both_files_when_the_host_may_not_write_the_secre
     IMP_HOST=local IMP_ENV_FILE="$tree/host/secrets/imp-host.env" IMP_DNS_TOKEN_FILE="$tree/host/secrets/dns-api-token" \
     bash install-imp-dns-token.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "mktemp: failed to create file via template '$tree/host/secrets/dns-api-token.XXXXXX': Permission denied"
+  # uutils mktemp names the file it tried, whose suffix is random, so the case masks it
+  sed -E 's|(/dns-api-token\.)[A-Za-z0-9]{6}"$|\1<random>"|' "$tree/err" > "$tree/err-masked"
+  printf '%s\n' "mktemp: failed to create file via template '$tree/host/secrets/dns-api-token.XXXXXX': Permission denied" > "$tree/err-gnu"
+  printf '%s\n' "mktemp: Permission denied (os error 13) at path \"$tree/host/secrets/dns-api-token.<random>\"" > "$tree/err-uutils"
+  assert_one_of_outputs "the install into a secrets directory the host may not write" "$tree/out" "$tree/err-masked" "$status" \
+    "GNU coreutils mktemp" /dev/null "$tree/err-gnu" 1 \
+    "uutils coreutils mktemp 0.10.0" /dev/null "$tree/err-uutils" 1
   diff - "$tree/calls" << 'CALLS'
 ["op","read","--no-newline","op://cloud/imp-dns-cloudflare/credential"]
 ["op","read","--no-newline","op://cloud/imp-dns-cloudflare/acme-email"]
@@ -265,7 +271,6 @@ CALLS
 dns-api-token
 imp-host.env
 FILES
-  assert_status 1 "$status"
 }
 
 it_refuses_and_writes_nothing_when_the_secrets_directory_is_not_a_mount_point() {
