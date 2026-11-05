@@ -92,10 +92,9 @@ nixie decrypts its own secrets file in its own process at start and keeps the pl
 The file is `deploy/nixie/secrets.sops.yaml`, encrypted with sops to two age recipients: the host
 key, which the pod holds, and the recovery key, which stays in 1Password and off the host. The repo
 holds only the public halves, in the sops config beside the file. The file holds the deployment key
-that wraps every record key, the model credential, nixie's impd token, the token nixie opens a pull
-request in the definitions repo with for each skill it writes, and the owner's name under
-`settings`, which the configuration names as `deployment:owner_name` so the name stays out of this
-public repo.
+that wraps every record key, nixie's impd token, the token nixie opens a pull request in the
+definitions repo with for each skill it writes, and the owner's name under `settings`, which the
+configuration names as `deployment:owner_name` so the name stays out of this public repo.
 
 Pulumi puts the encrypted file and the host's age identity into one Secret, and only the nixie
 container mounts it. git-sync's deploy key and GitHub's pinned host key sit in a second Secret that
@@ -120,12 +119,13 @@ nixie's own. Traefik's namespace holds the same deny
 ([which pod uses each grant](../network/tailnet.md#which-pod-uses-each-grant)).
 
 nixie's impd token can manage only imps whose names carry nixie's prefix, grant only nixie's model
-secret to them, and add images from nixie's registry path under names with nixie's prefix. nixie's
+secrets to them, and add images from nixie's registry path under names with nixie's prefix. nixie's
 start adds each sandbox image of its release that impd lacks, under the name it derives from the
 image's kind and the head of its digest. impd refuses a secret add to such a token, because a secret
-is host-wide. The host owner therefore adds the model secret as root, under the name nixie derives
-from the model profile and a digest of its credential, before the first deploy and after each
-credential rotation.
+is host-wide. The host owner therefore adds one model secret per profile as root, under the name
+nixie derives from a digest of the profile, the auth header and the model host. The name leaves the
+credential out, so nixie's secrets file holds no model credential, and a rotation replaces each
+secret's value in impd under the same name, with no deploy.
 
 ## Sandbox images before a roll
 
