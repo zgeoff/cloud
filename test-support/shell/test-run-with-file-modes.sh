@@ -14,6 +14,7 @@ umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-one-of-outputs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/run-with-file-modes.sh"
 
 it_runs_the_command_with_its_arguments_and_returns_its_exit_status() {
@@ -66,11 +67,15 @@ it_denies_a_create_in_a_directory_without_write_permission() {
   run_with_file_modes env -i PATH=/usr/bin:/bin mktemp "$tree/locked/draft.XXXXXX" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "mktemp: failed to create file via template '$tree/locked/draft.XXXXXX': Permission denied"
+  # uutils mktemp names the file it tried, whose suffix is random, so the case masks it
+  sed -E 's|(/locked/draft\.)[A-Za-z0-9]{6}"$|\1<random>"|' "$tree/err" > "$tree/err-masked"
+  printf '%s\n' "mktemp: failed to create file via template '$tree/locked/draft.XXXXXX': Permission denied" > "$tree/err-gnu"
+  printf '%s\n' "mktemp: Permission denied (os error 13) at path \"$tree/locked/draft.<random>\"" > "$tree/err-uutils"
+  assert_one_of_outputs "the denied mktemp" "$tree/out" "$tree/err-masked" "$status" \
+    "GNU coreutils mktemp" /dev/null "$tree/err-gnu" 1 \
+    "uutils coreutils mktemp 0.10.0" /dev/null "$tree/err-uutils" 1
   ls -A "$tree/locked" > "$tree/files"
   diff /dev/null "$tree/files"
-  assert_status 1 "$status"
 }
 
 it_fails_the_write_test_for_a_file_without_write_permission() {
