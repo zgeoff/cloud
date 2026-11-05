@@ -144,6 +144,11 @@ writes into its real memory.
    Expect a `200` from `api.anthropic.com` timestamped after the replace. A `401` means the new
    token is wrong. Put the right token in 1Password, and run steps 2 to 8 again.
 
+The preview service's secrets `preview-model` and `preview-model-counted` hold the same credential.
+Replace each with `--replace`, as [set the service up](./preview.md#set-the-service-up) and
+[cap each preview's model spend](./preview.md#cap-each-previews-model-spend) add them, or the
+previews keep the old token.
+
 ## Pin nixie's sandbox images
 
 nixie adds its sandbox images with its own token, which cannot pin an image. Delivery pins them with
