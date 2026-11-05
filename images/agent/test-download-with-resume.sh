@@ -77,18 +77,18 @@ it_fails_with_curls_status_after_5_attempts_in_a_row_that_add_no_bytes() {
 
   assert_status 7 "$status"
   diff /dev/null "$tree/out"
-  # the milliseconds each connect took are a measurement, so they are masked
-  sed -E 's/after [0-9]+ ms/after <ms> ms/' "$tree/err" > "$tree/err-masked"
+  # curl writes its own message, whose wording changes between curl releases, so the case masks it
+  sed -E 's/^(curl: \(7\)) .*/\1 <message>/' "$tree/err" > "$tree/err-masked"
   diff - "$tree/err-masked" << 'EOF'
-curl: (7) Failed to connect to 127.0.0.1 port 1 after <ms> ms: Couldn't connect to server
+curl: (7) <message>
 download-with-resume: curl exited 7 with 0 bytes, resuming in 2s
-curl: (7) Failed to connect to 127.0.0.1 port 1 after <ms> ms: Couldn't connect to server
+curl: (7) <message>
 download-with-resume: curl exited 7 with 0 bytes, resuming in 2s
-curl: (7) Failed to connect to 127.0.0.1 port 1 after <ms> ms: Couldn't connect to server
+curl: (7) <message>
 download-with-resume: curl exited 7 with 0 bytes, resuming in 2s
-curl: (7) Failed to connect to 127.0.0.1 port 1 after <ms> ms: Couldn't connect to server
+curl: (7) <message>
 download-with-resume: curl exited 7 with 0 bytes, resuming in 2s
-curl: (7) Failed to connect to 127.0.0.1 port 1 after <ms> ms: Couldn't connect to server
+curl: (7) <message>
 download-with-resume: curl exited 7 with 0 bytes, after 5 attempts that added none
 EOF
   diff - "$tree/bin/pauses" << 'EOF'
