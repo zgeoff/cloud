@@ -26,8 +26,8 @@ secret the file ever held. Never print a decrypted value, and never put one on a
 
 ## Set up the helpers
 
-Each step below runs sops from the nixie image of the pinned release, because that is the sops nixie
-decrypts with. Run these in the repo root first:
+Run these in the repo root first. Each sops step below uses the sops in the nixie image of the
+release to deploy, because nixie decrypts with that sops:
 
 ```bash
 NIXIE_IMAGE='ghcr.io/zgeoff/nixie:<version>@sha256:<nixie_digest>' # the release to deploy
@@ -151,33 +151,25 @@ previews keep the old token.
 
 ## Pin nixie's sandbox images
 
-nixie adds its sandbox images to impd with its own token, which cannot pin an image. You pin them as
-impd's root, so that impd's image eviction never removes one and a new sandbox never waits for a
-pull. nixie adds an evicted image again before it creates a sandbox on it, so an image that misses
-its pin costs only a pull.
+nixie adds its sandbox images to impd with its own token, which cannot pin an image. You pin them
+with `host_imp`, which runs `impz` as root inside imp-host, so that impd's image eviction never
+removes one and a new sandbox never waits for a pull. Before nixie creates a sandbox on an evicted
+image, nixie adds the image again, so an image that misses its pin costs only a pull.
 
-Run this section after you deploy a nixie bump that has the label `sandbox-images-changed`
+Run this section after you deploy a nixie bump PR that has the label `sandbox-images-changed`
 ([Release check](./release-check.md)), once step 3 of [Deploy or upgrade](#deploy-or-upgrade) shows
-every part ready. A dry run changes nothing in impd: it runs steps 1 and 3 only.
+every part ready. For a dry run, which changes nothing in impd, run steps 1 and 3 only.
 
-1. Set the image refs of these nixie releases. Each is an `image` value of the stack config `nixie`
-   in `infra/Pulumi.prod.yaml`:
-
-   | Variable         | Release                                              |
-   | ---------------- | ---------------------------------------------------- |
-   | `NIXIE_IMAGE`    | the release you deployed, the value on `main`        |
-   | `PREVIOUS_IMAGE` | the value that the bump of `NIXIE_IMAGE` replaced    |
-   | `OLD_IMAGE`      | the value that the bump of `PREVIOUS_IMAGE` replaced |
+1. From the `main` that holds the bump, print the nixie image that the bump replaced:
 
    ```bash
-   git log --format= -p -- infra/Pulumi.prod.yaml | grep '^-.*ghcr.io/zgeoff/nixie:' | head -2
+   git log --format= -p -- infra/Pulumi.prod.yaml | grep '^-.*ghcr.io/zgeoff/nixie:' | head -1
    ```
 
-   Expect 2 lines, newest first: `PREVIOUS_IMAGE`'s ref, then `OLD_IMAGE`'s. Set the 2 variables:
+   Expect 1 line, `-    image: <ref>`. Set `PREVIOUS_IMAGE` to its `<ref>`:
 
    ```bash
-   PREVIOUS_IMAGE='ghcr.io/zgeoff/nixie:<version>@sha256:<nixie_digest>' # the first line
-   OLD_IMAGE='ghcr.io/zgeoff/nixie:<version>@sha256:<nixie_digest>'      # the second line
+   PREVIOUS_IMAGE='ghcr.io/zgeoff/nixie:<version>@sha256:<nixie_digest>'
    ```
 
 2. Pin each sandbox image of `NIXIE_IMAGE` by the name nixie gives it:
@@ -187,27 +179,35 @@ every part ready. A dry run changes nothing in impd: it runs steps 1 and 3 only.
      | while read -r name; do host_imp image pin "$name" < /dev/null; done
    ```
 
-3. List the names in `OLD_IMAGE`'s manifest that lose their pin. A name keeps its pin when one of
-   these holds:
-   - the manifest of `NIXIE_IMAGE` or `PREVIOUS_IMAGE` lists it. An unchanged image keeps its name
-     from one release to the next, so `OLD_IMAGE`'s manifest can list the same name.
-   - an imp runs on it, asleep or awake, so `host_imp ls < /dev/null` shows it in the `IMAGE`
-     column. A sandbox keeps the image of the release that made it.
+   Expect `host_imp image ls < /dev/null` to show `yes` in the `PINNED` column of each name in the
+   manifest.
+
+3. List the sandbox images to unpin. Every image that nixie adds has a name that starts with
+   `nixie-`, so the list starts from each pinned image under that prefix. An image keeps its pin
+   when one of these holds:
+   - the manifest of `NIXIE_IMAGE` or `PREVIOUS_IMAGE` lists its name. An unchanged image has the
+     same name in both manifests.
+   - an imp runs on it, asleep or awake, so `host_imp ls < /dev/null` shows its name in the `IMAGE`
+     column. An imp stays on the image it started from after nixie moves to a new release.
+
+   An image kept for an imp stays pinned until the next run of this section after the imp ends.
 
    ```bash
    manifest() { docker run --rm --entrypoint nixie "$1" sandbox-manifest | jq -r '.[].name'; }
    unpin="$(
      set -o pipefail
-     old="$(manifest "$OLD_IMAGE")" || exit 1
+     pinned="$(host_imp image ls --json < /dev/null \
+       | jq -r '.[] | select(.pinned and (.name | startswith("nixie-"))) | .name')" || exit 1
      current="$(manifest "$NIXIE_IMAGE")" || exit 1
      previous="$(manifest "$PREVIOUS_IMAGE")" || exit 1
      in_use="$(host_imp ls --json < /dev/null | jq -r '.[].image')" || exit 1
-     comm -23 <(sort -u <<< "$old") <(printf '%s\n' "$current" "$previous" "$in_use" | sort -u)
-   )" && echo "unpin: ${unpin:-none}" || { unpin=''; echo 'a listing failed: unpin nothing' >&2; }
+     comm -23 <(sort -u <<< "$pinned") <(printf '%s\n' "$current" "$previous" "$in_use" | sort -u)
+   )" && printf 'unpin: %s\n' ${unpin:-none} || { unpin=''; echo 'a listing failed: unpin nothing' >&2; }
    ```
 
-   Expect `unpin:` and one name per line, or `unpin: none`. When a manifest or the imp listing
-   fails, the command prints `a listing failed: unpin nothing` and empties the list.
+   Expect one `unpin: <name>` line per image, or `unpin: none`. When the image listing, a manifest
+   or the imp listing fails, the command prints `a listing failed: unpin nothing` and empties the
+   list. Fix the failure and run step 3 again.
 
 4. Unpin each name on the list:
 
@@ -218,7 +218,7 @@ every part ready. A dry run changes nothing in impd: it runs steps 1 and 3 only.
    ```
 
    Expect `host_imp image ls < /dev/null` to show `no` in the `PINNED` column of each name on the
-   list, and `yes` for each name that step 3 kept.
+   list.
 
 ## Mint nixie's impd token
 
