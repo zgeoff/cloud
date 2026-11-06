@@ -1,3 +1,4 @@
+import { topology } from '@zgeoff/cloud-topology';
 import type { ProbeTarget } from './build-tcp-probe.ts';
 import { buildTCPProbe } from './build-tcp-probe.ts';
 import { findFetchImage } from './find-fetch-image.ts';
@@ -26,7 +27,7 @@ const usage = 'usage: bun run nixie:check-sandbox <tailnet address>:<port>\n';
 export async function checkNixieFetchSandbox(
   options: Readonly<CheckFetchSandboxOptions>,
 ): Promise<number> {
-  const tailnet = parseTailnetTarget(options.args);
+  const tailnet = parseTailnetTarget(options.args, topology.tailnet);
 
   if (!tailnet.ok) {
     options.printErr(`check-nixie-fetch-sandbox: ${tailnet.error}\n${usage}`);

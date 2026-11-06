@@ -1,15 +1,17 @@
 import { BlockList, isIP } from 'node:net';
-import { topology } from '@zgeoff/cloud-topology';
+import type { Topology } from '@zgeoff/cloud-topology';
 import type { ProbeTarget } from './build-tcp-probe.ts';
-
-const exampleTarget = `${topology.tailnet.nodes.geoffcloud.address}:443`;
 
 export type TailnetTargetResult =
   | { readonly ok: true; readonly target: ProbeTarget }
   | { readonly ok: false; readonly error: string };
 
-export function parseTailnetTarget(args: readonly string[]): TailnetTargetResult {
+export function parseTailnetTarget(
+  args: readonly string[],
+  tailnet: Readonly<Topology['tailnet']>,
+): TailnetTargetResult {
   const [arg] = args;
+  const exampleTarget = `${tailnet.nodes.geoffcloud.address}:443`;
 
   // no default, so the caller always names a listener that is not on port 53
   if (arg === undefined) {
@@ -25,7 +27,7 @@ export function parseTailnetTarget(args: readonly string[]): TailnetTargetResult
     return { ok: false, error: `give one tailnet address and port, such as ${exampleTarget}` };
   }
 
-  const refusal = findRefusal(arg, target);
+  const refusal = findRefusal(arg, target, tailnet, exampleTarget);
 
   return refusal === undefined ? { ok: true, target } : { ok: false, error: refusal };
 }
@@ -42,9 +44,14 @@ function findAddress(arg: string): ProbeTarget | undefined {
 // connect however well the sandbox is isolated, and the check would fail a correct deployment
 const dnsPort = 53;
 
-function findRefusal(arg: string, target: ProbeTarget): string | undefined {
-  if (!isTailnetAddress(target.host)) {
-    return `cannot probe ${arg}: the address is outside the tailnet's ${topology.tailnet.cidr} and fd7a:115c:a1e0::/48, so the host and the sandbox can each reach a different listener on it and the probe would prove nothing`;
+function findRefusal(
+  arg: string,
+  target: ProbeTarget,
+  tailnet: Readonly<Topology['tailnet']>,
+  exampleTarget: string,
+): string | undefined {
+  if (!isTailnetAddress(target.host, tailnet)) {
+    return `cannot probe ${arg}: the address is outside the tailnet's ${tailnet.cidr} and ${tailnet.cidrIPv6}, so the host and the sandbox can each reach a different listener on it and the probe would prove nothing`;
   }
 
   if (target.port === dnsPort) {
@@ -56,15 +63,22 @@ function findRefusal(arg: string, target: ProbeTarget): string | undefined {
 
 // Tailscale's address ranges; any other address, such as loopback, means something else on the host
 // than in the sandbox
-const tailnetRanges = new BlockList();
+function isTailnetAddress(host: string, tailnet: Readonly<Topology['tailnet']>): boolean {
+  const tailnetRanges = new BlockList();
 
-const [tailnetNetwork = '', tailnetPrefix] = topology.tailnet.cidr.split('/');
+  const ipv4 = splitCIDR(tailnet.cidr);
+  const ipv6 = splitCIDR(tailnet.cidrIPv6);
 
-tailnetRanges.addSubnet(tailnetNetwork, Number(tailnetPrefix), 'ipv4');
-tailnetRanges.addSubnet('fd7a:115c:a1e0::', 48, 'ipv6');
+  tailnetRanges.addSubnet(ipv4.address, ipv4.prefixLength, 'ipv4');
+  tailnetRanges.addSubnet(ipv6.address, ipv6.prefixLength, 'ipv6');
 
-function isTailnetAddress(host: string): boolean {
   const family = isIP(host) === 6 ? 'ipv6' : 'ipv4';
 
   return tailnetRanges.check(host, family);
+}
+
+function splitCIDR(cidr: string): { readonly address: string; readonly prefixLength: number } {
+  const [address = '', prefixLength = ''] = cidr.split('/');
+
+  return { address, prefixLength: Number(prefixLength) };
 }
