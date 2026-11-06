@@ -45,6 +45,7 @@
         "@pulumi/tailscale": "0.29.2",
         "@pulumi/tls": "5.6.2",
         "@pulumiverse/acme": "0.18.1",
+        "@pulumiverse/grafana": "2.44.0",
         "@zgeoff/cloud-health-check": "workspace:*",
         "@zgeoff/cloud-topology": "workspace:*",
         "@zgeoff/pulumi-onidel": "workspace:*",
@@ -544,6 +545,8 @@
     "@pulumi/tls": ["@pulumi/tls@5.6.2", "", { "dependencies": { "@pulumi/pulumi": "^3.142.0" } }, "sha512-Id9iwUsVONmXamwrAo1OR+RGjlR1WXqA50v2WQJevZSF+73ZZpZvp5rmd4CinWfvmoYVcBJGNpAzrUjUnUmuZg=="],
 
     "@pulumiverse/acme": ["@pulumiverse/acme@0.18.1", "", { "dependencies": { "@pulumi/pulumi": "^3.0.0" } }, "sha512-53gRCiqAgX4IyCb5IZe9p5319D8TK0EkYWMJXYEgn4blriZbbwy/+4EJ19d8hSVY5KRqNBolFSCoKy2RYR4TXA=="],
+
+    "@pulumiverse/grafana": ["@pulumiverse/grafana@2.44.0", "", { "dependencies": { "@pulumi/pulumi": "^3.142.0" } }, "sha512-7uS+wSn6J2zgWevbZsOZQvw7NbPADDwIwzTXBThTDxSYSbjsm3FNieRUKV1bQviiqMTzQeQFFSNQ01RTmDKf/g=="],
 
     "@sigstore/bundle": ["@sigstore/bundle@4.0.0", "", { "dependencies": { "@sigstore/protobuf-specs": "^0.5.0" } }, "sha512-NwCl5Y0V6Di0NexvkTqdoVfmjTaQwoLM236r89KEojGmq/jMls8S+zb7yOwAPdXvbwfKDlP+lmXgAL4vKSQT+A=="],
 

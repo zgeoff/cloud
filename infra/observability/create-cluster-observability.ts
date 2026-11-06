@@ -12,6 +12,7 @@ import { buildAlloyValues } from './alloy-values.ts';
 import type { AlertRuleInputs } from './build-alert-rules.ts';
 import { buildAlloyConfigMapArgs } from './build-alloy-config-map-args.ts';
 import { createDashboards } from './create-dashboards.ts';
+import { createMCPServiceAccount } from './create-mcp-service-account.ts';
 import { createMetrics } from './create-metrics.ts';
 import { createMonitors } from './create-monitors.ts';
 import { lokiValues } from './loki-values.ts';
@@ -57,6 +58,13 @@ export function createClusterObservability(
   createLogShipper(ns, [logs, metrics], cluster);
   createMonitors(ns, monitors, { provider: cluster, dependsOn: [metrics] });
   createDashboards(ns, cluster);
+
+  createMCPServiceAccount({
+    // the prod deploy's runner reaches the host by its tailnet address, with no MagicDNS name
+    grafanaURL: `http://${topology.tailnet.nodes.geoffcloud.address}:${grafanaNodePort}`,
+    adminPassword: adminPassword.result,
+    grafana: metrics,
+  });
 
   return {
     grafanaURL: `http://geoffcloud:${grafanaNodePort}`,
