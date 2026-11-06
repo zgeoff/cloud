@@ -20,15 +20,15 @@ export function buildNixieImpConfig(topology: Readonly<Topology>): NixieImpConfi
       `${topology.vm.publicIPv6}/${topology.vm.publicIPv6PrefixLength}`,
       `${topology.podman.bridgeAddress}/${splitCIDR(topology.podman.subnet).prefixLength}`,
       `${topology.tailnet.nodes.geoffcloud.address}/32`,
-      `${topology.tailnet.nodes.geoffcloud.addressIPv6}/128`,
 
       // flannel.1 holds the node's pod subnet's network address, and cni0 its first address
       `${nodePods.address}/32`,
       `${toIPv4(toIPv4Number(nodePods.address) + 1)}/${nodePods.prefixLength}`,
     ],
 
-    // k3s's pod and service ranges, which imp's module drops from imp-host's bridge as well
-    egress_deny: [topology.k3s.podCIDR, topology.k3s.serviceCIDR],
+    // k3s's pod and service ranges, which imp's module drops from imp-host's bridge as well, and
+    // the tailnet's IPv6 range, which holds the host's tailnet IPv6 address whatever a rejoin gives it
+    egress_deny: [topology.k3s.podCIDR, topology.k3s.serviceCIDR, topology.tailnet.cidrIPv6],
   };
 }
 

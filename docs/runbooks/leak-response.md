@@ -156,15 +156,13 @@ tailnet again with a new auth key. The reboot puts every imp to sleep and restar
 A node that joins the tailnet again gets a new address, but the host's config, the tailnet policy
 and nixie's config read each node's address from `packages/topology/constants.json`. Until a node
 holds that address again, the atc daemon and the preview service fail to bind on the host, and the
-names that point at the node reach nothing. Run these steps for each node that joined again:
+names that point at the node reach nothing. A node's tailnet IPv6 address needs no step, because the
+repo holds only the tailnet's IPv6 range. Run these steps for each node that joined again:
 
 1. On the Tailscale admin console's Machines page, edit the node's IPv4 address, and enter the
    `address` that `constants.json` gives the node. Tailscale lets an admin change a node's IPv4
    address at any time ([IP pool](https://tailscale.com/docs/reference/ip-pool)).
 2. Check from your machine: `tailscale ip -4 <node>` prints that address.
-3. Compare the node's IPv6 address, from `tailscale ip -6 <node>`, with its `addressIPv6`, where
-   `constants.json` gives one. Tailscale documents an edit of the IPv4 address only, so when the two
-   differ, change `addressIPv6` through a PR, and let the deploy apply it.
 
 ## Change the ZFS key
 
