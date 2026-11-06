@@ -27,14 +27,17 @@ as one replica of a StatefulSet, because SQLite takes one writer, and a rollout 
 before it starts the new one. The StatefulSet starts and replaces its pod without waiting for it to
 turn ready, so an apply that fixes an unready nixie rolls it out. The data volume is a claim of the
 retaining storage class that the atc gateway's volume uses, so deleting the claim keeps `nixie.db`
-and the key store beside it. A nightly CronJob runs nixie's own backup command, which copies both
-databases, and uploads the copy with restic to nixie's own R2 bucket, encrypted with a password that
-only 1Password and the backup's Secret hold. Only nixie's backup and restore commands open nixie's
-databases, so nixie may change its files between releases without breaking the backup. The CronJob
-runs as nixie's user, so a restore leaves files nixie can open, and the record keys stay useless
-without the deployment key in the secrets file. [nixie's backup](../../runbooks/nixie-backup.md)
-gives the steps. The volume sits in k3s's data directory on the encrypted zvol on the second disk,
-so no Onidel snapshot holds the databases ([protection at rest](../secrets.md#protection-at-rest)).
+and the key store beside it. nixie stages a backup set of both databases on its data volume, and a
+nightly CronJob runs the job in the `nixie-backup` image of nixie's release, which ships each set
+with restic to two repositories in nixie's own R2 bucket: `nixie.db` to the data repository, and
+`keys.db` to a key repository that keeps the newest set alone, so a forgotten item's key leaves
+every backup. Each repository has its own password, which only 1Password and the backup's Secret
+hold, and nixie's own container mounts neither. Only nixie's commands open nixie's databases, so
+nixie may change its files between releases without breaking the backup. The CronJob runs as nixie's
+user, so nixie can remove what the job leaves, and the record keys stay useless without the
+deployment key in the secrets file. [nixie's backup](../../runbooks/nixie-backup.md) gives the
+steps. The volume sits in k3s's data directory on the encrypted zvol on the second disk, so no
+Onidel snapshot holds the databases ([protection at rest](../secrets.md#protection-at-rest)).
 
 The web client is a Deployment of its own, because it holds no state, no secret and no database. It
 calls nixie's API at its cluster address, and the browser calls `/rpc` on the web client's own

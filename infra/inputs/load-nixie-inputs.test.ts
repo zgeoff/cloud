@@ -15,12 +15,8 @@ test('it returns nothing while the stack config leaves nixie out', () => {
         CLOUDFLARE_API_TOKEN: 'cf-token',
       },
       {
-        reference:
-          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-        pullCredential: {
-          username: 'octo-puller',
-          token: secret('ghp_fake0token0for0tests0only0000000000'),
-        },
+        username: 'octo-puller',
+        token: secret('ghp_fake0token0for0tests0only0000000000'),
       },
     ),
   ).toStrictEqual({});
@@ -46,12 +42,8 @@ test('it returns the pinned images, the host name and the 3 secrets when nixie i
         CLOUDFLARE_API_TOKEN: 'cf-token',
       },
       {
-        reference:
-          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-        pullCredential: {
-          username: 'octo-puller',
-          token: secret('ghp_fake0token0for0tests0only0000000000'),
-        },
+        username: 'octo-puller',
+        token: secret('ghp_fake0token0for0tests0only0000000000'),
       },
     ),
   ).toStrictEqual({
@@ -93,12 +85,8 @@ test.each([
       CLOUDFLARE_API_TOKEN: 'cf-token',
     },
     {
-      reference:
-        'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-      pullCredential: {
-        username: 'octo-puller',
-        token: secret('ghp_fake0token0for0tests0only0000000000'),
-      },
+      username: 'octo-puller',
+      token: secret('ghp_fake0token0for0tests0only0000000000'),
     },
   );
 
@@ -136,12 +124,8 @@ test.each([
       }),
       env,
       {
-        reference:
-          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-        pullCredential: {
-          username: 'octo-puller',
-          token: secret('ghp_fake0token0for0tests0only0000000000'),
-        },
+        username: 'octo-puller',
+        token: secret('ghp_fake0token0for0tests0only0000000000'),
       },
     ),
   ).toThrowWithMessage(Error, `${name} is unset; nixie needs it while stack config "nixie" is set`);
@@ -165,12 +149,8 @@ test('it throws when a nixie secret holds only whitespace', () => {
         CLOUDFLARE_API_TOKEN: 'cf-token',
       },
       {
-        reference:
-          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-        pullCredential: {
-          username: 'octo-puller',
-          token: secret('ghp_fake0token0for0tests0only0000000000'),
-        },
+        username: 'octo-puller',
+        token: secret('ghp_fake0token0for0tests0only0000000000'),
       },
     ),
   ).toThrowWithMessage(
@@ -206,12 +186,8 @@ test.each([
         CLOUDFLARE_API_TOKEN: 'cf-token',
       },
       {
-        reference:
-          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-        pullCredential: {
-          username: 'octo-puller',
-          token: secret('ghp_fake0token0for0tests0only0000000000'),
-        },
+        username: 'octo-puller',
+        token: secret('ghp_fake0token0for0tests0only0000000000'),
       },
     ),
   ).toThrowWithMessage(Error, `stack config "nixie.${key}" must name an image by tag and digest`);
@@ -240,12 +216,8 @@ test.each([
         CLOUDFLARE_API_TOKEN: 'cf-token',
       },
       {
-        reference:
-          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-        pullCredential: {
-          username: 'octo-puller',
-          token: secret('ghp_fake0token0for0tests0only0000000000'),
-        },
+        username: 'octo-puller',
+        token: secret('ghp_fake0token0for0tests0only0000000000'),
       },
     ),
   ).toThrowWithMessage(Error, 'stack config "nixie.hostname" must name a host under geoff.cloud');
@@ -276,7 +248,7 @@ test('it throws when the hostname is not a string', () => {
   );
 });
 
-test("it returns the backup with its pinned image and the gateway's pull credential when every NIXIE backup variable is set", () => {
+test("it returns the backup with nixie's backup image, the gateway's pull credential and both repos' secrets when every NIXIE backup variable is set", () => {
   const pullCredential = {
     username: 'octo-puller',
     token: secret('ghp_fake0token0for0tests0only0000000000'),
@@ -288,6 +260,8 @@ test("it returns the backup with its pinned image and the gateway's pull credent
         'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
       webImage:
         'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+      backupImage:
+        'ghcr.io/zgeoff/nixie-backup:0.1.0@sha256:5e0c1d5f3c7e2a9b8d4f6a1c3e5b7d9f0a2c4e6b8d0f1a3c5e7b9d1f3a5c7e9b',
       hostname: 'nixie.geoff.cloud',
     }),
   });
@@ -300,24 +274,23 @@ test("it returns the backup with its pinned image and the gateway's pull credent
         NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
         CLOUDFLARE_API_TOKEN: 'cf-token',
         NIXIE_RESTIC_PASSWORD: 'p'.repeat(32),
+        NIXIE_KEY_RESTIC_PASSWORD: 'k'.repeat(32),
         NIXIE_R2_ACCESS_KEY_ID: 'a'.repeat(32),
         NIXIE_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
         NIXIE_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
         NIXIE_R2_BUCKET: 'nixie-backups',
       },
-      {
-        reference:
-          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-        pullCredential,
-      },
+      pullCredential,
     ).nixie?.backup,
   ).toStrictEqual({
     image:
-      'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      'ghcr.io/zgeoff/nixie-backup:0.1.0@sha256:5e0c1d5f3c7e2a9b8d4f6a1c3e5b7d9f0a2c4e6b8d0f1a3c5e7b9d1f3a5c7e9b',
     pullCredential,
     secrets: {
-      repository: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
-      password: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
+      dataRepository: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
+      dataPassword: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
+      keyRepository: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
+      keyPassword: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
       accessKeyID: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
       secretAccessKey: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
     },
@@ -325,8 +298,13 @@ test("it returns the backup with its pinned image and the gateway's pull credent
 });
 
 test.each([
-  ['repository', 's3:https://0123456789abcdef.r2.cloudflarestorage.com/nixie-backups/nixie'],
-  ['password', 'p'.repeat(32)],
+  ['dataRepository', 's3:https://0123456789abcdef.r2.cloudflarestorage.com/nixie-backups/nixie'],
+  ['dataPassword', 'p'.repeat(32)],
+  [
+    'keyRepository',
+    's3:https://0123456789abcdef.r2.cloudflarestorage.com/nixie-backups/nixie-keys',
+  ],
+  ['keyPassword', 'k'.repeat(32)],
   ['accessKeyID', 'a'.repeat(32)],
   ['secretAccessKey', 's'.repeat(64)],
 ] as const)('it marks the backup %s secret and carries its value', async (name, expected) => {
@@ -337,6 +315,8 @@ test.each([
           'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
         webImage:
           'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+        backupImage:
+          'ghcr.io/zgeoff/nixie-backup:0.1.0@sha256:5e0c1d5f3c7e2a9b8d4f6a1c3e5b7d9f0a2c4e6b8d0f1a3c5e7b9d1f3a5c7e9b',
         hostname: 'nixie.geoff.cloud',
       }),
     }),
@@ -345,18 +325,15 @@ test.each([
       NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
       CLOUDFLARE_API_TOKEN: 'cf-token',
       NIXIE_RESTIC_PASSWORD: 'p'.repeat(32),
+      NIXIE_KEY_RESTIC_PASSWORD: 'k'.repeat(32),
       NIXIE_R2_ACCESS_KEY_ID: 'a'.repeat(32),
       NIXIE_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
       NIXIE_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
       NIXIE_R2_BUCKET: 'nixie-backups',
     },
     {
-      reference:
-        'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-      pullCredential: {
-        username: 'octo-puller',
-        token: secret('ghp_fake0token0for0tests0only0000000000'),
-      },
+      username: 'octo-puller',
+      token: secret('ghp_fake0token0for0tests0only0000000000'),
     },
   );
 
@@ -377,6 +354,8 @@ test('it returns no backup when no NIXIE backup variable is set, even with a bac
           'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
         webImage:
           'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+        backupImage:
+          'ghcr.io/zgeoff/nixie-backup:0.1.0@sha256:5e0c1d5f3c7e2a9b8d4f6a1c3e5b7d9f0a2c4e6b8d0f1a3c5e7b9d1f3a5c7e9b',
         hostname: 'nixie.geoff.cloud',
       }),
     }),
@@ -386,19 +365,48 @@ test('it returns no backup when no NIXIE backup variable is set, even with a bac
       CLOUDFLARE_API_TOKEN: 'cf-token',
     },
     {
-      reference:
-        'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-      pullCredential: {
-        username: 'octo-puller',
-        token: secret('ghp_fake0token0for0tests0only0000000000'),
-      },
+      username: 'octo-puller',
+      token: secret('ghp_fake0token0for0tests0only0000000000'),
     },
   );
 
   expect(inputs.nixie).not.toContainKey('backup');
 });
 
-test("it throws when the backup is set without the gateway's backup image", () => {
+test("it throws when the backup is set without the gateway's GHCR login", () => {
+  expect(() =>
+    loadNixieInputs(
+      buildStubConfig({
+        nixie: JSON.stringify({
+          image:
+            'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
+          webImage:
+            'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+          backupImage:
+            'ghcr.io/zgeoff/nixie-backup:0.1.0@sha256:5e0c1d5f3c7e2a9b8d4f6a1c3e5b7d9f0a2c4e6b8d0f1a3c5e7b9d1f3a5c7e9b',
+          hostname: 'nixie.geoff.cloud',
+        }),
+      }),
+      {
+        NIXIE_AGE_HOST_KEY: 'AGE-SECRET-KEY-1QQQ',
+        NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
+        CLOUDFLARE_API_TOKEN: 'cf-token',
+        NIXIE_RESTIC_PASSWORD: 'p'.repeat(32),
+        NIXIE_KEY_RESTIC_PASSWORD: 'k'.repeat(32),
+        NIXIE_R2_ACCESS_KEY_ID: 'a'.repeat(32),
+        NIXIE_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
+        NIXIE_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
+        NIXIE_R2_BUCKET: 'nixie-backups',
+      },
+      undefined,
+    ),
+  ).toThrowWithMessage(
+    Error,
+    'nixie\'s backup pulls its image with the GHCR login of stack config "atcGateway", which is unset: set atcGateway, or unset the NIXIE backup variables',
+  );
+});
+
+test('it throws when the backup is set without nixie.backupImage', () => {
   expect(() =>
     loadNixieInputs(
       buildStubConfig({
@@ -415,20 +423,33 @@ test("it throws when the backup is set without the gateway's backup image", () =
         NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
         CLOUDFLARE_API_TOKEN: 'cf-token',
         NIXIE_RESTIC_PASSWORD: 'p'.repeat(32),
+        NIXIE_KEY_RESTIC_PASSWORD: 'k'.repeat(32),
         NIXIE_R2_ACCESS_KEY_ID: 'a'.repeat(32),
         NIXIE_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
         NIXIE_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
         NIXIE_R2_BUCKET: 'nixie-backups',
       },
-      undefined,
+      {
+        username: 'octo-puller',
+        token: secret('ghp_fake0token0for0tests0only0000000000'),
+      },
     ),
   ).toThrowWithMessage(
     Error,
-    'nixie\'s backup runs in stack config "atcGateway.backupImage", which is unset: set atcGateway, or unset the NIXIE backup variables',
+    'stack config "nixie.backupImage" must name an image by tag and digest',
   );
 });
 
-test('it throws when the stack config still sets nixie.backupImage', () => {
+test.each([
+  [
+    "another release's nixie-backup",
+    'ghcr.io/zgeoff/nixie-backup:0.2.0@sha256:5e0c1d5f3c7e2a9b8d4f6a1c3e5b7d9f0a2c4e6b8d0f1a3c5e7b9d1f3a5c7e9b',
+  ],
+  [
+    'another backup image',
+    'ghcr.io/zgeoff/atc-gateway-backup:0.1.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+  ],
+] as const)('it throws when nixie.backupImage names %s', (_label, backupImage) => {
   expect(() =>
     loadNixieInputs(
       buildStubConfig({
@@ -437,29 +458,62 @@ test('it throws when the stack config still sets nixie.backupImage', () => {
             'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
           webImage:
             'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+          backupImage,
           hostname: 'nixie.geoff.cloud',
-          backupImage:
-            'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
         }),
       }),
       {
         NIXIE_AGE_HOST_KEY: 'AGE-SECRET-KEY-1QQQ',
         NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
         CLOUDFLARE_API_TOKEN: 'cf-token',
+        NIXIE_RESTIC_PASSWORD: 'p'.repeat(32),
+        NIXIE_KEY_RESTIC_PASSWORD: 'k'.repeat(32),
+        NIXIE_R2_ACCESS_KEY_ID: 'a'.repeat(32),
+        NIXIE_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
+        NIXIE_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
+        NIXIE_R2_BUCKET: 'nixie-backups',
       },
       {
-        reference:
-          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-        pullCredential: {
-          username: 'octo-puller',
-          token: secret('ghp_fake0token0for0tests0only0000000000'),
-        },
+        username: 'octo-puller',
+        token: secret('ghp_fake0token0for0tests0only0000000000'),
       },
     ),
   ).toThrowWithMessage(
     Error,
-    'stack config "nixie.backupImage" is no longer read: nixie\'s backup runs in "atcGateway.backupImage", so remove it',
+    'stack config "nixie.backupImage" must name ghcr.io/zgeoff/nixie-backup:0.1.0, the release of nixie.image',
   );
+});
+
+test("it throws when the backup is set without the key repo's password", () => {
+  expect(() =>
+    loadNixieInputs(
+      buildStubConfig({
+        nixie: JSON.stringify({
+          image:
+            'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
+          webImage:
+            'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+          backupImage:
+            'ghcr.io/zgeoff/nixie-backup:0.1.0@sha256:5e0c1d5f3c7e2a9b8d4f6a1c3e5b7d9f0a2c4e6b8d0f1a3c5e7b9d1f3a5c7e9b',
+          hostname: 'nixie.geoff.cloud',
+        }),
+      }),
+      {
+        NIXIE_AGE_HOST_KEY: 'AGE-SECRET-KEY-1QQQ',
+        NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
+        CLOUDFLARE_API_TOKEN: 'cf-token',
+        NIXIE_RESTIC_PASSWORD: 'p'.repeat(32),
+        NIXIE_R2_ACCESS_KEY_ID: 'a'.repeat(32),
+        NIXIE_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
+        NIXIE_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
+        NIXIE_R2_BUCKET: 'nixie-backups',
+      },
+      {
+        username: 'octo-puller',
+        token: secret('ghp_fake0token0for0tests0only0000000000'),
+      },
+    ),
+  ).toThrowWithMessage(Error, "NIXIE_KEY_RESTIC_PASSWORD is unset; nixie's backup needs it");
 });
 
 test('it throws, naming the gap, when the nixie backup variables are partial', () => {
@@ -481,12 +535,8 @@ test('it throws, naming the gap, when the nixie backup variables are partial', (
         NIXIE_RESTIC_PASSWORD: 'p'.repeat(32),
       },
       {
-        reference:
-          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-        pullCredential: {
-          username: 'octo-puller',
-          token: secret('ghp_fake0token0for0tests0only0000000000'),
-        },
+        username: 'octo-puller',
+        token: secret('ghp_fake0token0for0tests0only0000000000'),
       },
     ),
   ).toThrowWithMessage(

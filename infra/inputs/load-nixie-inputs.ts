@@ -6,8 +6,8 @@ import { requireGeoffCloudHostname } from './require-geoff-cloud-hostname.ts';
 import { requirePinnedImage } from './require-pinned-image.ts';
 import { requireVariable } from './require-variable.ts';
 import type {
-  BackupImage,
   Environment,
+  GHCRPullCredential,
   NixieBackupInputs,
   NixieInputs,
   StackConfig,
@@ -20,14 +20,15 @@ const nixieConfigSchema = z.object({
   image: z.string().optional(),
   webImage: z.string().optional(),
   hostname: z.string().optional(),
-  backupImage: z.unknown().optional(),
+  backupImage: z.string().optional(),
 });
 
-// setting stack config "nixie" approves the deploy; NIXIE_RESTIC_* and NIXIE_R2_* add the backup
+// setting stack config "nixie" approves the deploy; NIXIE_RESTIC_*, NIXIE_R2_* and
+// NIXIE_KEY_RESTIC_PASSWORD add the backup, which runs nixie.backupImage
 export function loadNixieInputs(
   stackConfig: Pick<StackConfig, 'getObject'>,
   env: Environment,
-  backupImage: BackupImage | undefined,
+  pullCredential: GHCRPullCredential | undefined,
 ): { readonly nixie?: NixieInputs } {
   const raw = stackConfig.getObject('nixie');
 
@@ -37,19 +38,17 @@ export function loadNixieInputs(
 
   const config = parseStackObject('nixie', raw, nixieConfigSchema);
 
-  if (config.backupImage !== undefined) {
-    throw new Error(
-      'stack config "nixie.backupImage" is no longer read: nixie\'s backup runs in "atcGateway.backupImage", so remove it',
-    );
-  }
-
   requirePinnedImage('nixie.image', config.image);
   requirePinnedImage('nixie.webImage', config.webImage);
 
   // the DNS record and the certificate live in the geoff.cloud zone
   requireGeoffCloudHostname('nixie.hostname', config.hostname);
 
-  const backup = findBackup(env, backupImage);
+  const backup = findBackup(
+    env,
+    { image: config.image, backupImage: config.backupImage },
+    pullCredential,
+  );
 
   return {
     nixie: {
@@ -66,9 +65,15 @@ export function loadNixieInputs(
   };
 }
 
+interface NixieImages {
+  readonly image: string;
+  readonly backupImage: string | undefined;
+}
+
 function findBackup(
   env: Environment,
-  backupImage: BackupImage | undefined,
+  images: NixieImages,
+  pullCredential: GHCRPullCredential | undefined,
 ): NixieBackupInputs | undefined {
   const backup = findResticBackup(env, { prefix: 'NIXIE', label: "nixie's backup", path: 'nixie' });
 
@@ -76,20 +81,53 @@ function findBackup(
     return undefined;
   }
 
-  if (backupImage === undefined) {
+  const image = requireReleaseBackupImage(images);
+
+  if (pullCredential === undefined) {
     throw new Error(
-      'nixie\'s backup runs in stack config "atcGateway.backupImage", which is unset: set atcGateway, or unset the NIXIE backup variables',
+      'nixie\'s backup pulls its image with the GHCR login of stack config "atcGateway", which is unset: set atcGateway, or unset the NIXIE backup variables',
     );
   }
 
   return {
-    image: backupImage.reference,
-    pullCredential: backupImage.pullCredential,
+    image,
+    pullCredential,
     secrets: {
-      repository: secret(backup.repository),
-      password: secret(backup.password),
+      dataRepository: secret(backup.repository),
+      dataPassword: secret(backup.password),
+
+      // the data repo's bucket and R2 key, beside it under a path and a password of its own
+      keyRepository: secret(`${backup.repository}-keys`),
+      keyPassword: secret(
+        requireVariable(env, 'NIXIE_KEY_RESTIC_PASSWORD', "nixie's backup needs it"),
+      ),
       accessKeyID: secret(backup.accessKeyID),
       secretAccessKey: secret(backup.secretAccessKey),
     },
   };
+}
+
+const backupRepository = 'ghcr.io/zgeoff/nixie-backup';
+
+// the job reads the staging folder that nixie's own release writes, so both come from one release
+function requireReleaseBackupImage(images: NixieImages): string {
+  const backupImage = images.backupImage;
+
+  requirePinnedImage('nixie.backupImage', backupImage);
+
+  const release = getImageTag(images.image);
+
+  if (backupImage.slice(0, backupImage.indexOf('@')) !== `${backupRepository}:${release}`) {
+    throw new Error(
+      `stack config "nixie.backupImage" must name ${backupRepository}:${release}, the release of nixie.image`,
+    );
+  }
+
+  return backupImage;
+}
+
+function getImageTag(image: string): string {
+  const name = image.slice(0, image.indexOf('@'));
+
+  return name.slice(name.lastIndexOf(':') + 1);
 }

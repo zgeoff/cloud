@@ -198,8 +198,8 @@ gates:
       - deploy/nixie/backup/**
       - scripts/run-shell-suites.sh
       - test-support/shell/run-cases.sh
-      - test-support/shell/run-backup.sh
-      - test-support/shell/run-backup-shell.sh
+      - test-support/shell/create-case-tree.sh
+      - test-support/shell/assert-status.sh
       - test-support/shell/normalize-restic-output.sh
       - infra/Pulumi.prod.yaml
       - .bun-version

@@ -67,13 +67,17 @@ interface NixieConfig {
   readonly hostname: string;
 }
 
-// a nightly restic backup of nixie.db and keys.db to nixie's own R2 bucket
+// a nightly job that ships the backup sets nixie stages: nixie.db to the data repo and keys.db to
+// the key repo, both restic repos in nixie's own R2 bucket
 export interface NixieBackupInputs {
+  // the nixie-backup image of nixie's release, by tag and digest
   readonly image: string;
   readonly pullCredential: GHCRPullCredential;
   readonly secrets: {
-    readonly repository: Output<string>;
-    readonly password: Output<string>;
+    readonly dataRepository: Output<string>;
+    readonly dataPassword: Output<string>;
+    readonly keyRepository: Output<string>;
+    readonly keyPassword: Output<string>;
     readonly accessKeyID: Output<string>;
     readonly secretAccessKey: Output<string>;
   };

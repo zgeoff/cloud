@@ -372,15 +372,19 @@ test('it refuses an imp release pinned with another digest', () => {
   );
 });
 
-test('it pins both nixie images and the contract package at the release and leaves the other images alone', () => {
+test('it pins every nixie image and the contract package at the release and leaves the other images alone', () => {
   const plan = planPinEdits({
     record: getRecord('nixie'),
     version: '0.32.0',
     values: {
-      digests: { nixie: `sha256:${'e'.repeat(64)}`, 'nixie-web': `sha256:${'f'.repeat(64)}` },
+      digests: {
+        nixie: `sha256:${'e'.repeat(64)}`,
+        'nixie-web': `sha256:${'f'.repeat(64)}`,
+        'nixie-backup': `sha256:${'d'.repeat(64)}`,
+      },
     },
     files: {
-      'infra/Pulumi.prod.yaml': `config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.31.0@sha256:${'1'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.31.0@sha256:${'2'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/backup:1.0.0@sha256:${'3'.repeat(64)}\n`,
+      'infra/Pulumi.prod.yaml': `config:\n  geoff-cloud:atc-gateway:\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:${'3'.repeat(64)}\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.31.0@sha256:${'1'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.31.0@sha256:${'2'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.31.0@sha256:${'4'.repeat(64)}\n`,
       'package.json':
         '{\n  "devDependencies": {\n    "@heynixie/contract": "0.31.0",\n    "@impz/client": "6.1.0"\n  }\n}\n',
     },
@@ -391,7 +395,7 @@ test('it pins both nixie images and the contract package at the release and leav
   }
 
   expect(plan.files).toStrictEqual({
-    'infra/Pulumi.prod.yaml': `config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.32.0@sha256:${'e'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.32.0@sha256:${'f'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/backup:1.0.0@sha256:${'3'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': `config:\n  geoff-cloud:atc-gateway:\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:${'3'.repeat(64)}\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.32.0@sha256:${'e'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.32.0@sha256:${'f'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.32.0@sha256:${'d'.repeat(64)}\n`,
     'package.json':
       '{\n  "devDependencies": {\n    "@heynixie/contract": "0.32.0",\n    "@impz/client": "6.1.0"\n  }\n}\n',
   });
@@ -402,9 +406,11 @@ test('it refuses a nixie release whose notes list no web image', () => {
     planPinEdits({
       record: getRecord('nixie'),
       version: '0.32.0',
-      values: { digests: { nixie: `sha256:${'e'.repeat(64)}` } },
+      values: {
+        digests: { nixie: `sha256:${'e'.repeat(64)}`, 'nixie-backup': `sha256:${'d'.repeat(64)}` },
+      },
       files: {
-        'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.31.0@sha256:${'1'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.31.0@sha256:${'2'.repeat(64)}\n`,
+        'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.31.0@sha256:${'1'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.31.0@sha256:${'2'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.31.0@sha256:${'4'.repeat(64)}\n`,
       },
     }),
   ).toStrictEqual(new Error('the release lists no nixie-web digest'));

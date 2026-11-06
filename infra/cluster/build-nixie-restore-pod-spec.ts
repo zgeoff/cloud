@@ -10,8 +10,8 @@ interface NixieRestorePodInputs {
   readonly pullSecret: string;
 }
 
-// The backup pod in reverse: restic restores a snapshot into /tmp, and nixie's own restore command
-// replaces its databases with it, so restic never mounts nixie's volume.
+// restic restores one backup set's copies from the data and key repos into /tmp, and nixie's own
+// restore command replaces its databases with them, so restic never mounts nixie's volume.
 export function buildNixieRestorePodSpec(inputs: NixieRestorePodInputs) {
   return {
     restartPolicy: 'Never',
@@ -30,11 +30,13 @@ export function buildNixieRestorePodSpec(inputs: NixieRestorePodInputs) {
       {
         name: 'fetch',
         image: inputs.image,
-        command: ['/bin/sh', '/opt/nixie-backup/backup.sh'],
+        command: ['/bin/sh', '/opt/nixie-backup/restore.sh'],
         args: ['restore'],
+
+        // empty, so the script restores the newest set; a data snapshot's ID restores that one
         env: [
           { name: 'HOME', value: '/tmp' },
-          { name: 'SNAPSHOT', value: 'latest' },
+          { name: 'SNAPSHOT', value: '' },
         ],
         envFrom: [{ secretRef: { name: inputs.envSecret } }],
         volumeMounts: [

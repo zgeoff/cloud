@@ -1,67 +1,104 @@
 # nixie's backup
 
-The `nixie-backup` CronJob backs up nixie's data every night with restic, encrypted on the cluster,
-to the repository `s3:<endpoint>/geoff-cloud-nixie/nixie` in R2. Its first container runs nixie's
-own `nixie backup` command, from the running nixie's image, against nixie's volume while nixie runs.
-The command writes a matching copy of nixie's databases into a directory the pod shares, and restic
-uploads that directory and nothing else. Only nixie's command opens nixie's files, and
-[nixie's host commands](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/host-commands.md#backup-and-restore)
-describe how it keeps the two databases matched. The restore Job runs the same two steps in reverse:
-restic restores a snapshot into the shared directory, and `nixie restore` replaces nixie's databases
-with it. The vault items `nixie-restic` and `r2-nixie-backup` hold the repository's password and R2
-key. [nixie](./nixie.md#restore-from-a-backup) gives a real restore.
+nixie stages a backup set of its two databases in the `backup` folder of its data volume, on its
+backup interval and at once after a forget. The `nixie-backup` CronJob runs every night at 04:00
+Melbourne time in the `nixie-backup` image of nixie's own release, pinned as `nixie.backupImage` in
+`infra/Pulumi.prod.yaml`. The image's job ships each waiting set with restic to two repositories in
+R2, encrypted on the cluster:
+
+| Repository | Path                                         | Holds              | Retention                                         |
+| ---------- | -------------------------------------------- | ------------------ | ------------------------------------------------- |
+| data       | `s3:<endpoint>/geoff-cloud-nixie/nixie`      | `nixie.db` per set | 24 hourly, 7 daily, 4 weekly and 6 monthly        |
+| key        | `s3:<endpoint>/geoff-cloud-nixie/nixie-keys` | `keys.db` per set  | the newest set alone, pruned of every unused byte |
+
+The job writes a receipt into each set and removes the set's copies, and nixie records the receipt
+on its next pass and removes the set's folder. Because the key repository keeps one set, a forgotten
+item's key leaves every backup at the first set after the forget.
+[nixie's backups doc](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/backups.md)
+describes the sets, the job and the receipts. nixie stages no new scheduled set while one waits for
+its receipt, so a set waits on the volume for up to a day.
+
+The restore Job runs `deploy/nixie/backup/restore.sh` in the same image. It restores `keys.db` from
+the key repository and the `nixie.db` of the same set from the data repository, and `nixie restore`
+replaces nixie's databases with them. The vault items `nixie-restic`, `nixie-key-restic` and
+`r2-nixie-backup` hold the data repository's password, the key repository's password and the R2 key.
+[nixie](./nixie.md#restore-from-a-backup) gives a real restore.
 
 ## Back up now
 
-```bash
-ssh root@geoffcloud k3s kubectl -n nixie create job --from=cronjob/nixie-backup nixie-backup-manual-$(date +%s)
-ssh root@geoffcloud k3s kubectl -n nixie logs -f job/<job-name>
-```
+A run of the job ships the sets that wait. When nixie has recorded the receipt, its next pass stages
+a fresh set, and a second run ships it.
 
-Expect the log to end with restic's retention table and `snapshot <id> saved` above it.
+1. Run the job, and read its log:
 
-## Read the repository from a workstation
+   ```bash
+   ssh root@geoffcloud k3s kubectl -n nixie create job --from=cronjob/nixie-backup nixie-backup-manual-$(date +%s)
+   ssh root@geoffcloud k3s kubectl -n nixie logs -f job/<job-name>
+   ```
 
-This helper runs the pinned restic image with the repository's secrets from 1Password. `op run`
+   Expect a `"event":"backup.set_published"` line with the set's `sequence` for each set it ships,
+   and no `backup.set_failed` line.
+
+2. List the staging folder until a set with a higher sequence than step 1's holds a `complete`
+   marker:
+
+   ```bash
+   ssh root@geoffcloud k3s kubectl -n nixie exec nixie-0 -c nixie -- ls -R /data/backup
+   ```
+
+3. Run step 1 again. Expect a `backup.set_published` line with that higher sequence.
+
+## Read the repositories from a workstation
+
+This helper runs restic from the pinned `nixie-backup` image, with one repository's secrets from
+1Password. Pass `nixie` for the data repository or `nixie-keys` for the key repository. `op run`
 resolves the references in the environment and masks them in the output:
 
 ```bash
 nixie_restic() {
-  RESTIC_PASSWORD=op://cloud/nixie-restic/password \
+  local repo="$1" item
+  shift
+  item=$([ "$repo" = nixie-keys ] && echo nixie-key-restic || echo nixie-restic)
+  RESTIC_PASSWORD="op://cloud/$item/password" \
     AWS_ACCESS_KEY_ID=op://cloud/r2-nixie-backup/access-key-id \
     AWS_SECRET_ACCESS_KEY=op://cloud/r2-nixie-backup/secret-access-key \
     op run -- docker run --rm -e RESTIC_PASSWORD -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
-    -e AWS_DEFAULT_REGION=auto restic/restic:0.18.1 \
-    -r "s3:$(op read op://cloud/r2-nixie-backup/endpoint)/geoff-cloud-nixie/nixie" "$@"
+    -e AWS_DEFAULT_REGION=auto --entrypoint restic \
+    "$(bun -e 'console.log(Bun.YAML.parse(await Bun.file("infra/Pulumi.prod.yaml").text()).config["geoff-cloud:nixie"].backupImage)')" \
+    -r "s3:$(op read op://cloud/r2-nixie-backup/endpoint)/geoff-cloud-nixie/$repo" "$@"
 }
-nixie_restic snapshots --tag nixie --host nixie
+nixie_restic nixie snapshots
+nixie_restic nixie-keys snapshots
 ```
+
+Expect each set's snapshot tagged `set-<sequence>` and `kind-scheduled` or `kind-forget`, and one
+snapshot in the key repository.
 
 ## Purge a forgotten item
 
-Each snapshot holds both databases whole, so restic cannot drop one item from it. The purge forgets
-every snapshot taken before nixie's forget instead.
+The data repository also holds the snapshots of the job that copied both databases whole into one
+snapshot, tagged `nixie`, so each of them holds `keys.db`. restic cannot drop one item from a
+snapshot. The purge forgets every such snapshot taken before nixie's forget instead.
 
-**CAUTION:** A forget cannot be undone. It removes every restore point older than the backup in step
-1, not only the forgotten item.
+**CAUTION:** A forget cannot be undone. It removes every restore point older than nixie's forget in
+those snapshots, not only the forgotten item.
 
-1. Back up now, as above, so the newest snapshot postdates nixie's forget.
-2. List the snapshots with `nixie_restic snapshots --tag nixie --host nixie`, and note each ID older
+1. List them with `nixie_restic nixie snapshots --tag nixie --host nixie`, and note each ID older
    than nixie's forget.
-3. Forget them and prune:
+2. Forget them and prune:
 
    ```bash
-   nixie_restic forget <snapshot_id> <snapshot_id>
-   nixie_restic prune
+   nixie_restic nixie forget <snapshot_id> <snapshot_id>
+   nixie_restic nixie prune
    ```
 
    Expect `removed <n> snapshots` and prune's summary.
 
 ## Test a restore
 
-The test restores the latest snapshot into a scratch claim and starts a second nixie on it, while
-the live nixie keeps running. The second nixie has impd's address pointed at a dead port, because
-its recovery would otherwise remove the live nixie's sandboxes. It opens both databases, runs its
+The test restores the newest set into a scratch claim and starts a second nixie on it, while the
+live nixie keeps running. The second nixie has impd's address pointed at a dead port, because its
+recovery would otherwise remove the live nixie's sandboxes. It opens both databases, runs its
 migrations and integrity check, and listens, but never turns ready.
 
 1. Create the scratch claim, and restore into it with `claimName: nixie-restore-check` and the live

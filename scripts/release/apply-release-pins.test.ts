@@ -700,11 +700,11 @@ test('it pins an atc release in the real pin files and keeps every other line', 
   );
 });
 
-test('it pins both nixie images and the contract package at the release, then locks the package', async () => {
+test('it pins every nixie image and the contract package at the release, then locks the package', async () => {
   const ctx = await setupTest();
 
   const files = {
-    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}\n`,
     'package.json':
       '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0",\n    "zod": "4.6.7"\n  }\n}\n',
     'bun.lock':
@@ -728,7 +728,11 @@ test('it pins both nixie images and the contract package at the release, then lo
     record: getReleaseRecord('nixie'),
     version: '0.7.2',
     values: {
-      digests: { nixie: `sha256:${'d'.repeat(64)}`, 'nixie-web': `sha256:${'e'.repeat(64)}` },
+      digests: {
+        nixie: `sha256:${'d'.repeat(64)}`,
+        'nixie-web': `sha256:${'e'.repeat(64)}`,
+        'nixie-backup': `sha256:${'f'.repeat(64)}`,
+      },
     },
     root: ctx.root,
     run: stub.run,
@@ -746,7 +750,7 @@ test('it pins both nixie images and the contract package at the release, then lo
   expect(applied).toBeUndefined();
 
   expect(tree).toStrictEqual([
-    `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.2@sha256:${'d'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.2@sha256:${'e'.repeat(64)}\n`,
+    `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.2@sha256:${'d'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.2@sha256:${'e'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.2@sha256:${'f'.repeat(64)}\n`,
     '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.2",\n    "zod": "4.6.7"\n  }\n}\n',
     '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.2", "", {}, "sha512-new"],\n  },\n}\n',
   ]);
@@ -760,7 +764,7 @@ test('it pins both nixie images and the contract package at the release, then lo
   ]);
 
   expect(ctx.printOut).toHaveBeenCalledExactlyOnceWith(
-    'pinned nixie 0.7.2\npinned nixie-web 0.7.2\npinned nixie-contract 0.7.2\n',
+    'pinned nixie 0.7.2\npinned nixie-web 0.7.2\npinned nixie-backup 0.7.2\npinned nixie-contract 0.7.2\n',
   );
 });
 
@@ -768,7 +772,7 @@ test('it checks the bun lock through the given reader', async () => {
   const ctx = await setupTest();
 
   const files = {
-    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}\n`,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     'bun.lock':
       '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
@@ -791,7 +795,11 @@ test('it checks the bun lock through the given reader', async () => {
     record: getReleaseRecord('nixie'),
     version: '0.7.2',
     values: {
-      digests: { nixie: `sha256:${'d'.repeat(64)}`, 'nixie-web': `sha256:${'e'.repeat(64)}` },
+      digests: {
+        nixie: `sha256:${'d'.repeat(64)}`,
+        'nixie-web': `sha256:${'e'.repeat(64)}`,
+        'nixie-backup': `sha256:${'f'.repeat(64)}`,
+      },
     },
     root: ctx.root,
     run: stub.run,
@@ -808,7 +816,7 @@ test('it puts the pins, the lock and the pin table back when the package fails t
   const ctx = await setupTest();
 
   const files = {
-    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}\n`,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     'bun.lock':
       '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
@@ -829,7 +837,11 @@ test('it puts the pins, the lock and the pin table back when the package fails t
     record: getReleaseRecord('nixie'),
     version: '0.7.2',
     values: {
-      digests: { nixie: `sha256:${'d'.repeat(64)}`, 'nixie-web': `sha256:${'e'.repeat(64)}` },
+      digests: {
+        nixie: `sha256:${'d'.repeat(64)}`,
+        'nixie-web': `sha256:${'e'.repeat(64)}`,
+        'nixie-backup': `sha256:${'f'.repeat(64)}`,
+      },
     },
     root: ctx.root,
     run: stub.run,
@@ -851,7 +863,7 @@ test('it refuses a lock that resolves the contract package at another version', 
   const ctx = await setupTest();
 
   const files = {
-    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}\n`,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     'bun.lock':
       '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
@@ -874,7 +886,11 @@ test('it refuses a lock that resolves the contract package at another version', 
     record: getReleaseRecord('nixie'),
     version: '0.7.2',
     values: {
-      digests: { nixie: `sha256:${'d'.repeat(64)}`, 'nixie-web': `sha256:${'e'.repeat(64)}` },
+      digests: {
+        nixie: `sha256:${'d'.repeat(64)}`,
+        'nixie-web': `sha256:${'e'.repeat(64)}`,
+        'nixie-backup': `sha256:${'f'.repeat(64)}`,
+      },
     },
     root: ctx.root,
     run: stub.run,

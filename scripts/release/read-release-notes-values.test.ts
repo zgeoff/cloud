@@ -4,14 +4,14 @@ import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
 import { getReleaseRecord } from '../test-utils/get-release-record.ts';
 import { readReleaseNotesValues } from './read-release-notes-values.ts';
 
-test('it reads both image digests from the target notes and flags nothing for a plain release', async () => {
+test('it reads every image digest from the target notes and flags nothing for a plain release', async () => {
   const stub = buildStubRunner(
     buildStubReleaseGH({
       releases: {
         'zgeoff/nixie': [
           {
             tag: 'v0.32.0',
-            notes: `## Migrations\n\nThis release adds no migration since v0.31.0.\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie@sha256:${'5'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'6'.repeat(64)}\`\n- \`ghcr.io/zgeoff/sandbox-node@sha256:${'7'.repeat(64)}\`\n`,
+            notes: `## Migrations\n\nThis release adds no migration since v0.31.0.\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie@sha256:${'5'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'6'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-backup@sha256:${'8'.repeat(64)}\`\n- \`ghcr.io/zgeoff/sandbox-node@sha256:${'7'.repeat(64)}\`\n`,
           },
           {
             tag: 'v0.31.0',
@@ -34,6 +34,7 @@ test('it reads both image digests from the target notes and flags nothing for a 
       digests: {
         nixie: `sha256:${'5'.repeat(64)}`,
         'nixie-web': `sha256:${'6'.repeat(64)}`,
+        'nixie-backup': `sha256:${'8'.repeat(64)}`,
       },
     },
     flags: [],
@@ -47,7 +48,7 @@ test('it flags the migrations of a release between the oldest pin and the target
         'zgeoff/nixie': [
           {
             tag: 'v0.32.0',
-            notes: `## Migrations\n\nThis release adds no migration since v0.31.1.\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie@sha256:${'5'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'6'.repeat(64)}\`\n`,
+            notes: `## Migrations\n\nThis release adds no migration since v0.31.1.\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie@sha256:${'5'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'6'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-backup@sha256:${'8'.repeat(64)}\`\n`,
           },
           { tag: 'v0.31.1', notes: '## Migrations\n\n- 0008 renames a column\n' },
           { tag: 'v0.31.0', notes: '## Images\n' },
@@ -77,7 +78,7 @@ test('it reads the notes of the oldest pin, the target and each release between,
         'zgeoff/nixie': [
           {
             tag: 'v0.32.0',
-            notes: `## Migrations\n\nThis release adds no migration since v0.31.1.\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie@sha256:${'5'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'6'.repeat(64)}\`\n`,
+            notes: `## Migrations\n\nThis release adds no migration since v0.31.1.\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie@sha256:${'5'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'6'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-backup@sha256:${'8'.repeat(64)}\`\n`,
           },
           {
             tag: 'v0.31.1',

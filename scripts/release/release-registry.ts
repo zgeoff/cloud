@@ -290,6 +290,17 @@ export const releaseRegistry: readonly ReleaseRecord[] = [
         ],
       },
       {
+        id: 'nixie-backup',
+        title: 'the nixie-backup image (`infra/Pulumi.prod.yaml`)',
+        lines: [
+          {
+            file: 'infra/Pulumi.prod.yaml',
+            pattern: String.raw`^ +backupImage: ghcr\.io\/zgeoff\/nixie-backup:(?<version>\d+\.\d+\.\d+)@(?<digest>sha256:[0-9a-f]{64})$`,
+            parts: { version, digest: { kind: 'digest', image: 'nixie-backup' } },
+          },
+        ],
+      },
+      {
         id: 'nixie-contract',
         title: 'the nixie contract package (`package.json`)',
         lines: [

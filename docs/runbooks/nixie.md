@@ -19,8 +19,9 @@ secret the file ever held. Never print a decrypted value, and never put one on a
 | vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind every model profile; impd's model secrets hold copies of it     |
 | vault `cloud`, item `nixie-definitions-deploy-key`   | git-sync's read-only deploy key for `zgeoff/nixie-definitions`                                |
 | vault `nixie`, item `nixie-definitions-export-token` | the token nixie opens skill pull requests in `zgeoff/nixie-definitions` with                  |
-| vault `cloud`, item `nixie-restic`                   | the restic password of nixie's backup repository                                              |
-| vault `cloud`, item `r2-nixie-backup`                | the R2 key, endpoint and bucket of nixie's backup repository                                  |
+| vault `cloud`, item `nixie-restic`                   | the restic password of nixie's backup data repository                                         |
+| vault `cloud`, item `nixie-key-restic`               | the restic password of nixie's backup key repository                                          |
+| vault `cloud`, item `r2-nixie-backup`                | the R2 key, endpoint and bucket of both of nixie's backup repositories                        |
 | `deploy/nixie/secrets.sops.yaml`                     | the deployment key, nixie's impd token, the definitions export token and the owner's settings |
 | impd                                                 | the token `nixie`, one model secret per profile and nixie's sandbox images                    |
 
@@ -494,18 +495,20 @@ host_restic prune
 
 ### nixie's backup
 
-Each snapshot of nixie's backup holds both databases whole, so a forgotten item stays in R2 until
-retention drops the last snapshot taken before the forget.
+nixie stages a set at once after a forget, and the key repository keeps only the newest set's
+`keys.db`, so a forgotten item's key leaves the backup at the job's next run. The data repository's
+snapshots tagged `nixie` each hold a whole `keys.db`, so a forgotten item stays in them until
+retention drops the last one taken before the forget.
 [Purge a forgotten item](./nixie-backup.md#purge-a-forgotten-item) removes it sooner.
 
 ## Restore from a backup
 
-The `nixie-backup` CronJob backs up nixie's data every night to R2, as
+The `nixie-backup` CronJob ships nixie's backup sets every night to R2, as
 [nixie's backup](./nixie-backup.md) describes. A restore also needs the deployment key from the
 secrets file, which wraps the record keys in `keys.db`.
 
-**CAUTION:** A restore replaces nixie's records and keys with the snapshot's. Every record and
-device enrolled after the snapshot is lost. Back up first if the current data still matters.
+**CAUTION:** A restore replaces nixie's records and keys with the backup set's. Every record and
+device enrolled after the set is lost. Back up first if the current data still matters.
 
 1. Stop nixie, so nothing writes during the restore:
 
@@ -518,8 +521,9 @@ device enrolled after the snapshot is lost. Back up first if the current data st
 
 2. Restore with `deploy/nixie/restore-job.yaml`, whose `nixie restore` checks both databases before
    it replaces either. The Job runs the stopped StatefulSet's nixie image in place of `NIXIE_IMAGE`.
-   Set the `fetch` container's `args: ["ls"]` to list the snapshots first, and `SNAPSHOT` to pick
-   one:
+   It restores the newest set. Set the `fetch` container's `args: ["ls"]` to list both repositories'
+   snapshots first, and `SNAPSHOT` to a data snapshot's ID to restore an older `nixie.db` beside the
+   newest `keys.db`, which keeps every forget since:
 
    ```bash
    image=$(ssh root@geoffcloud 'k3s kubectl -n nixie get statefulset nixie -o "jsonpath={.spec.template.spec.containers[?(@.name==\"nixie\")].image}"')

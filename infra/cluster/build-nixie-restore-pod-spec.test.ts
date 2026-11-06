@@ -1,11 +1,11 @@
 import { expect, test } from 'bun:test';
 import { buildNixieRestorePodSpec } from './build-nixie-restore-pod-spec.ts';
 
-test("it fetches the snapshot with the mounted script and replaces nixie's data with nixie's own restore command, which alone mounts nixie's claim", () => {
+test("it fetches the newest backup set with the mounted script and replaces nixie's data with nixie's own restore command, which alone mounts nixie's claim", () => {
   expect(
     buildNixieRestorePodSpec({
       image:
-        'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        'ghcr.io/zgeoff/nixie-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
       nixieImage:
         'ghcr.io/zgeoff/nixie:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222',
       claim: 'data-nixie-0',
@@ -29,12 +29,12 @@ test("it fetches the snapshot with the mounted script and replaces nixie's data 
       {
         name: 'fetch',
         image:
-          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-        command: ['/bin/sh', '/opt/nixie-backup/backup.sh'],
+          'ghcr.io/zgeoff/nixie-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        command: ['/bin/sh', '/opt/nixie-backup/restore.sh'],
         args: ['restore'],
         env: [
           { name: 'HOME', value: '/tmp' },
-          { name: 'SNAPSHOT', value: 'latest' },
+          { name: 'SNAPSHOT', value: '' },
         ],
         envFrom: [{ secretRef: { name: 'nixie-backup' } }],
         volumeMounts: [

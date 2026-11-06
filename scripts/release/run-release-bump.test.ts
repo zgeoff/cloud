@@ -239,7 +239,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
 
   const checkout = await createCloudCheckout({
     'scripts/release/release-pins.json': '{}\n',
-    'infra/Pulumi.prod.yaml': `  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': `  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'0'.repeat(64)}\n`,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     'bun.lock':
       '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
@@ -254,7 +254,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
         'zgeoff/nixie': [
           {
             tag: 'v0.7.2',
-            notes: `## Migrations\n\nThis release adds no migration since v0.7.1.\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie-fetch@sha256:${'c'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie@sha256:${'d'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'e'.repeat(64)}\`\n`,
+            notes: `## Migrations\n\nThis release adds no migration since v0.7.1.\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie-fetch@sha256:${'c'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie@sha256:${'d'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'e'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-backup@sha256:${'f'.repeat(64)}\`\n`,
           },
           {
             tag: 'v0.7.1',
@@ -263,7 +263,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
           },
           {
             tag: 'v0.7.0',
-            notes: `## Migrations\n\nThis release adds no migration since v0.6.2.\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie-fetch@sha256:${'c'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie@sha256:${'a'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'b'.repeat(64)}\`\n`,
+            notes: `## Migrations\n\nThis release adds no migration since v0.6.2.\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie-fetch@sha256:${'c'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie@sha256:${'a'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'b'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-backup@sha256:${'0'.repeat(64)}\`\n`,
           },
           { tag: 'v0.6.2' },
         ],
@@ -274,7 +274,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
 
   const status = await runReleaseBump(
     { cwd: checkout.clone, env: checkout.env, run: stub.run, ...ctx },
-    ['nixie', '0.7.2', '0.7.0', '0.7.0', '0.7.0'],
+    ['nixie', '0.7.2', '0.7.0', '0.7.0', '0.7.0', '0.7.0'],
   );
 
   const stat = await checkout.git([
@@ -294,14 +294,16 @@ test('it flags a nixie bump with the migrations of a release between', async () 
   expect(status).toBe(0);
 
   expect(ctx.printOut.mock.calls).toStrictEqual([
-    ['pinned nixie 0.7.2\npinned nixie-web 0.7.2\npinned nixie-contract 0.7.2\n'],
+    [
+      'pinned nixie 0.7.2\npinned nixie-web 0.7.2\npinned nixie-backup 0.7.2\npinned nixie-contract 0.7.2\n',
+    ],
     ['https://github.com/zgeoff/cloud/pull/200\n'],
   ]);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([]);
 
   expect(stat).toBe(
-    'bun.lock                          |  2 +-\n infra/Pulumi.prod.yaml            |  4 ++--\n package.json                      |  2 +-\n scripts/release/release-pins.json | 14 +++++++++++++-\n 4 files changed, 17 insertions(+), 5 deletions(-)',
+    'bun.lock                          |  2 +-\n infra/Pulumi.prod.yaml            |  6 +++---\n package.json                      |  2 +-\n scripts/release/release-pins.json | 18 +++++++++++++++++-\n 4 files changed, 22 insertions(+), 6 deletions(-)',
   );
 
   expect(manifest).toBe('{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.2"\n  }\n}');
@@ -337,7 +339,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
     ],
     [
       'gh pr create --repo zgeoff/cloud --base main --head release-check/nixie --title chore(nixie): bump nixie to 0.7.2 --body-file - --label update:patch,migrations,needs-review',
-      'Bumps nixie to [0.7.2](https://github.com/zgeoff/nixie/releases/tag/v0.7.2). The release check opened this pull request.\n\n| Pin | From | To |\n| --- | --- | --- |\n| nixie (`infra/Pulumi.prod.yaml`) | 0.7.0 | 0.7.2 |\n| nixie-web (`infra/Pulumi.prod.yaml`) | 0.7.0 | 0.7.2 |\n| the nixie contract package (`package.json`) | 0.7.0 | 0.7.2 |\n\nIt waits for a review, because:\n\n- a release in the bump adds database migrations, which a revert does not undo.\n\nAfter the merge: The `Deploy prod` workflow applies the stack config once CI passes on main, unless its guard holds the plan (`docs/runbooks/prod-apply.md`). Check the deploy (`docs/runbooks/nixie.md`).\n',
+      'Bumps nixie to [0.7.2](https://github.com/zgeoff/nixie/releases/tag/v0.7.2). The release check opened this pull request.\n\n| Pin | From | To |\n| --- | --- | --- |\n| nixie (`infra/Pulumi.prod.yaml`) | 0.7.0 | 0.7.2 |\n| nixie-web (`infra/Pulumi.prod.yaml`) | 0.7.0 | 0.7.2 |\n| the nixie-backup image (`infra/Pulumi.prod.yaml`) | 0.7.0 | 0.7.2 |\n| the nixie contract package (`package.json`) | 0.7.0 | 0.7.2 |\n\nIt waits for a review, because:\n\n- a release in the bump adds database migrations, which a revert does not undo.\n\nAfter the merge: The `Deploy prod` workflow applies the stack config once CI passes on main, unless its guard holds the plan (`docs/runbooks/prod-apply.md`). Check the deploy (`docs/runbooks/nixie.md`).\n',
     ],
   ]);
 });
@@ -586,7 +588,7 @@ test('it fails without a pull request when the release list misses the pinned re
 
   const status = await runReleaseBump(
     { cwd: '/nonexistent/clone', env: {}, run: stub.run, ...ctx },
-    ['nixie', '0.7.2', '0.5.0', '0.5.0', '0.5.0'],
+    ['nixie', '0.7.2', '0.5.0', '0.5.0', '0.5.0', '0.5.0'],
   );
 
   expect(status).toBe(1);

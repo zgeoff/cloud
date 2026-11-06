@@ -26,8 +26,8 @@ snapshot restore needs a monthly VM (see
    `building`, then `active` after about 80 s.
 2. Read the root password from `GET /vm/<vm_id>` into a root-only file, never to the terminal, and
    log in with it once to add a scratch SSH key.
-3. Install `sqlite3`, and restic 0.18.1 from its release page, checked against `SHA256SUMS`. 0.18.1
-   is the version [nixie's backup](./nixie-backup.md) pins.
+3. Install `sqlite3`, and restic 0.19.1 from its release page, checked against `SHA256SUMS`. 0.19.1
+   is the version in the `nixie-backup` image that [nixie's backup](./nixie-backup.md) pins.
 
 ## Restore an impd database copy
 

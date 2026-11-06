@@ -51,7 +51,7 @@ export function loadClusterInputs(
     kubeconfig,
     onePasswordConnectCredentials,
     ...atcGateway,
-    ...loadNixieInputs(stackConfig, env, backupImage),
+    ...loadNixieInputs(stackConfig, env, backupImage?.pullCredential),
     ...loadFilesInputs(stackConfig, env, backupImage),
   };
 }
