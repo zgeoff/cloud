@@ -30,7 +30,10 @@ export function createMCPServiceAccount(inputs: MCPServiceAccountInputs): Comman
   const token = new oss.ServiceAccountToken(
     'mcp-viewer',
     { name: 'mcp-viewer', serviceAccountId: account.id },
-    opts,
+
+    // Grafana refuses a second token of the same name on one account, so a replace that creates
+    // first fails
+    { ...opts, deleteBeforeReplace: true },
   );
 
   return new Command(
