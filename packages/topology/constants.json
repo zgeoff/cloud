@@ -8,6 +8,7 @@
   },
   "tailnet": {
     "cidr": "100.64.0.0/10",
+    "cidrIPv6": "fd7a:115c:a1e0::/48",
     "directPort": 41641,
     "tags": {
       "cloud": "tag:cloud",
@@ -16,8 +17,7 @@
     },
     "nodes": {
       "geoffcloud": {
-        "address": "100.69.47.33",
-        "addressIPv6": "fd7a:115c:a1e0::ca36:2f22"
+        "address": "100.69.47.33"
       },
       "homePC": {
         "address": "100.67.122.120"

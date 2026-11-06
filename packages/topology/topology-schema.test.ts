@@ -12,6 +12,7 @@ test('it accepts a complete topology as given', () => {
     },
     tailnet: {
       cidr: '100.64.0.0/10',
+      cidrIPv6: 'fd7a:115c:a1e0::/48',
       directPort: 41_641,
       tags: {
         cloud: 'tag:cloud',
@@ -19,7 +20,7 @@ test('it accepts a complete topology as given', () => {
         imp: 'tag:imp',
       },
       nodes: {
-        geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
+        geoffcloud: { address: '100.69.47.33' },
         homePC: { address: '100.67.122.120' },
         imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
       },
@@ -52,6 +53,7 @@ test('it rejects a key that the schema does not name', () => {
     },
     tailnet: {
       cidr: '100.64.0.0/10',
+      cidrIPv6: 'fd7a:115c:a1e0::/48',
       directPort: 41_641,
       tags: {
         cloud: 'tag:cloud',
@@ -59,7 +61,7 @@ test('it rejects a key that the schema does not name', () => {
         imp: 'tag:imp',
       },
       nodes: {
-        geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
+        geoffcloud: { address: '100.69.47.33' },
         homePC: { address: '100.67.122.120' },
         imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
       },
@@ -92,6 +94,7 @@ test('it rejects a port outside 1 to 65535', () => {
     },
     tailnet: {
       cidr: '100.64.0.0/10',
+      cidrIPv6: 'fd7a:115c:a1e0::/48',
       directPort: 41_641,
       tags: {
         cloud: 'tag:cloud',
@@ -99,7 +102,7 @@ test('it rejects a port outside 1 to 65535', () => {
         imp: 'tag:imp',
       },
       nodes: {
-        geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
+        geoffcloud: { address: '100.69.47.33' },
         homePC: { address: '100.67.122.120' },
         imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
       },
@@ -132,6 +135,7 @@ test('it rejects a tag without the tag: prefix', () => {
     },
     tailnet: {
       cidr: '100.64.0.0/10',
+      cidrIPv6: 'fd7a:115c:a1e0::/48',
       directPort: 41_641,
       tags: {
         cloud: 'cloud',
@@ -139,7 +143,7 @@ test('it rejects a tag without the tag: prefix', () => {
         imp: 'tag:imp',
       },
       nodes: {
-        geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
+        geoffcloud: { address: '100.69.47.33' },
         homePC: { address: '100.67.122.120' },
         imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
       },
@@ -172,6 +176,7 @@ test('it rejects a CIDR without its prefix length', () => {
     },
     tailnet: {
       cidr: '100.64.0.0/10',
+      cidrIPv6: 'fd7a:115c:a1e0::/48',
       directPort: 41_641,
       tags: {
         cloud: 'tag:cloud',
@@ -179,7 +184,7 @@ test('it rejects a CIDR without its prefix length', () => {
         imp: 'tag:imp',
       },
       nodes: {
-        geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
+        geoffcloud: { address: '100.69.47.33' },
         homePC: { address: '100.67.122.120' },
         imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
       },
@@ -199,4 +204,45 @@ test('it rejects a CIDR without its prefix length', () => {
   });
 
   expect(result.error?.issues).toPartiallyContain({ path: ['k3s', 'podCIDR'] });
+});
+
+test("it rejects an IPv4 range as the tailnet's IPv6 range", () => {
+  const result = topologySchema.safeParse({
+    vm: {
+      id: '0f289413-258f-4115-ac81-252000998fe0',
+      publicIPv4: '104.250.100.18',
+      publicIPv6: '2401:a4a0:4:17f::1',
+      publicIPv4PrefixLength: 24,
+      publicIPv6PrefixLength: 64,
+    },
+    tailnet: {
+      cidr: '100.64.0.0/10',
+      cidrIPv6: '100.64.0.0/10',
+      directPort: 41_641,
+      tags: {
+        cloud: 'tag:cloud',
+        cloudDeploy: 'tag:cloud-deploy',
+        imp: 'tag:imp',
+      },
+      nodes: {
+        geoffcloud: { address: '100.69.47.33' },
+        homePC: { address: '100.67.122.120' },
+        imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
+      },
+    },
+    k3s: {
+      podCIDR: '10.42.0.0/16',
+      serviceCIDR: '10.43.0.0/16',
+      nodePodCIDR: '10.42.0.0/24',
+      apiPort: 6443,
+      grafanaNodePort: 30_300,
+    },
+    podman: { bridge: 'podman0', bridgeAddress: '10.88.0.1', subnet: '10.88.0.0/16' },
+    atc: { daemonPort: 8415, gatewayPort: 8414 },
+    imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
+    onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
+    nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
+  });
+
+  expect(result.error?.issues).toPartiallyContain({ path: ['tailnet', 'cidrIPv6'] });
 });

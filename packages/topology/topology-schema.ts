@@ -22,8 +22,7 @@ const tagsSchema = z.strictObject({
 const nodeSchema = z.strictObject({ address: z.ipv4() });
 
 const nodesSchema = z.strictObject({
-  // the host also holds its tailnet IPv6 address on tailscale0
-  geoffcloud: z.strictObject({ address: z.ipv4(), addressIPv6: z.ipv6() }),
+  geoffcloud: nodeSchema,
   homePC: nodeSchema,
   imp: z.strictObject({ hostname: z.hostname(), address: z.ipv4() }),
 });
@@ -31,6 +30,7 @@ const nodesSchema = z.strictObject({
 // directPort is WireGuard's UDP port for direct connections, open on the host and the edge
 const tailnetSchema = z.strictObject({
   cidr: z.cidrv4(),
+  cidrIPv6: z.cidrv6(),
   directPort: portSchema,
   tags: tagsSchema,
   nodes: nodesSchema,

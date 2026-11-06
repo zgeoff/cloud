@@ -10,11 +10,10 @@ test('it builds the imp section that nixie ran with from packages/topology', () 
       '2401:a4a0:4:17f::1/64',
       '10.88.0.1/16',
       '100.69.47.33/32',
-      'fd7a:115c:a1e0::ca36:2f22/128',
       '10.42.0.0/32',
       '10.42.0.1/24',
     ],
-    egress_deny: ['10.42.0.0/16', '10.43.0.0/16'],
+    egress_deny: ['10.42.0.0/16', '10.43.0.0/16', 'fd7a:115c:a1e0::/48'],
   });
 });
 
@@ -30,9 +29,10 @@ test('it moves each address with the constant it comes from', () => {
     },
     tailnet: {
       ...topology.tailnet,
+      cidrIPv6: '2001:db8:7::/48',
       nodes: {
         ...topology.tailnet.nodes,
-        geoffcloud: { address: '100.100.1.2', addressIPv6: 'fd7a:115c:a1e0::1:2' },
+        geoffcloud: { address: '100.100.1.2' },
       },
     },
     k3s: {
@@ -52,12 +52,24 @@ test('it moves each address with the constant it comes from', () => {
       '2001:db8::7/56',
       '172.18.0.1/16',
       '100.100.1.2/32',
-      'fd7a:115c:a1e0::1:2/128',
       '10.52.3.0/32',
       '10.52.3.1/24',
     ],
-    egress_deny: ['10.52.0.0/16', '10.53.0.0/16'],
+    egress_deny: ['10.52.0.0/16', '10.53.0.0/16', '2001:db8:7::/48'],
   });
+});
+
+test("it denies the tailnet's IPv6 range, and gives nixie no host address inside it", () => {
+  const config = buildNixieImpConfig({
+    ...topology,
+    tailnet: { ...topology.tailnet, cidrIPv6: 'fd7a:115c:a1e0:42::/64' },
+  });
+
+  expect(config.egress_deny.at(-1)).toBe('fd7a:115c:a1e0:42::/64');
+
+  expect(config.host_addresses).toSatisfyAll(
+    (address: string) => !address.startsWith('fd7a:115c:a1e0:'),
+  );
 });
 
 test('it carries the first pod address into the next octet at a byte boundary', () => {

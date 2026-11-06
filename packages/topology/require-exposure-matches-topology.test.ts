@@ -53,6 +53,7 @@ test('it accepts registry ports that equal their constants', () => {
         },
         tailnet: {
           cidr: '100.64.0.0/10',
+          cidrIPv6: 'fd7a:115c:a1e0::/48',
           directPort: 41_641,
           tags: {
             cloud: 'tag:cloud',
@@ -60,7 +61,7 @@ test('it accepts registry ports that equal their constants', () => {
             imp: 'tag:imp',
           },
           nodes: {
-            geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
+            geoffcloud: { address: '100.69.47.33' },
             homePC: { address: '100.67.122.120' },
             imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
           },
@@ -126,6 +127,7 @@ test('it names every registry port that differs from its constant, and a missing
         },
         tailnet: {
           cidr: '100.64.0.0/10',
+          cidrIPv6: 'fd7a:115c:a1e0::/48',
           directPort: 41_641,
           tags: {
             cloud: 'tag:cloud',
@@ -133,7 +135,7 @@ test('it names every registry port that differs from its constant, and a missing
             imp: 'tag:imp',
           },
           nodes: {
-            geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
+            geoffcloud: { address: '100.69.47.33' },
             homePC: { address: '100.67.122.120' },
             imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
           },
