@@ -151,34 +151,74 @@ previews keep the old token.
 
 ## Pin nixie's sandbox images
 
-nixie adds its sandbox images with its own token, which cannot pin an image. Delivery pins them with
-`impz image pin` as impd's root at each nixie release that adds sandbox images, which the release
-check labels `sandbox-images-changed` on its bump, so impd's image eviction never makes a sandbox
-create pull its image again. nixie adds an evicted image again before it creates a sandbox on it, so
-an image that misses its pin costs a pull, not a failed create.
+nixie adds its sandbox images to impd with its own token, which cannot pin an image. You pin them as
+impd's root, so that impd's image eviction never removes one and a new sandbox never waits for a
+pull. nixie adds an evicted image again before it creates a sandbox on it, so an image that misses
+its pin costs only a pull.
 
-Once the release reports ready, pin each of its sandbox images by the name nixie gives it:
+Run this section after you deploy a nixie bump that has the label `sandbox-images-changed`
+([Release check](./release-check.md)), once step 3 of [Deploy or upgrade](#deploy-or-upgrade) shows
+every part ready. A dry run changes nothing in impd: it runs steps 1 and 3 only.
 
-```bash
-docker run --rm --entrypoint nixie "$NIXIE_IMAGE" sandbox-manifest | jq -r '.[].name' \
-  | while read -r name; do host_imp image pin "$name" < /dev/null; done
-```
+1. Set the image refs of these nixie releases. Each is an `image` value of the stack config `nixie`
+   in `infra/Pulumi.prod.yaml`:
 
-Then unpin the sandbox images of the release 2 back that neither of the last 2 releases uses. An
-unchanged image keeps its name from one release to the next, so unpin only a name that the manifests
-of this release and the one before leave out:
+   | Variable         | Release                                              |
+   | ---------------- | ---------------------------------------------------- |
+   | `NIXIE_IMAGE`    | the release you deployed, the value on `main`        |
+   | `PREVIOUS_IMAGE` | the value that the bump of `NIXIE_IMAGE` replaced    |
+   | `OLD_IMAGE`      | the value that the bump of `PREVIOUS_IMAGE` replaced |
 
-```bash
-PREVIOUS_IMAGE='ghcr.io/zgeoff/nixie:<version>@sha256:<nixie_digest>' # the release before
-OLD_IMAGE='ghcr.io/zgeoff/nixie:<version>@sha256:<nixie_digest>'      # the release 2 back
-names() { docker run --rm --entrypoint nixie "$1" sandbox-manifest | jq -r '.[].name' | sort -u; }
-comm -23 <(names "$OLD_IMAGE") <(sort -u <(names "$NIXIE_IMAGE") <(names "$PREVIOUS_IMAGE")) \
-  | while read -r name; do host_imp image unpin "$name" < /dev/null; done
-```
+   ```bash
+   git log --format= -p -- infra/Pulumi.prod.yaml | grep '^-.*ghcr.io/zgeoff/nixie:' | head -2
+   ```
 
-Expect `host_imp image ls < /dev/null` to show `yes` in the `PINNED` column of each image that
-either of the last 2 releases lists, an image the release 2 back shares with them included. Only a
-name outside both releases' manifests loses its pin.
+   Expect 2 lines, newest first: `PREVIOUS_IMAGE`'s ref, then `OLD_IMAGE`'s. Set the 2 variables:
+
+   ```bash
+   PREVIOUS_IMAGE='ghcr.io/zgeoff/nixie:<version>@sha256:<nixie_digest>' # the first line
+   OLD_IMAGE='ghcr.io/zgeoff/nixie:<version>@sha256:<nixie_digest>'      # the second line
+   ```
+
+2. Pin each sandbox image of `NIXIE_IMAGE` by the name nixie gives it:
+
+   ```bash
+   docker run --rm --entrypoint nixie "$NIXIE_IMAGE" sandbox-manifest | jq -r '.[].name' \
+     | while read -r name; do host_imp image pin "$name" < /dev/null; done
+   ```
+
+3. List the names in `OLD_IMAGE`'s manifest that lose their pin. A name keeps its pin when one of
+   these holds:
+   - the manifest of `NIXIE_IMAGE` or `PREVIOUS_IMAGE` lists it. An unchanged image keeps its name
+     from one release to the next, so `OLD_IMAGE`'s manifest can list the same name.
+   - an imp runs on it, asleep or awake, so `host_imp ls < /dev/null` shows it in the `IMAGE`
+     column. A sandbox keeps the image of the release that made it.
+
+   ```bash
+   manifest() { docker run --rm --entrypoint nixie "$1" sandbox-manifest | jq -r '.[].name'; }
+   unpin="$(
+     set -o pipefail
+     old="$(manifest "$OLD_IMAGE")" || exit 1
+     current="$(manifest "$NIXIE_IMAGE")" || exit 1
+     previous="$(manifest "$PREVIOUS_IMAGE")" || exit 1
+     in_use="$(host_imp ls --json < /dev/null | jq -r '.[].image')" || exit 1
+     comm -23 <(sort -u <<< "$old") <(printf '%s\n' "$current" "$previous" "$in_use" | sort -u)
+   )" && echo "unpin: ${unpin:-none}" || { unpin=''; echo 'a listing failed: unpin nothing' >&2; }
+   ```
+
+   Expect `unpin:` and one name per line, or `unpin: none`. When a manifest or the imp listing
+   fails, the command prints `a listing failed: unpin nothing` and empties the list.
+
+4. Unpin each name on the list:
+
+   ```bash
+   while read -r name; do
+     [ -z "$name" ] || host_imp image unpin "$name" < /dev/null
+   done <<< "$unpin"
+   ```
+
+   Expect `host_imp image ls < /dev/null` to show `no` in the `PINNED` column of each name on the
+   list, and `yes` for each name that step 3 kept.
 
 ## Mint nixie's impd token
 
@@ -281,7 +321,7 @@ When the pod's age identity changes, put its public half in `deploy/nixie/.sops.
 
 5. Run the deploy checks, as [Check a deploy](#check-a-deploy) describes.
 
-6. For a release that adds sandbox images, pin them, as
+6. For a release that changes its sandbox images, pin them, as
    [Pin nixie's sandbox images](#pin-nixies-sandbox-images) describes.
 
 ## Replace nixie's StatefulSet
