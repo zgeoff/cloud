@@ -164,9 +164,15 @@ lists each reason. The next push's run starts once the held run ends.
 
 3. To drop the change, revert it in a PR. The revert's own run then finds nothing to hold.
 
-Never dispatch a held plan that replaces imp's `tag:imp` key. The apply writes the new key into the
-`cloud` vault, which the job's account cannot write, so the dispatched apply fails partway and the
-vault keeps the old key. [Apply it by hand](./workflows.md#apply-by-hand).
+Never dispatch a held plan that writes a key or a token into 1Password:
+
+- a plan that replaces imp's `tag:imp` key, which the apply writes into the `cloud` vault;
+- a plan that creates or replaces the token of Grafana's MCP account, which the apply writes into
+  the `zgeoff` vault.
+
+The job's account can write neither vault, so the dispatched apply fails partway and the vault keeps
+the old value. [Apply it by hand](./workflows.md#apply-by-hand), from a 1Password session that reads
+the `cloud` vault and writes the vault that the plan writes.
 
 ## Rotate the job's credentials
 
