@@ -82,6 +82,11 @@ export function buildMetricsValues(grafana: GrafanaInputs): Record<string, unkno
       adminPassword: grafana.password,
       service: { type: 'NodePort', nodePort: grafana.nodePort },
       resources: grafanaResources,
+
+      // Grafana's SQLite database holds its service accounts, which the chart's emptyDir loses
+      // with the pod; Recreate keeps two pods off the one database file during a rollout
+      persistence: { enabled: true, size: '1Gi' },
+      deploymentStrategy: { type: 'Recreate' },
       additionalDataSources: [{ name: 'Loki', type: 'loki', url: lokiURL, access: 'proxy' }],
 
       // no Alertmanager datasource: Grafana does no alerting here; Grafana keeps a datasource it
