@@ -130,7 +130,7 @@ jobs:
         with:
           version: 2.40.0
 
-      # an ephemeral node, tagged tag:cloud-deploy, that reaches only k3s's API on geoffcloud
+      # an ephemeral node, tagged tag:cloud-deploy, that reaches only k3s's API and Grafana on geoffcloud
       - name: Join the tailnet
         if: steps.decide.outputs.apply == 'true'
         uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0

@@ -10,15 +10,15 @@ held one.
 
 ## What holds what
 
-| Where                                         | Holds                                                                                |
-| --------------------------------------------- | ------------------------------------------------------------------------------------ |
-| the 1Password vault `cloud-deploy`            | a copy of each item `.env` references, under the same item and field names           |
-| a 1Password service account                   | read access to `cloud-deploy` only                                                   |
-| the GitHub environment `prod`                 | the branch policy `main`; the secret `OP_SERVICE_ACCOUNT_TOKEN`, the account's token |
-| the `prod` environment's variables            | `TS_DEPLOY_CLIENT_ID` and `TS_DEPLOY_AUDIENCE`, the federated identity's two values  |
-| a Tailscale federated identity (made by hand) | scope Auth Keys (write), tag `tag:cloud-deploy`, trusted for the `prod` environment  |
-| the tailnet policy (Pulumi)                   | the tag `tag:cloud-deploy`, owned by admins and itself; its one grant, to k3s's API  |
-| the tag `deployed/prod`                       | the last revision applied, lightweight, moved only by the job after it passes        |
+| Where                                         | Holds                                                                                        |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| the 1Password vault `cloud-deploy`            | a copy of each item `.env` references, under the same item and field names                   |
+| a 1Password service account                   | read access to `cloud-deploy` only                                                           |
+| the GitHub environment `prod`                 | the branch policy `main`; the secret `OP_SERVICE_ACCOUNT_TOKEN`, the account's token         |
+| the `prod` environment's variables            | `TS_DEPLOY_CLIENT_ID` and `TS_DEPLOY_AUDIENCE`, the federated identity's two values          |
+| a Tailscale federated identity (made by hand) | scope Auth Keys (write), tag `tag:cloud-deploy`, trusted for the `prod` environment          |
+| the tailnet policy (Pulumi)                   | the tag `tag:cloud-deploy`, owned by admins and itself; its grants, to k3s's API and Grafana |
+| the tag `deployed/prod`                       | the last revision applied, lightweight, moved only by the job after it passes                |
 
 ## Set up the job
 

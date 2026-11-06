@@ -32,6 +32,7 @@ const allButK3sAPI = [
 ];
 
 const impAPIPort = `tcp:${topology.imp.apiPort}`;
+const grafanaNodePort = `tcp:${topology.k3s.grafanaNodePort}`;
 
 export const tailnetPolicy = {
   hosts: {
@@ -75,9 +76,8 @@ export const tailnetPolicy = {
     // grant no longer covers this route. Last, so adding it shifts no other grant
     { src: [tags.cloud], dst: [impHostname], ip: [`tcp:${impNode.httpsPort}`] },
 
-    // the prod apply job → k3s's API on the host, and nothing else: Pulumi drives the cluster
-    // through it, and every other provider the job uses is a public API. Last, so adding it shifts
-    // no other grant
+    // the prod apply job → k3s's API on the host: Pulumi drives the cluster through it. Last, so
+    // adding it shifts no other grant
     { src: [tags.cloudDeploy], dst: ['geoffcloud'], ip: [`tcp:${k3sAPIPort}`] },
 
     // members keep k3s's API port on every device but the host, which is the only tag:cloud node,
@@ -93,6 +93,11 @@ export const tailnetPolicy = {
     // by hand runs on the host over Tailscale SSH and needs no grant here. Last, so adding it
     // shifts no other grant
     { src: ['home-pc'], dst: ['geoffcloud'], ip: [`tcp:${k3sAPIPort}`] },
+
+    // the prod apply job → Grafana's NodePort on the host: Pulumi's Grafana provider reads Grafana's
+    // service accounts on each refresh. Every other provider the job uses is a public API. Last, so
+    // adding it shifts no other grant
+    { src: [tags.cloudDeploy], dst: ['geoffcloud'], ip: [grafanaNodePort] },
   ],
   ssh: [
     {

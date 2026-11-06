@@ -35,6 +35,7 @@ test('it holds every host, tag owner, grant and SSH rule the tailnet relies on',
         ip: ['tcp:6443'],
       },
       { src: ['home-pc'], dst: ['geoffcloud'], ip: ['tcp:6443'] },
+      { src: ['tag:cloud-deploy'], dst: ['geoffcloud'], ip: ['tcp:30300'] },
     ],
     ssh: [
       {
@@ -60,13 +61,14 @@ test('it grants no device a node attribute, so no device can use Funnel', () => 
 });
 
 // the prod apply job's runner holds full-account cloud credentials, so its node reaches the k3s
-// API and nothing else on the tailnet, and no SSH rule names it
-test('it lets tag:cloud-deploy reach only the k3s API on geoffcloud', () => {
+// API and Grafana and nothing else on the tailnet, and no SSH rule names it
+test('it lets tag:cloud-deploy reach only the k3s API and Grafana on geoffcloud', () => {
   const fromDeploy = tailnetPolicy.grants.filter((grant) => grant.src.includes('tag:cloud-deploy'));
   const sshToDeploy = tailnetPolicy.ssh.filter((rule) => rule.dst.includes('tag:cloud-deploy'));
 
   expect(fromDeploy).toStrictEqual([
     { src: ['tag:cloud-deploy'], dst: ['geoffcloud'], ip: ['tcp:6443'] },
+    { src: ['tag:cloud-deploy'], dst: ['geoffcloud'], ip: ['tcp:30300'] },
   ]);
 
   expect(sshToDeploy).toStrictEqual([]);
@@ -136,13 +138,27 @@ test('it lets a tag:cloud-deploy runner reach the k3s API on geoffcloud', () => 
   ).toBe(true);
 });
 
+// the prod apply job's runner: Pulumi's Grafana provider, on each refresh and apply
+test('it lets a tag:cloud-deploy runner reach Grafana on geoffcloud', () => {
+  const filter = buildStubTailnetFilter(tailnetPolicy);
+
+  expect(
+    filter.canConnect(
+      { ip: '100.64.0.13', roles: [], tags: ['tag:cloud-deploy'] },
+      { ip: '100.69.47.33', roles: [], tags: ['tag:cloud'] },
+      { proto: 'tcp', port: 30_300 },
+    ),
+  ).toBe(true);
+});
+
 test('it keeps a member device on every other TCP port of geoffcloud', () => {
   const filter = buildStubTailnetFilter(tailnetPolicy);
 
   // The filter answers by port range, so its answer changes only at a port the policy names; each
   // port the policy names, the ports beside it and both ends of the TCP range cover every port
   const edgePorts = [
-    1, 2, 442, 443, 444, 6441, 6442, 6444, 6445, 7069, 7070, 7071, 8414, 8415, 8416, 65_534, 65_535,
+    1, 2, 442, 443, 444, 6441, 6442, 6444, 6445, 7069, 7070, 7071, 8414, 8415, 8416, 30_299, 30_300,
+    30_301, 65_534, 65_535,
   ];
 
   expect(edgePorts).toSatisfyAll((port: number) =>
