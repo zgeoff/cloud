@@ -156,7 +156,7 @@ test('it leaves out the baseline typecheck before a commit, beside its own typec
   await $`git add -A`.env(ctx.env).cwd(ctx.repo).quiet();
 
   const result = await $`${ctx.lefthook} run pre-commit 2>&1`
-    .env({ ...ctx.env, PATH: `${bin}:${ctx.env.PATH ?? ''}` })
+    .env({ ...ctx.env, PATH: `${bin}:${process.env.PATH ?? ''}` })
     .cwd(ctx.repo)
     .nothrow()
     .quiet();
