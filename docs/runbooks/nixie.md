@@ -520,7 +520,18 @@ device enrolled after the set is lost. Back up first if the current data still m
 
    Expect `pod/nixie-0 condition met`. nixie writes until its pod stops.
 
-2. Restore with `deploy/nixie/restore-job.yaml`, whose `nixie restore` checks both databases before
+2. Suspend the backup CronJob, so no backup run removes the key snapshot that the restore picks:
+
+   ```bash
+   ssh root@geoffcloud "k3s kubectl -n nixie patch cronjob nixie-backup -p '{\"spec\":{\"suspend\":true}}'"
+   ssh root@geoffcloud "k3s kubectl -n nixie get cronjob nixie-backup -o 'jsonpath={.status.active}'"
+   ```
+
+   Expect `cronjob.batch/nixie-backup patched`, then no output from the second command. When it
+   prints a Job, a backup run is still running: run the second command again until it prints
+   nothing. A `Deploy prod` run can set `suspend` back to `false`, so start none until step 4.
+
+3. Restore with `deploy/nixie/restore-job.yaml`, whose `nixie restore` checks both databases before
    it replaces either. The Job runs the stopped StatefulSet's nixie image in place of `NIXIE_IMAGE`.
    It restores the newest set. Set the `fetch` container's `args: ["ls"]` to list both repositories'
    snapshots first, and `SNAPSHOT` to a data snapshot's ID to restore an older `nixie.db` beside the
@@ -542,13 +553,17 @@ device enrolled after the set is lost. Back up first if the current data still m
    ssh root@geoffcloud k3s kubectl -n nixie logs job/<job-name> -c fetch
    ```
 
-3. Start nixie and check it, as step 3 of [Deploy or upgrade](#deploy-or-upgrade) describes:
+4. Start nixie and check it, as step 3 of [Deploy or upgrade](#deploy-or-upgrade) describes, then
+   resume the backup CronJob:
 
    ```bash
    ssh root@geoffcloud k3s kubectl -n nixie scale statefulset/nixie --replicas=1
+   ssh root@geoffcloud "k3s kubectl -n nixie patch cronjob nixie-backup -p '{\"spec\":{\"suspend\":false}}'"
    ```
 
-4. Record the restore, with the snapshot ID, the time and the reason, in a cloud issue.
+   Expect `cronjob.batch/nixie-backup patched`.
+
+5. Record the restore, with the snapshot ID, the time and the reason, in a cloud issue.
 
 ## Renew the certificate
 

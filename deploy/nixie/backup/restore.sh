@@ -65,11 +65,15 @@ case "${1:-}" in
         echo "the data snapshot $SNAPSHOT holds $data_set, newer than the key repo's $set_tag" >&2
         exit 1
       }
+    fi
+    # keys.db first: a backup run that publishes a newer set removes this key snapshot, and restic's
+    # lock holds that removal off only while a restore runs
+    key_restic restore latest --tag "$set_tag" --target "$copy_dir"
+    if [ -n "${SNAPSHOT:-}" ]; then
       data_restic restore "$SNAPSHOT" --target "$copy_dir"
     else
       data_restic restore latest --tag "$set_tag" --target "$copy_dir"
     fi
-    key_restic restore latest --tag "$set_tag" --target "$copy_dir"
     ;;
   ls)
     echo 'data repo:'

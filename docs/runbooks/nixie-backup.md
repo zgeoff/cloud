@@ -181,7 +181,10 @@ but never turns ready.
    ssh root@geoffcloud k3s kubectl -n nixie logs job/<job_name> -c restore
    ```
 
-   Expect the log to end with `nixie restored nixie.db and keys.db from /tmp/nixie-backup`.
+   Expect the log to end with `nixie restored nixie.db and keys.db from /tmp/nixie-backup`. A backup
+   run removes the key snapshot that the Job picked when it publishes a newer set, so run the test
+   away from 04:00 Melbourne time. When the `fetch` container fails with `no snapshot found`, remove
+   the Job and create it again.
 
 4. Copy the live config into the ConfigMap `nixie-restore-check`, with impd's URL pointed at a dead
    port. `deploy/nixie/config.yaml` lacks the `imp` section, which infra adds from

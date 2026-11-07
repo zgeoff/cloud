@@ -138,7 +138,8 @@ EOF
 }
 
 # The data repo's newest snapshot is set 3's, whose key snapshot never landed, as a failed key step
-# leaves it; the restore still pairs the key repo's set 2 with set 2's nixie.db.
+# leaves it; the restore still pairs the key repo's set 2 with set 2's nixie.db. It restores keys.db
+# first, while a backup run that removes the picked key snapshot is least likely.
 it_restores_keys_db_and_the_nixie_db_of_the_same_set_from_the_two_repos() {
   local image="$1" script="$2" status=0
   name="nixie-backup-$3-$BASHPID"
@@ -158,9 +159,9 @@ EOF
   diff /dev/null "$tree/err"
   normalize_restic_output < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
-restoring snapshot ID of [/nixie.db] at NOW +0000 UTC by nixie@nixie to /tmp/nixie-backup
-Summary: Restored 1 files/dirs (SIZE) in T
 restoring snapshot ID of [/keys.db] at NOW +0000 UTC by nixie@nixie to /tmp/nixie-backup
+Summary: Restored 1 files/dirs (SIZE) in T
+restoring snapshot ID of [/nixie.db] at NOW +0000 UTC by nixie@nixie to /tmp/nixie-backup
 Summary: Restored 1 files/dirs (SIZE) in T
 EOF
   assert_status 0 "$status"
