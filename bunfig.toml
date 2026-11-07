@@ -21,6 +21,7 @@ minimumReleaseAgeExcludes = [
   "@impz/client",
   "@zgeoff/agent-hooks",
   "@zgeoff/bun-test-extended",
+  "@zgeoff/diet",
   "@zgeoff/format-codemod",
   "@zgeoff/oxlint-config",
   "@zgeoff/skill-gate",
