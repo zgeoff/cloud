@@ -535,7 +535,9 @@ device enrolled after the set is lost. Back up first if the current data still m
    it replaces either. The Job runs the stopped StatefulSet's nixie image in place of `NIXIE_IMAGE`.
    It restores the newest set. Set the `fetch` container's `args: ["ls"]` to list both repositories'
    snapshots first, and `SNAPSHOT` to a data snapshot's ID to restore an older `nixie.db` beside the
-   newest `keys.db`, which keeps every forget since:
+   newest `keys.db`, which keeps every forget since. Name a snapshot tagged `set-<sequence>`. The
+   script refuses a snapshot tagged only `nixie`, which holds both databases from before the two
+   repositories, so this procedure cannot restore one:
 
    ```bash
    image=$(ssh root@geoffcloud 'k3s kubectl -n nixie get statefulset nixie -o "jsonpath={.spec.template.spec.containers[?(@.name==\"nixie\")].image}"')
