@@ -1,9 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { z } from 'zod';
 
 test('it runs lint:sh and test:scripts before a force-push of a shell change rebased onto a moved main', async () => {
   const ctx = await setupTest();
@@ -59,6 +60,40 @@ test('it skips the shell jobs before a force-push of a rebased branch whose move
   expect(readFileSync(ctx.ranLog, 'utf8')).toBe(
     'format:check\ncheck:pulumi-pins\ncheck:topology\ntypecheck\n',
   );
+});
+
+test('it passes the lint job before a push whose only TypeScript file is one oxlint ignores', async () => {
+  const ctx = await setupTest();
+
+  await $`git switch --quiet -c feature`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  const fixtureText = readFileSync(join(ctx.repo, 'package.json'), 'utf8');
+
+  const fixture = z
+    .object({ scripts: z.record(z.string(), z.string()) })
+    .parse(JSON.parse(fixtureText));
+
+  writeFileSync(
+    join(ctx.repo, 'package.json'),
+    `${JSON.stringify({
+      scripts: {
+        ...fixture.scripts,
+        'lint:files': `bun run --silent --cwd ${import.meta.dir} lint:files`,
+      },
+    })}\n`,
+  );
+
+  mkdirSync(join(ctx.repo, '.claude/hooks'), { recursive: true });
+  writeFileSync(join(ctx.repo, '.claude/hooks/start.ts'), 'export {};\n');
+
+  await $`git add -A && git commit --quiet -m feature && git push --quiet -u origin feature`
+    .env(ctx.env)
+    .cwd(ctx.repo)
+    .quiet();
+
+  const result = await $`${ctx.lefthook} run pre-push`.env(ctx.env).cwd(ctx.repo).nothrow().quiet();
+
+  expect(result.exitCode).toBe(0);
 });
 
 async function setupTest() {
