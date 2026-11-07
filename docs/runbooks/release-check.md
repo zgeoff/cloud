@@ -16,13 +16,13 @@ daemon's `cloud` target only in the order that
 [the agent image runbook](./agent-image.md#roll-out-an-atc-release) gives: the image first, then the
 daemon.
 
-| Dependency         | Branch                             | Pins                                                                        |
-| ------------------ | ---------------------------------- | --------------------------------------------------------------------------- |
-| atc                | `release-check/atc`                | the agent image, the host's atc daemon, the atc-gateway images' release     |
-| imp                | `release-check/imp`                | imp's NixOS module and its lock with the imp-host image, the imp-base image |
-| nixie              | `release-check/nixie`              | the nixie and nixie-web images in the stack config, the contract package    |
-| auto-mode          | `release-check/auto-mode`          | the auto-mode tarball in the agent image                                    |
-| atc-gateway-images | `release-check/atc-gateway-images` | the atc-gateway and backup images in the stack config                       |
+| Dependency         | Branch                             | Pins                                                                                   |
+| ------------------ | ---------------------------------- | -------------------------------------------------------------------------------------- |
+| atc                | `release-check/atc`                | the agent image, the host's atc daemon, the atc-gateway images' release                |
+| imp                | `release-check/imp`                | imp's NixOS module and its lock with the imp-host image, the imp-base image            |
+| nixie              | `release-check/nixie`              | the nixie, nixie-web and nixie-backup images in the stack config, the contract package |
+| auto-mode          | `release-check/auto-mode`          | the auto-mode tarball in the agent image                                               |
+| atc-gateway-images | `release-check/atc-gateway-images` | the atc-gateway and backup images in the stack config                                  |
 
 The release registry in `scripts/release/` holds one record per dependency: its repository, its tag
 form, what its releases publish, and each pin's lines in the files. The bump reads each value it
@@ -32,6 +32,11 @@ commit and the images' digests from GitHub and GHCR, and the auto-mode pin takes
 npm tarball, which it checks against npm's integrity hash and the release's version. Before it
 writes anything, it checks every pin line of the dependency, so a pin at the release with another
 sum fails the bump and changes no file. The bump never moves a pin back to an older release.
+
+A restore Job names the backup image of its workload, so a bump that moves `backupImage` in the
+stack config also runs `bun infra/cluster/write-restore-jobs.ts` and commits the restore Jobs it
+writes. CI's restore Job check fails a bump without them. When a lock fails, the bump puts back
+every file it wrote.
 
 The nixie bump moves nixie's contract package, `@heynixie/contract`, to the same release as the
 images, then runs `bun install --lockfile-only` and checks that `bun.lock` resolves the package at

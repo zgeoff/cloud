@@ -49,7 +49,8 @@ export interface PinLine {
 }
 
 // runs after the pin's lines are written: a flake lock must lock the input at the pinned commit,
-// and a bun lock must lock the package at the pinned version
+// a bun lock must lock the package at the pinned version, and the restore Jobs must name the
+// pinned backup image, which CI's check:restore-job compares
 export type PinLock =
   | {
       readonly kind: 'nix-flake-lock';
@@ -57,7 +58,8 @@ export type PinLock =
       readonly input: string;
       readonly lockFile: string;
     }
-  | { readonly kind: 'bun-lock'; readonly packageName: string; readonly lockFile: string };
+  | { readonly kind: 'bun-lock'; readonly packageName: string; readonly lockFile: string }
+  | { readonly kind: 'restore-jobs'; readonly lockFiles: readonly string[] };
 
 export interface Pin {
   readonly id: string;
@@ -205,6 +207,10 @@ export const releaseRegistry: readonly ReleaseRecord[] = [
             },
           },
         ],
+        lock: {
+          kind: 'restore-jobs',
+          lockFiles: ['deploy/files/restore-job.yaml', 'images/atc-gateway/restore-job.yaml'],
+        },
       },
     ],
     rollout:
@@ -299,6 +305,7 @@ export const releaseRegistry: readonly ReleaseRecord[] = [
             parts: { version, digest: { kind: 'digest', image: 'nixie-backup' } },
           },
         ],
+        lock: { kind: 'restore-jobs', lockFiles: ['deploy/nixie/restore-job.yaml'] },
       },
       {
         id: 'nixie-contract',

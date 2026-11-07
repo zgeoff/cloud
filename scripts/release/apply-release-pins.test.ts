@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { buildStubBunInstall } from '../test-utils/build-stub-bun-install.ts';
 import { buildStubReleaseDocker } from '../test-utils/build-stub-release-docker.ts';
 import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
+import { buildStubWriteRestoreJobs } from '../test-utils/build-stub-write-restore-jobs.ts';
 import { getReleaseRecord } from '../test-utils/get-release-record.ts';
 import { applyReleasePins } from './apply-release-pins.ts';
 
@@ -20,6 +21,7 @@ async function setupTest() {
       'images/agent',
       'images/atc-gateway',
       'infra',
+      'deploy/nixie',
       'scripts/release',
     ].map((directory) => mkdir(join(root, directory), { recursive: true })),
   );
@@ -700,11 +702,12 @@ test('it pins an atc release in the real pin files and keeps every other line', 
   );
 });
 
-test('it pins every nixie image and the contract package at the release, then locks the package', async () => {
+test('it pins every nixie image and the contract package at the release, then writes the restore Job and locks the package', async () => {
   const ctx = await setupTest();
 
   const files = {
     'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}\n`,
+    'deploy/nixie/restore-job.yaml': `image: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}\n`,
     'package.json':
       '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0",\n    "zod": "4.6.7"\n  }\n}\n',
     'bun.lock':
@@ -719,6 +722,11 @@ test('it pins every nixie image and the contract package at the release, then lo
   );
 
   const stub = buildStubRunner(
+    buildStubWriteRestoreJobs({
+      jobs: {
+        'deploy/nixie/restore-job.yaml': `image: ghcr.io/zgeoff/nixie-backup:0.7.2@sha256:${'f'.repeat(64)}\n`,
+      },
+    }),
     buildStubBunInstall({
       lock: '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.2", "", {}, "sha512-new"],\n  },\n}\n',
     }),
@@ -742,8 +750,8 @@ test('it pins every nixie image and the contract package at the release, then lo
   });
 
   const tree = await Promise.all(
-    ['infra/Pulumi.prod.yaml', 'package.json', 'bun.lock'].map((path) =>
-      readFile(join(ctx.root, path), 'utf8'),
+    ['infra/Pulumi.prod.yaml', 'deploy/nixie/restore-job.yaml', 'package.json', 'bun.lock'].map(
+      (path) => readFile(join(ctx.root, path), 'utf8'),
     ),
   );
 
@@ -751,11 +759,17 @@ test('it pins every nixie image and the contract package at the release, then lo
 
   expect(tree).toStrictEqual([
     `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.2@sha256:${'d'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.2@sha256:${'e'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.2@sha256:${'f'.repeat(64)}\n`,
+    `image: ghcr.io/zgeoff/nixie-backup:0.7.2@sha256:${'f'.repeat(64)}\n`,
     '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.2",\n    "zod": "4.6.7"\n  }\n}\n',
     '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.2", "", {}, "sha512-new"],\n  },\n}\n',
   ]);
 
   expect(stub.calls).toStrictEqual([
+    {
+      argv: ['bun', 'infra/cluster/write-restore-jobs.ts'],
+      stdin: '',
+      options: { cwd: ctx.root },
+    },
     {
       argv: ['bun', 'install', '--lockfile-only'],
       stdin: '',
@@ -773,6 +787,7 @@ test('it checks the bun lock through the given reader', async () => {
 
   const files = {
     'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}\n`,
+    'deploy/nixie/restore-job.yaml': `image: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}\n`,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     'bun.lock':
       '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
@@ -786,6 +801,11 @@ test('it checks the bun lock through the given reader', async () => {
   );
 
   const stub = buildStubRunner(
+    buildStubWriteRestoreJobs({
+      jobs: {
+        'deploy/nixie/restore-job.yaml': `image: ghcr.io/zgeoff/nixie-backup:0.7.2@sha256:${'f'.repeat(64)}\n`,
+      },
+    }),
     buildStubBunInstall({
       lock: '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.2", "", {}, "sha512-new"],\n  },\n}\n',
     }),
@@ -817,6 +837,7 @@ test('it puts the pins, the lock and the pin table back when the package fails t
 
   const files = {
     'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}\n`,
+    'deploy/nixie/restore-job.yaml': `image: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}\n`,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     'bun.lock':
       '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
@@ -830,6 +851,11 @@ test('it puts the pins, the lock and the pin table back when the package fails t
   );
 
   const stub = buildStubRunner(
+    buildStubWriteRestoreJobs({
+      jobs: {
+        'deploy/nixie/restore-job.yaml': `image: ghcr.io/zgeoff/nixie-backup:0.7.2@sha256:${'f'.repeat(64)}\n`,
+      },
+    }),
     buildStubBunInstall({ error: 'error: @heynixie/contract@0.7.2 failed to resolve' }),
   );
 
@@ -859,11 +885,12 @@ test('it puts the pins, the lock and the pin table back when the package fails t
   expect(ctx.printOut).not.toHaveBeenCalled();
 });
 
-test('it refuses a lock that resolves the contract package at another version', async () => {
+test('it puts the pins, the restore Job and the pin table back when the restore Job fails to write', async () => {
   const ctx = await setupTest();
 
   const files = {
     'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}\n`,
+    'deploy/nixie/restore-job.yaml': `image: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}\n`,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     'bun.lock':
       '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
@@ -877,6 +904,62 @@ test('it refuses a lock that resolves the contract package at another version', 
   );
 
   const stub = buildStubRunner(
+    buildStubWriteRestoreJobs({ error: "infra/Pulumi.prod.yaml's geoff-cloud:nixie: ✖ Required" }),
+  );
+
+  const applied = await applyReleasePins({
+    record: getReleaseRecord('nixie'),
+    version: '0.7.2',
+    values: {
+      digests: {
+        nixie: `sha256:${'d'.repeat(64)}`,
+        'nixie-web': `sha256:${'e'.repeat(64)}`,
+        'nixie-backup': `sha256:${'f'.repeat(64)}`,
+      },
+    },
+    root: ctx.root,
+    run: stub.run,
+    readText: ctx.readText,
+    env: {},
+    printOut: ctx.printOut,
+  });
+
+  const tree = await Promise.all(
+    Object.keys(files).map((path) => readFile(join(ctx.root, path), 'utf8')),
+  );
+
+  expect(applied).toStrictEqual(
+    new Error("write-restore-jobs: infra/Pulumi.prod.yaml's geoff-cloud:nixie: ✖ Required"),
+  );
+
+  expect(tree).toStrictEqual(Object.values(files));
+  expect(ctx.printOut).not.toHaveBeenCalled();
+});
+
+test('it refuses a lock that resolves the contract package at another version', async () => {
+  const ctx = await setupTest();
+
+  const files = {
+    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}\n`,
+    'deploy/nixie/restore-job.yaml': `image: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}\n`,
+    'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
+    'bun.lock':
+      '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
+    'scripts/release/release-pins.json': '{}\n',
+  };
+
+  await Promise.all(
+    Object.entries(files).map((entry: readonly [string, string]) =>
+      writeFile(join(ctx.root, entry[0]), entry[1]),
+    ),
+  );
+
+  const stub = buildStubRunner(
+    buildStubWriteRestoreJobs({
+      jobs: {
+        'deploy/nixie/restore-job.yaml': `image: ghcr.io/zgeoff/nixie-backup:0.7.2@sha256:${'f'.repeat(64)}\n`,
+      },
+    }),
     buildStubBunInstall({
       lock: '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.1", "", {}, "sha512-other"],\n  },\n}\n',
     }),

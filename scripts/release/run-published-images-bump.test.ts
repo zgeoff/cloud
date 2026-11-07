@@ -3,6 +3,7 @@ import { buildRealProgramHandler } from '../test-utils/build-real-program-handle
 import { buildStubReleaseDocker } from '../test-utils/build-stub-release-docker.ts';
 import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
 import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
+import { buildStubWriteRestoreJobs } from '../test-utils/build-stub-write-restore-jobs.ts';
 import { createCloudCheckout } from '../test-utils/create-cloud-checkout.ts';
 import { runPublishedImagesBump } from './run-published-images-bump.ts';
 
@@ -152,13 +153,15 @@ test('it opens a gateway major bump that waits for review', async () => {
   );
 });
 
-test('it opens a backup image bump that waits for review, since no release version moves', async () => {
+test('it opens a backup image bump that waits for review, since no release version moves, with the restore Jobs written beside the pin', async () => {
   const ctx = setupTest();
 
   const checkout = await createCloudCheckout({
     'scripts/release/release-pins.json': '{}\n',
     'images/atc-gateway/versions.env': 'GATEWAY_IMAGE_TAG=7.1.0\nBACKUP_IMAGE_TAG=3.1.0-r2\n',
     'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}\n`,
+    'images/atc-gateway/restore-job.yaml': `  image: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}\n`,
+    'deploy/files/restore-job.yaml': `  image: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}\n`,
   });
 
   const docker = buildStubReleaseDocker({
@@ -171,6 +174,12 @@ test('it opens a backup image bump that waits for review, since no release versi
   const stub = buildStubRunner(
     buildStubReleaseGH({ releases: {} }),
     docker.answer,
+    buildStubWriteRestoreJobs({
+      jobs: {
+        'images/atc-gateway/restore-job.yaml': `  image: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r2@sha256:${'4'.repeat(64)}\n`,
+        'deploy/files/restore-job.yaml': `  image: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r2@sha256:${'4'.repeat(64)}\n`,
+      },
+    }),
     buildRealProgramHandler(['git'], checkout.env),
   );
 
@@ -186,11 +195,17 @@ test('it opens a backup image bump that waits for review, since no release versi
     'release-check/atc-gateway-images',
     '--',
     'infra/Pulumi.prod.yaml',
+    'images/atc-gateway/restore-job.yaml',
+    'deploy/files/restore-job.yaml',
   ]);
 
   expect(status).toBe(0);
 
   expect(diff.split('\n').filter((line) => /^[-+] /u.test(line))).toStrictEqual([
+    `-  image: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}`,
+    `+  image: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r2@sha256:${'4'.repeat(64)}`,
+    `-  image: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}`,
+    `+  image: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r2@sha256:${'4'.repeat(64)}`,
     `-    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}`,
     `+    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r2@sha256:${'4'.repeat(64)}`,
   ]);
@@ -211,6 +226,8 @@ test('it opens a new backup revision after a person closed the one before it', a
     'scripts/release/release-pins.json': '{}\n',
     'images/atc-gateway/versions.env': 'GATEWAY_IMAGE_TAG=7.1.0\nBACKUP_IMAGE_TAG=3.1.0-r1\n',
     'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}\n`,
+    'images/atc-gateway/restore-job.yaml': `  image: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}\n`,
+    'deploy/files/restore-job.yaml': `  image: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}\n`,
   });
 
   await checkout.git(['-C', checkout.seed, 'switch', '-qc', 'release-check/atc-gateway-images']);
@@ -266,6 +283,12 @@ test('it opens a new backup revision after a person closed the one before it', a
       closedPRs: [{ headRefOid: rejected, isCrossRepository: false, number: 31 }],
     }),
     docker.answer,
+    buildStubWriteRestoreJobs({
+      jobs: {
+        'images/atc-gateway/restore-job.yaml': `  image: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r3@sha256:${'5'.repeat(64)}\n`,
+        'deploy/files/restore-job.yaml': `  image: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r3@sha256:${'5'.repeat(64)}\n`,
+      },
+    }),
     buildRealProgramHandler(['git'], checkout.env),
   );
 

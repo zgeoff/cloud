@@ -6,6 +6,7 @@ import { buildStubNPMRegistry } from '../test-utils/build-stub-npm-registry.ts';
 import { buildStubReleaseDocker } from '../test-utils/build-stub-release-docker.ts';
 import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
 import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
+import { buildStubWriteRestoreJobs } from '../test-utils/build-stub-write-restore-jobs.ts';
 import { createCloudCheckout } from '../test-utils/create-cloud-checkout.ts';
 import { createNPMTarball } from '../test-utils/create-npm-tarball.ts';
 import { runReleaseBump } from './run-release-bump.ts';
@@ -234,7 +235,7 @@ test('it locks the imp commit with the github token by name, never in an argv', 
   expect(flake).toBe('imp = {\n      url = "github:zgeoff/impz/c5bea940";\n    };');
 });
 
-test('it flags a nixie bump with the migrations of a release between', async () => {
+test('it flags a nixie bump with the migrations of a release between, with the restore Job written beside the pins', async () => {
   const ctx = await setupTest();
 
   const checkout = await createCloudCheckout({
@@ -243,6 +244,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     'bun.lock':
       '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
+    'deploy/nixie/restore-job.yaml': `  image: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'0'.repeat(64)}\n`,
   });
 
   const stub = buildStubRunner(
@@ -267,6 +269,11 @@ test('it flags a nixie bump with the migrations of a release between', async () 
           },
           { tag: 'v0.6.2' },
         ],
+      },
+    }),
+    buildStubWriteRestoreJobs({
+      jobs: {
+        'deploy/nixie/restore-job.yaml': `  image: ghcr.io/zgeoff/nixie-backup:0.7.2@sha256:${'f'.repeat(64)}\n`,
       },
     }),
     buildRealProgramHandler(['git'], checkout.env),
@@ -303,7 +310,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
   expect(ctx.printErr.mock.calls).toStrictEqual([]);
 
   expect(stat).toBe(
-    'bun.lock                          |  2 +-\n infra/Pulumi.prod.yaml            |  6 +++---\n package.json                      |  2 +-\n scripts/release/release-pins.json | 18 +++++++++++++++++-\n 4 files changed, 22 insertions(+), 6 deletions(-)',
+    'bun.lock                          |  2 +-\n deploy/nixie/restore-job.yaml     |  2 +-\n infra/Pulumi.prod.yaml            |  6 +++---\n package.json                      |  2 +-\n scripts/release/release-pins.json | 18 +++++++++++++++++-\n 5 files changed, 23 insertions(+), 7 deletions(-)',
   );
 
   expect(manifest).toBe('{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.2"\n  }\n}');
@@ -320,6 +327,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
     ['gh release view v0.7.0 -R zgeoff/nixie --json body', ''],
     ['gh release view v0.7.2 -R zgeoff/nixie --json body', ''],
     ['gh release view v0.7.1 -R zgeoff/nixie --json body', ''],
+    ['bun infra/cluster/write-restore-jobs.ts', ''],
     ['bun install --lockfile-only', ''],
     [
       'gh pr list --repo zgeoff/cloud --head release-check/nixie --state open --json number,url,autoMergeRequest,labels,headRefOid,isCrossRepository',

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { match } from 'ts-pattern';
 import { findJSONField } from '../find-json-field.ts';
 import type { Runner } from '../run-process.ts';
+import { collectLockFiles } from './collect-lock-files.ts';
 import { collectPinFiles } from './collect-pin-files.ts';
 import { pinTableFile } from './pin-table-file.ts';
 import type { PinPlan, ReleaseValues } from './plan-pin-edits.ts';
@@ -105,9 +106,7 @@ async function writeLockedPins(
 
   const locked = await runLocks(options, plan.written);
 
-  const lockFiles = plan.written.flatMap((pin) =>
-    pin.lock === undefined ? [] : [pin.lock.lockFile],
-  );
+  const lockFiles = plan.written.flatMap((pin) => collectLockFiles(pin.lock));
 
   // put every file back, so no pin moves without its lock
   if (locked instanceof Error) {
@@ -156,6 +155,7 @@ function runLock(options: Readonly<ApplyReleasePinsOptions>, lock: PinLock) {
   return match(lock)
     .with({ kind: 'nix-flake-lock' }, (flakeLock) => runFlakeLock(options, flakeLock))
     .with({ kind: 'bun-lock' }, (bunLock) => runBunLock(options, bunLock))
+    .with({ kind: 'restore-jobs' }, () => runRestoreJobsLock(options))
     .exhaustive();
 }
 
@@ -252,4 +252,12 @@ async function checkLockedVersion(options: Readonly<ApplyReleasePinsOptions>, lo
     : new Error(
         `${lock.lockFile} locks ${lock.packageName} at ${version ?? 'no version'}, want ${options.version}`,
       );
+}
+
+async function runRestoreJobsLock(options: Readonly<ApplyReleasePinsOptions>) {
+  const written = await runChecked(options.run, ['bun', 'infra/cluster/write-restore-jobs.ts'], {
+    cwd: options.root,
+  });
+
+  return written instanceof Error ? written : undefined;
 }

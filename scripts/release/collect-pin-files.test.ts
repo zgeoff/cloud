@@ -24,7 +24,22 @@ test.each([
   ],
   [
     'release-check/nixie',
-    ['bun.lock', 'infra/Pulumi.prod.yaml', 'package.json', 'scripts/release/release-pins.json'],
+    [
+      'bun.lock',
+      'deploy/nixie/restore-job.yaml',
+      'infra/Pulumi.prod.yaml',
+      'package.json',
+      'scripts/release/release-pins.json',
+    ],
+  ],
+  [
+    'release-check/atc-gateway-images',
+    [
+      'deploy/files/restore-job.yaml',
+      'images/atc-gateway/restore-job.yaml',
+      'infra/Pulumi.prod.yaml',
+      'scripts/release/release-pins.json',
+    ],
   ],
   ['release-check/auto-mode', ['images/agent/Dockerfile', 'scripts/release/release-pins.json']],
 ])('it lists the files that a bump from %s writes', (branch: string, files: readonly string[]) => {
