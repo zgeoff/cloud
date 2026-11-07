@@ -13,7 +13,8 @@
 # loopback port 80, and whose PATH starts with create_stub_clock's pause, so a wait is recorded
 # and returns at once. The stand-in serves unsigned suites over HTTP, so the case allows an
 # unsigned repository in apt's config, and removes apt's `is not signed` warning for each suite
-# from stderr before it compares it. It drops Docker's source, which the container cannot reach.
+# from stderr before it compares it. The step runs with DEBIAN_FRONTEND=noninteractive, as the
+# Dockerfile's build runs it. It drops Docker's source, which the container cannot reach.
 # apt's stdout is its progress, whose order and timings change between runs, so no case compares
 # it. The suites are built on the host, so the host needs dpkg-deb; without it the suite fails
 # before any case. One case alone:
@@ -53,7 +54,8 @@ it_installs_a_pin_that_the_live_archive_replaced_as_the_snapshot_holds_it() {
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin "$container" \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
     http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
     > /dev/null 2> "$tree/err" || status=$?
@@ -65,9 +67,7 @@ it_installs_a_pin_that_the_live_archive_replaced_as_the_snapshot_holds_it() {
 200 snapshot.ubuntu.com /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb
 EOF
   sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff - "$tree/err.normal" << 'EOF'
-debconf: delaying package configuration, since apt-utils is not installed
-EOF
+  diff /dev/null "$tree/err.normal"
   assert_status 0 "$status"
 }
 
@@ -86,7 +86,8 @@ it_resolves_an_unpinned_dependency_as_the_snapshot_holds_it_when_the_live_archiv
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin "$container" \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
     http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
     > /dev/null 2> "$tree/err" || status=$?
@@ -97,9 +98,7 @@ cloud-stub	1.0-1
 cloud-stub-lib	2.0-1
 EOF
   sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff - "$tree/err.normal" << 'EOF'
-debconf: delaying package configuration, since apt-utils is not installed
-EOF
+  diff /dev/null "$tree/err.normal"
   assert_status 0 "$status"
 }
 
@@ -116,7 +115,8 @@ it_fetches_a_file_from_the_live_archive_first() {
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin "$container" \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
     http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
     > /dev/null 2> "$tree/err" || status=$?
@@ -126,9 +126,7 @@ it_fetches_a_file_from_the_live_archive_first() {
 200 archive.ubuntu.com /ubuntu/pool/main/cloud-stub_1.0-1_all.deb
 EOF
   sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff - "$tree/err.normal" << 'EOF'
-debconf: delaying package configuration, since apt-utils is not installed
-EOF
+  diff /dev/null "$tree/err.normal"
   assert_status 0 "$status"
 }
 
@@ -146,7 +144,8 @@ it_fetches_a_file_from_the_snapshot_when_the_live_archive_fails_to_serve_it() {
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin "$container" \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
     http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
     > /dev/null 2> "$tree/err" || status=$?
@@ -159,9 +158,7 @@ it_fetches_a_file_from_the_snapshot_when_the_live_archive_fails_to_serve_it() {
 200 snapshot.ubuntu.com /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb
 EOF
   sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff - "$tree/err.normal" << 'EOF'
-debconf: delaying package configuration, since apt-utils is not installed
-EOF
+  diff /dev/null "$tree/err.normal"
   assert_status 0 "$status"
 }
 
@@ -180,7 +177,8 @@ it_fetches_a_list_again_after_a_wait_when_the_snapshot_fails_to_serve_it_at_firs
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin "$container" \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
     http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
     > /dev/null 2> "$tree/err" || status=$?
@@ -207,7 +205,6 @@ install-ubuntu-packages: apt-get update exited 100, again in 10s
 E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
 E: Some index files failed to download. They have been ignored, or old ones used instead.
 install-ubuntu-packages: apt-get update exited 100, again in 20s
-debconf: delaying package configuration, since apt-utils is not installed
 EOF
   assert_status 0 "$status"
 }
@@ -226,7 +223,8 @@ it_fetches_a_file_again_after_a_wait_when_the_snapshot_fails_to_serve_it_at_firs
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin "$container" \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
     http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
     > /dev/null 2> "$tree/err" || status=$?
@@ -245,7 +243,6 @@ EOF
 E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb  503  Service Unavailable [IP: 127.0.0.1 80]
 E: Some files failed to download
 install-ubuntu-packages: apt-get install exited 100, again in 10s
-debconf: delaying package configuration, since apt-utils is not installed
 EOF
   assert_status 0 "$status"
 }
@@ -265,7 +262,8 @@ it_fails_with_apt_s_error_when_the_snapshot_keeps_failing_a_list() {
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin "$container" \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
     http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
     > /dev/null 2> "$tree/err" || status=$?
@@ -313,7 +311,8 @@ it_leaves_the_image_s_own_apt_sources_and_no_pin() {
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin "$container" \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
     http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
     > /dev/null 2> "$tree/err" || status=$?
@@ -327,9 +326,7 @@ sources.list.d
 sources.list.d/ubuntu.sources
 EOF
   sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff - "$tree/err.normal" << 'EOF'
-debconf: delaying package configuration, since apt-utils is not installed
-EOF
+  diff /dev/null "$tree/err.normal"
   assert_status 0 "$status"
 }
 

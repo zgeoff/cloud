@@ -56,7 +56,7 @@ let
       '';
     }
     {
-      title = "it keeps 6144 MiB of impd's budget for the imps named nixie-*";
+      title = "it keeps 6144 MiB of the impd budget for the imps whose names start with nixie-";
       script = ''
         assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
         settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
