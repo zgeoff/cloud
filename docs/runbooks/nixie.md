@@ -499,7 +499,8 @@ nixie stages a set at once after a forget, and the key repository keeps only the
 `keys.db`, so a forgotten item's key leaves the backup at the job's next run. The data repository's
 snapshots tagged `nixie` each hold a whole `keys.db`, so a forgotten item stays in them until
 retention drops the last one taken before the forget.
-[Purge a forgotten item](./nixie-backup.md#purge-a-forgotten-item) removes it sooner.
+[Purge a forgotten item](./nixie-backup.md#purge-a-forgotten-item-from-old-snapshots) removes it
+sooner.
 
 ## Restore from a backup
 
