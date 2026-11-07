@@ -201,6 +201,7 @@ gates:
       - test-support/shell/create-case-tree.sh
       - test-support/shell/assert-status.sh
       - test-support/shell/normalize-restic-output.sh
+      - test-support/shell/create-stub-racing-restic.sh
       - infra/Pulumi.prod.yaml
       - .bun-version
       - package.json

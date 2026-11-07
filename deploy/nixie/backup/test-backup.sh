@@ -29,6 +29,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/normalize-restic-output.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/create-stub-racing-restic.sh"
 
 # the cleanup every case passes to create_case_tree: the containers first, then the volumes
 cleanup='docker rm -f "$name-staging" "$name-job" "$name-restore" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-data" "$name-keys" "$name-copy" > /dev/null || true'
@@ -229,6 +230,44 @@ EOF
   diff - "$tree/copy" << 'EOF'
 nixie.db of set 1
 keys.db of set 1
+EOF
+}
+
+# A backup run publishes set 3 and removes set 2's key snapshot between the restore's pick of set 2
+# and its key restore, as a run that the restore races does; the restore then picks set 3.
+it_restores_the_newer_set_when_a_backup_run_removes_the_picked_key_snapshot() {
+  local image="$1" script="$2" status=0
+  name="nixie-backup-$3-$BASHPID"
+  create_case_tree "$cleanup"
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+  run_job "$name" "$image" > /dev/null
+  stage_sets "$name" "$image" 2:scheduled
+  run_job "$name" "$image" > /dev/null
+  mkdir "$tree/bin"
+  create_stub_racing_restic "$tree/bin" /usr/local/bin/restic /opt/race/race.sh /tmp
+  cat > "$tree/race.sh" << 'EOF'
+set -e
+data() { RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only /usr/local/bin/restic "$@"; }
+keys() { RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only /usr/local/bin/restic "$@"; }
+echo 'nixie.db of set 3' | data backup -q --host nixie --tag set-3 --tag kind-scheduled --stdin \
+  --stdin-filename nixie.db
+echo 'keys.db of set 3' | keys backup -q --host nixie --tag set-3 --tag kind-scheduled --stdin \
+  --stdin-filename keys.db
+keys forget -q --keep-last 1 --prune > /dev/null
+EOF
+
+  run_restore "$name" "$image" "$script" -v "$tree/bin/restic:/usr/local/sbin/restic:ro" \
+    -v "$tree/race.sh:/opt/race/race.sh:ro" restore > /dev/null 2> "$tree/err" || status=$?
+
+  diff - "$tree/err" << 'EOF'
+Fatal: failed to find snapshot: snapshot filter (Paths:[] Tags:[[set-2]] Hosts:[]): no snapshot found
+EOF
+  assert_status 0 "$status"
+  run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
+  diff - "$tree/copy" << 'EOF'
+nixie.db of set 3
+keys.db of set 3
 EOF
 }
 

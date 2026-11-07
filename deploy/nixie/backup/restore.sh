@@ -45,30 +45,38 @@ case "${1:-}" in
       echo "$copy_dir is not empty" >&2
       exit 1
     }
-    # the job tags both snapshots of a set with set-<sequence>, and a key snapshot whose removal
-    # failed stays beside the newest
-    key_snapshots="$(key_restic snapshots --json)"
-    set_tag="$(echo "$key_snapshots" | pick_newest_set)"
-    [ -n "$set_tag" ] || {
-      echo "the key repo holds no snapshot of a backup set" >&2
-      exit 1
-    }
     if [ -n "${SNAPSHOT:-}" ]; then
-      # a newer nixie.db holds records whose keys the key repo's set lacks
       data_snapshots="$(data_restic snapshots --json "$SNAPSHOT")"
       data_set="$(echo "$data_snapshots" | pick_newest_set)"
       [ -n "$data_set" ] || {
         echo "the data snapshot $SNAPSHOT holds no backup set" >&2
         exit 1
       }
-      [ "${data_set#set-}" -le "${set_tag#set-}" ] || {
+    fi
+    # A backup run removes the key snapshot this picks once it publishes a newer set, which can
+    # land between the pick and the restore; the next pick then finds that newer set. keys.db goes
+    # first, because restic's lock holds the removal off only while a restore runs.
+    attempt=1
+    while :; do
+      # the job tags both snapshots of a set with set-<sequence>, and a key snapshot whose removal
+      # failed stays beside the newest
+      key_snapshots="$(key_restic snapshots --json)"
+      set_tag="$(echo "$key_snapshots" | pick_newest_set)"
+      [ -n "$set_tag" ] || {
+        echo "the key repo holds no snapshot of a backup set" >&2
+        exit 1
+      }
+      # a newer nixie.db holds records whose keys the key repo's set lacks
+      [ -z "${SNAPSHOT:-}" ] || [ "${data_set#set-}" -le "${set_tag#set-}" ] || {
         echo "the data snapshot $SNAPSHOT holds $data_set, newer than the key repo's $set_tag" >&2
         exit 1
       }
-    fi
-    # keys.db first: a backup run that publishes a newer set removes this key snapshot, and restic's
-    # lock holds that removal off only while a restore runs
-    key_restic restore latest --tag "$set_tag" --target "$copy_dir"
+      if key_restic restore latest --tag "$set_tag" --target "$copy_dir"; then
+        break
+      fi
+      [ "$attempt" -lt 3 ] || exit 1
+      attempt=$((attempt + 1))
+    done
     if [ -n "${SNAPSHOT:-}" ]; then
       data_restic restore "$SNAPSHOT" --target "$copy_dir"
     else
