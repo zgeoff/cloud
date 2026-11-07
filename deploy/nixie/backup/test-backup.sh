@@ -162,6 +162,59 @@ keys.db of set 2
 EOF
 }
 
+# set 2's data snapshot landed and its key snapshot did not, so set 2's records have no keys
+it_refuses_a_SNAPSHOT_whose_set_is_newer_than_the_key_repos() {
+  local image="$1" script="$2" newer status=0
+  name="nixie-backup-$3-$BASHPID"
+  create_case_tree "$cleanup"
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+  run_job "$name" "$image" > /dev/null
+  newer="$(
+    run_shell "$name" "$image" << 'EOF'
+echo 'nixie.db of set 2' | RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only \
+  restic backup -q --json --host nixie --tag set-2 --tag kind-scheduled --stdin --stdin-filename nixie.db |
+  grep -o '"snapshot_id":"[0-9a-f]*"' | cut -d'"' -f4
+EOF
+  )"
+
+  run_restore "$name" "$image" "$script" -e "SNAPSHOT=$newer" restore > "$tree/out" 2> "$tree/err" ||
+    status=$?
+
+  diff - "$tree/err" <<< "the data snapshot $newer holds set-2, newer than the key repo's set-1"
+  diff /dev/null "$tree/out"
+  assert_status 1 "$status"
+  run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup'
+  diff /dev/null "$tree/copy"
+}
+
+# a snapshot with no set tag, such as one tagged nixie that holds both databases, pairs with no
+# key snapshot
+it_refuses_a_SNAPSHOT_that_holds_no_backup_set() {
+  local image="$1" script="$2" old status=0
+  name="nixie-backup-$3-$BASHPID"
+  create_case_tree "$cleanup"
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+  run_job "$name" "$image" > /dev/null
+  old="$(
+    run_shell "$name" "$image" << 'EOF'
+mkdir /tmp/old && echo old > /tmp/old/nixie.db && echo old > /tmp/old/keys.db
+cd /tmp/old && RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only \
+  restic backup -q --json --host nixie --tag nixie . | grep -o '"snapshot_id":"[0-9a-f]*"' | cut -d'"' -f4
+EOF
+  )"
+
+  run_restore "$name" "$image" "$script" -e "SNAPSHOT=$old" restore > "$tree/out" 2> "$tree/err" ||
+    status=$?
+
+  diff - "$tree/err" <<< "the data snapshot $old holds no backup set"
+  diff /dev/null "$tree/out"
+  assert_status 1 "$status"
+  run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup'
+  diff /dev/null "$tree/copy"
+}
+
 # a copy directory that holds files already would mix them into the restore
 it_refuses_a_restore_into_a_copy_directory_that_is_not_empty() {
   local image="$1" script="$2" status=0

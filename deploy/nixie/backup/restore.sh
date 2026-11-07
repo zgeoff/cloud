@@ -3,8 +3,9 @@
 # container
 #
 # restore: restore keys.db from the key repo's newest snapshot and nixie.db from the data repo's
-#          snapshot of the same backup set, or from the data snapshot that $SNAPSHOT names, into an
-#          empty /tmp/nixie-backup, where the restore pod's `nixie restore` reads them.
+#          snapshot of the same backup set, or from the data snapshot of an older set that
+#          $SNAPSHOT names, into an empty /tmp/nixie-backup, where the restore pod's
+#          `nixie restore` reads them.
 # ls:      list the snapshots of both repos.
 #
 # The nixie-backup job keeps one key snapshot, so a forgotten item's key leaves the key repo at the
@@ -46,6 +47,16 @@ case "${1:-}" in
       exit 1
     }
     if [ -n "${SNAPSHOT:-}" ]; then
+      # a newer nixie.db holds records whose keys the key repo's set lacks
+      data_set="$(data_restic snapshots --json "$SNAPSHOT" | grep -o '"set-[0-9]*"' | tr -d '"' | head -n 1)"
+      [ -n "$data_set" ] || {
+        echo "the data snapshot $SNAPSHOT holds no backup set" >&2
+        exit 1
+      }
+      [ "${data_set#set-}" -le "${set_tag#set-}" ] || {
+        echo "the data snapshot $SNAPSHOT holds $data_set, newer than the key repo's $set_tag" >&2
+        exit 1
+      }
       data_restic restore "$SNAPSHOT" --target "$copy_dir"
     else
       data_restic restore latest --tag "$set_tag" --target "$copy_dir"
