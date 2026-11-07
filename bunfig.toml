@@ -41,6 +41,6 @@ preload = [
   "./infra/test-utils/seed-faker.ts",
   "./scripts/mocks/register-mock-server.ts",
 ]
-# rig's ignore patterns replace this list in the unit run, so the `test` script names these folders
-# again
+# rig's ignore patterns replace this list in the unit run, so the ignore list in rig.config.ts names
+# these folders again
 pathIgnorePatterns = ["workers/**", "packages/preview/**", "packages/files/**", "e2e/**"]
