@@ -139,7 +139,27 @@ async function setupTest() {
     .cwd(repo)
     .quiet();
 
-  copyFileSync(join(import.meta.dir, 'lefthook.yml'), join(repo, 'lefthook.yml'));
+  const jobSchema = z.looseObject({ name: z.string() });
+  const hookSchema = z.looseObject({ jobs: z.array(jobSchema) });
+  const configSchema = z.looseObject({ 'pre-commit': hookSchema, 'pre-push': hookSchema });
+  const configText = readFileSync(join(import.meta.dir, 'lefthook.yml'), 'utf8');
+  const { extends: _, ...config } = configSchema.parse(Bun.YAML.parse(configText));
+
+  const keepOwnJobs = (hook: z.infer<typeof hookSchema>) => ({
+    ...hook,
+    jobs: hook.jobs.filter((job) => job.name !== 'chex-baseline'),
+  });
+
+  // the chex baseline and its guard read node_modules, which the fixture lacks, so it keeps cloud's
+  // own jobs
+  writeFileSync(
+    join(repo, 'lefthook.yml'),
+    Bun.YAML.stringify({
+      ...config,
+      'pre-commit': keepOwnJobs(config['pre-commit']),
+      'pre-push': keepOwnJobs(config['pre-push']),
+    }),
+  );
 
   // each script a pre-push job runs records its name; files:branch is the real one
   const recorders = [

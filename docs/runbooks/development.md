@@ -29,8 +29,11 @@ bun install
 `bun install` also installs the lefthook git hooks. pre-commit fixes and checks staged files and
 runs gitleaks. pre-push runs the format check, the Pulumi pin and topology checks and typecheck on
 every push, and the linters and tests of each kind of file the branch changes, such as every shell
-suite for a branch that changes a shell file; `lefthook.yml` lists the jobs. CI adds the type-aware
-lint, the dead-code check, the docs checks and the NixOS checks.
+suite for a branch that changes a shell file; `lefthook.yml` lists the jobs. It then runs the rest
+of the baseline that `lefthook.yml` extends from `@zgeoff/chex`: the docs checks that `check:docs`
+names, the workflow lint, and the commit, local-path, test-timeout, dependency-gate and
+uncommitted-file checks. CI adds the type-aware lint, the dead-code check, the docs checks and the
+NixOS checks.
 
 The Pulumi CLI runs at the version `infra/package.json` pins for `@pulumi/pulumi`, the one Pulumi
 pin in the repo. CI installs that version for the SDK check, and `check:sdk` warns when the local

@@ -78,8 +78,6 @@
     "lint:nix": "bash scripts/lint.sh nix",
     "lint:py": "bash scripts/lint.sh py",
     "lint:actions": "bash scripts/lint.sh actions && bun scripts/workflows/run-workflow-lint.ts && bun scripts/check-ci-profiles.ts",
-    "check:doc-links": "bash .claude/skills/docs-writing/scripts/check-links.sh",
-    "check:doc-length": "bash .claude/skills/docs-writing/scripts/check-length.sh",
     "ci:decide-prod-apply": "bash scripts/decide-prod-apply.sh",
     "ci:check-out-deployed-revision": "bash scripts/check-out-deployed-revision.sh",
     "ci:preview-and-guard-prod": "bash scripts/preview-and-guard-prod.sh",
@@ -111,7 +109,8 @@
     "ci:decide-atc-gateway-publish": "bun scripts/release/run-decide-gateway-publish.ts",
     "ci:write-files-image-context": "bash scripts/write-files-image-context.sh",
     "ci:publish-files-image": "bash scripts/publish-files-image.sh",
-    "ci:pin-atc-gateway-images": "bun scripts/release/run-published-images-bump.ts atc-gateway-images"
+    "ci:pin-atc-gateway-images": "bun scripts/release/run-published-images-bump.ts atc-gateway-images",
+    "check:docs": "chex length links skill"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
@@ -126,6 +125,7 @@
     "@types/bun": "1.4.4",
     "@zgeoff/agent-hooks": "0.2.7",
     "@zgeoff/bun-test-extended": "0.2.3",
+    "@zgeoff/chex": "0.2.1",
     "@zgeoff/cloud-preview": "workspace:*",
     "@zgeoff/cloud-topology": "workspace:*",
     "@zgeoff/diet": "0.2.2",
