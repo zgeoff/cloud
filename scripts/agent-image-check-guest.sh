@@ -134,7 +134,10 @@ check_tool gcc "" gcc --version
 check_tool make "" make --version
 check_tool go "go$GO_VERSION" go version
 check_package python3 "$PYTHON3_VERSION"
-check_tool python3 "${PYTHON3_VERSION%%-*}" python3 --version
+# the python3 package pins the minor series: its interpreter package, such as python3.14, can carry a
+# later patch release than python3's own version names
+python3_series=${PYTHON3_VERSION%%-*}
+check_tool python3 "Python ${python3_series%.*}." python3 --version
 check_tool uv "$UV_VERSION" uv --version
 check_tool uvx "$UV_VERSION" uvx --version
 check_tool op "$OP_VERSION" op --version
