@@ -141,6 +141,63 @@ test('it leaves out each baseline job that one of its own pre-push jobs replaces
   });
 });
 
+test('it leaves out the baseline typecheck before a commit, beside its own typecheck job', async () => {
+  const ctx = await setupTest();
+
+  const bin = join(ctx.ranLog, '..', 'bin');
+
+  copyFileSync(join(import.meta.dir, 'lefthook.yml'), join(ctx.repo, 'lefthook.yml'));
+  symlinkSync(join(import.meta.dir, 'node_modules'), join(ctx.repo, 'node_modules'));
+  writeFileSync(join(ctx.repo, '.gitignore'), 'node_modules\n');
+  writeFileSync(join(ctx.repo, 'feature.ts'), 'export {};\n');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'gitleaks'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+
+  await $`git add -A`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  const result = await $`${ctx.lefthook} run pre-commit 2>&1`
+    .env({ ...ctx.env, PATH: `${bin}:${ctx.env.PATH ?? ''}` })
+    .cwd(ctx.repo)
+    .nothrow()
+    .quiet();
+
+  const output = Bun.stripANSI(result.text());
+
+  const excluded = [...output.matchAll(/(?<job>chex-\S+) \(skip\) name$/gmu)].map(
+    (match) => match.groups?.job,
+  );
+
+  expect({ exitCode: result.exitCode, excluded }).toStrictEqual({
+    exitCode: 0,
+    excluded: ['chex-typecheck'],
+  });
+});
+
+test('it fails a push with the guard message when the chex baseline is not installed', async () => {
+  const ctx = await setupTest();
+
+  await $`git switch --quiet -c feature`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  copyFileSync(join(import.meta.dir, 'lefthook.yml'), join(ctx.repo, 'lefthook.yml'));
+
+  await $`git add -A && git commit --quiet -m feature && git push --quiet -u origin feature`
+    .env(ctx.env)
+    .cwd(ctx.repo)
+    .quiet();
+
+  const result = await $`${ctx.lefthook} run pre-push 2>&1`
+    .env(ctx.env)
+    .cwd(ctx.repo)
+    .nothrow()
+    .quiet();
+
+  expect(result.exitCode).toBe(1);
+
+  expect(Bun.stripANSI(result.text())).toInclude(
+    'node_modules/@zgeoff/chex/lefthook.yml is missing',
+  );
+});
+
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'lefthook-'));
 
