@@ -59,7 +59,7 @@ setup_test() {
   (cd "$tree/chart" && echo "$chart_digest  $(jq -r '.chart + "-" + .version' "$tree/chart.json").tgz" | sha256sum -c --quiet)
 }
 
-it_renders_the_grafana_deployment_strategy_with_its_rolling_update_block_and_no_surge_pod() {
+it_renders_the_grafana_deployment_strategy_as_recreate_with_no_rolling_update_block() {
   local status=0
   create_case_tree
   setup_test "$tree"
@@ -76,7 +76,7 @@ it_renders_the_grafana_deployment_strategy_with_its_rolling_update_block_and_no_
     await Bun.write(tree + '/strategy.json', JSON.stringify(deployment.spec.strategy) + '\n');
   ")
   diff - "$tree/strategy.json" << 'EOF'
-{"rollingUpdate":{"maxSurge":0,"maxUnavailable":1},"type":"RollingUpdate"}
+{"type":"Recreate"}
 EOF
 }
 

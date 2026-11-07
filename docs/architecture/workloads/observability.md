@@ -54,11 +54,11 @@ server's launcher reads it at each connect
 volumes with no backup, because losing them loses history and never service. Grafana's database sits
 on a cluster volume with no backup too, so the account and its token outlive a pod restart. The
 database is one SQLite file, which two Grafana processes can corrupt when they write it at once. A
-rollout starts the new pod as soon as Kubernetes marks the old pod for deletion, so both pods can
-write the file until the old pod stops. If the volume is lost, `mcp-viewer` and its token are gone
-until an [apply by hand](../../runbooks/workflows.md#apply-by-hand) with a refresh: the refresh
-finds the account missing, so Pulumi makes a new account and token and copies the token into the
-`grafana-mcp` item.
+rollout stops the old pod before it starts the new one, so only one pod writes the file. If the
+volume is lost, `mcp-viewer` and its token are gone until an
+[apply by hand](../../runbooks/workflows.md#apply-by-hand) with a refresh: the refresh finds the
+account missing, so Pulumi makes a new account and token and copies the token into the `grafana-mcp`
+item.
 
 ## Probes of impd
 
