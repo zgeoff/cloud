@@ -32,9 +32,9 @@
   },
   "ignoreDependencies": [
     "@stylistic/eslint-plugin",
+    "@zgeoff/agent-hooks",
     "@zgeoff/diet",
-    "@zgeoff/oxlint-config",
-    "@zgeoff/skill-gate"
+    "@zgeoff/oxlint-config"
   ],
   "ignoreBinaries": ["go", "gofmt", "op", "pulumi"],
   "ignore": [".claude/**"],
