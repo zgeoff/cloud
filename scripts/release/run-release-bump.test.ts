@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'bun:test';
+import { join } from 'node:path';
 import { server } from '../mocks/node.ts';
 import { buildRealProgramHandler } from '../test-utils/build-real-program-handler.ts';
 import { buildStubBunInstall } from '../test-utils/build-stub-bun-install.ts';
@@ -6,9 +7,9 @@ import { buildStubNPMRegistry } from '../test-utils/build-stub-npm-registry.ts';
 import { buildStubReleaseDocker } from '../test-utils/build-stub-release-docker.ts';
 import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
 import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
-import { buildStubWriteRestoreJobs } from '../test-utils/build-stub-write-restore-jobs.ts';
 import { createCloudCheckout } from '../test-utils/create-cloud-checkout.ts';
 import { createNPMTarball } from '../test-utils/create-npm-tarball.ts';
+import { createRestoreJobFiles } from '../test-utils/create-restore-job-files.ts';
 import { runReleaseBump } from './run-release-bump.ts';
 
 async function setupTest() {
@@ -238,13 +239,29 @@ test('it locks the imp commit with the github token by name, never in an argv', 
 test('it flags a nixie bump with the migrations of a release between, with the restore Job written beside the pins', async () => {
   const ctx = await setupTest();
 
+  const stack = `config:
+  geoff-cloud:atcGateway:
+    image: ghcr.io/zgeoff/atc-gateway:5.0.0@sha256:${'1'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/atc-gateway-backup:5.0.0-r1@sha256:${'2'.repeat(64)}
+    publicURL: https://gateway.example.org
+    daemons:
+      harbour:
+        address: 100.64.0.9:8415
+        daemonID: 7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
+    defaultDaemon: harbour
+  geoff-cloud:nixie:
+    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}
+    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'0'.repeat(64)}
+`;
+
   const checkout = await createCloudCheckout({
     'scripts/release/release-pins.json': '{}\n',
-    'infra/Pulumi.prod.yaml': `  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'0'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': stack,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     'bun.lock':
       '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
-    'deploy/nixie/restore-job.yaml': `  image: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'0'.repeat(64)}\n`,
+    ...(await createRestoreJobFiles(stack)),
   });
 
   const stub = buildStubRunner(
@@ -271,12 +288,8 @@ test('it flags a nixie bump with the migrations of a release between, with the r
         ],
       },
     }),
-    buildStubWriteRestoreJobs({
-      jobs: {
-        'deploy/nixie/restore-job.yaml': `  image: ghcr.io/zgeoff/nixie-backup:0.7.2@sha256:${'f'.repeat(64)}\n`,
-      },
-    }),
     buildRealProgramHandler(['git'], checkout.env),
+    buildRealProgramHandler(['bun']),
   );
 
   const status = await runReleaseBump(
@@ -327,7 +340,10 @@ test('it flags a nixie bump with the migrations of a release between, with the r
     ['gh release view v0.7.0 -R zgeoff/nixie --json body', ''],
     ['gh release view v0.7.2 -R zgeoff/nixie --json body', ''],
     ['gh release view v0.7.1 -R zgeoff/nixie --json body', ''],
-    ['bun infra/cluster/write-restore-jobs.ts', ''],
+    [
+      `bun ${join(import.meta.dir, '../../infra/cluster/write-restore-jobs.ts')} ${checkout.clone}`,
+      '',
+    ],
     ['bun install --lockfile-only', ''],
     [
       'gh pr list --repo zgeoff/cloud --head release-check/nixie --state open --json number,url,autoMergeRequest,labels,headRefOid,isCrossRepository',

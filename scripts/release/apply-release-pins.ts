@@ -254,10 +254,12 @@ async function checkLockedVersion(options: Readonly<ApplyReleasePinsOptions>, lo
       );
 }
 
+// the writer runs from this repo, whose node_modules hold its zod and oxfmt, on the checkout at the
+// root it is given
+const restoreJobsWriter = join(import.meta.dir, '../../infra/cluster/write-restore-jobs.ts');
+
 async function runRestoreJobsLock(options: Readonly<ApplyReleasePinsOptions>) {
-  const written = await runChecked(options.run, ['bun', 'infra/cluster/write-restore-jobs.ts'], {
-    cwd: options.root,
-  });
+  const written = await runChecked(options.run, ['bun', restoreJobsWriter, options.root]);
 
   return written instanceof Error ? written : undefined;
 }

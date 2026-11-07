@@ -34,9 +34,10 @@ writes anything, it checks every pin line of the dependency, so a pin at the rel
 sum fails the bump and changes no file. The bump never moves a pin back to an older release.
 
 A restore Job names the backup image of its workload, so a bump that moves `backupImage` in the
-stack config also runs `bun infra/cluster/write-restore-jobs.ts` and commits the restore Jobs it
-writes. CI's restore Job check fails a bump without them. When a lock fails, the bump puts back
-every file it wrote.
+stack config also runs `infra/cluster/write-restore-jobs.ts` on the checkout and commits the restore
+Jobs it writes. CI's restore Job check fails a bump without them. The writer needs the repo's
+dependencies, so each workflow that bumps a backup image runs `bun install` first. When a lock
+fails, the bump puts back every file it wrote.
 
 The nixie bump moves nixie's contract package, `@heynixie/contract`, to the same release as the
 images, then runs `bun install --lockfile-only` and checks that `bun.lock` resolves the package at
