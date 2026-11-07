@@ -172,12 +172,12 @@ first drift check fails and holds until a person repairs the stack.
 
 After the tag moves, the job checks that the applied commit's nixie client still speaks the API of
 the nixie it deployed. It waits for nixie's rollout, then sends nixie a few calls through the k3s
-API's service proxy, because the job's tailnet grant reaches only k3s's API. Each call carries no
-session, and each names a procedure that only reads, so the check changes nothing in nixie even if
-nixie stopped asking for a session. The check passes when nixie refuses every call with the
-contract's unauthorized error, which shows that the route, the client header, the RPC encoding and
-each procedure still hold. A failed check fails the workflow's check job, not the apply job, because
-the apply is done by then, and Discord gets the failure.
+API's service proxy, because the job's tailnet grants reach only k3s's API and Grafana. Each call
+carries no session, and each names a procedure that only reads, so the check changes nothing in
+nixie even if nixie stopped asking for a session. The check passes when nixie refuses every call
+with the contract's unauthorized error, which shows that the route, the client header, the RPC
+encoding and each procedure still hold. A failed check fails the workflow's check job, not the apply
+job, because the apply is done by then, and Discord gets the failure.
 
 The apply plans again from a fresh refresh, so the guard covers the preview and not the apply
 itself. A change made outside Pulumi in the minutes between the two reaches the apply unguarded.
@@ -220,12 +220,13 @@ The job reads its secrets from its own 1Password vault, `cloud-deploy`, through 
 whose token is the `prod` environment's one secret. The vault holds a copy of each item `.env`
 references and nothing else, so a leaked token reaches no item the program does not already read.
 The job points `.env` at that vault before it resolves anything. Its tailnet node joins through a
-federated identity, with no stored key, as `tag:cloud-deploy`, whose one grant reaches the k3s API
-on the host ([the tailnet](./network/tailnet.md)).
+federated identity, with no stored key, as `tag:cloud-deploy`, whose grants reach the k3s API and
+Grafana's NodePort on the host ([the tailnet](./network/tailnet.md)).
 
-Two writes outside Pulumi stay with a person. The program copies each new `tag:imp` key into the
-`cloud` vault, which the job's account cannot write, but a new key replaces the old one and the
-guard holds that replace. A NixOS switch and an agent-image rollout run by hand
+Some writes stay with a person. The program copies each new `tag:imp` key into the `cloud` vault,
+and each new token of Grafana's MCP account into the `zgeoff` vault. The job's account can write
+neither vault, but a new key or token replaces the command that copies it, and the guard holds that
+replace. A NixOS switch and an agent-image rollout run by hand
 ([workflows](../runbooks/workflows.md)).
 
 ## Guards

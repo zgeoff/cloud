@@ -26,7 +26,7 @@ port except the host's k3s API.
 | the PC (`home-pc`) | the owner's WSL node, where Pulumi runs    | the host's k3s API, beside a member's reach                                 |
 | `tag:cloud`        | the host's node, and through it every pod  | the PC's atc daemon; impd's node for HTTPS                                  |
 | `tag:imp`          | impd's node on the host                    | other `tag:imp` nodes' API                                                  |
-| `tag:cloud-deploy` | the prod apply job's ephemeral runner node | the host's k3s API only                                                     |
+| `tag:cloud-deploy` | the prod apply job's ephemeral runner node | the host's k3s API and Grafana's NodePort only                              |
 
 A pod has no tailnet identity of its own. Its traffic leaves through the host's node, so the tailnet
 sees the cluster as a whole as `tag:cloud`, and only the cluster's own egress policies narrow which
@@ -62,8 +62,9 @@ holds no tag and no grant for a test node, and a test run never reaches a live i
 
 The prod apply job's runner joins for one run as `tag:cloud-deploy`, through a federated identity
 that GitHub's token for the job proves, so no key for it is stored anywhere. The runner holds
-full-account cloud credentials for the run, so its one grant is the k3s API port on the host, which
-Pulumi drives the cluster through, and no SSH rule lists it as a destination
+full-account cloud credentials for the run, so its grants reach two ports on the host: the k3s API,
+which Pulumi drives the cluster through, and Grafana's NodePort, which Pulumi's Grafana provider
+reads Grafana's service accounts through. No SSH rule lists it as a destination
 ([infrastructure as code](../infrastructure-as-code.md#the-apply-job)).
 
 Each tag owns itself as well as being owned by the tailnet's admins, because Tailscale lets an OAuth

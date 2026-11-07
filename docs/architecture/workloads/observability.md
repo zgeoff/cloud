@@ -46,8 +46,15 @@ The stack runs in the `observability` namespace:
   once requiring its status to be ready.
 
 Grafana's admin password is a secret Pulumi generates, and Grafana's NodePort answers only on the
-tailnet. Its dashboards are provisioned from code. Metrics and logs sit on cluster volumes with no
-backup, because losing them loses history and never service.
+tailnet. Its dashboards are provisioned from code. Pulumi declares Grafana's one service account,
+`mcp-viewer`, with the Viewer role, for an MCP server that only reads. Pulumi copies the account's
+token into the `credential` field of the `grafana-mcp` item in the `zgeoff` vault, where the MCP
+server's launcher reads it at each connect
+([the apply job](../infrastructure-as-code.md#the-apply-job)). Metrics and logs sit on cluster
+volumes with no backup, because losing them loses history and never service. Grafana's database sits
+on a cluster volume with no backup too, so the account and its token outlive a pod restart. Grafana
+runs one pod at a time, because two pods would share the one SQLite file. A lost volume loses the
+account until an apply with a refresh makes a new account and token.
 
 ## Probes of impd
 

@@ -13,6 +13,7 @@
     "@pulumi/tailscale": "0.29.2",
     "@pulumi/tls": "5.6.2",
     "@pulumiverse/acme": "0.18.1",
+    "@pulumiverse/grafana": "2.44.0",
     "@zgeoff/cloud-health-check": "workspace:*",
     "@zgeoff/cloud-topology": "workspace:*",
     "@zgeoff/pulumi-onidel": "workspace:*",
