@@ -49,9 +49,6 @@ pre-push:
     - name: lint
       files: bun run --silent files:branch
       glob: '*.{js,mjs,cjs,ts,mts,cts}'
-      # oxlint ignores the generated SDK, and exits 1 when every file it gets is ignored
-      exclude:
-        - 'sdk/**'
       run: bun run lint:files {files}
     # the four linters run their pinned tools in the Nix image, so they need Docker; each lints the
     # whole tree, and runs only for a branch that changes a file of its kind

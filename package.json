@@ -19,7 +19,7 @@
     "deadcode": "knip",
     "files:branch": "bun scripts/read-branch-files.ts",
     "lint": "oxlint",
-    "lint:files": "oxlint",
+    "lint:files": "oxlint --no-error-on-unmatched-pattern",
     "lint:fix": "oxlint --fix",
     "lint:full": "tsgolint=$(tsrslint-path) && OXLINT_TSGOLINT_PATH=$tsgolint oxlint --type-aware --type-check --report-unused-disable-directives-severity error",
     "test": "rig unit",
