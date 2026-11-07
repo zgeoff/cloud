@@ -28,6 +28,7 @@
     "test:files": "cd packages/files && bun test --randomize",
     "test:e2e": "cd e2e && bun test --randomize",
     "test:related": "bun scripts/run-related-tests.ts",
+    "test:related-root": "rig related",
     "test:scripts": "bash scripts/run-shell-suites.sh",
     "test:alert-rules": "bash scripts/run-shell-suites.sh alert-rules",
     "test:atc-gateway-fixture": "bash images/atc-gateway/run-fixture-tests.sh",

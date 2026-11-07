@@ -63,9 +63,11 @@ function runTests(
   packageDir: string | undefined,
   tests: readonly string[],
 ): Promise<number> {
+  // rig related takes a test that git does not track yet, and drops a lane's file, where rig unit
+  // refuses a path it cannot place and fails the push
   const command =
     packageDir === undefined
-      ? ['bun', 'run', 'test', ...tests]
+      ? ['bun', 'run', 'test:related-root', ...tests]
       : ['bun', 'test', ...tests.map((test) => relative(packageDir, test))];
 
   const run = Bun.spawn(command, {
