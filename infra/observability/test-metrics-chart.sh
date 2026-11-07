@@ -21,18 +21,30 @@ helm_image='alpine/helm:3.19.0@sha256:aef9b56f64e866207d9591d0abd8f6d767b36aadd1
 # the sha256 of the chart archive at metrics-chart.ts's version, so a moved release fails the case
 chart_digest='dbd50ecc4b3c4a0231d8a7c766d4fd8690be4bf2230acb572849fae129797a23'
 
+# run_in_case <tree> <command>...: <command> with none of the caller's environment, so a
+# DOCKER_HOST or DOCKER_CONTEXT never picks the daemon, and with PATH, HOME and TMPDIR in the tree
+run_in_case() {
+  local tree="$1"
+  shift
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" TREE="$tree" "$@"
+}
+
 # run_helm <tree> <arg>...: the pinned Helm as the caller's user, with the case tree at /work
 run_helm() {
   local tree="$1"
   shift
-  docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$tree:/work" -w /work "$helm_image" "$@"
+  run_in_case "$tree" docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$tree:/work" -w /work "$helm_image" "$@"
 }
 
-# setup_test <tree>: the pinned chart's archive and the values as the repo builds them
+# setup_test <tree>: the case's bin, home and tmp folders, with the tools the case runs linked into
+# bin, the pinned chart's archive, and the values as the repo builds them
 setup_test() {
-  local tree="$1"
-  mkdir "$tree/chart"
-  (cd "$repo" && TREE="$tree" bun -e "
+  local tree="$1" tool
+  mkdir "$tree/bin" "$tree/home" "$tree/tmp" "$tree/chart"
+  for tool in bun docker jq; do
+    ln -s "$(command -v "$tool")" "$tree/bin/$tool"
+  done
+  (cd "$repo" && run_in_case "$tree" bun -e "
     import { buildMetricsValues } from './infra/observability/build-metrics-values.ts';
     import { metricsChart } from './infra/observability/metrics-chart.ts';
     const tree = process.env.TREE ?? '';
@@ -40,7 +52,7 @@ setup_test() {
     const values = buildMetricsValues({ password: 'grafana-test-password', nodePort: 30300 });
     await Bun.write(tree + '/values.json', JSON.stringify(values));
   ")
-  docker pull -q "$helm_image" > /dev/null
+  run_in_case "$tree" docker pull -q "$helm_image" > /dev/null
   run_helm "$tree" pull "$(jq -r .chart "$tree/chart.json")" \
     --repo "$(jq -r .repositoryOpts.repo "$tree/chart.json")" \
     --version "$(jq -r .version "$tree/chart.json")" -d /work/chart
@@ -58,7 +70,7 @@ it_renders_the_grafana_deployment_strategy_with_its_rolling_update_block_and_no_
 
   assert_equals 0 "$status" 'helm template exit'
   diff /dev/null "$tree/err"
-  (cd "$repo" && TREE="$tree" bun -e "
+  (cd "$repo" && run_in_case "$tree" bun -e "
     const tree = process.env.TREE ?? '';
     const deployment = Bun.YAML.parse(await Bun.file(tree + '/deployment.yaml').text());
     await Bun.write(tree + '/strategy.json', JSON.stringify(deployment.spec.strategy) + '\n');

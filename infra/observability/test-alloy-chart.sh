@@ -22,26 +22,38 @@ helm_image='alpine/helm:3.19.0@sha256:aef9b56f64e866207d9591d0abd8f6d767b36aadd1
 # the sha256 of the chart archive at alloy-chart.ts's version, so a moved release fails the case
 chart_digest='bfdda6cb770c3526444897b9cb5a4fb33711c608d364d9e7857ec699a2fff4fb'
 
+# run_in_case <tree> <command>...: <command> with none of the caller's environment, so a
+# DOCKER_HOST or DOCKER_CONTEXT never picks the daemon, and with PATH, HOME and TMPDIR in the tree
+run_in_case() {
+  local tree="$1"
+  shift
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" TREE="$tree" "$@"
+}
+
 # run_helm <tree> <arg>...: the pinned Helm as the caller's user, with the case tree at /work
 run_helm() {
   local tree="$1"
   shift
-  docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$tree:/work" -w /work "$helm_image" "$@"
+  run_in_case "$tree" docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$tree:/work" -w /work "$helm_image" "$@"
 }
 
-# setup_test <tree>: the pinned chart's archive and the values as the repo builds them, naming the
-# ConfigMap alloy-config-1a2b3c4d, as Pulumi names one
+# setup_test <tree>: the case's bin, home and tmp folders, with the tools the case runs linked into
+# bin, the pinned chart's archive, and the values as the repo builds them, naming the ConfigMap
+# alloy-config-1a2b3c4d, as Pulumi names one
 setup_test() {
-  local tree="$1"
-  mkdir "$tree/chart"
-  (cd "$repo" && TREE="$tree" bun -e "
+  local tree="$1" tool
+  mkdir "$tree/bin" "$tree/home" "$tree/tmp" "$tree/chart"
+  for tool in bun docker jq; do
+    ln -s "$(command -v "$tool")" "$tree/bin/$tool"
+  done
+  (cd "$repo" && run_in_case "$tree" bun -e "
     import { alloyChart } from './infra/observability/alloy-chart.ts';
     import { buildAlloyValues } from './infra/observability/alloy-values.ts';
     const tree = process.env.TREE ?? '';
     await Bun.write(tree + '/chart.json', JSON.stringify(alloyChart));
     await Bun.write(tree + '/values.json', JSON.stringify(buildAlloyValues('alloy-config-1a2b3c4d')));
   ")
-  docker pull -q "$helm_image" > /dev/null
+  run_in_case "$tree" docker pull -q "$helm_image" > /dev/null
   run_helm "$tree" pull "$(jq -r .chart "$tree/chart.json")" \
     --repo "$(jq -r .repositoryOpts.repo "$tree/chart.json")" \
     --version "$(jq -r .version "$tree/chart.json")" -d /work/chart
@@ -60,7 +72,7 @@ it_renders_no_configmap_and_mounts_alloys_config_from_the_configmap_the_values_n
   diff /dev/null "$tree/err"
   # the kinds the chart renders that hold config, the ConfigMap the DaemonSet's config volume
   # names, and the file Alloy runs
-  (cd "$repo" && TREE="$tree" bun -e "
+  (cd "$repo" && run_in_case "$tree" bun -e "
     const tree = process.env.TREE ?? '';
     const objects = Bun.YAML.parse(await Bun.file(tree + '/chart.yaml').text()).filter(Boolean);
     const daemonSet = objects.find((object) => object.kind === 'DaemonSet');
@@ -95,7 +107,7 @@ it_renders_the_alloy_container_with_the_entry_script_before_the_charts_run_argum
   diff /dev/null "$tree/err"
   # the Alloy container's command against the one alloy-values.ts builds, its first arguments, any
   # init container, and each pod volume the entry script reads or writes with its host path
-  (cd "$repo" && TREE="$tree" bun -e "
+  (cd "$repo" && run_in_case "$tree" bun -e "
     import { buildAlloyValues } from './infra/observability/alloy-values.ts';
     const tree = process.env.TREE ?? '';
     const pod = Bun.YAML.parse(await Bun.file(tree + '/daemonset.yaml').text()).spec.template.spec;
