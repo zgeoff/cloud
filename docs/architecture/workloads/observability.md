@@ -34,7 +34,7 @@ The stack runs in the `observability` namespace:
   counts against Loki's ingestion rate limit. Alloy also counts the gateway's sign-in events for
   Prometheus, which scrapes Alloy ([sign-in alerts](#sign-in-alerts)). Alloy reads the journal
   through sd-journal, which maps the journal files in windows and keeps many of them mapped before
-  it reuses one. Alloy's memory limit, set with the measured window total in Alloy's chart values in
+  it reuses one. Alloy's memory limit, set with the measured window total in Alloy's Helm values in
   `infra/observability/`, holds that page cache beside its `GOMEMLIMIT`. Under a smaller limit, the
   kernel evicts the window pages that Alloy faults in, Alloy faults them in again, and its readiness
   probe times out. Each fault reads only the host's root disk read-ahead
