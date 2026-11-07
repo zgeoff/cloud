@@ -169,11 +169,13 @@ checkout of `main`.
      ([the cloud daemon](../architecture/workloads/atc-gateway.md#the-cloud-daemon)), each with the
      kind, host and header of its profile in `nixos/hosts/geoffcloud/configuration.nix`, on stdin:
      `op read op://cloud/<secret>/credential | host_imp secret add <secret> --kind custom --hosts <host> --header <header> --scheme <scheme>`,
-     or `--kind github` alone for the GitHub profile. Each secret's item in the 1Password vault
-     `cloud` has the secret's own title: `claude-setup-token`, `github-imp-agents` and
-     `linear-imp-agents`. `host_imp` is the helper at the top of [Previews](./preview.md). Step 11's
-     credential installer refuses to mint the daemon's token while one of them is missing, and lists
-     each missing secret.
+     or `--kind github` alone for the GitHub profile. The items of `github-imp-agents` and
+     `linear-imp-agents` in the 1Password vault `cloud` have the secret's own title. For
+     `claude-setup-token`, read the item of the Claude account slot the broker runs on,
+     `op://fleet/claude-setup-token-<slot>`, where `<slot>` is 1, 2 or 3; the newest line of the
+     claude-account-switch skill's log of rotations holds the slot. `host_imp` is the helper at the
+     top of [Previews](./preview.md). Step 11's credential installer refuses to mint the daemon's
+     token while one of them is missing, and lists each missing secret.
    - The GitHub secret `gh`, through step 1 of
      [Set the service up](./preview.md#set-the-service-up). Each preview imp clones through it. The
      daemon's GitHub profile uses `github-imp-agents`, so the profile secrets leave `gh` out. impd
