@@ -4,7 +4,7 @@
 # /config, clustering off, and returns once it reports ready. <dir>/url then holds its loopback URL,
 # and <dir>/container the container to remove when the case ends. The image is the one
 # kube-prometheus-stack's values pin for the chart version in
-# infra/observability/create-metrics.ts, and it runs as uid 65532 on a read-only root with no
+# infra/observability/metrics-chart.ts, and it runs as uid 65532 on a read-only root with no
 # capabilities and no privilege escalation.
 # shellcheck source-path=SCRIPTDIR
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for.sh"
