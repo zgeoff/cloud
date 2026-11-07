@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Test for Grafana's MCP account in the real engine: the pinned Grafana that the chart in
-# create-metrics.ts runs (its grafana subchart's appVersion), with a service account made from the
-# arguments that build-mcp-account-args.ts builds, and a token for that account. Each case sends one
+# Test for Grafana's MCP account in the real engine: the pinned Grafana that the chart
+# metrics-chart.ts pins runs (its grafana subchart's appVersion), with a service account made from
+# the arguments that build-mcp-account-args.ts builds, and a token for that account. Each case sends one
 # request with the token and compares the HTTP status that Grafana answers: the account reads, and
 # Grafana refuses its writes.
 #

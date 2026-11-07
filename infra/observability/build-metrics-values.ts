@@ -84,9 +84,16 @@ export function buildMetricsValues(grafana: GrafanaInputs): Record<string, unkno
       resources: grafanaResources,
 
       // Grafana's SQLite database holds its service accounts, which the chart's emptyDir loses
-      // with the pod; Recreate keeps two pods off the one database file during a rollout
+      // with the pod
       persistence: { enabled: true, size: '1Gi' },
-      deploymentStrategy: { type: 'Recreate' },
+
+      // Recreate fails on the live Deployment: the API server refuses it beside the rollingUpdate
+      // block it defaulted, and server-side apply removes only a field its apply owns, so this
+      // apply owns the block; maxSurge 0 scales the old pod down before the new one starts
+      deploymentStrategy: {
+        type: 'RollingUpdate',
+        rollingUpdate: { maxSurge: 0, maxUnavailable: 1 },
+      },
       additionalDataSources: [{ name: 'Loki', type: 'loki', url: lokiURL, access: 'proxy' }],
 
       // no Alertmanager datasource: Grafana does no alerting here; Grafana keeps a datasource it

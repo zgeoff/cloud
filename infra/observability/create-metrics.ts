@@ -7,6 +7,7 @@ import { buildAlertmanagerValues } from './build-alertmanager-values.ts';
 import { buildMetricsValues } from './build-metrics-values.ts';
 import { createAlertWebhook } from './create-alert-webhook.ts';
 import { makeDeleteBeforeReplaceTransform } from './make-delete-before-replace-transform.ts';
+import { metricsChart } from './metrics-chart.ts';
 
 interface MetricsInputs {
   readonly grafanaPassword: Output<string>;
@@ -24,9 +25,7 @@ export function createMetrics(ns: Namespace, inputs: MetricsInputs, cluster: Pro
     'kube-prometheus-stack',
     {
       namespace: ns.metadata.name,
-      chart: 'kube-prometheus-stack',
-      version: '91.8.2',
-      repositoryOpts: { repo: 'https://prometheus-community.github.io/helm-charts' },
+      ...metricsChart,
       values: {
         ...buildMetricsValues({
           password: inputs.grafanaPassword,
