@@ -2,6 +2,8 @@ import { Command } from '@pulumi/command/local';
 import type { Output, Resource } from '@pulumi/pulumi';
 import { Provider, oss } from '@pulumiverse/grafana';
 import { buildGrafanaProviderArgs } from './build-grafana-provider-args.ts';
+import { buildMCPAccountArgs } from './build-mcp-account-args.ts';
+import { buildMCPTokenSpec } from './build-mcp-token-spec.ts';
 import { buildMCPTokenSyncArgs } from './build-mcp-token-sync-args.ts';
 
 interface MCPServiceAccountInputs {
@@ -12,29 +14,20 @@ interface MCPServiceAccountInputs {
   readonly grafana: Resource;
 }
 
-// a Viewer account for an MCP server that only reads: its queries work, and every write gets 403
 export function createMCPServiceAccount(inputs: MCPServiceAccountInputs): Command {
   const provider = new Provider(
     'grafana',
     buildGrafanaProviderArgs(inputs.grafanaURL, inputs.adminPassword),
   );
 
-  const opts = { provider, dependsOn: [inputs.grafana] };
+  const account = new oss.ServiceAccount('mcp-viewer', buildMCPAccountArgs(), {
+    provider,
+    dependsOn: [inputs.grafana],
+  });
 
-  const account = new oss.ServiceAccount(
-    'mcp-viewer',
-    { name: 'mcp-viewer', role: 'Viewer' },
-    opts,
-  );
+  const tokenSpec = buildMCPTokenSpec({ accountID: account.id, provider, grafana: inputs.grafana });
 
-  const token = new oss.ServiceAccountToken(
-    'mcp-viewer',
-    { name: 'mcp-viewer', serviceAccountId: account.id },
-
-    // Grafana refuses a second token of the same name on one account, so a replace that creates
-    // first fails
-    { ...opts, deleteBeforeReplace: true },
-  );
+  const token = new oss.ServiceAccountToken('mcp-viewer', tokenSpec.args, tokenSpec.options);
 
   return new Command(
     'grafana-mcp-token-to-1password',
