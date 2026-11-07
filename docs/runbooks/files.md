@@ -20,7 +20,9 @@ The prod apply job reads the same items from the `cloud-deploy` vault, so each i
 under the same name. Agents read their copy of the agent token from the `imp` vault on an imp, and
 from the `zgeoff` vault on a workstation. On an imp, the atc daemon's `claude` entry sets two
 variables in each Claude session: `PR_EVIDENCE_URL`, the service's `/api/files` address, and
-`PR_EVIDENCE_TOKEN_REF`, the `op://` reference of the `imp` copy.
+`PR_EVIDENCE_TOKEN_PATH`, the `imp` copy's `<vault>/<item>/<field>` path. The path has no `op://`
+prefix, because `op run` resolves every `op://` value in its environment and fails on one its token
+can't read.
 
 ## Deploy the first time
 
@@ -83,7 +85,7 @@ change until the owner approves it, as [the prod apply job](./prod-apply.md) des
 An agent on an imp uploads with `curl`, which sends the token as a bearer token:
 
 ```bash
-FILES_TOKEN="$(op read "$PR_EVIDENCE_TOKEN_REF")"
+FILES_TOKEN="$(op read "op://$PR_EVIDENCE_TOKEN_PATH")"
 curl -sS --oauth2-bearer "$FILES_TOKEN" -F file=@shot.png -F expires=7d "$PR_EVIDENCE_URL"
 ```
 

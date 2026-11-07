@@ -479,11 +479,13 @@ in
           };
         };
         # the pr-evidence skill uploads to the files service with these: its API address, and
-        # the reference of its agent token that `op read` resolves through the op-connect profile.
-        # They sit on the entry because atc takes only the profile's own host as a profile URL.
+        # the vault/item/field path of its agent token, which the skill reads with `op read` through
+        # the op-connect profile. The path has no op:// prefix, because `op run` resolves every
+        # op:// value in its environment and fails on one its token can't read. They sit on the
+        # entry because atc takes only the profile's own host as a profile URL.
         env = {
           PR_EVIDENCE_URL = "https://${filesExposure.hostname}/api/files";
-          PR_EVIDENCE_TOKEN_REF = "op://imp/files-agent-token/credential";
+          PR_EVIDENCE_TOKEN_PATH = "imp/files-agent-token/credential";
         };
       };
       # atc refuses a Codex auth without an oauth profile for chatgpt.com, which this daemon
