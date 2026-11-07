@@ -52,9 +52,11 @@ token into the `credential` field of the `grafana-mcp` item in the `zgeoff` vaul
 server's launcher reads it at each connect
 ([the apply job](../infrastructure-as-code.md#the-apply-job)). Metrics and logs sit on cluster
 volumes with no backup, because losing them loses history and never service. Grafana's database sits
-on a cluster volume with no backup too, so the account and its token outlive a pod restart. Grafana
-runs one pod at a time, because two pods would share the one SQLite file. A lost volume loses the
-account until an apply with a refresh makes a new account and token.
+on a cluster volume with no backup too, so the account and its token outlive a pod restart. The
+database is one SQLite file, which two Grafana processes can corrupt when they write it at once. A
+rollout starts the new pod as soon as Kubernetes marks the old pod for deletion, so both pods can
+write the file until the old pod stops. A lost volume loses the account until an apply with a
+refresh makes a new account and token.
 
 ## Probes of impd
 

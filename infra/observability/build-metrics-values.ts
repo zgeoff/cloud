@@ -89,7 +89,7 @@ export function buildMetricsValues(grafana: GrafanaInputs): Record<string, unkno
 
       // Recreate fails on the live Deployment: the API server refuses it beside the rollingUpdate
       // block it defaulted, and server-side apply removes only a field its apply owns, so this
-      // apply owns the block; maxSurge 0 scales the old pod down before the new one starts
+      // apply owns the block; maxSurge 0 holds the new pod until the old one is being deleted
       deploymentStrategy: {
         type: 'RollingUpdate',
         rollingUpdate: { maxSurge: 0, maxUnavailable: 1 },
