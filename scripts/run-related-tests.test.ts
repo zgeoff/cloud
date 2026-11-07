@@ -72,12 +72,12 @@ test('it exits 0 and says so when no path has a related test', async () => {
   expect(run.stdout.toString()).toBe('run-related-tests: no related tests\n');
 });
 
-test('it runs the related test through the test script and exits 0 when it passes', async () => {
+test('it runs a related test outside a package through the root related-tests script and exits 0 when it passes', async () => {
   const ctx = await setupTest();
 
   writeFileSync(
     join(ctx.directory, 'package.json'),
-    JSON.stringify({ scripts: { test: 'bun test' } }),
+    JSON.stringify({ scripts: { 'test:related-root': 'bun test' } }),
   );
 
   writeFileSync(
@@ -99,7 +99,7 @@ test('it exits with the failing code when the related test fails', async () => {
 
   writeFileSync(
     join(ctx.directory, 'package.json'),
-    JSON.stringify({ scripts: { test: 'bun test' } }),
+    JSON.stringify({ scripts: { 'test:related-root': 'bun test' } }),
   );
 
   writeFileSync(
@@ -120,7 +120,7 @@ test('it runs a test inside a package with its own bunfig.toml from that package
 
   writeFileSync(
     join(ctx.directory, 'package.json'),
-    JSON.stringify({ scripts: { test: 'exit 3' } }),
+    JSON.stringify({ scripts: { 'test:related-root': 'exit 3' } }),
   );
 
   mkdirSync(join(ctx.directory, 'src/pkg'));
@@ -150,7 +150,7 @@ test('it stops at the first failing run and exits with its failing code', async 
 
   writeFileSync(
     join(ctx.directory, 'package.json'),
-    JSON.stringify({ scripts: { test: 'bun test' } }),
+    JSON.stringify({ scripts: { 'test:related-root': 'bun test' } }),
   );
 
   mkdirSync(join(ctx.directory, 'src/pkg'));

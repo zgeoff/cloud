@@ -9,6 +9,7 @@
     "deploy/**/*.ts",
     "*.js",
     "scripts/**/*.ts",
-    "e2e/**/*.ts"
+    "e2e/**/*.ts",
+    "rig.config.ts"
   ]
 }
