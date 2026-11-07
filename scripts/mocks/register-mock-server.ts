@@ -1,4 +1,4 @@
-import { afterAll, afterEach } from 'bun:test';
+import { afterAll, afterEach, beforeAll } from 'bun:test';
 import { server } from './node.ts';
 
 // A script can turn a failed request into a result, so an unhandled request could still pass its
@@ -12,7 +12,12 @@ server.events.on('request:unhandled', (event) => {
 // the only real traffic is loopback, through a test's own passthrough(); every other request
 // goes to a handler
 server.configure({ onUnhandledFrame: 'error' });
-server.enable();
+
+// A `bun test --parallel` worker runs a preload's afterAll after each file, so the server turns on
+// before each file as well, and every disable meets an enable.
+beforeAll(() => {
+  server.enable();
+});
 
 afterEach(() => {
   server.resetHandlers();
