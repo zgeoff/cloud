@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { buildNixieBackupPodSpec } from './build-nixie-backup-pod-spec.ts';
 
-test("it runs the nixie-backup image's own job on the staging folder alone, after an init container with no secret creates the folder", () => {
+test("it runs the nixie-backup image's own job on the staging folder alone, never restarted, after an init container with no secret creates the folder", () => {
   expect(
     buildNixieBackupPodSpec({
       image:
@@ -11,7 +11,7 @@ test("it runs the nixie-backup image's own job on the staging folder alone, afte
       pullSecret: 'ghcr-pull',
     }),
   ).toStrictEqual({
-    restartPolicy: 'OnFailure',
+    restartPolicy: 'Never',
     securityContext: {
       runAsNonRoot: true,
       runAsUser: 10_001,

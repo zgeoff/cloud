@@ -6,8 +6,8 @@ import { ConfigMap, Secret } from '@pulumi/kubernetes/core/v1';
 import type { Output } from '@pulumi/pulumi';
 import type { NixieBackupInputs } from '../inputs/index.ts';
 import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
+import { buildNixieBackupCronJobSpec } from './build-nixie-backup-cron-job-spec.ts';
 import { buildNixieBackupEnv } from './build-nixie-backup-env.ts';
-import { buildNixieBackupPodSpec } from './build-nixie-backup-pod-spec.ts';
 import { nixieConfigKey } from './build-nixie-spec.ts';
 import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
 
@@ -38,30 +38,16 @@ export function createNixieBackupJob(cluster: Provider, inputs: NixieBackupJobIn
     'nixie-backup',
     {
       metadata: { name: 'nixie-backup', namespace: inputs.namespace },
-      spec: {
-        // half an hour after the atc gateway's backup, so the two never share the node's disk
-        schedule: '0 4 * * *',
-        timeZone: 'Australia/Melbourne',
-        suspend: false,
-        concurrencyPolicy: 'Forbid',
-        jobTemplate: {
-          spec: {
-            backoffLimit: 2,
-            template: {
-              spec: buildNixieBackupPodSpec({
-                image: inputs.backup.image,
+      spec: buildNixieBackupCronJobSpec({
+        image: inputs.backup.image,
 
-                // one node, so ReadWriteOnce allows the claim beside nixie
-                claim: 'data-nixie-0',
+        // one node, so ReadWriteOnce allows the claim beside nixie
+        claim: 'data-nixie-0',
 
-                // a fixed name, unlike nixie's own Secret, because the restore Job's YAML names it
-                envSecret: 'nixie-backup',
-                pullSecret: ghcrPullSecretName,
-              }),
-            },
-          },
-        },
-      },
+        // a fixed name, unlike nixie's own Secret, because the restore Job's YAML names it
+        envSecret: 'nixie-backup',
+        pullSecret: ghcrPullSecretName,
+      }),
     },
     { provider: cluster, dependsOn: [env, pull, inputs.statefulSet] },
   );

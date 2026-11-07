@@ -98,6 +98,44 @@ EOF
   diff - "$tree/receipt" <<< '{"status":"published","removed":1}'
 }
 
+# Why the CronJob never retries a pod (infra/cluster/build-nixie-backup-cron-job-spec.ts): a key
+# repo that refuses writes fails the set's receipt and the run, and a second run skips that set and
+# exits 0, so a retried Job would end as a success.
+it_fails_a_run_whose_set_fails_and_passes_its_rerun_with_the_receipt_unchanged() {
+  local image="$1" status=0 rerun=0
+  name="nixie-backup-$3-$BASHPID"
+  create_case_tree "$cleanup"
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+  run_shell "$name" "$image" <<< 'chmod 0500 /repos/keys'
+  run_job "$name" "$image" > "$tree/out" 2> "$tree/err" || status=$?
+  run_shell "$name" "$image" > "$tree/receipt-before" <<< 'cat /state/backup/000000000001/receipt.json'
+
+  run_job "$name" "$image" > "$tree/rerun" 2> "$tree/rerun-err" || rerun=$?
+
+  assert_status 1 "$status"
+  assert_status 0 "$rerun"
+  # restic creates the repo's folders in parallel, so the first refused one varies
+  sed -E 's/"time":"[^"]+",//; s#mkdir /repos/keys/[a-z]+:#mkdir /repos/keys/FOLDER:#' "$tree/out" > \
+    "$tree/out.normal"
+  diff - "$tree/out.normal" << 'EOF'
+nixie-backup (nixie-backup)
+
+{"event":"backup.set_failed","level":"error","sequence":1,"failure":"restic init in the key repo exited 1: Fatal: Fatal: create repository at /repos/keys failed: mkdir /repos/keys/FOLDER: permission denied"}
+EOF
+  diff /dev/null "$tree/err"
+  sed -E 's/"time":"[^"]+",//' "$tree/rerun" > "$tree/rerun.normal"
+  diff - "$tree/rerun.normal" << 'EOF'
+nixie-backup (nixie-backup)
+
+EOF
+  diff /dev/null "$tree/rerun-err"
+  run_shell "$name" "$image" > "$tree/receipt-after" <<< 'cat /state/backup/000000000001/receipt.json'
+  diff "$tree/receipt-before" "$tree/receipt-after"
+  jq -c '{status}' "$tree/receipt-after" > "$tree/receipt"
+  diff - "$tree/receipt" <<< '{"status":"failed"}'
+}
+
 # The data repo's newest snapshot is set 3's, whose key snapshot never landed, as a failed key step
 # leaves it; the restore still pairs the key repo's set 2 with set 2's nixie.db.
 it_restores_keys_db_and_the_nixie_db_of_the_same_set_from_the_two_repos() {

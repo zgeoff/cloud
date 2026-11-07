@@ -1,6 +1,6 @@
 import type { input } from '@pulumi/kubernetes/types';
 
-interface NixieBackupPodInputs {
+export interface NixieBackupPodInputs {
   readonly image: string;
   readonly claim: string;
   readonly envSecret: string;
@@ -14,7 +14,8 @@ const stagingFolder = 'backup';
 // container with no credentials creates the staging folder first, as nixie's user.
 export function buildNixieBackupPodSpec(inputs: NixieBackupPodInputs) {
   return {
-    restartPolicy: 'OnFailure',
+    // a restarted container skips the set whose failed receipt it wrote, and exits 0
+    restartPolicy: 'Never',
 
     // nixie's own user, so nixie can remove the receipts and copies the job leaves
     securityContext: {
