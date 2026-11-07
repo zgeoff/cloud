@@ -117,13 +117,10 @@ jobs:
         if: needs.decide.outputs.reused != 'true'
         run: bun run lint:full
 
-      - name: Doc links
+      # the docs checks that check:docs names, from chex
+      - name: Docs
         if: needs.decide.outputs.reused != 'true'
-        run: bun run check:doc-links
-
-      - name: Doc length and prose
-        if: needs.decide.outputs.reused != 'true'
-        run: bun run check:doc-length
+        run: bun run --silent check:docs
 
       - name: Pulumi pins
         if: needs.decide.outputs.reused != 'true'
@@ -521,13 +518,10 @@ jobs:
         if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
         run: bun run lint:full
 
-      - name: Doc links
+      # the docs checks that check:docs names, from chex
+      - name: Docs
         if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
-        run: bun run check:doc-links
-
-      - name: Doc length and prose
-        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
-        run: bun run check:doc-length
+        run: bun run --silent check:docs
 
       - name: Pulumi pins
         if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}

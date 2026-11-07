@@ -102,6 +102,102 @@ test('it passes the lint job before a push whose only TypeScript file is one oxl
   });
 });
 
+test('it leaves out each baseline job that one of its own pre-push jobs replaces', async () => {
+  const ctx = await setupTest();
+
+  await $`git switch --quiet -c feature`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  copyFileSync(join(import.meta.dir, 'lefthook.yml'), join(ctx.repo, 'lefthook.yml'));
+  symlinkSync(join(import.meta.dir, 'node_modules'), join(ctx.repo, 'node_modules'));
+  writeFileSync(join(ctx.repo, '.gitignore'), 'node_modules\n');
+
+  await $`git add -A && git commit --quiet -m feature && git push --quiet -u origin feature`
+    .env(ctx.env)
+    .cwd(ctx.repo)
+    .quiet();
+
+  const result = await $`${ctx.lefthook} run pre-push 2>&1`
+    .env(ctx.env)
+    .cwd(ctx.repo)
+    .nothrow()
+    .quiet();
+
+  const output = Bun.stripANSI(result.text());
+
+  const excluded = [...output.matchAll(/(?<job>chex-\S+) \(skip\) name$/gmu)].map(
+    (match) => match.groups?.job,
+  );
+
+  expect({ exitCode: result.exitCode, excluded }).toStrictEqual({
+    exitCode: 0,
+    excluded: [
+      'chex-format:check',
+      'chex-lint',
+      'chex-shell',
+      'chex-workflows',
+      'chex-typecheck',
+      'chex-test',
+    ],
+  });
+});
+
+test('it leaves out the baseline typecheck before a commit, beside its own typecheck job', async () => {
+  const ctx = await setupTest();
+
+  const bin = join(ctx.ranLog, '..', 'bin');
+
+  copyFileSync(join(import.meta.dir, 'lefthook.yml'), join(ctx.repo, 'lefthook.yml'));
+  symlinkSync(join(import.meta.dir, 'node_modules'), join(ctx.repo, 'node_modules'));
+  writeFileSync(join(ctx.repo, '.gitignore'), 'node_modules\n');
+  writeFileSync(join(ctx.repo, 'feature.ts'), 'export {};\n');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'gitleaks'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+
+  await $`git add -A`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  const result = await $`${ctx.lefthook} run pre-commit 2>&1`
+    .env({ ...ctx.env, PATH: `${bin}:${process.env.PATH ?? ''}` })
+    .cwd(ctx.repo)
+    .nothrow()
+    .quiet();
+
+  const output = Bun.stripANSI(result.text());
+
+  const excluded = [...output.matchAll(/(?<job>chex-\S+) \(skip\) name$/gmu)].map(
+    (match) => match.groups?.job,
+  );
+
+  expect({ exitCode: result.exitCode, excluded }).toStrictEqual({
+    exitCode: 0,
+    excluded: ['chex-typecheck'],
+  });
+});
+
+test('it fails a push with the guard message when the chex baseline is not installed', async () => {
+  const ctx = await setupTest();
+
+  await $`git switch --quiet -c feature`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  copyFileSync(join(import.meta.dir, 'lefthook.yml'), join(ctx.repo, 'lefthook.yml'));
+
+  await $`git add -A && git commit --quiet -m feature && git push --quiet -u origin feature`
+    .env(ctx.env)
+    .cwd(ctx.repo)
+    .quiet();
+
+  const result = await $`${ctx.lefthook} run pre-push 2>&1`
+    .env(ctx.env)
+    .cwd(ctx.repo)
+    .nothrow()
+    .quiet();
+
+  expect(result.exitCode).toBe(1);
+
+  expect(Bun.stripANSI(result.text())).toInclude(
+    'node_modules/@zgeoff/chex/lefthook.yml is missing',
+  );
+});
+
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'lefthook-'));
 
@@ -139,7 +235,27 @@ async function setupTest() {
     .cwd(repo)
     .quiet();
 
-  copyFileSync(join(import.meta.dir, 'lefthook.yml'), join(repo, 'lefthook.yml'));
+  const jobSchema = z.looseObject({ name: z.string() });
+  const hookSchema = z.looseObject({ jobs: z.array(jobSchema) });
+  const configSchema = z.looseObject({ 'pre-commit': hookSchema, 'pre-push': hookSchema });
+  const configText = readFileSync(join(import.meta.dir, 'lefthook.yml'), 'utf8');
+  const { extends: _, ...config } = configSchema.parse(Bun.YAML.parse(configText));
+
+  const keepOwnJobs = (hook: z.infer<typeof hookSchema>) => ({
+    ...hook,
+    jobs: hook.jobs.filter((job) => job.name !== 'chex-baseline'),
+  });
+
+  // the chex baseline and its guard read node_modules, which the fixture lacks, so it keeps cloud's
+  // own jobs
+  writeFileSync(
+    join(repo, 'lefthook.yml'),
+    Bun.YAML.stringify({
+      ...config,
+      'pre-commit': keepOwnJobs(config['pre-commit']),
+      'pre-push': keepOwnJobs(config['pre-push']),
+    }),
+  );
 
   // each script a pre-push job runs records its name; files:branch is the real one
   const recorders = [
