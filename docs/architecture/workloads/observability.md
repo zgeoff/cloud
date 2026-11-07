@@ -34,11 +34,11 @@ The stack runs in the `observability` namespace:
   counts against Loki's ingestion rate limit. Alloy also counts the gateway's sign-in events for
   Prometheus, which scrapes Alloy ([sign-in alerts](#sign-in-alerts)). Alloy reads the journal
   through sd-journal, which maps the journal files in windows and keeps many of them mapped before
-  it reuses one. Alloy's memory limit, set with the measured window total in
-  [`alloy-values.ts`](../../../infra/observability/alloy-values.ts), holds that page cache beside
-  its `GOMEMLIMIT`. Under a smaller limit, the kernel evicts the window pages that Alloy faults in,
-  Alloy faults them in again, and its readiness probe times out. Each fault reads only the host's
-  root disk read-ahead ([read-ahead on the root disk](../host/host.md#read-ahead-on-the-root-disk)).
+  it reuses one. Alloy's memory limit, set with the measured window total in Alloy's Helm values in
+  `infra/observability/`, holds that page cache beside its `GOMEMLIMIT`. Under a smaller limit, the
+  kernel evicts the window pages that Alloy faults in, Alloy faults them in again, and its readiness
+  probe times out. Each fault reads only the host's root disk read-ahead
+  ([read-ahead on the root disk](../host/host.md#read-ahead-on-the-root-disk)).
 - **Three blackbox exporters** run the probes that need a network path: one opens a TCP connection
   to each atc daemon on the gateway's path to it, one fetches impd's health over HTTPS on the
   tailnet and requires a valid certificate and a ready answer, and one fetches nixie's readiness
