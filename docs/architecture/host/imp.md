@@ -47,6 +47,13 @@ impd holds the host's memory budget for imps and refuses a boot that would excee
 imp sleeps to disk and frees its memory. The ZFS cache has a cap of its own, so the pool and the
 imps never compete for the rest of the host's memory.
 
+impd keeps part of the budget for nixie's sandboxes, the imps named `nixie-*`, because a person
+waits on each nixie turn and an agent imp does not. impd refuses an agent imp's boot or wake that
+would take the kept memory, while a nixie sandbox can use the whole budget and sleeps agent imps to
+make room
+([imp's priority imps](https://github.com/zgeoff/impz/blob/main/docs/architecture/lifecycle/ram-governor.md#priority-imps)).
+The host's `configuration.nix` sets the kept size beside the sandboxes it covers.
+
 impd runs every imp of fixed memory on huge pages, and restores and wakes it through a page handler
 ([imp's huge pages](https://github.com/zgeoff/impz/blob/main/docs/architecture/lifecycle/huge-pages.md)).
 A guest on huge pages takes one fault on the host where a guest on base pages takes 512, which is

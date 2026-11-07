@@ -44,12 +44,12 @@ it_installs_a_pin_that_the_live_archive_replaced_as_the_snapshot_holds_it() {
   local image="$1" status=0 suite
   create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
   setup_test "$image"
-  for suite in noble noble-backports noble-security; do
+  for suite in "$codename" "$codename-backports" "$codename-security"; do
     create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
     create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
   done
-  create_stub_apt_suite "$tree/archive/ubuntu" noble-updates cloud-stub=1.0-2
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" noble-updates cloud-stub=1.0-1
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-2
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
@@ -75,13 +75,13 @@ it_resolves_an_unpinned_dependency_as_the_snapshot_holds_it_when_the_live_archiv
   local image="$1" status=0 suite
   create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
   setup_test "$image"
-  for suite in noble noble-backports noble-security; do
+  for suite in "$codename" "$codename-backports" "$codename-security"; do
     create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
     create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
   done
-  create_stub_apt_suite "$tree/archive/ubuntu" noble-updates \
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" \
     cloud-stub=1.0-1/cloud-stub-lib cloud-stub-lib=2.0-2
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" noble-updates \
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" \
     cloud-stub=1.0-1/cloud-stub-lib cloud-stub-lib=2.0-1
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
@@ -107,12 +107,12 @@ it_fetches_a_file_from_the_live_archive_first() {
   local image="$1" status=0 suite
   create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
   setup_test "$image"
-  for suite in noble noble-backports noble-security; do
+  for suite in "$codename" "$codename-backports" "$codename-security"; do
     create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
     create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
   done
-  create_stub_apt_suite "$tree/archive/ubuntu" noble-updates cloud-stub=1.0-1
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" noble-updates cloud-stub=1.0-1
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-1
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
@@ -136,12 +136,12 @@ it_fetches_a_file_from_the_snapshot_when_the_live_archive_fails_to_serve_it() {
   local image="$1" status=0 suite
   create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
   setup_test "$image"
-  for suite in noble noble-backports noble-security; do
+  for suite in "$codename" "$codename-backports" "$codename-security"; do
     create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
     create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
   done
-  create_stub_apt_suite "$tree/archive/ubuntu" noble-updates cloud-stub=1.0-1
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" noble-updates cloud-stub=1.0-1
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-1
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
   echo '503 all /ubuntu/pool/main/cloud-stub_1.0-1_all.deb' > "$tree/faults"
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
@@ -169,13 +169,13 @@ it_fetches_a_list_again_after_a_wait_when_the_snapshot_fails_to_serve_it_at_firs
   local image="$1" status=0 suite
   create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
   setup_test "$image"
-  for suite in noble noble-backports noble-security; do
+  for suite in "$codename" "$codename-backports" "$codename-security"; do
     create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
     create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
   done
-  create_stub_apt_suite "$tree/archive/ubuntu" noble-updates
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" noble-updates cloud-stub=1.0-1
-  echo '503 2 /ubuntu/20260101T000000Z/dists/noble-updates/main/binary-amd64/Packages' \
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates"
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
+  echo "503 2 /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages" \
     > "$tree/faults"
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
@@ -187,12 +187,12 @@ it_fetches_a_list_again_after_a_wait_when_the_snapshot_fails_to_serve_it_at_firs
 
   docker exec "$container" dpkg-query -W cloud-stub > "$tree/installed"
   diff - "$tree/installed" <<< $'cloud-stub\t1.0-1'
-  docker exec "$container" grep ' /ubuntu/20260101T000000Z/dists/noble-updates/main/' \
+  docker exec "$container" grep " /ubuntu/20260101T000000Z/dists/$codename-updates/main/" \
     /run/stub/requests > "$tree/requests"
-  diff - "$tree/requests" << 'EOF'
-503 snapshot.ubuntu.com /ubuntu/20260101T000000Z/dists/noble-updates/main/binary-amd64/Packages
-503 snapshot.ubuntu.com /ubuntu/20260101T000000Z/dists/noble-updates/main/binary-amd64/Packages
-200 snapshot.ubuntu.com /ubuntu/20260101T000000Z/dists/noble-updates/main/binary-amd64/Packages
+  diff - "$tree/requests" << EOF
+503 snapshot.ubuntu.com /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages
+503 snapshot.ubuntu.com /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages
+200 snapshot.ubuntu.com /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages
 EOF
   docker exec "$container" cat /run/clock/pauses > "$tree/pauses"
   diff - "$tree/pauses" << 'EOF'
@@ -200,11 +200,11 @@ EOF
 20
 EOF
   sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff - "$tree/err.normal" << 'EOF'
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/noble-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
+  diff - "$tree/err.normal" << EOF
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
 E: Some index files failed to download. They have been ignored, or old ones used instead.
 install-ubuntu-packages: apt-get update exited 100, again in 10s
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/noble-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
 E: Some index files failed to download. They have been ignored, or old ones used instead.
 install-ubuntu-packages: apt-get update exited 100, again in 20s
 debconf: delaying package configuration, since apt-utils is not installed
@@ -216,12 +216,12 @@ it_fetches_a_file_again_after_a_wait_when_the_snapshot_fails_to_serve_it_at_firs
   local image="$1" status=0 suite
   create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
   setup_test "$image"
-  for suite in noble noble-backports noble-security; do
+  for suite in "$codename" "$codename-backports" "$codename-security"; do
     create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
     create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
   done
-  create_stub_apt_suite "$tree/archive/ubuntu" noble-updates cloud-stub=1.0-2
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" noble-updates cloud-stub=1.0-1
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-2
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
   echo '503 1 /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb' > "$tree/faults"
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
@@ -254,13 +254,13 @@ it_fails_with_apt_s_error_when_the_snapshot_keeps_failing_a_list() {
   local image="$1" status=0 suite
   create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
   setup_test "$image"
-  for suite in noble noble-backports noble-security; do
+  for suite in "$codename" "$codename-backports" "$codename-security"; do
     create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
     create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
   done
-  create_stub_apt_suite "$tree/archive/ubuntu" noble-updates
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" noble-updates cloud-stub=1.0-1
-  echo '503 all /ubuntu/20260101T000000Z/dists/noble-updates/main/binary-amd64/Packages' \
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates"
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
+  echo "503 all /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages" \
     > "$tree/faults"
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
@@ -270,7 +270,7 @@ it_fails_with_apt_s_error_when_the_snapshot_keeps_failing_a_list() {
     http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
     > /dev/null 2> "$tree/err" || status=$?
 
-  docker exec "$container" grep -c ' /ubuntu/20260101T000000Z/dists/noble-updates/main/' \
+  docker exec "$container" grep -c " /ubuntu/20260101T000000Z/dists/$codename-updates/main/" \
     /run/stub/requests > "$tree/requests"
   diff - "$tree/requests" <<< 5
   docker exec "$container" cat /run/clock/pauses > "$tree/pauses"
@@ -281,20 +281,20 @@ it_fails_with_apt_s_error_when_the_snapshot_keeps_failing_a_list() {
 80
 EOF
   sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff - "$tree/err.normal" << 'EOF'
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/noble-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
+  diff - "$tree/err.normal" << EOF
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
 E: Some index files failed to download. They have been ignored, or old ones used instead.
 install-ubuntu-packages: apt-get update exited 100, again in 10s
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/noble-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
 E: Some index files failed to download. They have been ignored, or old ones used instead.
 install-ubuntu-packages: apt-get update exited 100, again in 20s
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/noble-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
 E: Some index files failed to download. They have been ignored, or old ones used instead.
 install-ubuntu-packages: apt-get update exited 100, again in 40s
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/noble-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
 E: Some index files failed to download. They have been ignored, or old ones used instead.
 install-ubuntu-packages: apt-get update exited 100, again in 80s
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/noble-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
 E: Some index files failed to download. They have been ignored, or old ones used instead.
 EOF
   assert_status 100 "$status"
@@ -304,12 +304,12 @@ it_leaves_the_image_s_own_apt_sources_and_no_pin() {
   local image="$1" status=0 suite
   create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
   setup_test "$image"
-  for suite in noble-updates noble-backports noble-security; do
+  for suite in "$codename-updates" "$codename-backports" "$codename-security"; do
     create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
     create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
   done
-  create_stub_apt_suite "$tree/archive/ubuntu" noble
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" noble cloud-stub=1.0-1
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename"
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename" cloud-stub=1.0-1
   docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
@@ -352,10 +352,13 @@ EOF
 # create_stub_clock in /run/clock. The stand-in serves $tree/archive, with the faults in
 # $tree/faults, from /run/stub; each case writes both, then starts it. apt's config allows the
 # stand-in's unsigned suites, and Docker's source, which the container cannot reach, is gone. The
-# image's own sources.list.d holds ubuntu.sources besides.
+# image's own sources.list.d holds ubuntu.sources besides. Sets codename to the image's Ubuntu
+# release, which names the suites that its ubuntu.sources and the step read.
 setup_test() {
   local image="$1"
   container="install-ubuntu-packages-$(basename "$tree")"
+  codename="$(docker run --rm --network none --entrypoint sh "$image" -c \
+    '. /etc/os-release && echo "$VERSION_CODENAME"')"
   mkdir -p "$tree/archive"
   : > "$tree/faults"
   docker run -d --name "$container" --network none \

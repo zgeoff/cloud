@@ -27,6 +27,8 @@ if [ "$#" -lt 2 ]; then
 fi
 snapshot_uri=$1
 shift
+# the base image's Ubuntu release names the suites, so a base on a new release needs no edit here
+codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
 
 # after ubuntu.sources in apt's order, so apt tries the live archive's copy of a file first
 sources=/etc/apt/sources.list.d/zz-ubuntu-snapshot.sources
@@ -36,7 +38,7 @@ preferences=/etc/apt/preferences.d/ubuntu-snapshot
 cat > "$sources" << EOF
 Types: deb
 URIs: $snapshot_uri
-Suites: noble noble-updates noble-backports noble-security
+Suites: $codename $codename-updates $codename-backports $codename-security
 Components: main universe restricted multiverse
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 EOF
