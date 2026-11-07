@@ -125,7 +125,7 @@
     "@types/bun": "1.4.4",
     "@zgeoff/agent-hooks": "0.2.9",
     "@zgeoff/bun-test-extended": "0.2.3",
-    "@zgeoff/chex": "0.2.1",
+    "@zgeoff/chex": "0.2.4",
     "@zgeoff/cloud-preview": "workspace:*",
     "@zgeoff/cloud-topology": "workspace:*",
     "@zgeoff/diet": "0.2.2",
