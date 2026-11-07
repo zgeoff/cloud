@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -67,22 +67,25 @@ test('it passes the lint job before a push whose only TypeScript file is one oxl
 
   await $`git switch --quiet -c feature`.env(ctx.env).cwd(ctx.repo).quiet();
 
+  const scriptsSchema = z.object({ scripts: z.record(z.string(), z.string()) });
   const fixtureText = readFileSync(join(ctx.repo, 'package.json'), 'utf8');
-
-  const fixture = z
-    .object({ scripts: z.record(z.string(), z.string()) })
-    .parse(JSON.parse(fixtureText));
+  const repoText = readFileSync(join(import.meta.dir, 'package.json'), 'utf8');
+  const fixture = scriptsSchema.parse(JSON.parse(fixtureText));
+  const lintFiles = scriptsSchema.parse(JSON.parse(repoText)).scripts['lint:files'];
 
   writeFileSync(
     join(ctx.repo, 'package.json'),
     `${JSON.stringify({
       scripts: {
         ...fixture.scripts,
-        'lint:files': `bun run --silent --cwd ${import.meta.dir} lint:files`,
+        'lint:files': `sh -c '${lintFiles} "$@" && echo lint:files >> ${ctx.ranLog}' lint:files`,
       },
     })}\n`,
   );
 
+  copyFileSync(join(import.meta.dir, '.oxlintrc.json'), join(ctx.repo, '.oxlintrc.json'));
+  symlinkSync(join(import.meta.dir, 'node_modules'), join(ctx.repo, 'node_modules'));
+  writeFileSync(join(ctx.repo, '.gitignore'), 'node_modules\n');
   mkdirSync(join(ctx.repo, '.claude/hooks'), { recursive: true });
   writeFileSync(join(ctx.repo, '.claude/hooks/start.ts'), 'export {};\n');
 
@@ -93,7 +96,10 @@ test('it passes the lint job before a push whose only TypeScript file is one oxl
 
   const result = await $`${ctx.lefthook} run pre-push`.env(ctx.env).cwd(ctx.repo).nothrow().quiet();
 
-  expect(result.exitCode).toBe(0);
+  expect({ exitCode: result.exitCode, ran: readFileSync(ctx.ranLog, 'utf8') }).toStrictEqual({
+    exitCode: 0,
+    ran: 'lint:files\ntest:related .claude/hooks/start.ts\n',
+  });
 });
 
 async function setupTest() {
