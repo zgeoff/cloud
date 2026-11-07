@@ -88,7 +88,7 @@ test('it reads the nixie digests and flags from the notes for a release-notes so
         'zgeoff/nixie': [
           {
             tag: 'v0.32.0',
-            notes: `## Migrations\n\n- 0009 adds an index\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie@sha256:${'5'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'6'.repeat(64)}\`\n`,
+            notes: `## Migrations\n\n- 0009 adds an index\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie@sha256:${'5'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'6'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-backup@sha256:${'7'.repeat(64)}\`\n`,
           },
           { tag: 'v0.31.0', notes: '## Images\n' },
         ],
@@ -108,6 +108,7 @@ test('it reads the nixie digests and flags from the notes for a release-notes so
       digests: {
         nixie: `sha256:${'5'.repeat(64)}`,
         'nixie-web': `sha256:${'6'.repeat(64)}`,
+        'nixie-backup': `sha256:${'7'.repeat(64)}`,
       },
     },
     flags: ['migrations'],

@@ -108,7 +108,6 @@ export function createNixie(
     createNixieBackupJob(cluster, {
       namespace,
       statefulSet,
-      nixieImage: inputs.config.image,
       config,
       backup: inputs.backup,
     });

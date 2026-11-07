@@ -32,7 +32,7 @@ test('it writes each bump as the bumps output and lists them', async () => {
     'nixos/packages/atc.nix': '  version = "4.2.0";\n',
     'images/atc-gateway/versions.env': 'ATC_RELEASE=@zgeoff/atc@4.3.0\n',
     'nixos/hosts/geoffcloud/configuration.nix': `    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:${'1'.repeat(64)}";\n`,
-    'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
   });
 
@@ -84,7 +84,7 @@ test('it says every pin is current and writes no output', async () => {
     'nixos/packages/atc.nix': '  version = "4.3.0";\n',
     'images/atc-gateway/versions.env': 'ATC_RELEASE=@zgeoff/atc@4.3.0\n',
     'nixos/hosts/geoffcloud/configuration.nix': `    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:${'1'.repeat(64)}";\n`,
-    'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
   });
 
@@ -127,7 +127,7 @@ test('it fails with the search error and writes nothing', async () => {
     'nixos/packages/atc.nix': '  version = "4.3.0";\n',
     'images/atc-gateway/versions.env': 'ATC_RELEASE=@zgeoff/atc@4.3.0\n',
     'nixos/hosts/geoffcloud/configuration.nix': `    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:${'1'.repeat(64)}";\n`,
-    'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
   });
 

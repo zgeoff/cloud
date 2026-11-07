@@ -134,8 +134,15 @@ jobs:
           SLUG: ${{ steps.app-token.outputs.app-slug }}
         run: bun run --silent ci:set-release-bot-identity "$SLUG"
 
+      # the bump writes the restore Jobs with infra/cluster/write-restore-jobs.ts, which imports zod
+      # and lays each file out with the repo's oxfmt
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      # LEFTHOOK=0 skips the hooks that the install's prepare script installed, for the bump commit
       - name: Open or update the pull request that pins the digests
         env:
+          LEFTHOOK: '0'
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_TELEMETRY: '0'
           DO_NOT_TRACK: '1'

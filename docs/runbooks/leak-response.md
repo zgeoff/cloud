@@ -74,11 +74,12 @@ A restic repository holds ciphertext, and its password sits in 1Password and in 
 the encrypted pool, never on `vda`. A leaked repository alone therefore exposes nothing. A
 repository and its password together expose that system's backed-up data.
 
-| Repository  | Password item        | R2 key item             |
-| ----------- | -------------------- | ----------------------- |
-| imp's       | `imp-restic`         | `r2-backups`            |
-| the gateway | `atc-gateway-restic` | `r2-atc-gateway-backup` |
-| nixie's     | `nixie-restic`       | `r2-nixie-backup`       |
+| Repository   | Password item        | R2 key item             |
+| ------------ | -------------------- | ----------------------- |
+| imp's        | `imp-restic`         | `r2-backups`            |
+| the gateway  | `atc-gateway-restic` | `r2-atc-gateway-backup` |
+| nixie's data | `nixie-restic`       | `r2-nixie-backup`       |
+| nixie's keys | `nixie-key-restic`   | `r2-nixie-backup`       |
 
 nixie's bucket also holds hq's repository, under the password in `hq-restic`.
 

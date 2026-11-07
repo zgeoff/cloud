@@ -47,7 +47,9 @@ function findSection(notes: string, heading: string) {
 function collectSandboxImages(notes: string) {
   return (findSection(notes, '## Images') ?? [])
     .filter(
-      (line) => line.startsWith('- `') && !/^- `ghcr\.io\/zgeoff\/(?:nixie|nixie-web)@/u.test(line),
+      (line) =>
+        line.startsWith('- `') &&
+        !/^- `ghcr\.io\/zgeoff\/(?:nixie|nixie-web|nixie-backup)@/u.test(line),
     )
     .toSorted();
 }

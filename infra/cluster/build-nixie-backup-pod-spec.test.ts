@@ -1,16 +1,12 @@
 import { expect, test } from 'bun:test';
 import { buildNixieBackupPodSpec } from './build-nixie-backup-pod-spec.ts';
 
-test("it copies nixie's data with nixie's own backup command and uploads the copy with the mounted script, which never mounts nixie's claim", () => {
+test("it runs the nixie-backup image's own job on the staging folder alone, never restarted, after an init container with no secret creates the folder", () => {
   expect(
     buildNixieBackupPodSpec({
       image:
-        'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-      nixieImage:
-        'ghcr.io/zgeoff/nixie:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222',
+        'ghcr.io/zgeoff/nixie-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
       claim: 'data-nixie-0',
-      scriptConfigMap: 'nixie-backup-script',
-      configMap: 'nixie-backup-config',
       envSecret: 'nixie-backup',
       pullSecret: 'ghcr-pull',
     }),
@@ -27,61 +23,45 @@ test("it copies nixie's data with nixie's own backup command and uploads the cop
     imagePullSecrets: [{ name: 'ghcr-pull' }],
     initContainers: [
       {
-        name: 'copy',
+        name: 'staging',
         image:
-          'ghcr.io/zgeoff/nixie:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222',
-        command: ['nixie', 'backup', '--to', '/tmp/nixie-backup'],
-        volumeMounts: [
-          { name: 'state', mountPath: '/data' },
-          {
-            name: 'config',
-            mountPath: '/etc/nixie/config.yaml',
-            subPath: 'config.yaml',
-            readOnly: true,
-          },
-          { name: 'tmp', mountPath: '/tmp' },
-        ],
-        resources: { requests: { cpu: '50m', memory: '128Mi' }, limits: { memory: '512Mi' } },
-        securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ['ALL'] } },
+          'ghcr.io/zgeoff/nixie-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        command: ['mkdir', '-p', '-m', '0700', '/state/backup'],
+        volumeMounts: [{ name: 'state', mountPath: '/state' }],
+        resources: { requests: { cpu: '10m', memory: '16Mi' }, limits: { memory: '32Mi' } },
+        securityContext: {
+          allowPrivilegeEscalation: false,
+          readOnlyRootFilesystem: true,
+          capabilities: { drop: ['ALL'] },
+        },
       },
     ],
     containers: [
       {
         name: 'backup',
         image:
-          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-        command: ['/bin/sh', '/opt/nixie-backup/backup.sh'],
-        args: ['backup'],
-        env: [{ name: 'HOME', value: '/tmp' }],
+          'ghcr.io/zgeoff/nixie-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        args: ['run'],
+        env: [
+          { name: 'NIXIE_BACKUP_STAGING_DIR', value: '/backup' },
+          { name: 'HOME', value: '/tmp' },
+        ],
         envFrom: [{ secretRef: { name: 'nixie-backup' } }],
         volumeMounts: [
-          { name: 'script', mountPath: '/opt/nixie-backup', readOnly: true },
+          { name: 'state', mountPath: '/backup', subPath: 'backup' },
           { name: 'tmp', mountPath: '/tmp' },
         ],
-        resources: { requests: { cpu: '50m', memory: '64Mi' }, limits: { memory: '256Mi' } },
-        securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ['ALL'] } },
+        resources: { requests: { cpu: '50m', memory: '128Mi' }, limits: { memory: '512Mi' } },
+        securityContext: {
+          allowPrivilegeEscalation: false,
+          readOnlyRootFilesystem: true,
+          capabilities: { drop: ['ALL'] },
+        },
       },
     ],
     volumes: [
       { name: 'state', persistentVolumeClaim: { claimName: 'data-nixie-0' } },
-      { name: 'config', configMap: { name: 'nixie-backup-config' } },
-      { name: 'script', configMap: { name: 'nixie-backup-script' } },
       { name: 'tmp', emptyDir: {} },
     ],
   });
-});
-
-test("it retries a failed backup in a new pod, because nixie's backup command refuses the directory a failed attempt left", () => {
-  const spec = buildNixieBackupPodSpec({
-    image: 'ghcr.io/zgeoff/atc-gateway-backup:2.0.0',
-    nixieImage: 'ghcr.io/zgeoff/nixie:2.0.0',
-    claim: 'data-nixie-0',
-    scriptConfigMap: 'nixie-backup-script',
-    configMap: 'nixie-backup-config',
-    envSecret: 'nixie-backup',
-    pullSecret: 'ghcr-pull',
-  });
-
-  expect(spec.restartPolicy).toBe('Never');
-  expect(spec.volumes).toContainEqual({ name: 'tmp', emptyDir: {} });
 });

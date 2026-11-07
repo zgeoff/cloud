@@ -42,7 +42,7 @@ test('it finds nothing when every pin holds its newest release', async () => {
 
   await writeFile(
     join(ctx.root, 'infra/Pulumi.prod.yaml'),
-    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
   );
 
   await writeFile(
@@ -95,7 +95,7 @@ test('it finds the atc line with every pinned version when one pin is older', as
 
   await writeFile(
     join(ctx.root, 'infra/Pulumi.prod.yaml'),
-    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
   );
 
   await writeFile(
@@ -141,7 +141,7 @@ test('it finds the imp and nixie lines when their pins are older', async () => {
 
   await writeFile(
     join(ctx.root, 'infra/Pulumi.prod.yaml'),
-    `    image: ghcr.io/zgeoff/nixie:0.6.2@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.6.2@sha256:${'4'.repeat(64)}\n`,
+    `    image: ghcr.io/zgeoff/nixie:0.6.2@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.6.2@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.6.2@sha256:${'6'.repeat(64)}\n`,
   );
 
   await writeFile(
@@ -162,7 +162,7 @@ test('it finds the imp and nixie lines when their pins are older', async () => {
 
   const bumps = await readReleaseBumps(ctx.root, stub.run);
 
-  expect(bumps).toStrictEqual(['imp 1.0.1 1.0.0 0.33.0', 'nixie 0.7.0 0.6.2 0.6.2 0.6.2']);
+  expect(bumps).toStrictEqual(['imp 1.0.1 1.0.0 0.33.0', 'nixie 0.7.0 0.6.2 0.6.2 0.6.2 0.6.2']);
 });
 
 test('it finds the auto-mode line when the agent image pin is older', async () => {
@@ -187,7 +187,7 @@ test('it finds the auto-mode line when the agent image pin is older', async () =
 
   await writeFile(
     join(ctx.root, 'infra/Pulumi.prod.yaml'),
-    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
   );
 
   await writeFile(
@@ -233,7 +233,7 @@ test('it takes the highest version among the tags of the dependency own form', a
 
   await writeFile(
     join(ctx.root, 'infra/Pulumi.prod.yaml'),
-    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
   );
 
   await writeFile(
@@ -284,7 +284,7 @@ test('it finds nothing for a pin newer than the newest release', async () => {
 
   await writeFile(
     join(ctx.root, 'infra/Pulumi.prod.yaml'),
-    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
   );
 
   await writeFile(
@@ -330,7 +330,7 @@ test('it fails on a missing pin before it reads a release', async () => {
 
   await writeFile(
     join(ctx.root, 'infra/Pulumi.prod.yaml'),
-    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
   );
 
   await writeFile(
@@ -373,7 +373,7 @@ test('it fails on a doubled pin', async () => {
 
   await writeFile(
     join(ctx.root, 'infra/Pulumi.prod.yaml'),
-    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    image: ghcr.io/zgeoff/nixie:0.6.2@sha256:${'5'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    image: ghcr.io/zgeoff/nixie:0.6.2@sha256:${'5'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
   );
 
   const stub = buildStubRunner(
@@ -418,7 +418,7 @@ test('it fails when a repository has no release of its form', async () => {
 
   await writeFile(
     join(ctx.root, 'infra/Pulumi.prod.yaml'),
-    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
   );
 
   await writeFile(
@@ -462,7 +462,7 @@ test('it gives the gh error when a release list fails', async () => {
 
   await writeFile(
     join(ctx.root, 'infra/Pulumi.prod.yaml'),
-    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n`,
+    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
   );
 
   await writeFile(

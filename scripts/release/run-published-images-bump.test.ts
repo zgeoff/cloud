@@ -4,6 +4,7 @@ import { buildStubReleaseDocker } from '../test-utils/build-stub-release-docker.
 import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
 import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
 import { createCloudCheckout } from '../test-utils/create-cloud-checkout.ts';
+import { createRestoreJobFiles } from '../test-utils/create-restore-job-files.ts';
 import { runPublishedImagesBump } from './run-published-images-bump.ts';
 
 function setupTest() {
@@ -152,14 +153,36 @@ test('it opens a gateway major bump that waits for review', async () => {
   );
 });
 
-test('it opens a backup image bump that waits for review, since no release version moves', async () => {
+test('it opens a backup image bump that waits for review, since no release version moves, with the restore Jobs written beside the pin', async () => {
   const ctx = setupTest();
+
+  const stack = `config:
+  geoff-cloud:atcGateway:
+    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}
+    publicURL: https://gateway.example.org
+    daemons:
+      harbour:
+        address: 100.64.0.9:8415
+        daemonID: 7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
+    defaultDaemon: harbour
+  geoff-cloud:nixie:
+    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'3'.repeat(64)}
+`;
 
   const checkout = await createCloudCheckout({
     'scripts/release/release-pins.json': '{}\n',
     'images/atc-gateway/versions.env': 'GATEWAY_IMAGE_TAG=7.1.0\nBACKUP_IMAGE_TAG=3.1.0-r2\n',
-    'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': stack,
+    ...(await createRestoreJobFiles(stack)),
   });
+
+  const expected = await createRestoreJobFiles(
+    stack.replace(
+      `atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}`,
+      `atc-gateway-backup:3.1.0-r2@sha256:${'4'.repeat(64)}`,
+    ),
+  );
 
   const docker = buildStubReleaseDocker({
     manifests: {
@@ -172,6 +195,7 @@ test('it opens a backup image bump that waits for review, since no release versi
     buildStubReleaseGH({ releases: {} }),
     docker.answer,
     buildRealProgramHandler(['git'], checkout.env),
+    buildRealProgramHandler(['bun']),
   );
 
   const status = await runPublishedImagesBump(
@@ -188,11 +212,26 @@ test('it opens a backup image bump that waits for review, since no release versi
     'infra/Pulumi.prod.yaml',
   ]);
 
+  const jobs = await Promise.all(
+    ['images/atc-gateway/restore-job.yaml', 'deploy/files/restore-job.yaml'].map((path) =>
+      checkout.git([
+        `--git-dir=${checkout.origin}`,
+        'show',
+        `release-check/atc-gateway-images:${path}`,
+      ]),
+    ),
+  );
+
   expect(status).toBe(0);
 
   expect(diff.split('\n').filter((line) => /^[-+] /u.test(line))).toStrictEqual([
     `-    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}`,
     `+    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r2@sha256:${'4'.repeat(64)}`,
+  ]);
+
+  expect(jobs).toStrictEqual([
+    expected['images/atc-gateway/restore-job.yaml'].trimEnd(),
+    expected['deploy/files/restore-job.yaml'].trimEnd(),
   ]);
 
   expect(stub.calls.map((call) => call.argv.join(' ')).at(-1)).toBe(
@@ -207,17 +246,35 @@ test('it opens a backup image bump that waits for review, since no release versi
 test('it opens a new backup revision after a person closed the one before it', async () => {
   const ctx = setupTest();
 
+  const stack = `config:
+  geoff-cloud:atcGateway:
+    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}
+    publicURL: https://gateway.example.org
+    daemons:
+      harbour:
+        address: 100.64.0.9:8415
+        daemonID: 7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
+    defaultDaemon: harbour
+  geoff-cloud:nixie:
+    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'3'.repeat(64)}
+`;
+
   const checkout = await createCloudCheckout({
     'scripts/release/release-pins.json': '{}\n',
     'images/atc-gateway/versions.env': 'GATEWAY_IMAGE_TAG=7.1.0\nBACKUP_IMAGE_TAG=3.1.0-r1\n',
-    'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': stack,
+    ...(await createRestoreJobFiles(stack)),
   });
 
   await checkout.git(['-C', checkout.seed, 'switch', '-qc', 'release-check/atc-gateway-images']);
 
   await Bun.write(
     `${checkout.seed}/infra/Pulumi.prod.yaml`,
-    `    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r2@sha256:${'4'.repeat(64)}\n`,
+    stack.replace(
+      `atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}`,
+      `atc-gateway-backup:3.1.0-r2@sha256:${'4'.repeat(64)}`,
+    ),
   );
 
   await checkout.git([
@@ -267,6 +324,7 @@ test('it opens a new backup revision after a person closed the one before it', a
     }),
     docker.answer,
     buildRealProgramHandler(['git'], checkout.env),
+    buildRealProgramHandler(['bun']),
   );
 
   const status = await runPublishedImagesBump(

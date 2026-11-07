@@ -99,6 +99,18 @@ test('it flags a changed sandbox image, ignoring nixie and nixie-web', () => {
   ).toStrictEqual(['sandbox-images-changed']);
 });
 
+test('it flags no sandbox image change when only the nixie-backup image changes, which the bump pins itself', () => {
+  expect(
+    collectNixieReleaseFlags({
+      pinned:
+        '## Images\n\n- `ghcr.io/zgeoff/nixie-backup@sha256:aaa`\n- `ghcr.io/zgeoff/sandbox-node@sha256:bbb`\n',
+      target:
+        '## Migrations\n\nThis release adds no migration since v0.31.0.\n\n## Images\n\n- `ghcr.io/zgeoff/nixie-backup@sha256:ccc`\n- `ghcr.io/zgeoff/sandbox-node@sha256:bbb`\n',
+      between: [],
+    }),
+  ).toStrictEqual([]);
+});
+
 test('it flags both for a release with both', () => {
   expect(
     collectNixieReleaseFlags({

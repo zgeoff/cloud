@@ -1,25 +1,23 @@
 import type { input } from '@pulumi/kubernetes/types';
 
-interface NixieBackupPodInputs {
+export interface NixieBackupPodInputs {
   readonly image: string;
-  readonly nixieImage: string;
   readonly claim: string;
-  readonly scriptConfigMap: string;
-  readonly configMap: string;
   readonly envSecret: string;
   readonly pullSecret: string;
 }
 
-// Only nixie's own backup command reads nixie's databases (nixie's
-// docs/architecture/deployment/host-commands.md), so restic uploads the copy it leaves in /tmp and
-// never mounts nixie's volume.
+// nixie stages its backup sets in this folder of its data volume
+const stagingFolder = 'backup';
+
+// The kubelet creates a missing subPath as root, which nixie's user cannot write, so an init
+// container with no credentials creates the staging folder first, as nixie's user.
 export function buildNixieBackupPodSpec(inputs: NixieBackupPodInputs) {
   return {
-    // nixie's backup command refuses a directory that exists, and a container restarted in place
-    // keeps the emptyDir that holds the failed attempt's directory, so each retry is a new pod
+    // a restarted container skips the set whose failed receipt it wrote, and exits 0
     restartPolicy: 'Never',
 
-    // nixie's own user, so nixie's command opens its files
+    // nixie's own user, so nixie can remove the receipts and copies the job leaves
     securityContext: {
       runAsNonRoot: true,
       runAsUser: 10_001,
@@ -31,45 +29,44 @@ export function buildNixieBackupPodSpec(inputs: NixieBackupPodInputs) {
     imagePullSecrets: [{ name: inputs.pullSecret }],
     initContainers: [
       {
-        name: 'copy',
-        image: inputs.nixieImage,
-        command: ['nixie', 'backup', '--to', '/tmp/nixie-backup'],
-        volumeMounts: [
-          { name: 'state', mountPath: '/data' },
-          {
-            name: 'config',
-            mountPath: '/etc/nixie/config.yaml',
-            subPath: 'config.yaml',
-            readOnly: true,
-          },
-          { name: 'tmp', mountPath: '/tmp' },
-        ],
-        resources: { requests: { cpu: '50m', memory: '128Mi' }, limits: { memory: '512Mi' } },
-        securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ['ALL'] } },
+        name: 'staging',
+        image: inputs.image,
+        command: ['mkdir', '-p', '-m', '0700', `/state/${stagingFolder}`],
+        volumeMounts: [{ name: 'state', mountPath: '/state' }],
+        resources: { requests: { cpu: '10m', memory: '16Mi' }, limits: { memory: '32Mi' } },
+        securityContext: {
+          allowPrivilegeEscalation: false,
+          readOnlyRootFilesystem: true,
+          capabilities: { drop: ['ALL'] },
+        },
       },
     ],
     containers: [
       {
         name: 'backup',
         image: inputs.image,
-
-        // the image's own entrypoint backs up the atc gateway
-        command: ['/bin/sh', '/opt/nixie-backup/backup.sh'],
-        args: ['backup'],
-        env: [{ name: 'HOME', value: '/tmp' }],
+        args: ['run'],
+        env: [
+          { name: 'NIXIE_BACKUP_STAGING_DIR', value: '/backup' },
+          { name: 'HOME', value: '/tmp' },
+        ],
         envFrom: [{ secretRef: { name: inputs.envSecret } }],
         volumeMounts: [
-          { name: 'script', mountPath: '/opt/nixie-backup', readOnly: true },
+          { name: 'state', mountPath: '/backup', subPath: stagingFolder },
           { name: 'tmp', mountPath: '/tmp' },
         ],
-        resources: { requests: { cpu: '50m', memory: '64Mi' }, limits: { memory: '256Mi' } },
-        securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ['ALL'] } },
+
+        // restic's prune holds the repo's index in memory
+        resources: { requests: { cpu: '50m', memory: '128Mi' }, limits: { memory: '512Mi' } },
+        securityContext: {
+          allowPrivilegeEscalation: false,
+          readOnlyRootFilesystem: true,
+          capabilities: { drop: ['ALL'] },
+        },
       },
     ],
     volumes: [
       { name: 'state', persistentVolumeClaim: { claimName: inputs.claim } },
-      { name: 'config', configMap: { name: inputs.configMap } },
-      { name: 'script', configMap: { name: inputs.scriptConfigMap } },
       { name: 'tmp', emptyDir: {} },
     ],
   } satisfies input.core.v1.PodSpec;

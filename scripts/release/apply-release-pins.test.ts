@@ -2,9 +2,11 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { buildRealProgramHandler } from '../test-utils/build-real-program-handler.ts';
 import { buildStubBunInstall } from '../test-utils/build-stub-bun-install.ts';
 import { buildStubReleaseDocker } from '../test-utils/build-stub-release-docker.ts';
 import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
+import { createRestoreJobFiles } from '../test-utils/create-restore-job-files.ts';
 import { getReleaseRecord } from '../test-utils/get-release-record.ts';
 import { applyReleasePins } from './apply-release-pins.ts';
 
@@ -20,6 +22,8 @@ async function setupTest() {
       'images/agent',
       'images/atc-gateway',
       'infra',
+      'deploy/nixie',
+      'deploy/files',
       'scripts/release',
     ].map((directory) => mkdir(join(root, directory), { recursive: true })),
   );
@@ -28,6 +32,7 @@ async function setupTest() {
 
   return {
     root,
+    restoreJobsWriter: join(import.meta.dir, '../../infra/cluster/write-restore-jobs.ts'),
     nixImage: /^NIX_IMAGE='(?<image>[^']+)'$/mu.exec(nixImageFile)?.groups?.['image'] ?? '',
     checkout: join(import.meta.dir, '../..'),
     owner: `${process.getuid?.() ?? 0}:${process.getgid?.() ?? 0}`,
@@ -700,11 +705,36 @@ test('it pins an atc release in the real pin files and keeps every other line', 
   );
 });
 
-test('it pins both nixie images and the contract package at the release, then locks the package', async () => {
+test('it pins every nixie image and the contract package at the release, then writes the restore Job and locks the package', async () => {
   const ctx = await setupTest();
 
+  const stack = `config:
+  geoff-cloud:atcGateway:
+    image: ghcr.io/zgeoff/atc-gateway:5.0.0@sha256:${'1'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/atc-gateway-backup:5.0.0-r1@sha256:${'2'.repeat(64)}
+    publicURL: https://gateway.example.org
+    daemons:
+      harbour:
+        address: 100.64.0.9:8415
+        daemonID: 7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
+    defaultDaemon: harbour
+  geoff-cloud:nixie:
+    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}
+    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}
+`;
+
+  const pinned = stack
+    .replace(`nixie:0.7.0@sha256:${'a'.repeat(64)}`, `nixie:0.7.2@sha256:${'d'.repeat(64)}`)
+    .replace(`nixie-web:0.7.0@sha256:${'b'.repeat(64)}`, `nixie-web:0.7.2@sha256:${'e'.repeat(64)}`)
+    .replace(
+      `nixie-backup:0.7.0@sha256:${'c'.repeat(64)}`,
+      `nixie-backup:0.7.2@sha256:${'f'.repeat(64)}`,
+    );
+
   const files = {
-    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': stack,
+    ...(await createRestoreJobFiles(stack)),
     'package.json':
       '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0",\n    "zod": "4.6.7"\n  }\n}\n',
     'bun.lock':
@@ -718,17 +748,24 @@ test('it pins both nixie images and the contract package at the release, then lo
     ),
   );
 
+  const expected = await createRestoreJobFiles(pinned);
+
   const stub = buildStubRunner(
     buildStubBunInstall({
       lock: '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.2", "", {}, "sha512-new"],\n  },\n}\n',
     }),
+    buildRealProgramHandler(['bun']),
   );
 
   const applied = await applyReleasePins({
     record: getReleaseRecord('nixie'),
     version: '0.7.2',
     values: {
-      digests: { nixie: `sha256:${'d'.repeat(64)}`, 'nixie-web': `sha256:${'e'.repeat(64)}` },
+      digests: {
+        nixie: `sha256:${'d'.repeat(64)}`,
+        'nixie-web': `sha256:${'e'.repeat(64)}`,
+        'nixie-backup': `sha256:${'f'.repeat(64)}`,
+      },
     },
     root: ctx.root,
     run: stub.run,
@@ -738,20 +775,26 @@ test('it pins both nixie images and the contract package at the release, then lo
   });
 
   const tree = await Promise.all(
-    ['infra/Pulumi.prod.yaml', 'package.json', 'bun.lock'].map((path) =>
-      readFile(join(ctx.root, path), 'utf8'),
+    ['infra/Pulumi.prod.yaml', 'deploy/nixie/restore-job.yaml', 'package.json', 'bun.lock'].map(
+      (path) => readFile(join(ctx.root, path), 'utf8'),
     ),
   );
 
   expect(applied).toBeUndefined();
 
   expect(tree).toStrictEqual([
-    `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.2@sha256:${'d'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.2@sha256:${'e'.repeat(64)}\n`,
+    pinned,
+    expected['deploy/nixie/restore-job.yaml'],
     '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.2",\n    "zod": "4.6.7"\n  }\n}\n',
     '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.2", "", {}, "sha512-new"],\n  },\n}\n',
   ]);
 
   expect(stub.calls).toStrictEqual([
+    {
+      argv: ['bun', ctx.restoreJobsWriter, ctx.root],
+      stdin: '',
+      options: {},
+    },
     {
       argv: ['bun', 'install', '--lockfile-only'],
       stdin: '',
@@ -760,15 +803,32 @@ test('it pins both nixie images and the contract package at the release, then lo
   ]);
 
   expect(ctx.printOut).toHaveBeenCalledExactlyOnceWith(
-    'pinned nixie 0.7.2\npinned nixie-web 0.7.2\npinned nixie-contract 0.7.2\n',
+    'pinned nixie 0.7.2\npinned nixie-web 0.7.2\npinned nixie-backup 0.7.2\npinned nixie-contract 0.7.2\n',
   );
 });
 
 test('it checks the bun lock through the given reader', async () => {
   const ctx = await setupTest();
 
+  const stack = `config:
+  geoff-cloud:atcGateway:
+    image: ghcr.io/zgeoff/atc-gateway:5.0.0@sha256:${'1'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/atc-gateway-backup:5.0.0-r1@sha256:${'2'.repeat(64)}
+    publicURL: https://gateway.example.org
+    daemons:
+      harbour:
+        address: 100.64.0.9:8415
+        daemonID: 7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
+    defaultDaemon: harbour
+  geoff-cloud:nixie:
+    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}
+    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}
+`;
+
   const files = {
-    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': stack,
+    ...(await createRestoreJobFiles(stack)),
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     'bun.lock':
       '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
@@ -785,13 +845,18 @@ test('it checks the bun lock through the given reader', async () => {
     buildStubBunInstall({
       lock: '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.2", "", {}, "sha512-new"],\n  },\n}\n',
     }),
+    buildRealProgramHandler(['bun']),
   );
 
   const applied = await applyReleasePins({
     record: getReleaseRecord('nixie'),
     version: '0.7.2',
     values: {
-      digests: { nixie: `sha256:${'d'.repeat(64)}`, 'nixie-web': `sha256:${'e'.repeat(64)}` },
+      digests: {
+        nixie: `sha256:${'d'.repeat(64)}`,
+        'nixie-web': `sha256:${'e'.repeat(64)}`,
+        'nixie-backup': `sha256:${'f'.repeat(64)}`,
+      },
     },
     root: ctx.root,
     run: stub.run,
@@ -807,8 +872,25 @@ test('it checks the bun lock through the given reader', async () => {
 test('it puts the pins, the lock and the pin table back when the package fails to install', async () => {
   const ctx = await setupTest();
 
+  const stack = `config:
+  geoff-cloud:atcGateway:
+    image: ghcr.io/zgeoff/atc-gateway:5.0.0@sha256:${'1'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/atc-gateway-backup:5.0.0-r1@sha256:${'2'.repeat(64)}
+    publicURL: https://gateway.example.org
+    daemons:
+      harbour:
+        address: 100.64.0.9:8415
+        daemonID: 7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
+    defaultDaemon: harbour
+  geoff-cloud:nixie:
+    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}
+    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}
+`;
+
   const files = {
-    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': stack,
+    ...(await createRestoreJobFiles(stack)),
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     'bun.lock':
       '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
@@ -823,13 +905,18 @@ test('it puts the pins, the lock and the pin table back when the package fails t
 
   const stub = buildStubRunner(
     buildStubBunInstall({ error: 'error: @heynixie/contract@0.7.2 failed to resolve' }),
+    buildRealProgramHandler(['bun']),
   );
 
   const applied = await applyReleasePins({
     record: getReleaseRecord('nixie'),
     version: '0.7.2',
     values: {
-      digests: { nixie: `sha256:${'d'.repeat(64)}`, 'nixie-web': `sha256:${'e'.repeat(64)}` },
+      digests: {
+        nixie: `sha256:${'d'.repeat(64)}`,
+        'nixie-web': `sha256:${'e'.repeat(64)}`,
+        'nixie-backup': `sha256:${'f'.repeat(64)}`,
+      },
     },
     root: ctx.root,
     run: stub.run,
@@ -847,11 +934,96 @@ test('it puts the pins, the lock and the pin table back when the package fails t
   expect(ctx.printOut).not.toHaveBeenCalled();
 });
 
+test('it puts the pins, the restore Job and the pin table back when the restore Job fails to write', async () => {
+  const ctx = await setupTest();
+
+  const stack = `config:
+  geoff-cloud:atcGateway:
+    image: ghcr.io/zgeoff/atc-gateway:5.0.0@sha256:${'1'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/atc-gateway-backup:5.0.0-r1@sha256:${'2'.repeat(64)}
+    publicURL: https://gateway.example.org
+    daemons:
+      harbour:
+        address: 100.64.0.9:8415
+        daemonID: 7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
+    defaultDaemon: harbour
+  geoff-cloud:nixie:
+    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}
+    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}
+`;
+
+  // the writer refuses a stack config with no atcGateway block, as one a person broke by hand
+  const files = {
+    'infra/Pulumi.prod.yaml': stack.replace(/ {2}geoff-cloud:atcGateway:\n(?: {4}.*\n)+/u, ''),
+    ...(await createRestoreJobFiles(stack)),
+    'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
+    'bun.lock':
+      '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
+    'scripts/release/release-pins.json': '{}\n',
+  };
+
+  await Promise.all(
+    Object.entries(files).map((entry: readonly [string, string]) =>
+      writeFile(join(ctx.root, entry[0]), entry[1]),
+    ),
+  );
+
+  const stub = buildStubRunner(buildRealProgramHandler(['bun']));
+
+  const applied = await applyReleasePins({
+    record: getReleaseRecord('nixie'),
+    version: '0.7.2',
+    values: {
+      digests: {
+        nixie: `sha256:${'d'.repeat(64)}`,
+        'nixie-web': `sha256:${'e'.repeat(64)}`,
+        'nixie-backup': `sha256:${'f'.repeat(64)}`,
+      },
+    },
+    root: ctx.root,
+    run: stub.run,
+    readText: ctx.readText,
+    env: {},
+    printOut: ctx.printOut,
+  });
+
+  const tree = await Promise.all(
+    Object.keys(files).map((path) => readFile(join(ctx.root, path), 'utf8')),
+  );
+
+  expect(applied).toStrictEqual(
+    new Error(
+      'write-restore-jobs: infra/Pulumi.prod.yaml sets no geoff-cloud:atcGateway or no geoff-cloud:nixie',
+    ),
+  );
+
+  expect(tree).toStrictEqual(Object.values(files));
+  expect(ctx.printOut).not.toHaveBeenCalled();
+});
+
 test('it refuses a lock that resolves the contract package at another version', async () => {
   const ctx = await setupTest();
 
+  const stack = `config:
+  geoff-cloud:atcGateway:
+    image: ghcr.io/zgeoff/atc-gateway:5.0.0@sha256:${'1'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/atc-gateway-backup:5.0.0-r1@sha256:${'2'.repeat(64)}
+    publicURL: https://gateway.example.org
+    daemons:
+      harbour:
+        address: 100.64.0.9:8415
+        daemonID: 7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
+    defaultDaemon: harbour
+  geoff-cloud:nixie:
+    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}
+    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'c'.repeat(64)}
+`;
+
   const files = {
-    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': stack,
+    ...(await createRestoreJobFiles(stack)),
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     'bun.lock':
       '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
@@ -868,13 +1040,18 @@ test('it refuses a lock that resolves the contract package at another version', 
     buildStubBunInstall({
       lock: '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.1", "", {}, "sha512-other"],\n  },\n}\n',
     }),
+    buildRealProgramHandler(['bun']),
   );
 
   const applied = await applyReleasePins({
     record: getReleaseRecord('nixie'),
     version: '0.7.2',
     values: {
-      digests: { nixie: `sha256:${'d'.repeat(64)}`, 'nixie-web': `sha256:${'e'.repeat(64)}` },
+      digests: {
+        nixie: `sha256:${'d'.repeat(64)}`,
+        'nixie-web': `sha256:${'e'.repeat(64)}`,
+        'nixie-backup': `sha256:${'f'.repeat(64)}`,
+      },
     },
     root: ctx.root,
     run: stub.run,

@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'bun:test';
+import { join } from 'node:path';
 import { server } from '../mocks/node.ts';
 import { buildRealProgramHandler } from '../test-utils/build-real-program-handler.ts';
 import { buildStubBunInstall } from '../test-utils/build-stub-bun-install.ts';
@@ -8,6 +9,7 @@ import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
 import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
 import { createCloudCheckout } from '../test-utils/create-cloud-checkout.ts';
 import { createNPMTarball } from '../test-utils/create-npm-tarball.ts';
+import { createRestoreJobFiles } from '../test-utils/create-restore-job-files.ts';
 import { runReleaseBump } from './run-release-bump.ts';
 
 async function setupTest() {
@@ -234,15 +236,32 @@ test('it locks the imp commit with the github token by name, never in an argv', 
   expect(flake).toBe('imp = {\n      url = "github:zgeoff/impz/c5bea940";\n    };');
 });
 
-test('it flags a nixie bump with the migrations of a release between', async () => {
+test('it flags a nixie bump with the migrations of a release between, with the restore Job written beside the pins', async () => {
   const ctx = await setupTest();
+
+  const stack = `config:
+  geoff-cloud:atcGateway:
+    image: ghcr.io/zgeoff/atc-gateway:5.0.0@sha256:${'1'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/atc-gateway-backup:5.0.0-r1@sha256:${'2'.repeat(64)}
+    publicURL: https://gateway.example.org
+    daemons:
+      harbour:
+        address: 100.64.0.9:8415
+        daemonID: 7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
+    defaultDaemon: harbour
+  geoff-cloud:nixie:
+    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}
+    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'0'.repeat(64)}
+`;
 
   const checkout = await createCloudCheckout({
     'scripts/release/release-pins.json': '{}\n',
-    'infra/Pulumi.prod.yaml': `  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'infra/Pulumi.prod.yaml': stack,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     'bun.lock':
       '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
+    ...(await createRestoreJobFiles(stack)),
   });
 
   const stub = buildStubRunner(
@@ -254,7 +273,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
         'zgeoff/nixie': [
           {
             tag: 'v0.7.2',
-            notes: `## Migrations\n\nThis release adds no migration since v0.7.1.\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie-fetch@sha256:${'c'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie@sha256:${'d'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'e'.repeat(64)}\`\n`,
+            notes: `## Migrations\n\nThis release adds no migration since v0.7.1.\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie-fetch@sha256:${'c'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie@sha256:${'d'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'e'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-backup@sha256:${'f'.repeat(64)}\`\n`,
           },
           {
             tag: 'v0.7.1',
@@ -263,18 +282,19 @@ test('it flags a nixie bump with the migrations of a release between', async () 
           },
           {
             tag: 'v0.7.0',
-            notes: `## Migrations\n\nThis release adds no migration since v0.6.2.\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie-fetch@sha256:${'c'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie@sha256:${'a'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'b'.repeat(64)}\`\n`,
+            notes: `## Migrations\n\nThis release adds no migration since v0.6.2.\n\n## Images\n\n- \`ghcr.io/zgeoff/nixie-fetch@sha256:${'c'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie@sha256:${'a'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-web@sha256:${'b'.repeat(64)}\`\n- \`ghcr.io/zgeoff/nixie-backup@sha256:${'0'.repeat(64)}\`\n`,
           },
           { tag: 'v0.6.2' },
         ],
       },
     }),
     buildRealProgramHandler(['git'], checkout.env),
+    buildRealProgramHandler(['bun']),
   );
 
   const status = await runReleaseBump(
     { cwd: checkout.clone, env: checkout.env, run: stub.run, ...ctx },
-    ['nixie', '0.7.2', '0.7.0', '0.7.0', '0.7.0'],
+    ['nixie', '0.7.2', '0.7.0', '0.7.0', '0.7.0', '0.7.0'],
   );
 
   const stat = await checkout.git([
@@ -294,14 +314,16 @@ test('it flags a nixie bump with the migrations of a release between', async () 
   expect(status).toBe(0);
 
   expect(ctx.printOut.mock.calls).toStrictEqual([
-    ['pinned nixie 0.7.2\npinned nixie-web 0.7.2\npinned nixie-contract 0.7.2\n'],
+    [
+      'pinned nixie 0.7.2\npinned nixie-web 0.7.2\npinned nixie-backup 0.7.2\npinned nixie-contract 0.7.2\n',
+    ],
     ['https://github.com/zgeoff/cloud/pull/200\n'],
   ]);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([]);
 
   expect(stat).toBe(
-    'bun.lock                          |  2 +-\n infra/Pulumi.prod.yaml            |  4 ++--\n package.json                      |  2 +-\n scripts/release/release-pins.json | 14 +++++++++++++-\n 4 files changed, 17 insertions(+), 5 deletions(-)',
+    'bun.lock                          |  2 +-\n deploy/nixie/restore-job.yaml     |  2 +-\n infra/Pulumi.prod.yaml            |  6 +++---\n package.json                      |  2 +-\n scripts/release/release-pins.json | 18 +++++++++++++++++-\n 5 files changed, 23 insertions(+), 7 deletions(-)',
   );
 
   expect(manifest).toBe('{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.2"\n  }\n}');
@@ -318,6 +340,10 @@ test('it flags a nixie bump with the migrations of a release between', async () 
     ['gh release view v0.7.0 -R zgeoff/nixie --json body', ''],
     ['gh release view v0.7.2 -R zgeoff/nixie --json body', ''],
     ['gh release view v0.7.1 -R zgeoff/nixie --json body', ''],
+    [
+      `bun ${join(import.meta.dir, '../../infra/cluster/write-restore-jobs.ts')} ${checkout.clone}`,
+      '',
+    ],
     ['bun install --lockfile-only', ''],
     [
       'gh pr list --repo zgeoff/cloud --head release-check/nixie --state open --json number,url,autoMergeRequest,labels,headRefOid,isCrossRepository',
@@ -337,7 +363,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
     ],
     [
       'gh pr create --repo zgeoff/cloud --base main --head release-check/nixie --title chore(nixie): bump nixie to 0.7.2 --body-file - --label update:patch,migrations,needs-review',
-      'Bumps nixie to [0.7.2](https://github.com/zgeoff/nixie/releases/tag/v0.7.2). The release check opened this pull request.\n\n| Pin | From | To |\n| --- | --- | --- |\n| nixie (`infra/Pulumi.prod.yaml`) | 0.7.0 | 0.7.2 |\n| nixie-web (`infra/Pulumi.prod.yaml`) | 0.7.0 | 0.7.2 |\n| the nixie contract package (`package.json`) | 0.7.0 | 0.7.2 |\n\nIt waits for a review, because:\n\n- a release in the bump adds database migrations, which a revert does not undo.\n\nAfter the merge: The `Deploy prod` workflow applies the stack config once CI passes on main, unless its guard holds the plan (`docs/runbooks/prod-apply.md`). Check the deploy (`docs/runbooks/nixie.md`).\n',
+      'Bumps nixie to [0.7.2](https://github.com/zgeoff/nixie/releases/tag/v0.7.2). The release check opened this pull request.\n\n| Pin | From | To |\n| --- | --- | --- |\n| nixie (`infra/Pulumi.prod.yaml`) | 0.7.0 | 0.7.2 |\n| nixie-web (`infra/Pulumi.prod.yaml`) | 0.7.0 | 0.7.2 |\n| the nixie-backup image (`infra/Pulumi.prod.yaml`) | 0.7.0 | 0.7.2 |\n| the nixie contract package (`package.json`) | 0.7.0 | 0.7.2 |\n\nIt waits for a review, because:\n\n- a release in the bump adds database migrations, which a revert does not undo.\n\nAfter the merge: The `Deploy prod` workflow applies the stack config once CI passes on main, unless its guard holds the plan (`docs/runbooks/prod-apply.md`). Check the deploy (`docs/runbooks/nixie.md`).\n',
     ],
   ]);
 });
@@ -586,7 +612,7 @@ test('it fails without a pull request when the release list misses the pinned re
 
   const status = await runReleaseBump(
     { cwd: '/nonexistent/clone', env: {}, run: stub.run, ...ctx },
-    ['nixie', '0.7.2', '0.5.0', '0.5.0', '0.5.0'],
+    ['nixie', '0.7.2', '0.5.0', '0.5.0', '0.5.0', '0.5.0'],
   );
 
   expect(status).toBe(1);

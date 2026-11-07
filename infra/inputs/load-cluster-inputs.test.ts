@@ -112,7 +112,7 @@ test('it checks the Connect credentials before the gateway, so a missing file fa
   );
 });
 
-test("it runs nixie's backup in the gateway's backup image, pulled with the gateway's credential", () => {
+test("it runs nixie's backup in nixie's own backup image, pulled with the gateway's credential", () => {
   const config = buildMockATCGatewayConfig({
     backupImage:
       'ghcr.io/zgeoff/atc-gateway-backup:4.0.0-r1@sha256:2222222222222222222222222222222222222222222222222222222222222222',
@@ -130,6 +130,8 @@ test("it runs nixie's backup in the gateway's backup image, pulled with the gate
           'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
         webImage:
           'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+        backupImage:
+          'ghcr.io/zgeoff/nixie-backup:0.1.0@sha256:5e0c1d5f3c7e2a9b8d4f6a1c3e5b7d9f0a2c4e6b8d0f1a3c5e7b9d1f3a5c7e9b',
         hostname: 'nixie.geoff.cloud',
       }),
     }),
@@ -143,6 +145,7 @@ test("it runs nixie's backup in the gateway's backup image, pulled with the gate
       NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
       CLOUDFLARE_API_TOKEN: 'cf-token',
       NIXIE_RESTIC_PASSWORD: 'p'.repeat(32),
+      NIXIE_KEY_RESTIC_PASSWORD: 'k'.repeat(32),
       NIXIE_R2_ACCESS_KEY_ID: 'a'.repeat(32),
       NIXIE_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
       NIXIE_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
@@ -158,7 +161,7 @@ test("it runs nixie's backup in the gateway's backup image, pulled with the gate
   expect(inputs?.nixie?.backup?.pullCredential).toBe(inputs?.atcGateway?.secrets.pullCredential);
 
   expect(inputs?.nixie?.backup?.image).toBe(
-    'ghcr.io/zgeoff/atc-gateway-backup:4.0.0-r1@sha256:2222222222222222222222222222222222222222222222222222222222222222',
+    'ghcr.io/zgeoff/nixie-backup:0.1.0@sha256:5e0c1d5f3c7e2a9b8d4f6a1c3e5b7d9f0a2c4e6b8d0f1a3c5e7b9d1f3a5c7e9b',
   );
 });
 

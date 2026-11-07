@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { atcGatewayConfigSchema } from '../inputs/index.ts';
+import { atcGatewayConfigSchema, pinnedImagePattern } from '../inputs/index.ts';
 import { buildATCGatewayBackupPodSpec } from './build-atc-gateway-backup-pod-spec.ts';
 import { buildFilesBackupPodSpec } from './build-files-backup-pod-spec.ts';
 import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
@@ -54,16 +54,16 @@ async function applyRestoreJobs(
   parsed: RestoreJobsArgs,
   options: Readonly<WriteRestoreJobsOptions>,
 ): Promise<number> {
-  const backupImage = await loadBackupImage(parsed.root);
+  const backupImages = await loadBackupImages(parsed.root);
 
-  if (typeof backupImage !== 'string') {
-    options.printErr(`write-restore-jobs: ${backupImage.error}\n`);
+  if ('error' in backupImages) {
+    options.printErr(`write-restore-jobs: ${backupImages.error}\n`);
 
     return 1;
   }
 
   const outcomes = await Promise.all(
-    buildRestoreJobFiles(backupImage).map((job) =>
+    buildRestoreJobFiles(backupImages).map((job) =>
       applyRestoreJob({
         root: parsed.root,
         check: parsed.check,
@@ -78,9 +78,19 @@ async function applyRestoreJobs(
   return Math.max(0, ...outcomes.map((outcome) => outcome.status));
 }
 
-const stackSchema = z.object({ config: z.object({ 'geoff-cloud:atcGateway': z.unknown() }) });
+const stackSchema = z.object({
+  config: z.object({ 'geoff-cloud:atcGateway': z.unknown(), 'geoff-cloud:nixie': z.unknown() }),
+});
 
-async function loadBackupImage(root: string): Promise<string | { readonly error: string }> {
+const nixieBackupSchema = z.object({ backupImage: z.string().regex(pinnedImagePattern) });
+
+// the image each restore Job fetches its snapshot with
+interface BackupImages {
+  readonly gateway: string;
+  readonly nixie: string;
+}
+
+async function loadBackupImages(root: string): Promise<BackupImages | { readonly error: string }> {
   const text = await readFile(join(root, stackFile), 'utf8').catch(() => null);
 
   if (text === null) {
@@ -90,14 +100,20 @@ async function loadBackupImage(root: string): Promise<string | { readonly error:
   const stack = stackSchema.safeParse(parseYAML(text));
 
   if (!stack.success) {
-    return { error: `${stackFile} sets no geoff-cloud:atcGateway` };
+    return { error: `${stackFile} sets no geoff-cloud:atcGateway or no geoff-cloud:nixie` };
   }
 
-  const config = atcGatewayConfigSchema.safeParse(stack.data.config['geoff-cloud:atcGateway']);
+  const gateway = atcGatewayConfigSchema.safeParse(stack.data.config['geoff-cloud:atcGateway']);
 
-  return config.success
-    ? config.data.backupImage
-    : { error: `${stackFile}'s geoff-cloud:atcGateway: ${z.prettifyError(config.error)}` };
+  if (!gateway.success) {
+    return { error: `${stackFile}'s geoff-cloud:atcGateway: ${z.prettifyError(gateway.error)}` };
+  }
+
+  const nixie = nixieBackupSchema.safeParse(stack.data.config['geoff-cloud:nixie']);
+
+  return nixie.success
+    ? { gateway: gateway.data.backupImage, nixie: nixie.data.backupImage }
+    : { error: `${stackFile}'s geoff-cloud:nixie: ${z.prettifyError(nixie.error)}` };
 }
 
 function parseYAML(text: string): unknown {
@@ -117,11 +133,11 @@ interface RestoreJobFile {
 }
 
 // each name must match the one its backup CronJob's claim, Secret or ConfigMap gets in the cluster
-function buildRestoreJobFiles(backupImage: string): readonly RestoreJobFile[] {
+function buildRestoreJobFiles(backupImages: BackupImages): readonly RestoreJobFile[] {
   return [
     {
       path: join('images', 'atc-gateway', 'restore-job.yaml'),
-      header: `${renderGeneratedNote('backup pod', 'infra/cluster/build-atc-gateway-backup-pod-spec.ts')}# One-off restore of the atc gateway's state. Stop the gateway first
+      header: `${renderGeneratedNote('backup pod', 'infra/cluster/build-atc-gateway-backup-pod-spec.ts', 'atcGateway.backupImage')}# One-off restore of the atc gateway's state. Stop the gateway first
 # (docs/runbooks/atc-gateway-backup-restore.md), then:
 #   ssh root@geoffcloud k3s kubectl create -f - < images/atc-gateway/restore-job.yaml
 # To list the snapshots instead, set args to ['ls']; to restore another snapshot, set SNAPSHOT.
@@ -131,7 +147,7 @@ function buildRestoreJobFiles(backupImage: string): readonly RestoreJobFile[] {
         namespace: 'atc',
         pod: toRestorePod(
           buildATCGatewayBackupPodSpec({
-            image: backupImage,
+            image: backupImages.gateway,
             claim: 'atc-gateway-state',
             envSecret: 'atc-gateway-backup',
             pullSecret: ghcrPullSecretName,
@@ -141,19 +157,21 @@ function buildRestoreJobFiles(backupImage: string): readonly RestoreJobFile[] {
     },
     {
       path: join('deploy', 'nixie', 'restore-job.yaml'),
-      header: `${renderGeneratedNote('restore pod', 'infra/cluster/build-nixie-restore-pod-spec.ts')}# One-off restore of nixie's data, from the nixie-backup CronJob's repository: restic restores the
-# snapshot, and nixie's own restore command replaces nixie.db and keys.db with it. Stop nixie first
-# and create the Job with nixie's image in place of NIXIE_IMAGE (docs/runbooks/nixie-backup.md).
-# To list the snapshots instead, set the fetch container's args to ['ls'], and nixie's restore then
-# finds no backup and changes nothing; to restore another snapshot, set SNAPSHOT. The claim is
-# data-nixie-0, nixie's own; the restore test swaps in its scratch claim, nixie-restore-check. The
-# script, nixie's config and the Secret come from the CronJob's fixed-name ConfigMaps and Secret.
+      header: `${renderGeneratedNote('restore pod', 'infra/cluster/build-nixie-restore-pod-spec.ts', 'nixie.backupImage')}# One-off restore of nixie's data, from the nixie-backup CronJob's data and key repositories:
+# restic restores keys.db from the key repository's one snapshot and nixie.db from the data snapshot
+# of the same backup set, and nixie's own restore command replaces nixie's databases with them. Stop
+# nixie first and create the Job with nixie's image in place of NIXIE_IMAGE
+# (docs/runbooks/nixie-backup.md). To list the snapshots instead, set the fetch container's args to
+# ['ls'], and nixie's restore then finds no backup and changes nothing; to restore an older nixie.db,
+# set SNAPSHOT to its data snapshot's ID. The claim is data-nixie-0, nixie's own; the restore test
+# swaps in its scratch claim, nixie-restore-check. The script, nixie's config and the Secret come
+# from the CronJob's fixed-name ConfigMaps and Secret.
 `,
       job: buildRestoreJob({
         name: 'nixie',
         namespace: 'nixie',
         pod: buildNixieRestorePodSpec({
-          image: backupImage,
+          image: backupImages.nixie,
           nixieImage: 'NIXIE_IMAGE',
           claim: 'data-nixie-0',
           scriptConfigMap: 'nixie-backup-script',
@@ -165,7 +183,7 @@ function buildRestoreJobFiles(backupImage: string): readonly RestoreJobFile[] {
     },
     {
       path: join('deploy', 'files', 'restore-job.yaml'),
-      header: `${renderGeneratedNote('backup pod', 'infra/cluster/build-files-backup-pod-spec.ts')}# One-off restore of the files service's volume, from the files-backup CronJob's repository. Stop
+      header: `${renderGeneratedNote('backup pod', 'infra/cluster/build-files-backup-pod-spec.ts', 'atcGateway.backupImage')}# One-off restore of the files service's volume, from the files-backup CronJob's repository. Stop
 # the service first (docs/runbooks/files.md), then:
 #   ssh root@geoffcloud k3s kubectl create -f - < deploy/files/restore-job.yaml
 # To list the snapshots instead, set args to ['ls']; to restore another snapshot, set SNAPSHOT. The
@@ -177,7 +195,7 @@ function buildRestoreJobFiles(backupImage: string): readonly RestoreJobFile[] {
         namespace: 'files',
         pod: toRestorePod(
           buildFilesBackupPodSpec({
-            image: backupImage,
+            image: backupImages.gateway,
             claim: 'data-files-0',
             scriptConfigMap: 'files-backup-script',
             envSecret: 'files-backup',
@@ -189,9 +207,13 @@ function buildRestoreJobFiles(backupImage: string): readonly RestoreJobFile[] {
   ];
 }
 
-function renderGeneratedNote(pod: 'backup pod' | 'restore pod', builder: string): string {
+function renderGeneratedNote(
+  pod: 'backup pod' | 'restore pod',
+  builder: string,
+  imageKey: 'atcGateway.backupImage' | 'nixie.backupImage',
+): string {
   return `# Generated by \`bun run write:restore-job\` from the ${pod} in
-# ${builder} and the stack config's atcGateway.backupImage: never
+# ${builder} and the stack config's ${imageKey}: never
 # edit it by hand. \`bun run check:restore-job\` fails when it differs.
 #
 `;

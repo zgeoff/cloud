@@ -37,6 +37,10 @@
     "version": "0.67.0",
     "digest": "sha256:af16092f2005b3327d71fb62b23d73c3ad4332d29c7ecdc17e13e521ff97e8ff"
   },
+  "nixie-backup": {
+    "version": "0.67.0",
+    "digest": "sha256:2547e32df3b41afc1315f3ec44901597a0220037cae29d15305cf79abdcc27b8"
+  },
   "nixie-contract": {
     "version": "0.67.0"
   },
