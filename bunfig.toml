@@ -24,6 +24,7 @@ minimumReleaseAgeExcludes = [
   "@zgeoff/diet",
   "@zgeoff/format-codemod",
   "@zgeoff/oxlint-config",
+  "@zgeoff/rig",
   "@zgeoff/skill-gate",
   "@zgeoff/std",
 ]
@@ -40,4 +41,6 @@ preload = [
   "./infra/test-utils/seed-faker.ts",
   "./scripts/mocks/register-mock-server.ts",
 ]
+# rig's ignore patterns replace this list in the unit run, so the `test` script names these folders
+# again
 pathIgnorePatterns = ["workers/**", "packages/preview/**", "packages/files/**", "e2e/**"]
