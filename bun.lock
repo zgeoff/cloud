@@ -18,6 +18,7 @@
         "@zgeoff/bun-test-extended": "0.2.3",
         "@zgeoff/cloud-preview": "workspace:*",
         "@zgeoff/cloud-topology": "workspace:*",
+        "@zgeoff/diet": "0.2.1",
         "@zgeoff/format-codemod": "0.3.5",
         "@zgeoff/oxlint-config": "0.8.5",
         "@zgeoff/skill-gate": "0.2.22",
@@ -669,6 +670,8 @@
     "@zgeoff/cloud-preview": ["@zgeoff/cloud-preview@workspace:packages/preview"],
 
     "@zgeoff/cloud-topology": ["@zgeoff/cloud-topology@workspace:packages/topology"],
+
+    "@zgeoff/diet": ["@zgeoff/diet@0.2.1", "", { "bin": { "diet": "diet.sh" } }, "sha512-8xzPM1AlurcFcXt3aDdyGblvEtdtlDP2CAie3lf/AVGWkK4y1Qz40RGz22fl9Ad9SioEb+9EJHUPGshEtt7fjw=="],
 
     "@zgeoff/format-codemod": ["@zgeoff/format-codemod@0.3.5", "", { "dependencies": { "gunshi": "1.0.0-rc.1", "oxc-parser": "0.155.0" }, "bin": { "format-codemod": "dist/cli.js" } }, "sha512-aVHu3c5pYTISM68OL5fPjo2Go5DwemqB70chqFLsOnjlDJsEYBB2jdzyufv8QxrOwtTishnMV/v7EexmLZhIyQ=="],
 
