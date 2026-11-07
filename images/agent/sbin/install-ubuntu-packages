@@ -28,7 +28,7 @@ fi
 snapshot_uri=$1
 shift
 # the base image's Ubuntu release names the suites, so a base on a new release needs no edit here
-codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
+codename=$(sed -n 's/^VERSION_CODENAME=//p' /etc/os-release)
 
 # after ubuntu.sources in apt's order, so apt tries the live archive's copy of a file first
 sources=/etc/apt/sources.list.d/zz-ubuntu-snapshot.sources

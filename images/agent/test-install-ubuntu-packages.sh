@@ -357,8 +357,8 @@ EOF
 setup_test() {
   local image="$1"
   container="install-ubuntu-packages-$(basename "$tree")"
-  codename="$(docker run --rm --network none --entrypoint sh "$image" -c \
-    '. /etc/os-release && echo "$VERSION_CODENAME"')"
+  codename="$(docker run --rm --network none --entrypoint sed "$image" \
+    -n 's/^VERSION_CODENAME=//p' /etc/os-release)"
   mkdir -p "$tree/archive"
   : > "$tree/faults"
   docker run -d --name "$container" --network none \
