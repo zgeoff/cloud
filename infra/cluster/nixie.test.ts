@@ -1,5 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { output, runtime } from '@pulumi/pulumi';
+import { z } from 'zod';
 import { buildStubResourceMocks } from '../test-utils/build-stub-resource-mocks.ts';
 import { createClusterProvider } from './create-cluster-provider.ts';
 import { createNixie } from './nixie.ts';
@@ -12,6 +13,12 @@ async function setupTest() {
       'acme:index/certificate:Certificate::nixie': {
         certificatePem: 'leaf-pem',
         issuerPem: 'issuer-pem',
+      },
+      'kubernetes:core/v1:Secret::nixie-secrets': {
+        metadata: { name: 'nixie-secrets-5e6f7a8b', namespace: 'nixie' },
+      },
+      'kubernetes:core/v1:Secret::nixie-sandbox-images-secrets': {
+        metadata: { name: 'nixie-sandbox-images-secrets-1a2b3c4d', namespace: 'nixie' },
       },
     },
   );
@@ -59,6 +66,56 @@ test('it registers none of the config, the definitions key and the Secret that n
     'kubernetes:core/v1:Secret::nixie-definitions-key',
     'kubernetes:core/v1:Secret::nixie-secrets',
   ]);
+});
+
+test("it mounts the sandbox image Job's own copy of nixie's Secret in the Job", async () => {
+  const ctx = await setupTest();
+
+  createNixie(
+    ctx.cluster,
+    {
+      config: {
+        image:
+          'ghcr.io/zgeoff/nixie:0.43.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
+        webImage:
+          'ghcr.io/zgeoff/nixie-web:0.43.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        hostname: 'chat.example.test',
+      },
+      secrets: {
+        ageHostKey: output('AGE-SECRET-KEY-FAKE0FOR0TESTS'),
+        definitionsDeployKey: output('fake-deploy-key'),
+        dnsToken: output('fake-dns-token'),
+      },
+    },
+    { zoneID: output('zone'), kubeconfig: output('kubeconfig-for-tests') },
+  );
+
+  await ctx.stub.whenRegistered('command:local:Command::nixie-sandbox-images');
+
+  const command = z
+    .object({ environment: z.object({ NIXIE_SANDBOX_IMAGES: z.string() }) })
+    .parse(ctx.stub.inputs.get('command:local:Command::nixie-sandbox-images'));
+
+  const payload = z
+    .object({ job: z.string() })
+    .parse(JSON.parse(command.environment.NIXIE_SANDBOX_IMAGES));
+
+  const volumeSchema = z.object({
+    name: z.string(),
+    secret: z.object({ secretName: z.string() }).optional(),
+  });
+
+  const podSpecSchema = z.object({ volumes: z.array(volumeSchema) });
+  const templateSchema = z.object({ spec: podSpecSchema });
+
+  const job = z
+    .object({ spec: z.object({ template: templateSchema }) })
+    .parse(JSON.parse(payload.job));
+
+  expect(job.spec.template.spec.volumes.find((volume) => volume.name === 'secrets')).toStrictEqual({
+    name: 'secrets',
+    secret: { secretName: 'nixie-sandbox-images-secrets-1a2b3c4d' },
+  });
 });
 
 test("it registers no copy of the config for the backup's restore while nixie's StatefulSet has not rolled", async () => {

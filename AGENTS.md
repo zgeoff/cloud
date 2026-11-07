@@ -156,7 +156,7 @@ docs/
   - a failed drift check, for a manual dispatch
 
   A merge that changes only `deploy/nixie/secrets.sops.yaml` applies with no manual dispatch. Its
-  plan replaces two Secrets whose names Pulumi generates, because the infra code sets no
+  plan replaces nixie's Secrets, whose names Pulumi generates, because the infra code sets no
   `metadata.name` on them, and the guard passes a replace of such an object when only its data
   changed. The guard holds the same change to an object whose `metadata.name` the code sets, so it
   holds every change to `deploy/nixie/config.yaml`: nixie's backup job keeps a copy of that file in
