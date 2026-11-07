@@ -406,7 +406,7 @@ let
         '';
     }
     {
-      title = "it links geoffcloud a config.json whose target names the agent image and its atc, and whose claude signs in through the claude, github, linear and op-connect profiles of the broker and gets the pr-evidence file host address and token reference";
+      title = "it links geoffcloud a config.json whose target names the agent image and its atc, and whose claude signs in through the claude, github, linear and op-connect profiles of the broker and gets the pr-evidence file host address and the token path with no op:// prefix";
       script = ''
         jq -S . > expected <<'EOF'
         {
@@ -417,7 +417,7 @@ let
                 "profiles": ["claude", "github", "linear", "op-connect"]
               },
               "env": {
-                "PR_EVIDENCE_TOKEN_REF": "op://imp/files-agent-token/credential",
+                "PR_EVIDENCE_TOKEN_PATH": "imp/files-agent-token/credential",
                 "PR_EVIDENCE_URL": "https://files.geoff.cloud/api/files"
               }
             },
