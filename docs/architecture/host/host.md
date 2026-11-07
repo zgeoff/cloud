@@ -30,11 +30,13 @@ the VM's Secure Boot blocks, so Secure Boot stays off
 
 ### Read-ahead on the root disk
 
-The host holds the root disk, vda, at the small read-ahead that `services.disk-read-ahead` sets in
-the [host configuration](../../../nixos/hosts/geoffcloud/configuration.nix). A udev rule sets it at
-each add or change event of vda. The rule acts only on a device event, so the `disk-read-ahead` unit
-also sets it at boot and at a switch that adds or changes the unit. Left alone, the kernel derives a
-read-ahead for vda from the optimal I/O size the disk reports, as large as a journal window.
+The host holds the root disk, vda, at the small read-ahead that is the default of the
+[`disk-read-ahead` module](../../../nixos/modules/disk-read-ahead.nix), which the
+[host configuration](../../../nixos/hosts/geoffcloud/configuration.nix) enables for vda. A udev rule
+sets it at each add or change event of vda. The rule acts only on a device event, so the
+`disk-read-ahead` unit also sets it at boot and at a switch that adds or changes the unit. Left
+alone, the kernel derives a read-ahead for vda from the optimal I/O size the disk reports, as large
+as a journal window.
 
 The value matters because of how the kernel serves a page fault in a mapped file. It reads up to the
 read-ahead size around the faulting page, and it charges every page it reads to the memory cgroup of
