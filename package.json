@@ -110,7 +110,7 @@
     "ci:write-files-image-context": "bash scripts/write-files-image-context.sh",
     "ci:publish-files-image": "bash scripts/publish-files-image.sh",
     "ci:pin-atc-gateway-images": "bun scripts/release/run-published-images-bump.ts atc-gateway-images",
-    "check:docs": "chex length links skill"
+    "check:docs": "chex length links readmes skill"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
