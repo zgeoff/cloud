@@ -85,7 +85,17 @@ export function buildMetricsValues(grafana: GrafanaInputs): Record<string, unkno
 
       // Grafana's SQLite database holds its service accounts, which the chart's emptyDir loses
       // with the pod; Recreate keeps two pods off the one database file during a rollout
-      persistence: { enabled: true, size: '1Gi' },
+      persistence: {
+        enabled: true,
+        size: '1Gi',
+
+        // keeps the volume when the claim is deleted
+        storageClassName: 'local-path-retain',
+
+        // Pulumi's Chart runs the chart's lookup against the cluster, so a bound claim would gain
+        // its volumeName, and Pulumi replaces a claim on any change to its spec
+        lookupVolumeName: false,
+      },
       deploymentStrategy: { type: 'Recreate' },
       additionalDataSources: [{ name: 'Loki', type: 'loki', url: lokiURL, access: 'proxy' }],
 

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Test for the kube-prometheus-stack chart as the repo configures it: the pinned Helm renders the
 # chart that metrics-chart.ts pins with the values build-metrics-values.ts builds, as Pulumi's Chart
-# does. The case checks the Grafana Deployment's rollout strategy, which server-side apply merges
-# into the live Deployment's: the apply owns only the strategy fields that the chart renders.
+# does. One case checks the Grafana Deployment's rollout strategy, which server-side apply merges
+# into the live Deployment's: the apply owns only the strategy fields that the chart renders. The
+# other checks the spec of Grafana's volume claim, whose every change makes Pulumi replace it.
 #
 #   bash scripts/run-shell-suites.sh alert-rules
 #   CASE='strategy' bash infra/observability/test-metrics-chart.sh
@@ -77,6 +78,27 @@ it_renders_the_grafana_deployment_strategy_as_recreate_with_no_rolling_update_bl
   ")
   diff - "$tree/strategy.json" << 'EOF'
 {"type":"Recreate"}
+EOF
+}
+
+it_renders_the_grafana_claim_on_the_retaining_class_with_no_volume_name() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  run_helm "$tree" template kube-prometheus-stack "/work/chart/$(ls "$tree/chart")" \
+    --namespace observability -f /work/values.json \
+    --show-only charts/grafana/templates/pvc.yaml > "$tree/pvc.yaml" 2> "$tree/err" || status=$?
+
+  assert_equals 0 "$status" 'helm template exit'
+  diff /dev/null "$tree/err"
+  (cd "$repo" && run_in_case "$tree" bun -e "
+    const tree = process.env.TREE ?? '';
+    const claim = Bun.YAML.parse(await Bun.file(tree + '/pvc.yaml').text());
+    await Bun.write(tree + '/claim.json', JSON.stringify(claim.spec) + '\n');
+  ")
+  diff - "$tree/claim.json" << 'EOF'
+{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"1Gi"}},"storageClassName":"local-path-retain"}
 EOF
 }
 
