@@ -11,7 +11,7 @@
 
 # imp-base, pinned to the multi-arch index digest. Check a bump with:
 #   gh attestation verify oci://ghcr.io/zgeoff/imp-base:X.Y.Z --repo zgeoff/impz
-FROM ghcr.io/zgeoff/imp-base:6.6.1@sha256:baf64e2927bcc6debc7021193b30ae7e21db1c6c444f9c89ad0090f3bff73345
+FROM ghcr.io/zgeoff/imp-base:6.8.0@sha256:7a69f3b8035b2d08ef0f8296b25d9b3ec0e80f6a37a0f0aeb42a9a3bf6a596b8
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -23,18 +23,18 @@ ARG DEBIAN_FRONTEND=noninteractive
 # the versions together; read the candidates with
 #   apt-get update --snapshot <stamp> && apt-cache --snapshot <stamp> policy <package>
 # docker-compose-plugin comes from Docker's repository, which keeps old builds.
-ARG UBUNTU_SNAPSHOT=20261021T120000Z
-ARG GIT_VERSION=1:2.43.0-1ubuntu7.4
-ARG BASH_VERSION=5.2.21-2ubuntu4
-ARG JQ_VERSION=1.7.1-3ubuntu0.24.04.2
-ARG BUILD_ESSENTIAL_VERSION=12.10ubuntu1
-ARG PKG_CONFIG_VERSION=1.8.1-2build1
-ARG PYTHON3_VERSION=3.12.3-0ubuntu2.1
-ARG PYTHON3_PIP_VERSION=24.0+dfsg-1ubuntu1.3
-ARG PYTHON_IS_PYTHON3_VERSION=3.11.4-1
-ARG UNZIP_VERSION=6.0-28ubuntu4.1
-ARG XZ_UTILS_VERSION=5.6.1+really5.4.5-1ubuntu0.4
-ARG DOCKER_COMPOSE_VERSION=5.6.0-1~ubuntu.24.04~noble
+ARG UBUNTU_SNAPSHOT=20261106T120000Z
+ARG GIT_VERSION=1:2.53.0-1ubuntu1.1
+ARG BASH_VERSION=5.3-2ubuntu1
+ARG JQ_VERSION=1.8.1-4ubuntu2
+ARG BUILD_ESSENTIAL_VERSION=12.12ubuntu2.26.04.2
+ARG PKG_CONFIG_VERSION=2.5.1-4
+ARG PYTHON3_VERSION=3.14.3-0ubuntu2
+ARG PYTHON3_PIP_VERSION=25.1.1+dfsg-1ubuntu2
+ARG PYTHON_IS_PYTHON3_VERSION=3.13.3-1+build1
+ARG UNZIP_VERSION=6.0-29ubuntu1
+ARG XZ_UTILS_VERSION=5.8.3-1ubuntu0.1
+ARG DOCKER_COMPOSE_VERSION=5.7.0-1~ubuntu.26.04~resolute
 
 # build-essential: native npm modules and Python wheels without a binary build
 # need a compiler. docker-compose-plugin: dev stacks use compose.
@@ -320,19 +320,19 @@ RUN curl -fsSL ${CURL_RETRY} -o /tmp/actionlint.tar.gz \
 # that the zip's deb.deps names no library the pins below lack.
 ARG CHROME_VERSION=156.0.8078.80
 ARG CHROME_SHA256=b711c720f774be355197f32edf37e0651418ba036d92446ee2da19ac017540a7
-ARG LIBNSS3_VERSION=2:3.98-1ubuntu0.2
-ARG LIBATK_BRIDGE_VERSION=2.52.0-1build1
-ARG LIBCUPS2_VERSION=2.4.7-1.2ubuntu7.14
-ARG LIBGBM1_VERSION=25.2.8-0ubuntu0.24.04.4
-ARG LIBASOUND2_VERSION=1.2.11-1ubuntu0.3
-ARG LIBXKBCOMMON0_VERSION=1.6.0-1build1
-ARG LIBXCOMPOSITE1_VERSION=1:0.4.5-1build3
-ARG LIBXDAMAGE1_VERSION=1:1.1.6-1build1
-ARG LIBXFIXES3_VERSION=1:6.0.0-2build1
-ARG LIBXRANDR2_VERSION=2:1.5.2-2build1
-ARG LIBPANGO_VERSION=1.52.1+ds-1build1
-ARG LIBCAIRO2_VERSION=1.18.0-3build1
-ARG FONTS_LIBERATION_VERSION=1:2.1.5-3
+ARG LIBNSS3_VERSION=2:3.120-1ubuntu2.2
+ARG LIBATK_BRIDGE_VERSION=2.60.4-0ubuntu0.1
+ARG LIBCUPS2_VERSION=2.4.16-1ubuntu1.3
+ARG LIBGBM1_VERSION=26.0.8-1ubuntu0.3
+ARG LIBASOUND2_VERSION=1.2.15.3-1ubuntu1.1
+ARG LIBXKBCOMMON0_VERSION=1.13.1-1
+ARG LIBXCOMPOSITE1_VERSION=1:0.4.6-1build1
+ARG LIBXDAMAGE1_VERSION=1:1.1.7-1
+ARG LIBXFIXES3_VERSION=1:6.0.0-2build2
+ARG LIBXRANDR2_VERSION=2:1.5.4-1build1
+ARG LIBPANGO_VERSION=1.57.0-1
+ARG LIBCAIRO2_VERSION=1.18.4-3
+ARG FONTS_LIBERATION_VERSION=1:2.1.5-3build1
 COPY sbin/install-ubuntu-packages /tmp/install-ubuntu-packages
 RUN /tmp/install-ubuntu-packages "https://snapshot.ubuntu.com/ubuntu/$UBUNTU_SNAPSHOT/" \
       "libnss3=$LIBNSS3_VERSION" "libatk-bridge2.0-0t64=$LIBATK_BRIDGE_VERSION" \
