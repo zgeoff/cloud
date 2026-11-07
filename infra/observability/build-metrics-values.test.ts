@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildMetricsValues } from './build-metrics-values.ts';
 
-test("it disables the chart's TargetDown, drops the kubelet's copy of the control plane's series, picks up every monitor and rule, and serves Grafana on its node port from a database on a volume, rolling out with no surge pod through a rolling update block of its own", () => {
+test("it disables the chart's TargetDown, drops the kubelet's copy of the control plane's series, picks up every monitor and rule, and serves Grafana on its node port from a database on a retained volume that one pod at a time holds, with a claim that never takes its volume's name", () => {
   const password = output('grafana-admin-password');
 
   expect(buildMetricsValues({ password, nodePort: 30_300 })).toStrictEqual({
@@ -54,11 +54,13 @@ test("it disables the chart's TargetDown, drops the kubelet's copy of the contro
       adminPassword: password,
       service: { type: 'NodePort', nodePort: 30_300 },
       resources: { requests: { cpu: '50m', memory: '256Mi' }, limits: { memory: '768Mi' } },
-      persistence: { enabled: true, size: '1Gi' },
-      deploymentStrategy: {
-        type: 'RollingUpdate',
-        rollingUpdate: { maxSurge: 0, maxUnavailable: 1 },
+      persistence: {
+        enabled: true,
+        size: '1Gi',
+        storageClassName: 'local-path-retain',
+        lookupVolumeName: false,
       },
+      deploymentStrategy: { type: 'Recreate' },
       additionalDataSources: [
         { name: 'Loki', type: 'loki', url: 'http://loki.observability.svc:3100', access: 'proxy' },
       ],
