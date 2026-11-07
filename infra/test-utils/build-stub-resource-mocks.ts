@@ -1,7 +1,11 @@
 import type { runtime } from '@pulumi/pulumi';
 import { z } from 'zod';
 
-export function buildStubResourceMocks(held: readonly string[] = []): {
+// outputs holds the state a provider computes, such as a certificate's PEM, by registration key
+export function buildStubResourceMocks(
+  held: readonly string[] = [],
+  outputs: Readonly<Record<string, Record<string, unknown>>> = {},
+): {
   readonly mocks: runtime.Mocks;
   readonly registered: string[];
   readonly inputs: Map<string, Record<string, unknown>>;
@@ -47,7 +51,7 @@ export function buildStubResourceMocks(held: readonly string[] = []): {
           await gate.promise;
         }
 
-        return { id: `${args.name}-id`, state };
+        return { id: `${args.name}-id`, state: { ...state, ...outputs[key] } };
       },
       call: (args: runtime.MockCallArgs) => inputsSchema.parse(args.inputs),
     },

@@ -27,21 +27,25 @@ as one replica of a StatefulSet, because SQLite takes one writer, and a rollout 
 before it starts the new one. The StatefulSet starts and replaces its pod without waiting for it to
 turn ready, so an apply that fixes an unready nixie rolls it out. The data volume is a claim of the
 retaining storage class that the atc gateway's volume uses, so deleting the claim keeps `nixie.db`
-and the key store beside it. nixie stages a backup set of both databases on its data volume, and a
-nightly CronJob runs the job in the `nixie-backup` image of nixie's release, which ships each set
-with restic to two repositories in nixie's own R2 bucket: `nixie.db` to the data repository, and
-`keys.db` to a key repository that keeps the newest set alone, so a forgotten item's key leaves the
-key repository at the next set. The data repository's older snapshots tagged `nixie` hold a whole
-`keys.db` until retention drops them or an operator purges them
+and the key store beside it.
+
+nixie stages a backup set of both databases on its data volume, and a nightly CronJob runs the job
+in the `nixie-backup` image of nixie's release, which ships each set with restic to two repositories
+in nixie's own R2 bucket: `nixie.db` to the data repository, and `keys.db` to a key repository that
+keeps the newest set alone, so a forgotten item's key leaves the key repository at the next set. The
+data repository's older snapshots tagged `nixie` hold a whole `keys.db` until retention drops them
+or an operator purges them
 ([purge a forgotten item](../../runbooks/nixie-backup.md#purge-a-forgotten-item-from-old-snapshots)).
 Kubernetes never retries a failed run, because a second run skips the set whose failed receipt the
-first wrote and exits 0. Each repository has its own password, which only 1Password and the backup's
-Secret hold, and nixie's own container mounts neither. Only nixie's commands open nixie's databases,
-so nixie may change its files between releases without breaking the backup. The CronJob runs as
-nixie's user, so nixie can remove what the job leaves, and the record keys stay useless without the
-deployment key in the secrets file. [nixie's backup](../../runbooks/nixie-backup.md) gives the
-steps. The volume sits in k3s's data directory on the encrypted zvol on the second disk, so no
-Onidel snapshot holds the databases ([protection at rest](../secrets.md#protection-at-rest)).
+first wrote and exits 0.
+
+Each repository has its own password, which only 1Password and the backup's Secret hold, and nixie's
+own container mounts neither. Only nixie's commands open nixie's databases, so nixie may change its
+files between releases without breaking the backup. The CronJob runs as nixie's user, so nixie can
+remove what the job leaves, and the record keys stay useless without the deployment key in the
+secrets file. [nixie's backup](../../runbooks/nixie-backup.md) gives the steps. The volume sits in
+k3s's data directory on the encrypted zvol on the second disk, so no Onidel snapshot holds the
+databases ([protection at rest](../secrets.md#protection-at-rest)).
 
 The web client is a Deployment of its own, because it holds no state, no secret and no database. It
 calls nixie's API at its cluster address, and the browser calls `/rpc` on the web client's own
@@ -139,7 +143,8 @@ secret's value in impd under the same name, with no deploy.
 The prod apply adds a release's sandbox images to impd before Pulumi rolls nixie's StatefulSet.
 nixie turns ready only once impd holds every image of its sandbox manifest, and a pull takes
 minutes, so an add at start would leave the new pod unready after the old one stopped. Pulumi runs a
-local command on the apply's machine, and the StatefulSet depends on that command:
+local command on the apply's machine, and the StatefulSet, nixie's config ConfigMap and the backup's
+copy of the config all wait for that command:
 
 1. The command creates a ConfigMap that holds the add script, bundled into one file, because the
    nixie image holds Bun but none of this repo's packages.
@@ -150,12 +155,16 @@ local command on the apply's machine, and the StatefulSet depends on that comman
    derives. It refuses an image that impd holds under the same name at another digest.
 5. The command prints the Job's log and removes the ConfigMap.
 
-A failed or timed-out Job fails the command, and Pulumi then leaves the StatefulSet unchanged, so
-the old nixie keeps serving. Pulumi runs the command again only when the Job it describes changes,
-which a new nixie image or a new secrets file does. The Job is no Pulumi resource: Kubernetes
-refuses a change to a Job's pod template, so Pulumi would replace it at each release, and the
-deploy's guard holds a Job's replace. Each run starts a fresh Job, so a retry reads impd again
-rather than trust an earlier Job's result.
+A failed or timed-out Job fails the command, and Pulumi then leaves the StatefulSet and both copies
+of the config unchanged. The old nixie keeps serving, and a restart reads the config it accepts: a
+release's config can hold a key that the older nixie's schema refuses. impd admits the Job's pulls
+as it admits any imp outside its priority patterns, so a pull fails when other imps fill impd's
+memory budget, and the RAM that impd keeps for nixie stays unused.
+
+Pulumi runs the command again only when the Job it describes changes, which a new nixie image or a
+new secrets file does. The Job is no Pulumi resource: Kubernetes refuses a change to a Job's pod
+template, so Pulumi would replace it at each release, and the deploy's guard holds a Job's replace.
+Each run starts a fresh Job, so a retry reads impd again rather than trust an earlier Job's result.
 
 The Job adds without a pin, because nixie's token cannot pin an image. impd never evicts an image
 used recently, and an add counts as a use, so the image stays until the new conversation imp holds

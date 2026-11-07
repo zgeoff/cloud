@@ -185,7 +185,10 @@ function createStatefulSet(
       spec: buildNixieSpec({
         image: shape.inputs.config.image,
         serviceName: shape.serviceName,
-        configMap: createConfig(cluster, namespace, shape.config),
+        configMap: createConfig(cluster, namespace, {
+          text: shape.config,
+          sandboxImages: shape.sandboxImages,
+        }),
         secret: shape.secret,
         definitionsSecret: createDefinitionsKey(cluster, namespace, shape.inputs),
       }),
@@ -194,16 +197,28 @@ function createStatefulSet(
   );
 }
 
-function createConfig(cluster: Provider, namespace: Output<string>, text: string): Output<string> {
+interface ConfigShape {
+  readonly text: string;
+  readonly sandboxImages: Command;
+}
+
+function createConfig(
+  cluster: Provider,
+  namespace: Output<string>,
+  shape: ConfigShape,
+): Output<string> {
   const config = new ConfigMap(
     'nixie-config',
     {
       // No fixed name, as on the Secrets: Pulumi replaces each on a change, so the StatefulSet
       // rolls and nixie reads the change at its next start.
       metadata: { namespace },
-      data: { [nixieConfigKey]: text },
+      data: { [nixieConfigKey]: shape.text },
     },
-    { provider: cluster },
+
+    // the running nixie can refuse a new release's config at a restart, so a failed image add
+    // leaves the config it runs with in place
+    { provider: cluster, dependsOn: [shape.sandboxImages] },
   );
 
   return config.metadata.name;

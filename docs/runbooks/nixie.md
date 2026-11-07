@@ -586,3 +586,4 @@ an apply would renew it.
 | the pod restarts with `nixie refuses the secrets` | a key is missing from the file           | set it, as above                                                     |
 | TLS error on the name                             | the certificate expired                  | `bun run up`                                                         |
 | the apply fails at `nixie-sandbox-images`         | the Job did not add every sandbox image  | read the Job's log above the failure, fix its cause, and apply again |
+| the Job's log shows `not enough 2 MiB pages`      | awake imps fill impd's memory budget     | `host_imp sleep <idle_imp> < /dev/null`, then apply again            |

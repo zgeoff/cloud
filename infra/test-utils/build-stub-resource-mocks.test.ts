@@ -19,6 +19,28 @@ test('it records each registration by type and name and returns its inputs as it
   );
 });
 
+test("it adds a registration's given outputs to the state it returns, and records only its inputs", async () => {
+  const stub = buildStubResourceMocks([], {
+    'acme:index/certificate:Certificate::chat': { certificatePem: 'leaf-pem' },
+  });
+
+  const result = await stub.mocks.newResource({
+    type: 'acme:index/certificate:Certificate',
+    name: 'chat',
+    inputs: { commonName: 'chat.example.test' },
+    custom: true,
+  });
+
+  expect(result).toStrictEqual({
+    id: 'chat-id',
+    state: { commonName: 'chat.example.test', certificatePem: 'leaf-pem' },
+  });
+
+  expect(stub.inputs).toStrictEqual(
+    new Map([['acme:index/certificate:Certificate::chat', { commonName: 'chat.example.test' }]]),
+  );
+});
+
 test('it keeps a held registration pending until release, after it has started', async () => {
   const stub = buildStubResourceMocks(['cloudflare:index/dnsRecord:DnsRecord::atc']);
 
