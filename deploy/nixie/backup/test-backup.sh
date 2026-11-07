@@ -6,7 +6,8 @@
 # nixie's uid and gid 10001, a read-only root, the staging init container, then the image's own job
 # on the staging folder of the data volume, with a local data repo and key repo. It runs the
 # restore script as the restore Job's fetch container runs it
-# (infra/cluster/build-nixie-restore-pod-spec.ts): the script mounted read-only and run by /bin/sh
+# (infra/cluster/build-nixie-restore-pod-spec.ts): the script and the parser it runs
+# (pick-newest-set.ts) mounted read-only, as the script ConfigMap holds them, and run by /bin/sh
 # in place of the image's job, writing into the directory it shares with `nixie restore` at
 # /tmp/nixie-backup. A set's copies are opaque bytes, because only nixie's commands open its
 # databases, and their tests live in nixie. What this proves: the pod's wiring ships a staged set to
@@ -477,7 +478,9 @@ run_restore() {
     -v "$name-data:/repos/data" -v "$name-keys:/repos/keys" \
     -e NIXIE_BACKUP_DATA_REPOSITORY=/repos/data -e NIXIE_BACKUP_DATA_PASSWORD=data-fixture-only \
     -e NIXIE_BACKUP_KEY_REPOSITORY=/repos/keys -e NIXIE_BACKUP_KEY_PASSWORD=key-fixture-only \
-    -v "$script:/opt/nixie-backup/restore.sh:ro" "${options[@]}" --entrypoint /bin/sh "$image" \
+    -v "$script:/opt/nixie-backup/restore.sh:ro" \
+    -v "$(dirname "$script")/pick-newest-set.ts:/opt/nixie-backup/pick-newest-set.ts:ro" \
+    "${options[@]}" --entrypoint /bin/sh "$image" \
     /opt/nixie-backup/restore.sh "$@"
 }
 

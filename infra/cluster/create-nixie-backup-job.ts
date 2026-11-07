@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import type { Provider } from '@pulumi/kubernetes';
 import type { StatefulSet } from '@pulumi/kubernetes/apps/v1';
 import { CronJob } from '@pulumi/kubernetes/batch/v1';
@@ -10,6 +9,7 @@ import { buildNixieBackupCronJobSpec } from './build-nixie-backup-cron-job-spec.
 import { buildNixieBackupEnv } from './build-nixie-backup-env.ts';
 import { nixieConfigKey } from './build-nixie-spec.ts';
 import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
+import { readNixieRestoreScripts } from './read-nixie-restore-scripts.ts';
 
 interface NixieBackupJobInputs {
   readonly namespace: Output<string>;
@@ -72,12 +72,7 @@ function createScriptConfigMap(cluster: Provider, namespace: Output<string>): Co
     {
       // a fixed name, because the restore Job's YAML names it
       metadata: { name: 'nixie-backup-script', namespace },
-      data: {
-        'restore.sh': readFileSync(
-          new URL('../../deploy/nixie/backup/restore.sh', import.meta.url),
-          'utf8',
-        ),
-      },
+      data: readNixieRestoreScripts(),
     },
 
     // Pulumi replaces a ConfigMap whose data changes, and a create under the same name fails while

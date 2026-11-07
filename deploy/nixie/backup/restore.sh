@@ -31,20 +31,11 @@ key_restic() {
     restic "$@"
 }
 
-# pick_newest_set: reads `restic snapshots --json` on stdin and prints the newest set-<sequence> tag
-# of its snapshots, by number, or nothing when no snapshot carries one. The image runs the job with
-# bun, so bun parses the JSON; a sequence is a number, and set-10 sorts after set-9 only as one.
+# pick_newest_set: reads `restic snapshots --json` on stdin and prints the newest set-<sequence> tag,
+# or nothing when no snapshot carries one, through bun, which the image runs the job with. It exits
+# 1 on output that is no snapshot list.
 pick_newest_set() {
-  bun -e '
-    const snapshots = JSON.parse(await Bun.stdin.text());
-    const sequences = snapshots.flatMap((snapshot) =>
-      (snapshot.tags ?? []).flatMap((tag) => {
-        const sequence = /^set-([0-9]+)$/.exec(tag)?.[1];
-        return sequence === undefined ? [] : [Number(sequence)];
-      }),
-    );
-    if (sequences.length > 0) console.log("set-" + Math.max(...sequences));
-  '
+  bun "$(dirname "$0")/pick-newest-set.ts"
 }
 
 case "${1:-}" in
