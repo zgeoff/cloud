@@ -63,6 +63,7 @@ pre-push:
     - chex-format:check
     - chex-lint
     - chex-shell
+    - chex-workflows
     - chex-typecheck
     - chex-test
   jobs:
