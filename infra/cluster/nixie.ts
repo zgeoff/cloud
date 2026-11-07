@@ -185,34 +185,57 @@ function createStatefulSet(
       spec: buildNixieSpec({
         image: shape.inputs.config.image,
         serviceName: shape.serviceName,
-        configMap: createConfig(cluster, namespace, shape.config),
+        configMap: createConfig(cluster, namespace, {
+          text: shape.config,
+          sandboxImages: shape.sandboxImages,
+        }),
         secret: shape.secret,
-        definitionsSecret: createDefinitionsKey(cluster, namespace, shape.inputs),
+        definitionsSecret: createDefinitionsKey(cluster, namespace, {
+          inputs: shape.inputs,
+          sandboxImages: shape.sandboxImages,
+        }),
       }),
     },
     buildNixieStatefulSetOptions({ cluster, sandboxImages: shape.sandboxImages }),
   );
 }
 
-function createConfig(cluster: Provider, namespace: Output<string>, text: string): Output<string> {
+interface ConfigShape {
+  readonly text: string;
+  readonly sandboxImages: Command;
+}
+
+function createConfig(
+  cluster: Provider,
+  namespace: Output<string>,
+  shape: ConfigShape,
+): Output<string> {
   const config = new ConfigMap(
     'nixie-config',
     {
       // No fixed name, as on the Secrets: Pulumi replaces each on a change, so the StatefulSet
       // rolls and nixie reads the change at its next start.
       metadata: { namespace },
-      data: { [nixieConfigKey]: text },
+      data: { [nixieConfigKey]: shape.text },
     },
-    { provider: cluster },
+
+    // the running nixie can refuse a new release's config, so a failed image add leaves the config
+    // it mounts in place
+    { provider: cluster, dependsOn: [shape.sandboxImages] },
   );
 
   return config.metadata.name;
 }
 
+interface DefinitionsKeyShape {
+  readonly inputs: NixieInputs;
+  readonly sandboxImages: Command;
+}
+
 function createDefinitionsKey(
   cluster: Provider,
   namespace: Output<string>,
-  inputs: NixieInputs,
+  shape: DefinitionsKeyShape,
 ): Output<string> {
   const key = new Secret(
     'nixie-definitions-key',
@@ -220,13 +243,15 @@ function createDefinitionsKey(
       metadata: { namespace },
       stringData: {
         // OpenSSH refuses a private key without its final newline
-        [definitionsDeployKeyKey]: secret(inputs.secrets.definitionsDeployKey).apply(
+        [definitionsDeployKeyKey]: secret(shape.inputs.secrets.definitionsDeployKey).apply(
           (value) => `${value.trimEnd()}\n`,
         ),
         [definitionsKnownHostsKey]: githubKnownHosts,
       },
     },
-    { provider: cluster },
+
+    // a failed image add leaves the key the running pod mounts in place
+    { provider: cluster, dependsOn: [shape.sandboxImages] },
   );
 
   return key.metadata.name;

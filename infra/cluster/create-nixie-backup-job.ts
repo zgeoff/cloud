@@ -90,7 +90,8 @@ function createConfigMap(cluster: Provider, inputs: NixieBackupJobInputs): Confi
       data: { [nixieConfigKey]: inputs.config },
     },
 
-    // as on the script: each change to config.yaml replaces it
-    { provider: cluster, deleteBeforeReplace: true },
+    // as on the script: each change to config.yaml replaces it; after nixie rolls, so a failed
+    // rollout leaves the restore with the config the running nixie accepts
+    { provider: cluster, deleteBeforeReplace: true, dependsOn: [inputs.statefulSet] },
   );
 }
