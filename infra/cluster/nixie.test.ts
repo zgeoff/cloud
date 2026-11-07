@@ -5,13 +5,16 @@ import { createClusterProvider } from './create-cluster-provider.ts';
 import { createNixie } from './nixie.ts';
 
 async function setupTest() {
-  // a held registration stands in for a sandbox image Job that has not finished, or has failed
-  const stub = buildStubResourceMocks(['command:local:Command::nixie-sandbox-images'], {
-    'acme:index/certificate:Certificate::nixie': {
-      certificatePem: 'leaf-pem',
-      issuerPem: 'issuer-pem',
+  // a held registration stands in for a sandbox image add or a roll that has not finished
+  const stub = buildStubResourceMocks(
+    ['command:local:Command::nixie-sandbox-images', 'kubernetes:apps/v1:StatefulSet::nixie'],
+    {
+      'acme:index/certificate:Certificate::nixie': {
+        certificatePem: 'leaf-pem',
+        issuerPem: 'issuer-pem',
+      },
     },
-  });
+  );
 
   await runtime.setMocks(stub.mocks, 'geoff-cloud', 'test');
 
@@ -26,7 +29,7 @@ async function setupTest() {
   };
 }
 
-test('it registers no nixie-config while the sandbox image Command has not finished', async () => {
+test('it registers neither the config nor the definitions key that nixie mounts while the sandbox image Command has not finished', async () => {
   const ctx = await setupTest();
 
   createNixie(
@@ -49,21 +52,15 @@ test('it registers no nixie-config while the sandbox image Command has not finis
   );
 
   await ctx.stub.whenRegistered('command:local:Command::nixie-sandbox-images');
-  await ctx.stub.whenRegistered('kubernetes:core/v1:Secret::nixie-definitions-key');
+  await ctx.stub.whenRegistered('kubernetes:networking.k8s.io/v1:Ingress::nixie');
 
-  // setImmediate runs only after every pending promise callback has run
-  const flushed = Promise.withResolvers<void>();
-
-  setImmediate(() => {
-    flushed.resolve();
-  });
-
-  await flushed.promise;
-
-  expect(ctx.stub.registered).not.toContain('kubernetes:core/v1:ConfigMap::nixie-config');
+  expect(ctx.stub.registered).not.toIncludeAnyMembers([
+    'kubernetes:core/v1:ConfigMap::nixie-config',
+    'kubernetes:core/v1:Secret::nixie-definitions-key',
+  ]);
 });
 
-test("it registers no copy of the config for the backup's restore while the sandbox image Command has not finished", async () => {
+test("it registers no copy of the config for the backup's restore while nixie's StatefulSet has not rolled", async () => {
   const ctx = await setupTest();
 
   createNixie(
@@ -98,16 +95,10 @@ test("it registers no copy of the config for the backup's restore while the sand
     { zoneID: output('zone'), kubeconfig: output('kubeconfig-for-tests') },
   );
 
-  await ctx.stub.whenRegistered('command:local:Command::nixie-sandbox-images');
-  await ctx.stub.whenRegistered('kubernetes:core/v1:ConfigMap::nixie-backup-script');
+  ctx.stub.releaseKey('command:local:Command::nixie-sandbox-images');
 
-  const flushed = Promise.withResolvers<void>();
-
-  setImmediate(() => {
-    flushed.resolve();
-  });
-
-  await flushed.promise;
+  await ctx.stub.whenRegistered('kubernetes:apps/v1:StatefulSet::nixie');
+  await ctx.stub.whenRegistered('kubernetes:networking.k8s.io/v1:Ingress::nixie');
 
   expect(ctx.stub.registered).not.toContain('kubernetes:core/v1:ConfigMap::nixie-backup-config');
 });

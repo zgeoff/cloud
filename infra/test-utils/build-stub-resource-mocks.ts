@@ -11,13 +11,13 @@ export function buildStubResourceMocks(
   readonly inputs: Map<string, Record<string, unknown>>;
   readonly whenRegistered: (key: string) => Promise<void>;
   readonly release: () => void;
+  readonly releaseKey: (key: string) => void;
 } {
   const registered: string[] = [];
 
   const inputs = new Map<string, Record<string, unknown>>();
   const started = new Map<string, PromiseWithResolvers<void>>();
-
-  const gate = Promise.withResolvers<void>();
+  const gates = new Map(held.map((key) => [key, Promise.withResolvers<void>()]));
 
   // Pulumi types a registration's inputs as any
   const inputsSchema = z.record(z.string(), z.unknown());
@@ -35,7 +35,12 @@ export function buildStubResourceMocks(
     inputs,
     whenRegistered: (key: string) => getStarted(key).promise,
     release: () => {
-      gate.resolve();
+      for (const gate of gates.values()) {
+        gate.resolve();
+      }
+    },
+    releaseKey: (key: string) => {
+      gates.get(key)?.resolve();
     },
     mocks: {
       newResource: async (args: runtime.MockResourceArgs) => {
@@ -47,9 +52,7 @@ export function buildStubResourceMocks(
 
         getStarted(key).resolve();
 
-        if (held.includes(key)) {
-          await gate.promise;
-        }
+        await gates.get(key)?.promise;
 
         return { id: `${args.name}-id`, state: { ...state, ...outputs[key] } };
       },

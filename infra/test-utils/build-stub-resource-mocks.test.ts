@@ -85,6 +85,43 @@ test('it keeps a held registration pending until release, after it has started',
   expect(settled).toBeTrue();
 });
 
+test('it keeps the other held registrations pending after a release of one key', async () => {
+  const stub = buildStubResourceMocks([
+    'cloudflare:index/dnsRecord:DnsRecord::atc',
+    'cloudflare:index/dnsRecord:DnsRecord::files',
+  ]);
+
+  const atc = Promise.resolve(
+    stub.mocks.newResource({
+      type: 'cloudflare:index/dnsRecord:DnsRecord',
+      name: 'atc',
+      inputs: {},
+      custom: true,
+    }),
+  );
+
+  const files = Promise.resolve(
+    stub.mocks.newResource({
+      type: 'cloudflare:index/dnsRecord:DnsRecord',
+      name: 'files',
+      inputs: {},
+      custom: true,
+    }),
+  );
+
+  stub.releaseKey('cloudflare:index/dnsRecord:DnsRecord::atc');
+
+  await atc;
+
+  const filesStatus = Bun.peek.status(files);
+
+  stub.release();
+
+  await files;
+
+  expect(filesStatus).toBe('pending');
+});
+
 test('it resolves whenRegistered for a registration that started before the wait', async () => {
   const stub = buildStubResourceMocks();
 

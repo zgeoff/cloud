@@ -190,7 +190,10 @@ function createStatefulSet(
           sandboxImages: shape.sandboxImages,
         }),
         secret: shape.secret,
-        definitionsSecret: createDefinitionsKey(cluster, namespace, shape.inputs),
+        definitionsSecret: createDefinitionsKey(cluster, namespace, {
+          inputs: shape.inputs,
+          sandboxImages: shape.sandboxImages,
+        }),
       }),
     },
     buildNixieStatefulSetOptions({ cluster, sandboxImages: shape.sandboxImages }),
@@ -216,18 +219,23 @@ function createConfig(
       data: { [nixieConfigKey]: shape.text },
     },
 
-    // the running nixie can refuse a new release's config at a restart, so a failed image add
-    // leaves the config it runs with in place
+    // the running nixie can refuse a new release's config, so a failed image add leaves the config
+    // it mounts in place
     { provider: cluster, dependsOn: [shape.sandboxImages] },
   );
 
   return config.metadata.name;
 }
 
+interface DefinitionsKeyShape {
+  readonly inputs: NixieInputs;
+  readonly sandboxImages: Command;
+}
+
 function createDefinitionsKey(
   cluster: Provider,
   namespace: Output<string>,
-  inputs: NixieInputs,
+  shape: DefinitionsKeyShape,
 ): Output<string> {
   const key = new Secret(
     'nixie-definitions-key',
@@ -235,13 +243,15 @@ function createDefinitionsKey(
       metadata: { namespace },
       stringData: {
         // OpenSSH refuses a private key without its final newline
-        [definitionsDeployKeyKey]: secret(inputs.secrets.definitionsDeployKey).apply(
+        [definitionsDeployKeyKey]: secret(shape.inputs.secrets.definitionsDeployKey).apply(
           (value) => `${value.trimEnd()}\n`,
         ),
         [definitionsKnownHostsKey]: githubKnownHosts,
       },
     },
-    { provider: cluster },
+
+    // a failed image add leaves the key the running pod mounts in place
+    { provider: cluster, dependsOn: [shape.sandboxImages] },
   );
 
   return key.metadata.name;

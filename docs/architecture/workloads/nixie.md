@@ -143,8 +143,8 @@ secret's value in impd under the same name, with no deploy.
 The prod apply adds a release's sandbox images to impd before Pulumi rolls nixie's StatefulSet.
 nixie turns ready only once impd holds every image of its sandbox manifest, and a pull takes
 minutes, so an add at start would leave the new pod unready after the old one stopped. Pulumi runs a
-local command on the apply's machine, and the StatefulSet, nixie's config ConfigMap and the backup's
-copy of the config all wait for that command:
+local command on the apply's machine. The StatefulSet, the config ConfigMap and the definitions key
+that nixie mounts wait for that command, and the backup's copy of the config waits for the roll:
 
 1. The command creates a ConfigMap that holds the add script, bundled into one file, because the
    nixie image holds Bun but none of this repo's packages.
@@ -155,11 +155,12 @@ copy of the config all wait for that command:
    derives. It refuses an image that impd holds under the same name at another digest.
 5. The command prints the Job's log and removes the ConfigMap.
 
-A failed or timed-out Job fails the command, and Pulumi then leaves the StatefulSet and both copies
-of the config unchanged. The old nixie keeps serving, and a restart reads the config it accepts: a
-release's config can hold a key that the older nixie's schema refuses. impd admits the Job's pulls
-as it admits any imp outside its priority patterns, so a pull fails when other imps fill impd's
-memory budget, and the RAM that impd keeps for nixie stays unused.
+A failed or timed-out Job fails the command, and Pulumi then changes none of the resources that wait
+for it. The old nixie keeps serving, and a restart reads the config it accepts: a release's config
+can hold a key that the older nixie's schema refuses. nixie's Secret is the exception: the Job reads
+it, so Pulumi replaces it before the command runs. impd admits the Job's pulls as it admits any imp
+outside its priority patterns, so a pull fails when other imps fill impd's memory budget, and the
+RAM that impd keeps for nixie stays unused.
 
 Pulumi runs the command again only when the Job it describes changes, which a new nixie image or a
 new secrets file does. The Job is no Pulumi resource: Kubernetes refuses a change to a Job's pod
