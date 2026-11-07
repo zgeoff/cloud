@@ -496,9 +496,9 @@ host_restic prune
 ### nixie's backup
 
 nixie stages a set at once after a forget, and the key repository keeps only the newest set's
-`keys.db`, so a forgotten item's key leaves the backup at the job's next run. The data repository's
-snapshots tagged `nixie` each hold a whole `keys.db`, so a forgotten item stays in them until
-retention drops the last one taken before the forget.
+`keys.db`, so a forgotten item's key leaves the key repository at the job's next run. The data
+repository's snapshots tagged `nixie` each hold a whole `keys.db`, so a forgotten item stays in them
+until retention drops the last one taken before the forget.
 [Purge a forgotten item](./nixie-backup.md#purge-a-forgotten-item-from-old-snapshots) removes it
 sooner.
 

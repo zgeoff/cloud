@@ -23,6 +23,11 @@ checks its `backup` folder on a poll, records each receipt it finds and deletes 
 nixie writes no new hourly set while a set waits for its receipt, so a set can wait up to a day for
 the nightly run.
 
+A failed upload gives the set a failed receipt and fails the run's Job. Kubernetes never retries the
+Job: a second run skips each set that holds a receipt and exits 0, so a retry would turn the failed
+Job into a success. A run that stops before it writes a receipt leaves the set to the next night's
+run.
+
 The key repository holds only the newest set's `keys.db`. Once the CronJob uploads the set that
 nixie writes after it forgets an item, the key repository holds that item's key no longer. The data
 repository's old snapshots tagged `nixie` are the exception, until you purge them as
@@ -84,7 +89,8 @@ can be a day old. nixie then writes a fresh set, and the second run uploads it.
 Run this helper from the root of a cloud checkout, with Docker, Bun and `op` signed in to the
 `cloud` vault. It runs restic from the pinned `nixie-backup` image, with one repository's secrets
 from 1Password. Pass `nixie` for the data repository or `nixie-keys` for the key repository.
-`op run` resolves the references in the environment and masks them in the output:
+`op run` resolves the references in the environment and masks them in the output. The image's user
+has no writable home folder, so the helper runs restic with `--no-cache`:
 
 ```bash
 nixie_restic() {
@@ -97,7 +103,7 @@ nixie_restic() {
     op run -- docker run --rm -e RESTIC_PASSWORD -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
     -e AWS_DEFAULT_REGION=auto --entrypoint restic \
     "$(bun -e 'console.log(Bun.YAML.parse(await Bun.file("infra/Pulumi.prod.yaml").text()).config["geoff-cloud:nixie"].backupImage)')" \
-    -r "s3:$(op read op://cloud/r2-nixie-backup/endpoint)/geoff-cloud-nixie/$repo" "$@"
+    --no-cache -r "s3:$(op read op://cloud/r2-nixie-backup/endpoint)/geoff-cloud-nixie/$repo" "$@"
 }
 nixie_restic nixie snapshots
 nixie_restic nixie-keys snapshots
