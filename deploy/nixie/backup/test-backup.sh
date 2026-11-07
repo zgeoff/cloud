@@ -11,8 +11,8 @@
 # /tmp/nixie-backup. A set's copies are opaque bytes, because only nixie's commands open its
 # databases, and their tests live in nixie. What this proves: the pod's wiring ships a staged set to
 # both repos, records the receipt and removes the copies; the key repo keeps only the newest set;
-# a restore takes keys.db from the key repo and the nixie.db of the same set, or the one SNAPSHOT
-# names; the refusals, ls and the usage. What it does not prove: R2, k3s, and nixie's staging and
+# a restore takes keys.db from the key repo's highest set, read from the snapshots' tags, and the
+# nixie.db of the same set, or the one SNAPSHOT names; the refusals, ls and the usage. What it does not prove: R2, k3s, and nixie's staging and
 # commands, which the restore test in docs/runbooks/nixie-backup.md covers.
 #
 # `bun run test:nixie-backup-fixture` runs it; one case alone:
@@ -134,6 +134,61 @@ keys.db 10001:10001
 nixie.db 10001:10001
 nixie.db of set 2
 keys.db of set 2
+EOF
+}
+
+# Set 2's key snapshot stays beside set 10's, as a failed removal leaves it. restic lists snapshots
+# oldest first, and set-10 sorts before set-2 as text, so only the set's number picks set 10.
+it_restores_the_set_with_the_highest_number_when_the_key_repo_holds_two() {
+  local image="$1" script="$2" status=0
+  name="nixie-backup-$3-$BASHPID"
+  create_case_tree "$cleanup"
+  setup_test "$name" "$image"
+  run_shell "$name" "$image" << 'EOF'
+RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only restic init -q
+RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only restic init -q
+for sequence in 2 10; do
+  echo "nixie.db of set $sequence" | RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only \
+    restic backup -q --host nixie --tag "set-$sequence" --tag kind-scheduled --stdin \
+    --stdin-filename nixie.db
+  echo "keys.db of set $sequence" | RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only \
+    restic backup -q --host nixie --tag "set-$sequence" --tag kind-scheduled --stdin \
+    --stdin-filename keys.db
+done
+EOF
+
+  run_restore "$name" "$image" "$script" restore > /dev/null 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/err"
+  assert_status 0 "$status"
+  run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
+  diff - "$tree/copy" << 'EOF'
+nixie.db of set 10
+keys.db of set 10
+EOF
+}
+
+# A snapshot's host, like its paths, is free text that can read set-<n>; only its tags name a set.
+it_reads_a_backup_set_only_from_a_snapshots_tags() {
+  local image="$1" script="$2" status=0
+  name="nixie-backup-$3-$BASHPID"
+  create_case_tree "$cleanup"
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+  run_job "$name" "$image" > /dev/null
+  run_shell "$name" "$image" << 'EOF'
+echo 'a note' | RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only \
+  restic backup -q --host set-99 --stdin --stdin-filename set-99
+EOF
+
+  run_restore "$name" "$image" "$script" restore > /dev/null 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/err"
+  assert_status 0 "$status"
+  run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
+  diff - "$tree/copy" << 'EOF'
+nixie.db of set 1
+keys.db of set 1
 EOF
 }
 

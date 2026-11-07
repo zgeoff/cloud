@@ -31,6 +31,22 @@ key_restic() {
     restic "$@"
 }
 
+# pick_newest_set: reads `restic snapshots --json` on stdin and prints the newest set-<sequence> tag
+# of its snapshots, by number, or nothing when no snapshot carries one. The image runs the job with
+# bun, so bun parses the JSON; a sequence is a number, and set-10 sorts after set-9 only as one.
+pick_newest_set() {
+  bun -e '
+    const snapshots = JSON.parse(await Bun.stdin.text());
+    const sequences = snapshots.flatMap((snapshot) =>
+      (snapshot.tags ?? []).flatMap((tag) => {
+        const sequence = /^set-([0-9]+)$/.exec(tag)?.[1];
+        return sequence === undefined ? [] : [Number(sequence)];
+      }),
+    );
+    if (sequences.length > 0) console.log("set-" + Math.max(...sequences));
+  '
+}
+
 case "${1:-}" in
   restore)
     [ -d "$copy_dir" ] || mkdir -m 0700 "$copy_dir"
@@ -41,14 +57,15 @@ case "${1:-}" in
     # the job tags both snapshots of a set with set-<sequence>, and a key snapshot whose removal
     # failed stays beside the newest
     key_snapshots="$(key_restic snapshots --json)"
-    set_tag="$(echo "$key_snapshots" | grep -o '"set-[0-9]*"' | tr -d '"' | sort -t- -k2 -n | tail -n 1)"
+    set_tag="$(echo "$key_snapshots" | pick_newest_set)"
     [ -n "$set_tag" ] || {
       echo "the key repo holds no snapshot of a backup set" >&2
       exit 1
     }
     if [ -n "${SNAPSHOT:-}" ]; then
       # a newer nixie.db holds records whose keys the key repo's set lacks
-      data_set="$(data_restic snapshots --json "$SNAPSHOT" | grep -o '"set-[0-9]*"' | tr -d '"' | head -n 1)"
+      data_snapshots="$(data_restic snapshots --json "$SNAPSHOT")"
+      data_set="$(echo "$data_snapshots" | pick_newest_set)"
       [ -n "$data_set" ] || {
         echo "the data snapshot $SNAPSHOT holds no backup set" >&2
         exit 1
