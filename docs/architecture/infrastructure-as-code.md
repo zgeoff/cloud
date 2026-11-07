@@ -154,11 +154,11 @@ for each replace, the fields that force it. The guard passes the replace when ea
 is `data`, `stringData` or `binaryData`, and the new name differs from the old one. When the program
 sets the name, it also sets `deleteBeforeReplace` on the object, because Pulumi otherwise creates
 the replacement first, and that create fails on the name the old object still holds. The guard holds
-that replace. The Secret of [nixie](./workloads/nixie.md) holds the encrypted
-`deploy/nixie/secrets.sops.yaml`, so a merge that changes only that file applies without a person. A
-merge that changes `deploy/nixie/config.yaml` is held: nixie's backup job keeps a copy of the file
-in the ConfigMap `nixie-backup-config`, whose name the restore Job names, so the plan replaces an
-object whose name the program sets.
+that replace. Two Secrets of [nixie](./workloads/nixie.md) hold the encrypted
+`deploy/nixie/secrets.sops.yaml`, and the program sets no name on either, so a merge that changes
+only that file applies without a person. A merge that changes `deploy/nixie/config.yaml` is held:
+nixie's backup job keeps a copy of the file in the ConfigMap `nixie-backup-config`, whose name the
+restore Job names, so the plan replaces an object whose name the program sets.
 
 A held run ends as held, not failed: the job succeeds, its summary names the revision to dispatch,
 Discord gets the hold, and the next push's run takes its turn. A manual dispatch of the workflow on

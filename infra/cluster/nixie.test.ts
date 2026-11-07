@@ -29,7 +29,7 @@ async function setupTest() {
   };
 }
 
-test('it registers neither the config nor the definitions key that nixie mounts while the sandbox image Command has not finished', async () => {
+test('it registers none of the config, the definitions key and the Secret that nixie mounts while the sandbox image Command has not finished', async () => {
   const ctx = await setupTest();
 
   createNixie(
@@ -57,6 +57,7 @@ test('it registers neither the config nor the definitions key that nixie mounts 
   expect(ctx.stub.registered).not.toIncludeAnyMembers([
     'kubernetes:core/v1:ConfigMap::nixie-config',
     'kubernetes:core/v1:Secret::nixie-definitions-key',
+    'kubernetes:core/v1:Secret::nixie-secrets',
   ]);
 });
 
