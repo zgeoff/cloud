@@ -172,3 +172,8 @@ memory:
 search:
   credential: deployment:kagi
   daily_call_cap: 200
+
+# backups: the nixie-backup CronJob uploads once a day (04:00), so nixie writes a set and expects
+# its receipt on the same daily cadence; readiness reports backups unready past twice the interval
+backup:
+  interval_minutes: 1440
