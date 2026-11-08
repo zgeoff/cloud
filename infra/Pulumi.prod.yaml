@@ -3,7 +3,7 @@ config:
   geoff-cloud:cluster: managed
   geoff-cloud:hostOnTailnet: 'true'
   geoff-cloud:atcGateway:
-    image: ghcr.io/zgeoff/atc-gateway:7.11.0@sha256:0bfa27e184554133dbd9f0bf60e2ffca8331fda3e7ad29fff0233c64e67ebcbc
+    image: ghcr.io/zgeoff/atc-gateway:7.12.0@sha256:86fb560eebe7472e92fdf6678ff9788c1f909084a6bc7ed41a651ca83fa56f9b
     backupImage: ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2@sha256:ac47d4a0409e81be7304c46372f2d855083cd45315fe30529dc3279ccae9f377
     publicURL: https://atc.geoff.cloud
     daemons:
