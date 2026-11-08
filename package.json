@@ -16,7 +16,7 @@
   "type": "module",
   "scripts": {
     "audit": "bun audit",
-    "deadcode": "knip",
+    "deadcode": "bash scripts/run-knip.sh",
     "files:branch": "bun scripts/read-branch-files.ts",
     "lint": "oxlint",
     "lint:files": "oxlint --no-error-on-unmatched-pattern",

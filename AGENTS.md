@@ -85,10 +85,6 @@ docs/
   oxlint runs both through tsrslint (`@maschwenk/tsrslint`), a Rust port of tsgolint, in tsgolint's
   place, because stock tsgolint runs out of memory under 2 GiB. `lint:full` is CI-only: never run it
   locally.
-- Run `bun install` in the main checkout before you run `bun run deadcode` in a worktree. knip's
-  config loader looks for a `tsconfig.json` from the directory above the worktree, so it reads the
-  main checkout's, and without that checkout's `node_modules` knip exits 1 with
-  `File '@tsconfig/strictest/tsconfig.json' not found.`
 
 ## Public repo and secrets
 
