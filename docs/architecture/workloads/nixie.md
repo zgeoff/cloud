@@ -108,10 +108,11 @@ definitions repo with for each skill it writes, and the owner's name under `sett
 configuration names as `deployment:owner_name` so the name stays out of this public repo.
 
 Pulumi puts the encrypted file and the host's age identity into one Secret, and only the nixie
-container mounts it. git-sync's deploy key and GitHub's pinned host key sit in a second Secret that
-only git-sync mounts, so neither container holds the other's credential. The deploy key reads the
-definitions repo and nothing else. git-sync reaches GitHub's SSH on port 443, because the host
-blocks outbound port 22.
+container mounts it. The Job that adds nixie's sandbox images reads a copy of that Secret
+([sandbox images before a roll](#sandbox-images-before-a-roll)). git-sync's deploy key and GitHub's
+pinned host key sit in a second Secret that only git-sync mounts, so neither container holds the
+other's credential. The deploy key reads the definitions repo and nothing else. git-sync reaches
+GitHub's SSH on port 443, because the host blocks outbound port 22.
 
 ## Reaching impd
 
@@ -143,24 +144,27 @@ secret's value in impd under the same name, with no deploy.
 The prod apply adds a release's sandbox images to impd before Pulumi rolls nixie's StatefulSet.
 nixie turns ready only once impd holds every image of its sandbox manifest, and a pull takes
 minutes, so an add at start would leave the new pod unready after the old one stopped. Pulumi runs a
-local command on the apply's machine. The StatefulSet, the config ConfigMap and the definitions key
-that nixie mounts wait for that command, and the backup's copy of the config waits for the roll:
+local command on the apply's machine. The StatefulSet, and the config ConfigMap, the Secret and the
+definitions key that nixie mounts, wait for that command, and the backup's copy of the config waits
+for the roll:
 
 1. The command creates a ConfigMap that holds the add script, bundled into one file, because the
    nixie image holds Bun but none of this repo's packages.
 2. It starts a Job in nixie's namespace from the new nixie image, and waits for the Job to finish.
-3. The Job decrypts only nixie's impd token from the secrets file, with the host's age identity that
-   nixie's Secret holds, and reads the image's sandbox manifest.
+3. The Job decrypts only nixie's impd token from the secrets file, with the host's age identity, and
+   reads the image's sandbox manifest. It reads both from its own copy of nixie's Secret.
 4. The Job adds each image that impd lacks, with nixie's own token and under the names nixie
    derives. It refuses an image that impd holds under the same name at another digest.
 5. The command prints the Job's log and removes the ConfigMap.
 
 A failed or timed-out Job fails the command, and Pulumi then changes none of the resources that wait
 for it. The old nixie keeps serving, and a restart reads the config it accepts: a release's config
-can hold a key that the older nixie's schema refuses. nixie's Secret is the exception: the Job reads
-it, so Pulumi replaces it before the command runs. impd admits the Job's pulls as it admits any imp
-outside its priority patterns, so a pull fails when other imps fill impd's memory budget, and the
-RAM that impd keeps for nixie stays unused.
+can hold a key that the older nixie's schema refuses. Pulumi replaces the Job's copy of the Secret
+before the command runs, and deletes the old copy in a later apply, after its Job has ended. An
+apply run with `--continue-on-error` deletes it even when the add fails again, so nixie's own Secret
+waits for the command: nixie-0 never mounts a deleted Secret. impd admits the Job's pulls as it
+admits any imp outside its priority patterns, so a pull fails when other imps fill impd's memory
+budget, and the RAM that impd keeps for nixie stays unused.
 
 Pulumi runs the command again only when the Job it describes changes, which a new nixie image or a
 new secrets file does. The Job is no Pulumi resource: Kubernetes refuses a change to a Job's pod

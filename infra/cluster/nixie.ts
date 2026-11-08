@@ -4,7 +4,7 @@ import type { Provider } from '@pulumi/kubernetes';
 import { Deployment, StatefulSet } from '@pulumi/kubernetes/apps/v1';
 import { ConfigMap, Secret, Service } from '@pulumi/kubernetes/core/v1';
 import type { NetworkPolicy } from '@pulumi/kubernetes/networking/v1';
-import type { Output } from '@pulumi/pulumi';
+import type { Output, Resource } from '@pulumi/pulumi';
 import { interpolate, secret } from '@pulumi/pulumi';
 import { topology } from '@zgeoff/cloud-topology';
 import type { NixieInputs } from '../inputs/index.ts';
@@ -64,15 +64,28 @@ export function createNixie(
     buildNixieImpConfig(topology),
   );
 
-  const secrets = createSecrets(cluster, namespace, inputs);
+  const sandboxImagesSecrets = createSecrets(cluster, namespace, {
+    name: 'nixie-sandbox-images-secrets',
+    inputs,
+    dependsOn: [],
+  });
 
   const sandboxImages = createSandboxImagesCommand({
     image: inputs.config.image,
-    secrets,
+    secrets: sandboxImagesSecrets,
     egressAllow: createEgressAllow(egressAllows.nixieSandboxImages, namespace, {
       provider: cluster,
     }),
     kubeconfig: shape.kubeconfig,
+  });
+
+  // Pulumi deletes a replaced Secret in a later apply, even one whose image add failed again, when
+  // it runs with --continue-on-error; nixie-0 then mounts a missing Secret, so nixie's own Secret
+  // waits for the image add, and the Job reads a copy
+  const secrets = createSecrets(cluster, namespace, {
+    name: 'nixie-secrets',
+    inputs,
+    dependsOn: [sandboxImages],
   });
 
   const statefulSet = createStatefulSet(cluster, namespace, {
@@ -128,18 +141,24 @@ function createService(cluster: Provider, namespace: Output<string>, shape: Serv
   });
 }
 
-function createSecrets(cluster: Provider, namespace: Output<string>, inputs: NixieInputs): Secret {
+interface SecretsShape {
+  readonly name: string;
+  readonly inputs: NixieInputs;
+  readonly dependsOn: readonly Resource[];
+}
+
+function createSecrets(cluster: Provider, namespace: Output<string>, shape: SecretsShape): Secret {
   return new Secret(
-    'nixie-secrets',
+    shape.name,
     {
       metadata: { namespace },
       stringData: {
         // the sops file is encrypted already; the age identity beside it is the secret
         [nixieSecretsFileKey]: readFileSync(new URL('secrets.sops.yaml', deployDir), 'utf8'),
-        [nixieAgeKeyKey]: secret(inputs.secrets.ageHostKey),
+        [nixieAgeKeyKey]: secret(shape.inputs.secrets.ageHostKey),
       },
     },
-    { provider: cluster },
+    { provider: cluster, dependsOn: [...shape.dependsOn] },
   );
 }
 
