@@ -168,7 +168,8 @@ memory:
   retrieval_messages: 1
 
 # web search through Kagi: the key is the sops file's connector_credentials entry kagi, and nixie
-# refuses a search past the daily cap, counted from local midnight
+# refuses a search past the daily cap, counted from midnight in time.default_zone (nixie's
+# default, Australia/Sydney; this file sets no time section), not the pod's UTC clock
 search:
   credential: deployment:kagi
   daily_call_cap: 200
