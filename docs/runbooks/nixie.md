@@ -11,19 +11,19 @@ secret the file ever held. Never print a decrypted value, and never put one on a
 
 ## What holds what
 
-| Where                                                | Holds                                                                                         |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| vault `cloud`, item `nixie-age-host`                 | the age identity that the pod holds; its public half is in `deploy/nixie/.sops.yaml`          |
-| vault `cloud`, item `nixie-age-recovery`             | the age identity that stays off the host; restores need only it                               |
-| vault `cloud`, item `nixie-deployment-key`           | the deployment key, 32 random bytes in base64                                                 |
-| vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind every model profile; impd's model secrets hold copies of it     |
-| vault `cloud`, item `nixie-definitions-deploy-key`   | git-sync's read-only deploy key for `zgeoff/nixie-definitions`                                |
-| vault `nixie`, item `nixie-definitions-export-token` | the token nixie opens skill pull requests in `zgeoff/nixie-definitions` with                  |
-| vault `cloud`, item `nixie-restic`                   | the restic password of nixie's backup data repository                                         |
-| vault `cloud`, item `nixie-key-restic`               | the restic password of nixie's backup key repository                                          |
-| vault `cloud`, item `r2-nixie-backup`                | the R2 key, endpoint and bucket of both of nixie's backup repositories                        |
-| `deploy/nixie/secrets.sops.yaml`                     | the deployment key, nixie's impd token, the definitions export token and the owner's settings |
-| impd                                                 | the token `nixie`, one model secret per profile and nixie's sandbox images                    |
+| Where                                                | Holds                                                                                                              |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| vault `cloud`, item `nixie-age-host`                 | the age identity that the pod holds; its public half is in `deploy/nixie/.sops.yaml`                               |
+| vault `cloud`, item `nixie-age-recovery`             | the age identity that stays off the host; restores need only it                                                    |
+| vault `cloud`, item `nixie-deployment-key`           | the deployment key, 32 random bytes in base64                                                                      |
+| vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind every model profile; impd's model secrets hold copies of it                          |
+| vault `cloud`, item `nixie-definitions-deploy-key`   | git-sync's read-only deploy key for `zgeoff/nixie-definitions`                                                     |
+| vault `nixie`, item `nixie-definitions-export-token` | the token nixie opens skill pull requests in `zgeoff/nixie-definitions` with                                       |
+| vault `cloud`, item `nixie-restic`                   | the restic password of nixie's backup data repository                                                              |
+| vault `cloud`, item `nixie-key-restic`               | the restic password of nixie's backup key repository                                                               |
+| vault `cloud`, item `r2-nixie-backup`                | the R2 key, endpoint and bucket of both of nixie's backup repositories                                             |
+| `deploy/nixie/secrets.sops.yaml`                     | the deployment key, nixie's impd token, the definitions export token, the owner's settings and the Kagi search key |
+| impd                                                 | the token `nixie`, one model secret per profile and nixie's sandbox images                                         |
 
 ## Set up the helpers
 
@@ -267,7 +267,8 @@ secrets file.
    sops_nixie decrypt --output-type json secrets.sops.yaml | jq -c 'keys'
    ```
 
-   Expect `["definitions_export_token","deployment_key","impd_token","settings"]`.
+   Expect
+   `["connector_credentials","definitions_export_token","deployment_key","impd_token","settings"]`.
 
 3. Commit the file through a PR. Once CI passes on `main`, the `Deploy prod` workflow applies it
    ([prod apply](./prod-apply.md)).
