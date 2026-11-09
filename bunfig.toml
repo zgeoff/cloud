@@ -38,7 +38,7 @@ minimumReleaseAgeExcludes = [
 # `bun run test:e2e` runs them from their directory with their own preload.
 preload = [
   "@zgeoff/bun-test-extended",
-  "./infra/test-utils/seed-faker.ts",
+  "./infra/test-utils/pin-faker-seed.ts",
   "./scripts/mocks/register-mock-server.ts",
 ]
 # rig's ignore patterns replace this list in the unit run, so the ignore list in rig.config.ts names
