@@ -8,6 +8,11 @@
   "rules": {
     "zgeoff/function-verb": "error",
 
+    "zgeoff/file-named-for-export": [
+      "error",
+      { "pending": [".", "infra", "packages/preview", "workers/health-check"] }
+    ],
+
     // the import boundaries: no relative import into another workspace package, and the direction
     // between infra's groups
     "zgeoff/import-zones": [
