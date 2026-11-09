@@ -10,7 +10,6 @@
       "project": ["**/*.ts"]
     },
     "packages/topology": {
-      "entry": ["index.ts"],
       "project": ["**/*.ts"]
     },
     "packages/files": {
@@ -30,13 +29,7 @@
       "project": ["scripts/**/*.ts", "e2e/**/*.ts"]
     }
   },
-  "ignoreDependencies": [
-    "@stylistic/eslint-plugin",
-    "@zgeoff/agent-hooks",
-    "@zgeoff/diet",
-    "@zgeoff/oxlint-config"
-  ],
-  "ignoreBinaries": ["go", "gofmt", "op", "pulumi"],
-  "ignore": [".claude/**"],
+  "ignoreDependencies": ["@stylistic/eslint-plugin", "@zgeoff/agent-hooks", "@zgeoff/diet"],
+  "ignoreBinaries": ["go", "op"],
   "ignoreWorkspaces": ["sdk/*"]
 }
