@@ -118,7 +118,7 @@
     "@heynixie/contract": "0.69.0",
     "@impz/client": "6.11.2",
     "@maschwenk/tsrslint": "0.1.6",
-    "@mswjs/interceptors": "0.45.9",
+    "@mswjs/interceptors": "0.45.11",
     "@orpc/client": "1.16.1",
     "@stylistic/eslint-plugin": "5.10.0",
     "@tsconfig/strictest": "2.0.8",
