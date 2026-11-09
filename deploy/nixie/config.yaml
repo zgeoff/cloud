@@ -99,6 +99,14 @@ models:
       effort: medium
       harness: agent-sdk
       prices: { input: 10, cache_write: 12.5, cache_write_1h: 20, cached_input: 0.25, output: 50 }
+    fable-5-2:
+      base_url: https://api.anthropic.com
+      credential: deployment:anthropic
+      auth_header: bearer
+      model: claude-fable-5-2
+      effort: medium
+      harness: agent-sdk
+      prices: { input: 8, cache_write: 10, cache_write_1h: 16, cached_input: 0.2, output: 40 }
   roles:
     conversation: opus-5-5
     memory-writer: haiku-5-5-low
@@ -134,8 +142,14 @@ models:
     fable-5-1:
       profile: fable-5-1
       description:
-        Claude Fable 5.1, released August 2026. Anthropic's most capable model, and the most
-        expensive. For a hard question, or a conversation that deserves the deepest thought.
+        Claude Fable 5.1, released August 2026. The Fable before 5.2, and the most expensive model
+        here. Talk with it to hear how the earlier Fable sees something.
+    fable-5-2:
+      profile: fable-5-2
+      description:
+        Claude Fable 5.2, released November 2026. Anthropic's newest Fable, and the second most
+        expensive model here. For a hard question, or a conversation that deserves the deepest
+        thought.
   # a started task's dollar limits; nixie's defaults are $2 and $10, which Fable 5.1 spends in a few
   # turns. The turn limits keep nixie's defaults of 25 and 100
   limits:
