@@ -299,6 +299,9 @@ in
     # every imp of fixed memory runs on the host's pool of 2 MiB pages, restored and woken through
     # a page handler (docs/architecture/host/imp.md)
     settings.IMP_HUGE_PAGES = "2M";
+    # the most data a slept imp's memory file may hold for impd to warm it into the page cache after
+    # the sleep. A warm of an agent imp's file, about 1.8 GiB, would push most of the ZFS ARC out
+    settings.IMP_WARM_CAP_MIB = "256";
     # the budget kept for nixie's sandboxes, which serve people waiting on a turn: its conversation
     # imp (2048 MiB), two system tasks (1024 MiB each) and four web fetches (512 MiB each). The
     # other 14336 MiB hold 7 agent imps of 2048 MiB, as 5120 MiB would, so the last 1024 MiB costs
