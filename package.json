@@ -132,7 +132,7 @@
     "@zgeoff/format-codemod": "0.3.5",
     "@zgeoff/oxlint-config": "0.10.0",
     "@zgeoff/rig": "0.1.6",
-    "knip": "6.43.0",
+    "knip": "6.44.1",
     "lefthook": "2.2.2",
     "msw": "3.0.3",
     "oxfmt": "0.75.0",
