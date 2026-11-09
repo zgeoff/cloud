@@ -43,6 +43,18 @@ let
       '';
     }
     {
+      title = "it caps the memory file that impd warms after a sleep at 256 MiB of data";
+      script = ''
+        assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
+        settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
+        grep '^IMP_WARM_CAP_MIB=' "$settings" > actual
+
+        assert_files_equal - actual <<'EOF'
+        IMP_WARM_CAP_MIB=256
+        EOF
+      '';
+    }
+    {
       title = "it hands impd both image eviction marks, 80 and 65 percent";
       script = ''
         assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
