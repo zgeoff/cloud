@@ -207,9 +207,10 @@ gates:
       - package.json
       - .github/workflows/ci.yml
 
-  # The nixie config check: deploy/nixie/config.yaml as infra renders it, the render code and the
-  # shared constants it reads, the stack config that pins the nixie image whose validation it runs,
-  # the suite and its helpers, the script that runs it, and the CI workflow.
+  # The nixie config check: deploy/nixie/config.yaml as infra renders it, the render code, the
+  # module that renders it for the ConfigMap and the spec whose security settings the suite copies,
+  # the shared constants it reads, the stack config that pins the nixie image whose validation it
+  # runs, the suite and its helpers, the script that runs it, the dependencies, and the CI workflow.
   nixie-config:
     skipped: Nothing nixie's config is built from changed, so the pinned nixie did not check it.
     paths:
@@ -217,12 +218,15 @@ gates:
       - deploy/nixie/test-config.sh
       - infra/shared/render-nixie-config.ts
       - infra/shared/build-nixie-imp-config.ts
+      - infra/cluster/nixie.ts
+      - infra/cluster/build-nixie-spec.ts
       - packages/topology/**
       - infra/Pulumi.prod.yaml
       - scripts/run-shell-suites.sh
       - test-support/shell/run-cases.sh
       - test-support/shell/create-case-tree.sh
       - test-support/shell/assert-status.sh
+      - bun.lock
       - .bun-version
       - package.json
       - .github/workflows/ci.yml

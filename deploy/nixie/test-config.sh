@@ -45,8 +45,14 @@ it_shows_the_refusal_of_a_context_cap_above_the_cli_window() {
   local image="$1" status=0
   name="nixie-config-$2-$BASHPID"
   create_case_tree "$cleanup"
-  # an ID the CLI's catalog lacks gets its 200000-token window, under opus-5-5's 400000 cap
-  sed 's/model: claude-opus-5-5$/model: claude-test-1/' "$repo/deploy/nixie/config.yaml" > "$tree/source.yaml"
+  # a copy of the conversation's profile on an ID the CLI's catalog lacks, which gets the
+  # 200000-token window, with a 400000 cap
+  (cd "$repo" && bun -e '
+    const config = Bun.YAML.parse(await Bun.file("deploy/nixie/config.yaml").text());
+    const profile = config.models.profiles[config.models.roles.conversation];
+    config.models.profiles["test-refused"] = { ...profile, model: "claude-test-1", context_tokens: 400000 };
+    console.log(Bun.YAML.stringify(config, null, 2));
+  ') > "$tree/source.yaml"
   render_config "$tree/source.yaml" "$tree/config.yaml"
 
   run_health "$name" "$image" "$tree/config.yaml" > "$tree/out" 2> "$tree/err" || status=$?
@@ -54,7 +60,7 @@ it_shows_the_refusal_of_a_context_cap_above_the_cli_window() {
   diff /dev/null "$tree/err"
   sed -E 's/"time":"[^"]+",//' "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
-{"event":"command.failed","command":"health","error":"Error","message":"nixie refuses the deployment configuration in /etc/nixie/config.yaml:\nmodels.profiles.opus-5-5.context_tokens: the context cap of 400000 tokens is larger than the 200000-token window the Claude CLI assumes for claude-test-1"}
+{"event":"command.failed","command":"health","error":"Error","message":"nixie refuses the deployment configuration in /etc/nixie/config.yaml:\nmodels.profiles.test-refused.context_tokens: the context cap of 400000 tokens is larger than the 200000-token window the Claude CLI assumes for claude-test-1"}
 EOF
   assert_status 1 "$status"
 }
