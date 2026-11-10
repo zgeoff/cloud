@@ -120,7 +120,7 @@ jobs:
       # the CLI release that matches the program's @pulumi/pulumi
       - name: Setup Pulumi
         if: steps.decide.outputs.apply == 'true'
-        uses: pulumi/actions@8e5e406f4007fca908480587cb9893c07090f58d # v7.0.0
+        uses: pulumi/actions@96c7761824268174e0d2a4e8c7d75671eebd24a7 # v7.1.0
         with:
           pulumi-version: 3.273.0
 
