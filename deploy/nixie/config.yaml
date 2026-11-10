@@ -16,7 +16,21 @@ models:
     # pricing page. Each profile names its harness, the loop that runs its turns, with no default;
     # agent-sdk is the only harness nixie runs.
     #
-    # the conversation's profile, and the selectable opus-5-5
+    # the conversation's profile, and the selectable fable-5-2
+    fable-5-2:
+      base_url: https://api.anthropic.com
+      credential: deployment:anthropic
+      auth_header: bearer
+      model: claude-fable-5-2
+      effort: medium
+      harness: agent-sdk
+      # compact a long conversation at 400k tokens instead of near the full 1M window
+      context_tokens: 400000
+      # keep the cached prompt for an hour, for the conversation and for a task on fable-5-2 or
+      # opus-5-5; every other profile keeps the 5m default
+      cache_ttl: 1h
+      prices: { input: 8, cache_write: 10, cache_write_1h: 16, cached_input: 0.2, output: 40 }
+    # the selectable opus-5-5, with the conversation's context and cache settings
     opus-5-5:
       base_url: https://api.anthropic.com
       credential: deployment:anthropic
@@ -24,10 +38,7 @@ models:
       model: claude-opus-5-5
       effort: medium
       harness: agent-sdk
-      # compact a long conversation at 400k tokens instead of near the full window
       context_tokens: 400000
-      # keep the cached prompt for an hour, for the conversation and for a task on opus-5-5; every
-      # other profile keeps the 5m default
       cache_ttl: 1h
       prices: { input: 4, cache_write: 5, cache_write_1h: 8, cached_input: 0.2, output: 20 }
     # the memory writer extracts and files memories from each batch of messages
@@ -99,16 +110,8 @@ models:
       effort: medium
       harness: agent-sdk
       prices: { input: 10, cache_write: 12.5, cache_write_1h: 20, cached_input: 0.25, output: 50 }
-    fable-5-2:
-      base_url: https://api.anthropic.com
-      credential: deployment:anthropic
-      auth_header: bearer
-      model: claude-fable-5-2
-      effort: medium
-      harness: agent-sdk
-      prices: { input: 8, cache_write: 10, cache_write_1h: 16, cached_input: 0.2, output: 40 }
   roles:
-    conversation: opus-5-5
+    conversation: fable-5-2
     memory-writer: haiku-5-5-low
     checker: sonnet-5-5-high
   # the models a started task can choose in place of the task role's profile; the conversation sees
