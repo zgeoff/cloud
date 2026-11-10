@@ -55,6 +55,9 @@ test.each([
   ['nixie-backup', ['deploy/nixie/backup/restore.sh'], true],
   ['nixie-backup', ['package.json'], true],
   ['nixie-backup', ['deploy/files/backup/backup.sh', 'infra/index.ts'], false],
+  ['nixie-config', ['deploy/nixie/config.yaml'], true],
+  ['nixie-config', ['infra/Pulumi.prod.yaml'], true],
+  ['nixie-config', ['deploy/nixie/backup/restore.sh', 'infra/index.ts'], false],
   ['alert-rules', ['infra/observability/build-alert-rules.ts'], true],
   ['alert-rules', ['packages/topology/index.ts'], true],
   ['alert-rules', ['test-support/shell/start-alloy.sh'], true],
@@ -85,6 +88,7 @@ test('it holds the gates that CI, the NixOS checks and the prod apply read', asy
     'files-image',
     'files-backup',
     'nixie-backup',
+    'nixie-config',
     'alert-rules',
   ]);
 });

@@ -70,9 +70,11 @@ serves its API. The NixieDegraded alert watches that status
 
 nixie reads its settings from `deploy/nixie/config.yaml`, which Pulumi turns into a ConfigMap
 mounted at the path nixie reads. Pulumi adds the `imp` section, impd's URL and the host's addresses,
-from `packages/topology`, so the file holds no copy of them. The ConfigMap and both Secrets have no
-fixed name, so a change to any of them replaces it, and the StatefulSet rolls onto the new name.
-nixie reads each file once at start, so a roll is how a change reaches it.
+from `packages/topology`, so the file holds no copy of them. CI runs the rendered file through the
+validation of the nixie image the stack config pins (`deploy/nixie/test-config.sh`), so a file that
+nixie refuses fails its pull request and never reaches the deploy. The ConfigMap and both Secrets
+have no fixed name, so a change to any of them replaces it, and the StatefulSet rolls onto the new
+name. nixie reads each file once at start, so a roll is how a change reaches it.
 
 nixie reads its definitions, the persona and the rules in the private repo
 `zgeoff/nixie-definitions`, from a directory. A git-sync sidecar clones that repo's `live` branch
