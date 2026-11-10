@@ -30,19 +30,19 @@
     "digest": "sha256:93683107e42902ae89ea4ff3342fcdd5528c4b52b77b87061ba999a3d47bba37"
   },
   "nixie": {
-    "version": "0.70.0",
-    "digest": "sha256:c764c680be39cdd81de1982df2ac1ce7b73b710d4a69c82cc2bda186598ae4ed"
+    "version": "0.70.1",
+    "digest": "sha256:61407954a181aa427480ae5d41d8f0afe2b188063bb8d943522ab04b5866c547"
   },
   "nixie-web": {
-    "version": "0.70.0",
-    "digest": "sha256:97ff132501a75dbfe2bb4c4ede446b273384a04ebf5d9960b7a2f97013e6b328"
+    "version": "0.70.1",
+    "digest": "sha256:ea2b8ff5bd96c244a4ecc35104afd71c291e097bc33be7dbdcd020a0043cc884"
   },
   "nixie-backup": {
-    "version": "0.70.0",
-    "digest": "sha256:a177f05aa7257e968846b140770ac60792a72a9e9d04cb7ceb7e837c2da8a54b"
+    "version": "0.70.1",
+    "digest": "sha256:2a4dda166834196d895c0e2716ed0fe874b94bbe8ab4fc950dfa38fe2bcf9fa3"
   },
   "nixie-contract": {
-    "version": "0.70.0"
+    "version": "0.70.1"
   },
   "auto-mode": {
     "version": "4.0.0",

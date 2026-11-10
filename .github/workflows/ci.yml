@@ -48,6 +48,7 @@ jobs:
       files-image: ${{ steps.decide.outputs.files-image }}
       files-backup: ${{ steps.decide.outputs.files-backup }}
       nixie-backup: ${{ steps.decide.outputs.nixie-backup }}
+      nixie-config: ${{ steps.decide.outputs.nixie-config }}
       alert-rules: ${{ steps.decide.outputs.alert-rules }}
       reused: ${{ steps.decide.outputs.reused }}
     steps:
@@ -74,7 +75,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >-
           bun run --silent ci:decide-ci-gates provider onidel-vendor full agent-image atc-gateway
-          files-image files-backup nixie-backup alert-rules
+          files-image files-backup nixie-backup nixie-config alert-rules
 
   # the Bun checks and tests, the shell suites and the secret scan
   bun:
@@ -397,6 +398,33 @@ jobs:
         if: needs.decide.outputs.nixie-backup != 'false'
         run: bun run test:nixie-backup-fixture
 
+  # the rendered nixie config through the validation of the nixie image the stack config pins
+  test-nixie-config:
+    needs: decide
+    if: >-
+      ${{ !cancelled() && !github.event.repository.private && needs.decide.outputs.nixie-config !=
+      'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      LEFTHOOK: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Test nixie Config
+        run: bun run test:nixie-config
+
   # the provider's Go checks and the SDK check, which builds the provider and regenerates
   # sdk/onidel
   provider:
@@ -456,6 +484,7 @@ jobs:
       - test-agent-image
       - test-atc-gateway-fixture
       - test-backup-fixtures
+      - test-nixie-config
       - provider
     # always, not !cancelled(): a cancelled run would skip this job, and the ruleset counts a
     # skipped required check as passed, so it runs and fails on the cancelled jobs instead
@@ -504,7 +533,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >-
           bun run --silent ci:decide-ci-gates provider onidel-vendor full agent-image atc-gateway
-          files-image files-backup nixie-backup alert-rules
+          files-image files-backup nixie-backup nixie-config alert-rules
 
       - name: Install
         if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
@@ -650,6 +679,10 @@ jobs:
       - name: Test nixie Backup Fixture
         if: ${{ github.event.repository.private && steps.decide.outputs.nixie-backup != 'false' }}
         run: bun run test:nixie-backup-fixture
+
+      - name: Test nixie Config
+        if: ${{ github.event.repository.private && steps.decide.outputs.nixie-config != 'false' }}
+        run: bun run test:nixie-config
 
       - name: Setup Go
         if: >-
