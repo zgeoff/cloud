@@ -83,6 +83,8 @@ function createGarage(
   const env = createEnvSecret(cluster, namespace, garage.name, {
     GARAGE_RPC_SECRET: inputs.secrets.garageRPCSecret,
     GARAGE_ADMIN_TOKEN: inputs.secrets.garageAdminToken,
+    GARAGE_DEFAULT_ACCESS_KEY: inputs.secrets.s2GarageAccessKeyID,
+    GARAGE_DEFAULT_SECRET_KEY: inputs.secrets.s2GarageSecretAccessKey,
   });
 
   const config = new ConfigMap(

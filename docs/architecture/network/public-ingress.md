@@ -7,12 +7,14 @@ record that points at that tunnel, and Pulumi declares both. The TLS front serve
 imp's own MCP and OAuth route, which a hosted assistant signs in to and calls directly at
 `https://imp.geoff.cloud/mcp`. Each workload behind a route brings its own authentication. The atc
 tunnel serves `atc.geoff.cloud`, the atc gateway, which runs its own OAuth server. The shared tunnel
-serves two hostnames. `preview-webhook.geoff.cloud` reaches the preview service's webhook listener,
-which checks the signature of every GitHub delivery. `files.geoff.cloud` reaches the files service,
-which serves each file to anyone who holds its link and checks a role token on every write.
-Cloudflare Access adds an owner-only login in front of the gateway's sign-in pages, and nowhere
-else. [The atc gateway](../workloads/atc-gateway.md), [the preview service](../workloads/preview.md)
-and [the files service](../workloads/files.md) cover what answers behind each route.
+serves two hostnames, and a third while pepys runs. `preview-webhook.geoff.cloud` reaches the
+preview service's webhook listener, which checks the signature of every GitHub delivery.
+`files.geoff.cloud` reaches the files service, which serves each file to anyone who holds its link
+and checks a role token on every write. `pepys-webhook.geoff.cloud` reaches pepys ingest, which
+checks the signature of every GitHub delivery. Cloudflare Access adds an owner-only login in front
+of the gateway's sign-in pages, and nowhere else. [The atc gateway](../workloads/atc-gateway.md),
+[the preview service](../workloads/preview.md) [the files service](../workloads/files.md) and
+[pepys](../workloads/pepys.md) cover what answers behind each route.
 
 ## The host's TLS front
 
@@ -58,7 +60,9 @@ connected, so one replica's restart drops no traffic. Its list holds the preview
 which matches the path `/webhook` alone and routes it to the listener on the host's tailnet address,
 which the host admits only from pod addresses. It then holds the files service's rule, which has no
 path pattern, so every path of `files.geoff.cloud` reaches the service's cluster address and the
-service answers 404 for any path it does not serve.
+service answers 404 for any path it does not serve. While pepys runs, pepys's rule follows. Its path
+pattern lists exactly the ingest routes that pepys marks public, so every other path of
+`pepys-webhook.geoff.cloud` gets the tunnel's 404.
 
 ### The atc tunnel
 

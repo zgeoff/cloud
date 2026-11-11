@@ -37,6 +37,8 @@ export function loadPepysInputs(
   const pull = requireGHCRPullCredential(env);
   const backup = findBackup(env);
 
+  requireGarageKey(env);
+
   return {
     pepys: {
       config: {
@@ -107,4 +109,16 @@ const need = 'pepys needs it while stack config "pepys" is set';
 
 function requireSecret(env: Environment, name: string): Output<string> {
   return secret(requireVariable(env, name, need));
+}
+
+// Garage imports s2-lite's key at its first start and refuses a key in any other form
+function requireGarageKey(env: Environment): void {
+  const id = requireVariable(env, 'PEPYS_S2_GARAGE_ACCESS_KEY_ID', need);
+  const key = requireVariable(env, 'PEPYS_S2_GARAGE_SECRET_ACCESS_KEY', need);
+
+  if (!/^GK[\da-f]{24}$/u.test(id) || !/^[\da-f]{64}$/u.test(key)) {
+    throw new Error(
+      'PEPYS_S2_GARAGE_ACCESS_KEY_ID must be GK and 24 hex digits, and PEPYS_S2_GARAGE_SECRET_ACCESS_KEY 64 hex digits',
+    );
+  }
 }

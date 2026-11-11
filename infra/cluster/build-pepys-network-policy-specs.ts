@@ -31,7 +31,7 @@ export function buildPepysNetworkPolicySpecs(): Readonly<Record<string, NetworkP
       },
     ]),
 
-    // no caller in the cluster yet: the owner reaches the API through a port-forward
+    // no pod calls the API or the backup
     [workloads.host.name]: buildIngressPolicy(workloads.host.labels, []),
     [workloads.backup.name]: buildIngressPolicy(workloads.backup.labels, []),
   };

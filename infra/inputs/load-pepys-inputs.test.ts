@@ -22,8 +22,9 @@ function setupTest() {
     GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
     PEPYS_GARAGE_RPC_SECRET: 'rpc-secret-for-tests',
     PEPYS_GARAGE_ADMIN_TOKEN: 'admin-token-for-tests',
-    PEPYS_S2_GARAGE_ACCESS_KEY_ID: 'GK-s2-key-for-tests',
-    PEPYS_S2_GARAGE_SECRET_ACCESS_KEY: 's2-garage-secret-for-tests',
+    PEPYS_S2_GARAGE_ACCESS_KEY_ID: 'GK0123456789abcdef01234567',
+    PEPYS_S2_GARAGE_SECRET_ACCESS_KEY:
+      '89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567',
     PEPYS_S2_ACCESS_TOKEN: 's2-token-for-tests',
     PEPYS_WIDGET_SECRET: 'widget-secret-for-tests',
   };
@@ -164,4 +165,16 @@ test('it refuses an R2 endpoint with a path', () => {
       [],
     ),
   ).toThrowWithMessage(Error, 'PEPYS_R2_ENDPOINT must be an https:// origin with no path');
+});
+
+test('it refuses an s2-lite key that Garage would not import', () => {
+  const fixture = setupTest();
+
+  expect(() =>
+    loadPepysInputs(
+      fixture.pepysConfig,
+      { ...fixture.coreEnv, PEPYS_S2_GARAGE_ACCESS_KEY_ID: 'AKIA0123456789' },
+      [],
+    ),
+  ).toThrowWithMessage(Error, /^PEPYS_S2_GARAGE_ACCESS_KEY_ID must be GK and 24 hex digits/u);
 });

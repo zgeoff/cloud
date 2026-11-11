@@ -31,6 +31,9 @@ export function buildPepysBackupPodSpec(inputs: PepysBackupPodInputs) {
           { name: 'RCLONE_CONFIG_GARAGE_REGION', value: 'garage' },
           { name: 'RCLONE_CONFIG_R2_TYPE', value: 's3' },
           { name: 'RCLONE_CONFIG_R2_PROVIDER', value: 'Cloudflare' },
+
+          // an R2 token scoped to one bucket cannot list buckets, which rclone's check needs
+          { name: 'RCLONE_CONFIG_R2_NO_CHECK_BUCKET', value: 'true' },
         ],
         envFrom: [{ secretRef: { name: inputs.envSecret } }],
         volumeMounts: [

@@ -28,6 +28,7 @@ test('it runs the backup script on each bucket a store writes, with Garage and R
       { name: 'RCLONE_CONFIG_GARAGE_REGION', value: 'garage' },
       { name: 'RCLONE_CONFIG_R2_TYPE', value: 's3' },
       { name: 'RCLONE_CONFIG_R2_PROVIDER', value: 'Cloudflare' },
+      { name: 'RCLONE_CONFIG_R2_NO_CHECK_BUCKET', value: 'true' },
     ],
     envFrom: [{ secretRef: { name: envSecret } }],
   });

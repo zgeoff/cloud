@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildPepysGarageSpec } from './build-pepys-garage-spec.ts';
 
-test('it runs one single-node Garage as nonroot, with its secrets from the Secret and two retained volumes', () => {
+test('it runs one single-node Garage as nonroot that creates the facts bucket, with its secrets from the Secret and two retained volumes', () => {
   const configMap = output('pepys-garage-config-0a1b2c3d');
   const envSecret = output('pepys-garage-0a1b2c3d');
 
@@ -25,8 +25,11 @@ test('it runs one single-node Garage as nonroot, with its secrets from the Secre
   });
 
   expect(spec.template.spec?.containers[0]).toMatchObject({
-    command: ['/garage', 'server', '--single-node'],
-    env: [{ name: 'GARAGE_CONFIG_FILE', value: '/etc/garage/garage.toml' }],
+    command: ['/garage', 'server', '--single-node', '--default-bucket'],
+    env: [
+      { name: 'GARAGE_CONFIG_FILE', value: '/etc/garage/garage.toml' },
+      { name: 'GARAGE_DEFAULT_BUCKET', value: 'facts' },
+    ],
     envFrom: [{ secretRef: { name: envSecret } }],
     securityContext: {
       allowPrivilegeEscalation: false,

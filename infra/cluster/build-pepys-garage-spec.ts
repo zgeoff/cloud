@@ -11,7 +11,8 @@ interface PepysGarageSpecInputs {
   // the ConfigMap that holds deploy/pepys/garage.toml
   readonly configMap: Output<string>;
 
-  // the Secret with GARAGE_RPC_SECRET and GARAGE_ADMIN_TOKEN
+  // the Secret with GARAGE_RPC_SECRET, GARAGE_ADMIN_TOKEN, and s2-lite's key as
+  // GARAGE_DEFAULT_ACCESS_KEY and GARAGE_DEFAULT_SECRET_KEY
   readonly envSecret: Output<string>;
 }
 
@@ -38,10 +39,14 @@ export function buildPepysGarageSpec(inputs: PepysGarageSpecInputs) {
             name: 'garage',
             image: inputs.image,
 
-            // --single-node assigns the layout at the first start, so no layout command is run
-            command: ['/garage', 'server', '--single-node'],
+            // --single-node assigns the layout at the first start, and --default-bucket creates
+            // the log's bucket with s2-lite's key on it, so s2-lite starts with no setup command
+            command: ['/garage', 'server', '--single-node', '--default-bucket'],
             ports: [{ name: 's3', containerPort: garage.s3Port }],
-            env: [{ name: 'GARAGE_CONFIG_FILE', value: '/etc/garage/garage.toml' }],
+            env: [
+              { name: 'GARAGE_CONFIG_FILE', value: '/etc/garage/garage.toml' },
+              { name: 'GARAGE_DEFAULT_BUCKET', value: pepysWorkloads.s2.bucket },
+            ],
             envFrom: [{ secretRef: { name: inputs.envSecret } }],
             readinessProbe: {
               tcpSocket: { port: garage.s3Port },

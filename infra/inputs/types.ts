@@ -173,7 +173,7 @@ export interface PepysInputs {
     readonly garageRPCSecret: Output<string>;
     readonly garageAdminToken: Output<string>;
 
-    // s2-lite's key on the facts bucket
+    // s2-lite's key on the facts bucket, which Garage imports at its start
     readonly s2GarageAccessKeyID: Output<string>;
     readonly s2GarageSecretAccessKey: Output<string>;
     readonly s2AccessToken: Output<string>;
