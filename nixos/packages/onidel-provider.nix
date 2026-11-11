@@ -22,7 +22,7 @@ buildGoModule {
     ];
   };
 
-  vendorHash = "sha256-RQUlCg2ZJhMOfyfAkEw8ok/X6HDV26E79fPTZNNJm1Q=";
+  vendorHash = "sha256-pDA4h+GFzG69icu758dGxndeFc+IxdE//j2AgSTGjgE=";
   subPackages = [ "cmd/pulumi-resource-onidel" ];
   env.CGO_ENABLED = "0";
 
