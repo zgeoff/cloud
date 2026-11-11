@@ -308,6 +308,10 @@ in
     # no agent slot
     settings.IMP_PRIORITY_RAM_MIB = 6144;
     settings.IMP_PRIORITY_IMPS = "nixie-*";
+    # the name of this impd in each imp identity token that its broker signs. A service stores the
+    # name beside the imp it names, so a change orphans those rows, and no other impd may use it.
+    # An impd older than 6.12.0 does not read the setting
+    settings.IMP_IDENTITY_ISSUER = "geoffcloud";
   };
 
   # the pool of 2 MiB pages that impd's huge pages run on: the whole imp RAM budget, since no imp

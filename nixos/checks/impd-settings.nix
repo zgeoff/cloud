@@ -81,6 +81,18 @@ let
       '';
     }
     {
+      title = "it names impd geoffcloud as the issuer of its imp identity tokens";
+      script = ''
+        assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
+        settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
+        grep '^IMP_IDENTITY_' "$settings" > actual
+
+        assert_files_equal - actual <<'EOF'
+        IMP_IDENTITY_ISSUER=geoffcloud
+        EOF
+      '';
+    }
+    {
       title = "it hands impd the public MCP origin https://imp.geoff.cloud and its listener port 7071";
       script = ''
         assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
