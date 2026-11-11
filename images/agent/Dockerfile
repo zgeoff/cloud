@@ -69,8 +69,8 @@ ARG CURL_RETRY="--retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 2
 #   curl -fsSL https://downloads.claude.ai/keys/claude-code.asc | gpg --import
 #   gpg --verify manifest.json.sig manifest.json
 #   jq -r '.platforms["linux-x64"].checksum' manifest.json
-ARG CLAUDE_CODE_VERSION=2.1.294
-ARG CLAUDE_CODE_SHA256=27122ca7b624f537546fbef35b80c66370d974ff258f3d9b10ac50bb8771f262
+ARG CLAUDE_CODE_VERSION=2.1.322
+ARG CLAUDE_CODE_SHA256=bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478
 RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/claude \
       "https://downloads.claude.ai/claude-code-releases/${CLAUDE_CODE_VERSION}/linux-x64/claude" \
  && echo "${CLAUDE_CODE_SHA256}  /usr/local/bin/claude" | sha256sum -c - \
