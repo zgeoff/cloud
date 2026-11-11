@@ -119,7 +119,7 @@
     "@commitlint/cli": "21.2.4",
     "@faker-js/faker": "10.6.0",
     "@heynixie/contract": "0.70.1",
-    "@impz/client": "6.11.5",
+    "@impz/client": "6.11.6",
     "@maschwenk/tsrslint": "0.1.6",
     "@mswjs/interceptors": "0.45.11",
     "@orpc/client": "1.16.1",
