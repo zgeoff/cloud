@@ -31,6 +31,11 @@ host's own table therefore drops pod traffic to Podman's subnet
 ([firewalls](../network/firewalls.md#the-narrowing-table)), and on Podman's bridge only the host and
 the containers reach imp-host.
 
+impd signs an imp identity token for each request of a broker secret that asks for one, and names
+itself `geoffcloud` in the token. A service behind the broker pins impd's public keys under that
+name, from `impz identity jwks`, and so tells one imp from another. A change of the name orphans
+what each service stored under it.
+
 The container gets no socket of a container engine, and the host runs no Docker: impd fetches its
 builder image from the registry itself. Host tools reach impd through `podman exec imp-host`. A host
 unit that calls imp's CLI this way names root's home with `-e HOME=/root`, where the CLI finds
