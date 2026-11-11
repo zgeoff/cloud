@@ -50,6 +50,7 @@ const workloads =
         },
         ...(k3s.inputs.nixie === undefined ? {} : { nixie: k3s.inputs.nixie }),
         ...(k3s.inputs.files === undefined ? {} : { files: k3s.inputs.files }),
+        ...(k3s.inputs.pepys === undefined ? {} : { pepys: k3s.inputs.pepys }),
         zoneID: edge.zoneID,
         kubeconfig: secret(k3s.inputs.kubeconfig),
       });
@@ -62,6 +63,7 @@ const ingress = createIngress({
   atcOwnerEmail: k3s?.inputs.atcGateway?.secrets.ownerEmail,
   atcTunnel,
   filesRoute: workloads?.filesRoute,
+  pepysRoute: workloads?.pepysRoute,
 });
 
 export const tunnelToken = ingress.tunnelToken;
@@ -70,6 +72,7 @@ export const atcTunnelConfigVersion = ingress.atcTunnelConfigVersion;
 export const atcURL = ingress.atcURL;
 export const previewWebhookURL = ingress.previewWebhookURL;
 export const filesURL = ingress.filesURL;
+export const pepysWebhookURL = ingress.pepysWebhookURL;
 export const onePasswordConnectServiceURL = workloads?.onePasswordConnectServiceURL;
 export const atcGatewayServiceURL = workloads?.atcGatewayServiceURL;
 export const nixieURL = workloads?.nixieURL;

@@ -34,6 +34,8 @@ call, the path of a change, the topology and the data.
     link, and the signed webhook that posts it.
   - [The files service](./architecture/workloads/files.md): token-gated uploads, public reads by
     link, the type rules for serving, expiry and the backup.
+  - [pepys](./architecture/workloads/pepys.md): the data hub's stores, ingest, host and API, its one
+    public route, and the bucket backup.
   - [Observability](./architecture/workloads/observability.md): metrics, logs, probes, alerts and
     the check from the edge.
 

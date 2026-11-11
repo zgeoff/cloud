@@ -267,6 +267,30 @@
     "apiVersion": "networking.k8s.io/v1",
     "kind": "NetworkPolicy",
     "metadata": {
+      "name": "egress-deny",
+      "namespace": "pepys"
+    },
+    "spec": {
+      "podSelector": {},
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": ["100.64.0.0/10", "10.88.0.0/16"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
       "name": "atc-gateway-egress",
       "namespace": "atc"
     },

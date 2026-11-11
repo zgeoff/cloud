@@ -27,6 +27,7 @@ test('it gives every namespace the egress deny, kube-system and default included
     'nixie-ingress',
     'observability',
     'onepassword',
+    'pepys',
   ]);
 });
 

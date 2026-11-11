@@ -1,0 +1,9 @@
+{
+  "routes": [
+    { "source": "github", "route": "/webhook/github", "reach": "public" },
+    { "source": "telemetry", "route": "/v1/logs", "reach": "private" },
+    { "source": "telemetry", "route": "/v1/metrics", "reach": "private" },
+    { "source": "telemetry", "route": "/v1/traces", "reach": "private" }
+  ],
+  "secretVariables": ["PEPYS_GITHUB_WEBHOOK_SECRET", "PEPYS_TELEMETRY_TOKEN"]
+}

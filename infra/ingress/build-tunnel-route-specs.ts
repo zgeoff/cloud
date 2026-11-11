@@ -19,6 +19,7 @@ export interface TunnelRouteSpecs {
   readonly sharedIngresses: TunnelIngress[];
   readonly previewWebhookRecord: TunnelRecordSpec;
   readonly filesRecord?: TunnelRecordSpec;
+  readonly pepysRecord?: TunnelRecordSpec;
   readonly atc?: { readonly ingresses: TunnelIngress[]; readonly record: TunnelRecordSpec };
 }
 
@@ -26,6 +27,7 @@ export function buildTunnelRouteSpecs(
   sharedTunnelID: Output<string>,
   gateway: GatewayIngress | undefined,
   files: TunnelRoute | undefined,
+  pepys: TunnelRoute | undefined,
 ): TunnelRouteSpecs {
   const previewWebhookRoute = buildPreviewWebhookRoute();
 
@@ -33,11 +35,15 @@ export function buildTunnelRouteSpecs(
     sharedIngresses: buildTunnelIngresses([
       previewWebhookRoute,
       ...(files === undefined ? [] : [files]),
+      ...(pepys === undefined ? [] : [pepys]),
     ]),
     previewWebhookRecord: { hostname: previewWebhookRoute.hostname, tunnelID: sharedTunnelID },
     ...(files === undefined
       ? {}
       : { filesRecord: { hostname: files.hostname, tunnelID: sharedTunnelID } }),
+    ...(pepys === undefined
+      ? {}
+      : { pepysRecord: { hostname: pepys.hostname, tunnelID: sharedTunnelID } }),
     ...(gateway === undefined
       ? {}
       : {

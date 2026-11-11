@@ -14,5 +14,6 @@ test('it collects every namespace in the cluster, kube-system and default includ
     'nixie-ingress',
     'observability',
     'onepassword',
+    'pepys',
   ]);
 });

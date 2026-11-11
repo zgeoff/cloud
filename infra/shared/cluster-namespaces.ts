@@ -10,6 +10,7 @@ export const clusterNamespaceNames = [
   'nixie-ingress',
   'observability',
   'onepassword',
+  'pepys',
 ] as const;
 
 export type ClusterNamespace = (typeof clusterNamespaceNames)[number];
@@ -34,6 +35,7 @@ export const clusterNamespaces = {
   'nixie-ingress': { owner: 'pulumi', podSecurity: 'exempt', egress: 'deny' },
   observability: { owner: 'pulumi', podSecurity: 'exempt', egress: 'deny' },
   onepassword: { owner: 'pulumi', podSecurity: 'baseline', egress: 'deny' },
+  pepys: { owner: 'pulumi', podSecurity: 'baseline', egress: 'deny' },
 } as const satisfies Record<ClusterNamespace, ClusterNamespaceEntry>;
 
 export type PulumiNamespace = {

@@ -140,3 +140,48 @@ export interface AlertWebhook {
   // the Discord user a critical alert mentions, so the message pushes a notification
   readonly mentionUserID: string;
 }
+
+interface PepysConfig {
+  // the cloud-pepys image, by tag and digest: ingest, the host and the API run its binaries
+  readonly image: string;
+
+  // the public DNS name of ingest's public routes, which the shared tunnel serves
+  readonly webhookHostname: string;
+
+  // the audience that a telemetry sender's identity token must name
+  readonly impIdentityAudience: string;
+}
+
+// a nightly rclone copy of the Garage buckets to an R2 bucket
+export interface PepysBackupInputs {
+  readonly secrets: {
+    readonly garageAccessKeyID: Output<string>;
+    readonly garageSecretAccessKey: Output<string>;
+    readonly r2Endpoint: Output<string>;
+    readonly r2Bucket: Output<string>;
+    readonly r2AccessKeyID: Output<string>;
+    readonly r2SecretAccessKey: Output<string>;
+  };
+}
+
+export interface PepysInputs {
+  readonly config: PepysConfig;
+
+  readonly pullCredential: GHCRPullCredential;
+
+  readonly secrets: {
+    readonly garageRPCSecret: Output<string>;
+    readonly garageAdminToken: Output<string>;
+
+    // s2-lite's key on the facts bucket
+    readonly s2GarageAccessKeyID: Output<string>;
+    readonly s2GarageSecretAccessKey: Output<string>;
+    readonly s2AccessToken: Output<string>;
+
+    // each secret that a route of the deployment checks, by the variable ingest reads
+    readonly ingest: Readonly<Record<string, Output<string>>>;
+  };
+
+  // without it there is no backup CronJob
+  readonly backup?: PepysBackupInputs;
+}
