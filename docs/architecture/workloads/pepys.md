@@ -36,22 +36,29 @@ otherwise, and no Service reaches a loopback listener.
 [`write-pepys-image-context.sh`](../../../scripts/write-pepys-image-context.sh) writes its build
 context:
 
-1. It downloads the host binary of the release that
+1. It checks `ingest-routes.json` against the deployment, as [Routes](#routes) says, and stops on a
+   difference before it downloads or builds anything.
+2. It downloads the host binary of the release that
    [`images/pepys/versions.env`](../../../images/pepys/versions.env) pins, and checks the binary
    against the release's `SHA256SUMS` and against the pin.
-2. It runs `pepys build` on the deployment file for the modules.
-3. It compiles the ingest and API entry files with `bun build --compile`.
+3. It runs `pepys build` on the deployment file for the modules.
+4. It compiles the ingest and API entry files with `bun build --compile`.
 
 The `@pepys/*` packages must carry the version that `PEPYS_RELEASE` names, so that the binaries and
 the modules come from one release. The deployment file, the two entry files and the packages are not
 in the repo yet, so the image does not build yet.
 
+[`images/pepys/run-image-tests.sh`](../../../images/pepys/run-image-tests.sh) builds the image from
+a stand-in context and runs its suite: each program starts as nonroot from a 0555 file, and that
+user reads the modules, which root owns.
+
 ## Routes
 
 [`deploy/pepys/ingest-routes.json`](../../../deploy/pepys/ingest-routes.json) lists ingest's routes,
-each marked `public` or `private`, and the secret variables they check. It must match the receive
-routes of the deployment's plug-ins. The Pulumi program cannot load the plug-ins, so it reads this
-file instead.
+each marked `public` or `private`, and the secret variables ingest reads: each receive route's
+secret and each pull path's `env`. It must match the deployment's plug-ins, and
+[`check-pepys-routes.ts`](../../../scripts/check-pepys-routes.ts) checks that it does. The Pulumi
+program cannot load the plug-ins, so it reads this file instead.
 
 The shared tunnel carries the `public` routes to ingest at `pepys-webhook.geoff.cloud`, by one path
 pattern anchored at both ends. It answers 404 on every other path of that host. Ingest checks the
