@@ -67,8 +67,9 @@ The telemetry routes are `private`, and no route reaches them yet. Ingest refuse
 without a proven sender. The trust documents of the sender proof are the JSON files in
 `deploy/pepys/imp-issuers/`, which a ConfigMap mounts at `PEPYS_IMP_IDENTITY_ISSUERS`, and the
 audience is the stack config's `pepys.impIdentityAudience`, `pepys.imp.internal`. The folder holds
-no document yet, so ingest starts and refuses every export. The document of the issuer `geoffcloud`
-goes there as `geoffcloud.json`.
+`geoffcloud.json`, the public key of the issuer `geoffcloud`, so ingest accepts an export whose
+identity token that issuer signed for that audience, and refuses every other export. An invalid
+document stops ingest at start.
 
 The ingest Service has the pinned ClusterIP that `pepysIngest` in
 [`constants.json`](../../../packages/topology/constants.json) names, so a relay on the host can dial
