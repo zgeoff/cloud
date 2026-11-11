@@ -8,8 +8,9 @@ interface PepysIngestSpecInputs {
   // the cloud-pepys image
   readonly image: string;
 
-  // the audience that a telemetry sender's identity token must name
-  readonly impIdentityAudience: string;
+  // the audience that a telemetry sender's identity token must name; with none, ingest starts and
+  // refuses every telemetry export
+  readonly impIdentityAudience?: string;
 
   // the Secret with PEPYS_S2_ACCESS_TOKEN and each secret a route checks
   readonly envSecret: Output<string>;
@@ -47,7 +48,9 @@ export function buildPepysIngestSpec(inputs: PepysIngestSpecInputs) {
               { name: 'PEPYS_INGEST_PORT', value: String(ingest.port) },
               { name: 'PEPYS_S2_ENDPOINT', value: pepysWorkloads.s2.url },
               { name: 'PEPYS_S2_BASIN', value: pepysWorkloads.s2.basin },
-              { name: 'PEPYS_IMP_IDENTITY_AUDIENCE', value: inputs.impIdentityAudience },
+              ...(inputs.impIdentityAudience === undefined
+                ? []
+                : [{ name: 'PEPYS_IMP_IDENTITY_AUDIENCE', value: inputs.impIdentityAudience }]),
               { name: 'PEPYS_IMP_IDENTITY_ISSUERS', value: issuersDirectory },
             ],
             envFrom: [{ secretRef: { name: inputs.envSecret } }],

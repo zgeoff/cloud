@@ -44,6 +44,10 @@
   "nixie-contract": {
     "version": "0.70.1"
   },
+  "pepys-host": {
+    "version": "0.0.0",
+    "sum": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
   "auto-mode": {
     "version": "4.0.0",
     "sum": "b4f876ed5c586abd72ef3bf47b1a4ace3eefe81fb589397fd5be0c3307cfa58b"

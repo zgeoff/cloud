@@ -19,7 +19,9 @@ export const pepysWorkloads = {
     // the bucket and the path in it that hold the fact log
     bucket: 'facts',
     path: 's2lite',
-    basin: 'pepys',
+
+    // S2 refuses a basin name shorter than 8 bytes
+    basin: 'pepys-facts',
   },
   ingest: {
     name: 'pepys-ingest',

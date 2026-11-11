@@ -24,6 +24,7 @@ const pinFiles = [
   'nixos/hosts/geoffcloud/configuration.nix',
   'scripts/nix-image.sh',
   'infra/observability/test-nixie-alerts.sh',
+  'infra/shared/pepys-images.ts',
 ];
 
 export async function checkImagePins(options: Readonly<CheckImagePinsOptions>): Promise<number> {

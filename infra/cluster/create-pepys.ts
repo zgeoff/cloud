@@ -106,7 +106,7 @@ function createGarage(
     {
       metadata: { name: garage.name, namespace },
       spec: buildPepysGarageSpec({
-        image: pepysImages.garage,
+        image: pepysImages.garageImage,
         serviceName: service.metadata.name,
         configMap: config.metadata.name,
         envSecret: env.metadata.name,
@@ -170,7 +170,7 @@ function createS2(cluster: Provider, namespace: Output<string>, inputs: PepysInp
     s2.name,
     {
       metadata: { name: s2.name, namespace },
-      spec: buildPepysS2Spec({ image: pepysImages.s2, envSecret: env.metadata.name }),
+      spec: buildPepysS2Spec({ image: pepysImages.s2Image, envSecret: env.metadata.name }),
     },
     { provider: cluster },
   );
@@ -203,7 +203,9 @@ function createIngest(
       metadata: { name: ingest.name, namespace },
       spec: buildPepysIngestSpec({
         image: inputs.config.image,
-        impIdentityAudience: inputs.config.impIdentityAudience,
+        ...(inputs.config.impIdentityAudience === undefined
+          ? {}
+          : { impIdentityAudience: inputs.config.impIdentityAudience }),
         envSecret: env.metadata.name,
         issuersConfigMap: issuers.metadata.name,
         pullSecret: ghcrPullSecretName,

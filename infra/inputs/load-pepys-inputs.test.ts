@@ -47,6 +47,21 @@ function setupTest() {
   };
 }
 
+test('it leaves the audience out while the stack config names none', () => {
+  const fixture = setupTest();
+
+  const config = buildStubConfig({
+    pepys: JSON.stringify({ image: fixture.image, webhookHostname: 'pepys-webhook.geoff.cloud' }),
+  });
+
+  expect(
+    loadPepysInputs(config, fixture.coreEnv, ['PEPYS_WIDGET_SECRET']).pepys?.config,
+  ).toStrictEqual({
+    image: fixture.image,
+    webhookHostname: 'pepys-webhook.geoff.cloud',
+  });
+});
+
 test('it returns nothing while the stack config leaves pepys out', () => {
   const fixture = setupTest();
 

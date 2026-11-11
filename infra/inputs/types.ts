@@ -148,8 +148,9 @@ interface PepysConfig {
   // the public DNS name of ingest's public routes, which the shared tunnel serves
   readonly webhookHostname: string;
 
-  // the audience that a telemetry sender's identity token must name
-  readonly impIdentityAudience: string;
+  // the audience that a telemetry sender's identity token must name; while it is unset, ingest
+  // refuses every telemetry export
+  readonly impIdentityAudience?: string;
 }
 
 // a nightly rclone copy of the Garage buckets to an R2 bucket

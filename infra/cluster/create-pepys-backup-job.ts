@@ -60,7 +60,7 @@ export function createPepysBackupJob(
             template: {
               metadata: { labels: pepysWorkloads.backup.labels },
               spec: buildPepysBackupPodSpec({
-                image: pepysImages.rclone,
+                image: pepysImages.rcloneImage,
                 scriptConfigMap: script.metadata.name,
                 envSecret: env.metadata.name,
               }),

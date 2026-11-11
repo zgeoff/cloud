@@ -82,8 +82,8 @@ call, the path of a change, the topology and the data.
   forgotten item, test a restore.
 - [The files service](./runbooks/files.md): deploy files.geoff.cloud, upload a file, upgrade, revoke
   a token, back up, restore and check a restore.
-- [Release check](./runbooks/release-check.md): the bump pull requests for new atc, imp, nixie and
-  auto-mode releases, when they merge on their own, and the app they run as.
+- [Release check](./runbooks/release-check.md): the bump pull requests for new atc, imp, nixie,
+  pepys and auto-mode releases, when they merge on their own, and the app they run as.
 - [Previews](./runbooks/preview.md): set up the preview service, opt a repository in, check a
   preview live.
 - [imp's e2e nodes](./runbooks/imp-e2e-tailnet.md): where imp's end-to-end suites run, and how to

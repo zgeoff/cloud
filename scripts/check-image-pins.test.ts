@@ -22,6 +22,7 @@ async function setupTest() {
       'nixos/hosts/geoffcloud',
       'scripts',
       'infra/observability',
+      'infra/shared',
     ].map((directory) => mkdir(join(root, directory), { recursive: true })),
   );
 
@@ -35,6 +36,7 @@ async function setupTest() {
       'nixos/hosts/geoffcloud/configuration.nix',
       'scripts/nix-image.sh',
       'infra/observability/test-nixie-alerts.sh',
+      'infra/shared/pepys-images.ts',
     ].map((file) => writeFile(join(root, file), '')),
   );
 
@@ -130,6 +132,39 @@ test('it fails a release pin whose tag names another digest at the registry', as
   );
 
   expect(ctx.printOut).not.toHaveBeenCalled();
+});
+
+test('it reads a pin from a TypeScript key that ends in Image', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, 'infra', 'shared', 'pepys-images.ts'),
+    `export const pepysImages = {\n  storeImage: 'ghcr.io/zgeoff/store:1.4.0@sha256:${'5'.repeat(64)}',\n} as const;\n`,
+  );
+
+  server.use(
+    http.head(
+      'https://ghcr.io/v2/zgeoff/store/manifests/1.4.0',
+      () =>
+        new HttpResponse(null, {
+          status: 200,
+          headers: { 'docker-content-digest': `sha256:${'6'.repeat(64)}` },
+        }),
+    ),
+  );
+
+  const exitCode = await checkImagePins({
+    args: [ctx.root],
+    run: ctx.stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    `check-image-pins: infra/shared/pepys-images.ts: ghcr.io/zgeoff/store:1.4.0 pins sha256:${'5'.repeat(64)}, but the registry's 1.4.0 is sha256:${'6'.repeat(64)}\n`,
+  );
 });
 
 test('it fails a release pin whose tag the registry does not have', async () => {

@@ -26,5 +26,8 @@ config:
   geoff-cloud:files:
     image: ghcr.io/zgeoff/cloud-files:33830cac231f4295a03516fe081d1a0cbd790452@sha256:0c3ecdf88e7a02ce1b80d17e3017757b79f49b9abc1986af7c3674e7574334f9
     hostname: files.geoff.cloud
+  geoff-cloud:pepys:
+    image: PEPYS_IMAGE
+    webhookHostname: pepys-webhook.geoff.cloud
   geoff-cloud:atcGatewayOwnerEmail:
     secure: v1:qtn2w/XR0+liFzQ/:W1+yrhJlqaefFrlRSnptVnSirINfeT8elzOilqkmF0VmHbE=

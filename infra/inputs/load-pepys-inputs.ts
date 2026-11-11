@@ -13,7 +13,7 @@ import type { Environment, PepysBackupInputs, PepysInputs, StackConfig } from '.
 const pepysConfigSchema = z.object({
   image: z.string().optional(),
   webhookHostname: z.string().optional(),
-  impIdentityAudience: z.string().min(1),
+  impIdentityAudience: z.string().min(1).optional(),
 });
 
 // setting stack config "pepys" approves the deploy; the PEPYS_BACKUP_* and PEPYS_R2_* variables
@@ -44,7 +44,9 @@ export function loadPepysInputs(
       config: {
         image: config.image,
         webhookHostname: config.webhookHostname,
-        impIdentityAudience: config.impIdentityAudience,
+        ...(config.impIdentityAudience === undefined
+          ? {}
+          : { impIdentityAudience: config.impIdentityAudience }),
       },
       pullCredential: { username: pull.username, token: secret(pull.token) },
       secrets: {

@@ -48,9 +48,8 @@ The `@pepys/*` packages must carry the version that `PEPYS_RELEASE` names, so th
 the modules come from one release. The deployment file, the two entry files and the packages are not
 in the repo yet, so the image does not build yet.
 
-[`images/pepys/run-image-tests.sh`](../../../images/pepys/run-image-tests.sh) builds the image from
-a stand-in context and runs its suite: each program starts as nonroot from a 0555 file, and that
-user reads the modules, which root owns.
+`bun run test:pepys-image` builds the image from a stand-in context and runs its suite: each program
+starts as nonroot from a 0555 file, and that user reads the modules, which root owns.
 
 ## Routes
 
@@ -66,8 +65,9 @@ signature of every GitHub delivery.
 
 The telemetry routes are `private`, and no route reaches them yet. Ingest refuses a telemetry export
 without a proven sender. The trust documents of the sender proof are the JSON files in
-`deploy/pepys/imp-issuers/`, which a ConfigMap mounts at `PEPYS_IMP_IDENTITY_ISSUERS`. The folder
-holds no document yet, so ingest refuses every export.
+`deploy/pepys/imp-issuers/`, which a ConfigMap mounts at `PEPYS_IMP_IDENTITY_ISSUERS`, and the
+audience is the stack config's `pepys.impIdentityAudience`. Neither is set yet, so ingest starts and
+refuses every export.
 
 ## Network policies
 
@@ -76,7 +76,8 @@ Each pod admits only its callers:
 - Garage admits s2-lite and the backup on 3900.
 - s2-lite admits ingest and the host.
 - ingest admits only the shared tunnel's cloudflared.
-- The host and the backup admit no pod, so no route reaches the API yet.
+- The host and the backup admit no pod, so no route reaches the API yet. Until the tailnet route in
+  [Later work](#later-work) exists, reach the API with `kubectl port-forward`.
 
 The namespace's egress deny refuses every pod the tailnet and Podman's subnet, as in every other
 namespace.
@@ -90,3 +91,10 @@ from `.env`. The backup variables are all or none: without them, the cluster run
 
 The backup copies each bucket to its own folder of an R2 bucket with `rclone copy`, which never
 deletes a copied object. The host's store needs no backup: the host rebuilds it from the fact log.
+
+## Later work
+
+- A tailnet route to the API, through the cluster's Traefik, so a tailnet client reaches it without
+  a port-forward.
+- A CI job for `bun run test:pepys-image`, in the pepys image workflow, as `test:files-image` runs
+  in CI for the files image.

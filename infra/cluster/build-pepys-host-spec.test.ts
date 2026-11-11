@@ -26,7 +26,7 @@ test('it starts the host with run --up on the listed consumers, beside the API i
     command: ['/usr/local/bin/pepys-host', 'run', '--up'],
     env: [
       { name: 'PEPYS_S2_ENDPOINT', value: 'http://pepys-s2.pepys.svc.cluster.local:8080' },
-      { name: 'PEPYS_S2_BASIN', value: 'pepys' },
+      { name: 'PEPYS_S2_BASIN', value: 'pepys-facts' },
       { name: 'PEPYS_STORE_DIR', value: '/store' },
       { name: 'PEPYS_CONSUMERS', value: '/modules/consumers.json' },
     ],

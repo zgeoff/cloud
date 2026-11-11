@@ -16,9 +16,21 @@ minimumReleaseAge = 604800
 # @heynixie/contract releases with nixie, and the release check bumps it in the
 # same PR as the nixie image pin, so the scripts' nixie calls type-check against
 # the release they deploy.
+# The @pepys packages release with the pepys host binary that images/pepys/versions.env pins, so the
+# image's modules and programs come from the same release as its host on the day it publishes. The
+# list holds each one the image's build installs, the ones it imports and their own.
 minimumReleaseAgeExcludes = [
   "@heynixie/contract",
   "@impz/client",
+  "@pepys/api",
+  "@pepys/cli",
+  "@pepys/contract",
+  "@pepys/ingest",
+  "@pepys/kit",
+  "@pepys/kysely-turso",
+  "@pepys/schema",
+  "@pepys/source-github",
+  "@pepys/source-telemetry",
   "@zgeoff/agent-hooks",
   "@zgeoff/bun-test-extended",
   "@zgeoff/chex",
