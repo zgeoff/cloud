@@ -122,7 +122,7 @@ jobs:
         if: steps.decide.outputs.apply == 'true'
         uses: pulumi/actions@96c7761824268174e0d2a4e8c7d75671eebd24a7 # v7.1.0
         with:
-          pulumi-version: 3.273.0
+          pulumi-version: 3.274.0
 
       - name: Setup 1Password CLI
         if: steps.decide.outputs.apply == 'true'
