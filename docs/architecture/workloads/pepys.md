@@ -66,8 +66,13 @@ signature of every GitHub delivery.
 The telemetry routes are `private`, and no route reaches them yet. Ingest refuses a telemetry export
 without a proven sender. The trust documents of the sender proof are the JSON files in
 `deploy/pepys/imp-issuers/`, which a ConfigMap mounts at `PEPYS_IMP_IDENTITY_ISSUERS`, and the
-audience is the stack config's `pepys.impIdentityAudience`. Neither is set yet, so ingest starts and
-refuses every export.
+audience is the stack config's `pepys.impIdentityAudience`, `pepys.imp.internal`. The folder holds
+no document yet, so ingest starts and refuses every export. The document of the issuer `geoffcloud`
+goes there as `geoffcloud.json`.
+
+The ingest Service has the pinned ClusterIP that `pepysIngest` in
+[`constants.json`](../../../packages/topology/constants.json) names, so a relay on the host can dial
+it.
 
 ## Network policies
 

@@ -29,5 +29,6 @@ config:
   geoff-cloud:pepys:
     image: PEPYS_IMAGE
     webhookHostname: pepys-webhook.geoff.cloud
+    impIdentityAudience: pepys.imp.internal
   geoff-cloud:atcGatewayOwnerEmail:
     secure: v1:qtn2w/XR0+liFzQ/:W1+yrhJlqaefFrlRSnptVnSirINfeT8elzOilqkmF0VmHbE=

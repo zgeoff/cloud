@@ -1,3 +1,5 @@
+import { topology } from '@zgeoff/cloud-topology';
+
 // The namespace and the Services have fixed names, so each in-cluster URL is known before an apply
 // and the processes can name each other in their environment.
 const namespace = 'pepys';
@@ -26,8 +28,11 @@ export const pepysWorkloads = {
   ingest: {
     name: 'pepys-ingest',
     labels: { app: 'pepys-ingest' },
-    port: 8080,
-    url: `http://pepys-ingest.${namespace}.svc.cluster.local:8080`,
+    port: topology.pepysIngest.port,
+    url: `http://pepys-ingest.${namespace}.svc.cluster.local:${topology.pepysIngest.port}`,
+
+    // the host's telemetry relay dials this address, so a cluster rebuild must keep it free
+    clusterIP: topology.pepysIngest.clusterIP,
   },
   host: {
     name: 'pepys-host',

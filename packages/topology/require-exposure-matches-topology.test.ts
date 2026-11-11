@@ -77,6 +77,7 @@ test('it accepts registry ports that equal their constants', () => {
         atc: { daemonPort: 8415, gatewayPort: 8414 },
         imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
         onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
+        pepysIngest: { clusterIP: '10.43.82.200', port: 8080 },
         nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
       },
     );
@@ -151,6 +152,7 @@ test('it names every registry port that differs from its constant, and a missing
         atc: { daemonPort: 8415, gatewayPort: 8414 },
         imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
         onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
+        pepysIngest: { clusterIP: '10.43.82.200', port: 8080 },
         nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
       },
     );

@@ -119,6 +119,9 @@ function createGarage(
 interface PepysWorkload {
   readonly name: string;
   readonly labels: Readonly<Record<string, string>>;
+
+  // a pinned address, for a Service that something outside the cluster dials
+  readonly clusterIP?: string;
 }
 
 // Pulumi skips its wait for ready pods on each Service: the workload updates after the Service it
@@ -138,6 +141,7 @@ function createService(
         annotations: { 'pulumi.com/skipAwait': 'true' },
       },
       spec: {
+        ...(workload.clusterIP === undefined ? {} : { clusterIP: workload.clusterIP }),
         selector: workload.labels,
         ports: [{ name: 'http', port, targetPort: port }],
       },

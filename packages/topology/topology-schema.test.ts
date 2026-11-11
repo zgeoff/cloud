@@ -36,6 +36,7 @@ test('it accepts a complete topology as given', () => {
     atc: { daemonPort: 8415, gatewayPort: 8414 },
     imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
     onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
+    pepysIngest: { clusterIP: '10.43.82.200', port: 8080 },
     nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
   };
 
@@ -77,6 +78,7 @@ test('it rejects a key that the schema does not name', () => {
     atc: { daemonPort: 8415, gatewayPort: 8414, gatwayPort: 8414 },
     imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
     onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
+    pepysIngest: { clusterIP: '10.43.82.200', port: 8080 },
     nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
   });
 
@@ -118,6 +120,7 @@ test('it rejects a port outside 1 to 65535', () => {
     atc: { daemonPort: 8415, gatewayPort: 8414 },
     imp: { domain: 'imps.geoff.cloud', apiPort: 70_700 },
     onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
+    pepysIngest: { clusterIP: '10.43.82.200', port: 8080 },
     nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
   });
 
@@ -159,6 +162,7 @@ test('it rejects a tag without the tag: prefix', () => {
     atc: { daemonPort: 8415, gatewayPort: 8414 },
     imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
     onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
+    pepysIngest: { clusterIP: '10.43.82.200', port: 8080 },
     nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
   });
 
@@ -200,6 +204,7 @@ test('it rejects a CIDR without its prefix length', () => {
     atc: { daemonPort: 8415, gatewayPort: 8414 },
     imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
     onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
+    pepysIngest: { clusterIP: '10.43.82.200', port: 8080 },
     nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
   });
 
@@ -241,6 +246,7 @@ test("it rejects an IPv4 range as the tailnet's IPv6 range", () => {
     atc: { daemonPort: 8415, gatewayPort: 8414 },
     imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
     onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
+    pepysIngest: { clusterIP: '10.43.82.200', port: 8080 },
     nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
   });
 
