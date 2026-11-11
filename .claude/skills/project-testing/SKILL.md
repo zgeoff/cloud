@@ -20,10 +20,10 @@ metadata:
 
 ## Facts
 
-| Fact       | Where                                                                                                                                                                                                                                                                                                                          |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Lanes      | [`rig.config.ts`](../../../rig.config.ts) holds each lane's file suffix and per-test limit. `bun run test:e2e` runs the journeys in `e2e/`, which the unit run leaves out                                                                                                                                                     |
-| Test utils | the `test-utils/` folder of the package, such as [`infra/test-utils/`](../../../infra/test-utils/) or [`scripts/test-utils/`](../../../scripts/test-utils/); [`test-support/shell/`](../../../test-support/shell/) for a shell suite; [`nixos/checks/test-utils/`](../../../nixos/checks/test-utils/) for a NixOS check |
+| Fact          | Where                                                                                                                                                                                                                                                                                                                   |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Test commands | [`rig.config.ts`](../../../rig.config.ts) holds each test command's file suffix and per-test timeout. `bun run test:e2e` runs the journeys in `e2e/`, which `bun run test` leaves out                                                                                                                                   |
+| Test utils    | the `test-utils/` folder of the package, such as [`infra/test-utils/`](../../../infra/test-utils/) or [`scripts/test-utils/`](../../../scripts/test-utils/); [`test-support/shell/`](../../../test-support/shell/) for a shell suite; [`nixos/checks/test-utils/`](../../../nixos/checks/test-utils/) for a NixOS check |
 
 ## Departures
 
