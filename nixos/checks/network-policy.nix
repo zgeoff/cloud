@@ -9,7 +9,8 @@
 # pepys's pods only ingest and the backup reach, on 443 only; a private and a link-local address on
 # the same link show that the 443 rule excludes them. The VM leaves out inet cloud_host, so
 # kube-router alone refuses a path. Each test pod runs the same image and differs only by its
-# labels, and pepys's Garage pod by its port. It needs KVM: run `bun run test:nixos network-policy`.
+# labels, and pepys's Garage and host pods by their ports. The boxxy server reaches pepys's ingest
+# and host through the namespace deny alone; pepys's own ingress policies are not applied here. It needs KVM: run `bun run test:nixos network-policy`.
 { nixpkgs, geoffcloud }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -189,6 +190,11 @@ let
       labels = { };
     }
     {
+      namespace = "boxxy";
+      name = "server";
+      labels.app = "boxxy-server";
+    }
+    {
       namespace = "nixie-ingress";
       name = "traefik";
       labels."app.kubernetes.io/name" = "traefik";
@@ -214,6 +220,7 @@ let
       namespace = "pepys";
       name = "host";
       labels.app = "pepys-host";
+      port = 8081;
     }
     {
       namespace = "pepys";
@@ -247,6 +254,14 @@ let
     {
       name = "pepys-s2";
       port = 8080;
+    }
+    {
+      name = "pepys-ingest";
+      port = 8080;
+    }
+    {
+      name = "pepys-host";
+      port = 8081;
     }
   ];
 
@@ -433,7 +448,7 @@ pkgs.testers.runNixOSTest {
     pods = ["atc/gateway", "atc/stranger", "observability/daemon-probe", "observability/imp-probe",
             "observability/stranger", "ingress/cloudflared", "ingress/stranger", "kube-system/stranger",
             "default/stranger", "nixie/nixie", "nixie/web", "nixie/sandbox-images", "nixie/stranger",
-            "nixie-ingress/traefik", "pepys/garage", "pepys/s2", "pepys/ingest", "pepys/host",
+            "nixie-ingress/traefik", "boxxy/server", "pepys/garage", "pepys/s2", "pepys/ingest", "pepys/host",
             "pepys/backup", "pepys/stranger"]
 
 
@@ -562,6 +577,17 @@ pkgs.testers.runNixOSTest {
             "stranger -> nixie web": False,
             "ingest -> nixie web": False,
             "stranger -> kubernetes api": False,
+        }, json.dumps(reached, indent=2)
+
+    with subtest("it lets the boxxy server reach pepys's ingest and host on their ports under the deny"):
+        reached = {
+            "server -> ingest": dial("boxxy/server", "http://pepys-ingest.pepys.svc.cluster.local:8080/"),
+            "server -> host": dial("boxxy/server", "http://pepys-host.pepys.svc.cluster.local:8081/"),
+        }
+
+        assert reached == {
+            "server -> ingest": (0, "pod"),
+            "server -> host": (0, "pod"),
         }, json.dumps(reached, indent=2)
   '';
 }
