@@ -51,7 +51,12 @@ context, after `bun install --frozen-lockfile` in `deploy/pepys`:
    [`compile-entries.ts`](../../../deploy/pepys/compile-entries.ts).
 
 The `@pepys/*` packages must carry the version that `PEPYS_RELEASE` names, so that the binaries and
-the modules come from one release.
+the modules come from one release. A release bump changes `PEPYS_RELEASE` and each `@pepys/*`
+version in `deploy/pepys/package.json` in one pull request, with the lock of `deploy/pepys` written
+again. The shared release tooling changes only `images/pepys/versions.env`, so change the package
+versions and the lock by hand in its pull request.
+[`collect-pepys-version-mismatches.test.ts`](../../../scripts/collect-pepys-version-mismatches.test.ts)
+fails when the release and a package version differ.
 
 The compile embeds Turso's native addon in the API. Turso's loader reaches the addon through
 `createRequire`, which `bun build --compile` does not follow, so the compile script drops that call,
