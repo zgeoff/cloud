@@ -39,6 +39,8 @@ config:
       target: geoffcloud
     pepys:
       environment: production
+    github:
+      baseUrl: https://api.github.com
   geoff-cloud:atcGatewayOwnerEmail:
     secure: v1:qtn2w/XR0+liFzQ/:W1+yrhJlqaefFrlRSnptVnSirINfeT8elzOilqkmF0VmHbE=
   geoff-cloud:boxxySpawnRepos:

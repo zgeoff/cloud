@@ -198,10 +198,10 @@ needs its token in `.env`, and the program stops with the name of the variable w
    BOXXY_PEPYS_SIGNING_SECRET=op://cloud/boxxy-pepys-signing/credential
    ```
 
-2. For GitHub, create a fine-grained token whose repository access is only the repos in
-   `boxxySpawnRepos`, with the permission `Pull requests: read` and nothing else, and store it as
-   `boxxy-github-token` in `cloud` and `cloud-deploy`. The server only reads pull requests; it never
-   merges one. Add the line:
+2. For GitHub, create a fine-grained token on the owner's repos, with the permission
+   `Pull requests: read` and nothing else, and store it as `boxxy-github-token` in `cloud` and
+   `cloud-deploy`. Its repository access must cover every repo in `boxxySpawnRepos`. The server only
+   reads pull requests; it never merges one. Add the line:
 
    ```bash
    BOXXY_GITHUB_TOKEN=op://cloud/boxxy-github-token/credential
