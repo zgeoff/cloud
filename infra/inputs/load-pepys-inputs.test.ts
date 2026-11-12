@@ -194,25 +194,30 @@ test('it refuses an s2-lite key that Garage would not import', () => {
   ).toThrowWithMessage(Error, /^PEPYS_S2_GARAGE_ACCESS_KEY_ID must be GK and 24 hex digits/u);
 });
 
-test('it carries the API hostname while the image is pepys 0.3.0 or later', () => {
-  const fixture = setupTest();
+// 0.10.0 sorts below 0.3.0 as text, so it fails a check that compares the tag as a string
+test.each(['0.3.0', '0.3.1', '0.10.0', '1.0.0'])(
+  'it carries the API hostname on an image of pepys %s',
+  (release: string) => {
+    const fixture = setupTest();
+    const image = `ghcr.io/zgeoff/cloud-pepys:${release}-3f9c1d2a7b10@sha256:4444444444444444444444444444444444444444444444444444444444444444`;
 
-  const config = buildStubConfig({
-    pepys: JSON.stringify({
-      image: fixture.image,
+    const config = buildStubConfig({
+      pepys: JSON.stringify({
+        image,
+        webhookHostname: 'pepys-webhook.geoff.cloud',
+        apiHostname: 'pepys.geoff.cloud',
+      }),
+    });
+
+    expect(
+      loadPepysInputs(config, fixture.coreEnv, ['PEPYS_WIDGET_SECRET']).pepys?.config,
+    ).toStrictEqual({
+      image,
       webhookHostname: 'pepys-webhook.geoff.cloud',
       apiHostname: 'pepys.geoff.cloud',
-    }),
-  });
-
-  expect(
-    loadPepysInputs(config, fixture.coreEnv, ['PEPYS_WIDGET_SECRET']).pepys?.config,
-  ).toStrictEqual({
-    image: fixture.image,
-    webhookHostname: 'pepys-webhook.geoff.cloud',
-    apiHostname: 'pepys.geoff.cloud',
-  });
-});
+    });
+  },
+);
 
 test.each([
   [
