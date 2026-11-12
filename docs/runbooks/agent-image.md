@@ -29,6 +29,8 @@ because a tool can write state when it runs (`codex --version` creates `~/.codex
 | `scripts/agent-image-gitleaks.toml`   | gitleaks' default rules, less named upstream test files   |
 | `/opt/auto-mode/mods/auto-mode`       | the auto-mode mod in the guest, for `--plugin-dir`        |
 | `/usr/local/bin/atc`                  | atc in the guest, which the `cloud` target's hooks use    |
+| `/usr/local/bin/boxxy`                | boxxy's CLI, which its hook plug-in runs                  |
+| `/opt/boxxy/hook-plugin`              | boxxy's hook plug-in, for `--plugin-dir`                  |
 | `/usr/local/bin/bun`                  | the shim that runs the Bun a checkout pins                |
 | `/usr/local/bin/chromium`             | the Chrome start script that `BUN_CHROME_PATH` names      |
 | `/etc/imp/services.d/overcommit.json` | the boot service that sets `vm.overcommit_memory=1`       |
@@ -276,6 +278,23 @@ is the release, such as `4.5.0`.
    the new imp logs `runs hooks through the daemon's atc $VERSION, copied to /tmp/atc/bin/atc`, the
    target's image ships another atc: go back to step 2. An imp that existed before the restart logs
    that copy line too, as expected.
+
+## A new boxxy CLI release
+
+The [release check](./release-check.md) opens the `release-check/boxxy-cli` pull request for each
+new `@boxxy/cli` release. It writes the version and the sums of `boxxy-linux-x64` and
+`boxxy-hook-plugin.tar.gz` from the release's SHA256SUMS. To pin a release by hand, run the manual
+pin from a clean checkout of `main`:
+
+```sh
+bun scripts/release/run-release-pin.ts boxxy-cli "$VERSION"
+```
+
+Only a session that passes `--plugin-dir /opt/boxxy/hook-plugin` runs the plug-in's hooks: atc's
+`boxxy` agent entry passes it, and no managed setting names the plug-in. The image check fails when
+a file under `/etc/claude-code` names boxxy, and when the plug-in's session-start hook runs without
+`BOXXY_URL` and does not refuse. The CLI is a compiled Bun binary, so its version check on a live
+imp also shows that it runs on the host's CPU.
 
 ## A new auto-mode release
 

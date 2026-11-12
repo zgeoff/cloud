@@ -373,7 +373,7 @@ test('it opens an auto mode patch bump that merges on its own', async () => {
 
   const checkout = await createCloudCheckout({
     'scripts/release/release-pins.json': '{}\n',
-    'images/agent/Dockerfile': `ARG AUTO_MODE_VERSION=0.19.3\nARG AUTO_MODE_SHA256=${'d'.repeat(64)}\n`,
+    'images/agent/Dockerfile': `ARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.3\nARG AUTO_MODE_SHA256=${'d'.repeat(64)}\n`,
   });
 
   const tarball = await createNPMTarball({ name: 'auto-mode', version: '0.19.4' });
@@ -428,7 +428,7 @@ test('it pins the auto mode tarball sum that the registry serves', async () => {
 
   const checkout = await createCloudCheckout({
     'scripts/release/release-pins.json': '{}\n',
-    'images/agent/Dockerfile': `ARG AUTO_MODE_VERSION=0.19.3\nARG AUTO_MODE_SHA256=${'d'.repeat(64)}\n`,
+    'images/agent/Dockerfile': `ARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.3\nARG AUTO_MODE_SHA256=${'d'.repeat(64)}\n`,
   });
 
   const tarball = await createNPMTarball({ name: 'auto-mode', version: '0.19.4' });
@@ -453,7 +453,7 @@ test('it pins the auto mode tarball sum that the registry serves', async () => {
   ]);
 
   expect(dockerfile).toBe(
-    `ARG AUTO_MODE_VERSION=0.19.4\nARG AUTO_MODE_SHA256=${new Bun.CryptoHasher('sha256').update(tarball).digest('hex')}`,
+    `ARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.4\nARG AUTO_MODE_SHA256=${new Bun.CryptoHasher('sha256').update(tarball).digest('hex')}`,
   );
 });
 

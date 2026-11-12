@@ -1,13 +1,13 @@
 # Release check
 
-The `release check` workflow finds new atc, imp, nixie, pepys and auto-mode releases and opens one
-bump pull request per dependency, so the release repositories know nothing about cloud. It runs on a
-schedule and on dispatch. Its check job compares each dependency's newest release with the pins on
-`main`, and its bump job runs only when a pin is older. The `release bump merge` workflow then
-merges a bump that may merge on its own once its checks pass. A merged nixie bump changes the stack
-config, so the `Deploy prod` workflow applies it to prod with no person involved, unless its guard
-holds the plan ([the prod apply job](./prod-apply.md)). The same holds for the later pull request
-that pins the atc-gateway images an atc bump publishes
+The `release check` workflow finds new atc, imp, nixie, pepys, boxxy CLI and auto-mode releases and
+opens one bump pull request per dependency, so the release repositories know nothing about cloud. It
+runs on a schedule and on dispatch. Its check job compares each dependency's newest release with the
+pins on `main`, and its bump job runs only when a pin is older. The `release bump merge` workflow
+then merges a bump that may merge on its own once its checks pass. A merged nixie bump changes the
+stack config, so the `Deploy prod` workflow applies it to prod with no person involved, unless its
+guard holds the plan ([the prod apply job](./prod-apply.md)). The same holds for the later pull
+request that pins the atc-gateway images an atc bump publishes
 ([The atc-gateway images](#the-atc-gateway-images)). A host switch and an agent image rebuild stay
 with a person, and each pull request's body lists the steps its merge leaves. An atc major release
 reaches the host's atc daemon only after the atc gateway runs that major, because the host switch
@@ -22,17 +22,18 @@ daemon.
 | imp                | `release-check/imp`                | imp's NixOS module and its lock with the imp-host image, the imp-base image            |
 | nixie              | `release-check/nixie`              | the nixie, nixie-web and nixie-backup images in the stack config, the contract package |
 | pepys              | `release-check/pepys`              | the host binary in the cloud-pepys image's context                                     |
+| boxxy-cli          | `release-check/boxxy-cli`          | the boxxy CLI and its hook plug-in in the agent image                                  |
 | auto-mode          | `release-check/auto-mode`          | the auto-mode tarball in the agent image                                               |
 | atc-gateway-images | `release-check/atc-gateway-images` | the atc-gateway and backup images in the stack config                                  |
 
 The release registry in `scripts/release/` holds one record per dependency: its repository, its tag
 form, what its releases publish, and each pin's lines in the files. The bump reads each value it
-writes from the release itself: the atc pins take their sums from the release's SHA256SUMS, the
-nixie pins take their digests from the release notes' `## Images` list, the imp pins take the tag's
-commit and the images' digests from GitHub and GHCR, and the auto-mode pin takes its sum from the
-npm tarball, which it checks against npm's integrity hash and the release's version. Before it
-writes anything, it checks every pin line of the dependency, so a pin at the release with another
-sum fails the bump and changes no file. The bump never moves a pin back to an older release.
+writes from the release itself: the atc and boxxy CLI pins take their sums from the release's
+SHA256SUMS, the nixie pins take their digests from the release notes' `## Images` list, the imp pins
+take the tag's commit and the images' digests from GitHub and GHCR, and the auto-mode pin takes its
+sum from the npm tarball, which it checks against npm's integrity hash and the release's version.
+Before it writes anything, it checks every pin line of the dependency, so a pin at the release with
+another sum fails the bump and changes no file. The bump never moves a pin back to an older release.
 
 A restore Job names the backup image of its workload, so a bump that moves `backupImage` in the
 stack config also runs `infra/cluster/write-restore-jobs.ts` on the checkout and commits the restore

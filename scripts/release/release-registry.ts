@@ -358,6 +358,38 @@ export const releaseRegistry: readonly ReleaseRecord[] = [
       'Build and publish the cloud-pepys image from the new release, then pin its digest in the stack config (`docs/architecture/workloads/pepys.md`).',
   },
   {
+    name: 'boxxy-cli',
+    repo: 'zgeoff/boxxy',
+    tagPrefix: '@boxxy/cli@',
+    source: { kind: 'sha256sums' },
+    pins: [
+      // the CLI and its hook plug-in come from one release, so they move together
+      {
+        id: 'boxxy-cli',
+        title: "boxxy's CLI and hook plug-in in the agent image (`images/agent/Dockerfile`)",
+        lines: [
+          {
+            file: 'images/agent/Dockerfile',
+            pattern: String.raw`^ARG BOXXY_CLI_VERSION=(?<version>\d+\.\d+\.\d+)$`,
+            parts: { version },
+          },
+          {
+            file: 'images/agent/Dockerfile',
+            pattern: String.raw`^ARG BOXXY_CLI_SHA256=(?<sum>[0-9a-f]{64})$`,
+            parts: { sum: { kind: 'sum', asset: 'boxxy-linux-x64' } },
+          },
+          {
+            file: 'images/agent/Dockerfile',
+            pattern: String.raw`^ARG BOXXY_HOOK_PLUGIN_SHA256=(?<pluginSum>[0-9a-f]{64})$`,
+            parts: { pluginSum: { kind: 'sum', asset: 'boxxy-hook-plugin.tar.gz' } },
+          },
+        ],
+      },
+    ],
+    rollout:
+      "Rebuild the agent image (`docs/runbooks/agent-image.md`). Sessions that atc's `boxxy` agent entry starts run the new CLI and plug-in once they start on the new image.",
+  },
+  {
     name: 'auto-mode',
     repo: 'zgeoff/auto-mode',
     tagPrefix: 'auto-mode-v',
