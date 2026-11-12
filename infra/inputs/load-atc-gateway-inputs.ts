@@ -27,7 +27,7 @@ export function loadATCGatewayInputs(
   const pull = requireGHCRPullCredential(env);
   const backup = findBackupSecrets(env);
   const ownerEmail = requireOwnerEmail(stackConfig);
-  const serviceTokens = loadATCGatewayServiceTokens(env, serviceTokenOptions);
+  const serviceTokens = loadATCGatewayServiceTokens(env, checked.config.image, serviceTokenOptions);
 
   return {
     atcGateway: {

@@ -116,11 +116,14 @@ relay and the daemon's new config.
 
    ```sh
    op read op://cloud/boxxy-worker-token/credential \
-     | impz secret add boxxy --kind static --hosts boxxy.imp.internal \
-         --header authorization --scheme bearer --upstream http://10.88.0.1:18083 --identity
+     | ssh root@geoffcloud podman exec -i imp-host impz secret add boxxy \
+         --kind static --hosts boxxy.imp.internal --header authorization --scheme bearer \
+         --upstream http://10.88.0.1:18083 --identity
    ```
 
-   Run it in imp-host. Expect `impz secret ls` to show
+   Read the token on your machine with `op`: imp-host has neither `op` nor a vault credential, so
+   the secret travels over SSH's stdin into `impz` in the container. Never put it on the SSH command
+   line, because the host's journal records that line. Expect `impz secret ls` to show
    `boxxy.imp.internal -> http://10.88.0.1:18083 (identity)`. Impd signs identity tokens only with
    `IMP_IDENTITY_ISSUER` set, which the host's config sets to `geoffcloud`. Replacing the token of a
    secret that exists takes `--replace`, and a change of host, upstream or `--identity` takes
@@ -162,8 +165,10 @@ passes the flag. The server calls atc as the principal `service:boxxy`, which th
 
 - While `images/atc-gateway/versions.env` pins an atc release older than 7.14.0, Pulumi leaves the
   file, the mount and the flag out and prints one warning when it loads the inputs. The token then
-  need not have that shape. After the pin moves to 7.14.0 or later and the gateway image rolls, the
-  next apply adds the Secret, an init container and the flag.
+  need not have that shape. The stack's `atcGateway.image` gates it the same way, because the image
+  that the stack deploys is the one that must know the flag, and the pin only builds the next one.
+  Once the pin and `atcGateway.image` are both 7.14.0 or later, the next apply adds the Secret, an
+  init container and the flag.
 - The gateway refuses a token file that another user owns or that its group or others can open, and
   Kubernetes gives a Secret volume's files to root. So an init container, running as the gateway's
   user, copies the file to a memory volume with mode 0600, and the gateway mounts that volume

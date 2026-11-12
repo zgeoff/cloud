@@ -109,9 +109,9 @@ so a new token rolls the Deployment.
 
 The input is optional. While `BOXXY_ATC_TOKEN` is unset, the pod has no Secret, no init container,
 no mount and no flag. While `images/atc-gateway/versions.env` pins an atc release older than 7.14.0,
-which has no such flag, Pulumi leaves them out and prints one warning, so a deploy never starts a
-gateway that cannot read its arguments
-([the boxxy runbook](../../runbooks/boxxy.md#the-service-token-at-the-atc-gateway)).
+or the stack's `atcGateway.image` is older than 7.14.0, the image has no such flag. Pulumi then
+leaves them out and prints one warning, so a deploy never starts a gateway that cannot read its
+arguments ([the boxxy runbook](../../runbooks/boxxy.md#the-service-token-at-the-atc-gateway)).
 
 ## The cloud daemon
 

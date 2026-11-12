@@ -28,9 +28,14 @@ set to `pepys.imp.internal`.
 
    ```sh
    op read op://cloud/pepys-telemetry/credential \
-     | impz secret add pepys-telemetry --kind static --hosts pepys.imp.internal \
-         --header authorization --scheme bearer --upstream http://10.88.0.1:18082 --identity
+     | ssh root@geoffcloud podman exec -i imp-host impz secret add pepys-telemetry \
+         --kind static --hosts pepys.imp.internal --header authorization --scheme bearer \
+         --upstream http://10.88.0.1:18082 --identity
    ```
+
+   Read the token on your machine with `op`: imp-host has neither `op` nor a vault credential, so
+   the secret travels over SSH's stdin into `impz` in the container. Never put it on the SSH command
+   line, because the host's journal records that line.
 
    Expect `impz secret ls` to show `pepys.imp.internal -> http://10.88.0.1:18082 (identity)`.
    Replacing the token of a secret that exists takes `--replace`, and a change of host, upstream or

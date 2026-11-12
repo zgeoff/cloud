@@ -19,11 +19,12 @@ export interface ATCGatewayServiceTokenOptions {
   readonly warn?: (line: string) => void;
 }
 
-// The boxxy server's token for the gateway, from the variable the boxxy server also reads. An
-// older gateway image does not know --service-token-file, so with such a pin the token is left out
-// with one warning, and the variable need not hold the shape atc takes.
+// The boxxy server's token for the gateway, from the variable the boxxy server also reads. Unless
+// both the source pin and the deployed image are 7.14.0 or later, the token is left out with one
+// warning, and the variable need not hold the shape atc takes.
 export function loadATCGatewayServiceTokens(
   env: Environment,
+  image: string,
   options: ATCGatewayServiceTokenOptions = {},
 ): Readonly<Record<string, Output<string>>> | undefined {
   const token = findVariable(env, variable);
@@ -33,10 +34,22 @@ export function loadATCGatewayServiceTokens(
   }
 
   const release = (options.readRelease ?? readATCGatewayRelease)();
+  const warn = options.warn ?? warnOnStderr;
 
   if (!isReleaseAtLeast(release, serviceTokenRelease)) {
-    (options.warn ?? warnOnStderr)(
+    warn(
       `${variable} is set, but images/atc-gateway/versions.env pins atc ${release}, and --service-token-file needs ${serviceTokenRelease}: the gateway deploys without the boxxy service token`,
+    );
+
+    return undefined;
+  }
+
+  // the pin builds the next image; the stack config names the image that runs
+  const imageRelease = readImageRelease(image);
+
+  if (imageRelease === undefined || !isReleaseAtLeast(imageRelease, serviceTokenRelease)) {
+    warn(
+      `${variable} is set, but the stack's atcGateway.image is ${imageRelease === undefined ? 'not a release tag' : `release ${imageRelease}`}, and --service-token-file needs ${serviceTokenRelease}: the gateway deploys without the boxxy service token`,
     );
 
     return undefined;
@@ -50,6 +63,10 @@ export function loadATCGatewayServiceTokens(
   }
 
   return { boxxy: secret(token) };
+}
+
+function warnOnStderr(line: string): void {
+  process.stderr.write(`warning: ${line}\n`);
 }
 
 function isReleaseAtLeast(release: string, minimum: string): boolean {
@@ -67,6 +84,7 @@ function isReleaseAtLeast(release: string, minimum: string): boolean {
   return true;
 }
 
-function warnOnStderr(line: string): void {
-  process.stderr.write(`warning: ${line}\n`);
+// the release tag of a pinned image such as `ghcr.io/zgeoff/atc-gateway:7.14.0@sha256:...`
+function readImageRelease(image: string): string | undefined {
+  return /:(?<release>\d+\.\d+\.\d+)@/u.exec(image)?.groups?.['release'];
 }

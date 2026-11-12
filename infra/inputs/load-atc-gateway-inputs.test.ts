@@ -441,6 +441,44 @@ test.each(['7.12.1', '7.13.9', '6.99.99', '2.24.0'])(
   },
 );
 
+test.each(['7.12.1', '7.13.9'])(
+  'it leaves the service token out, with one warning, while the pin is 7.14.0 and the configured image is release %s',
+  (imageRelease) => {
+    const token = `atcs_${'b'.repeat(40)}`;
+    const warnings: string[] = [];
+
+    const result = loadATCGatewayInputs(
+      buildMockATCGatewayStackConfig({
+        image: `ghcr.io/zgeoff/atc-gateway:${imageRelease}@sha256:${'c'.repeat(64)}`,
+      }),
+      buildMockATCGatewayEnvironment({ BOXXY_ATC_TOKEN: token }),
+      { readRelease: () => '7.14.0', warn: (line) => warnings.push(line) },
+    );
+
+    expect(result.atcGateway?.secrets).not.toHaveProperty('serviceTokens');
+
+    expect(warnings).toStrictEqual([
+      `BOXXY_ATC_TOKEN is set, but the stack's atcGateway.image is release ${imageRelease}, and --service-token-file needs 7.14.0: the gateway deploys without the boxxy service token`,
+    ]);
+  },
+);
+
+test('it leaves the service token out, with one warning, while the configured image tag is not a release', () => {
+  const warnings: string[] = [];
+
+  const result = loadATCGatewayInputs(
+    buildMockATCGatewayStackConfig({
+      image: `ghcr.io/zgeoff/atc-gateway:latest-build@sha256:${'c'.repeat(64)}`,
+    }),
+    buildMockATCGatewayEnvironment({ BOXXY_ATC_TOKEN: `atcs_${'b'.repeat(40)}` }),
+    { readRelease: () => '7.14.0', warn: (line) => warnings.push(line) },
+  );
+
+  expect(result.atcGateway?.secrets).not.toHaveProperty('serviceTokens');
+  expect(warnings).toHaveLength(1);
+  expect(warnings[0]).toContain('is not a release tag');
+});
+
 test('it loads, with the warning, a BOXXY_ATC_TOKEN of the older shape while the pinned release lacks the flag', () => {
   const warnings: string[] = [];
 
