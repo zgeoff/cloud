@@ -1,10 +1,10 @@
-# Evaluates services.onepassword-connect-relay apart from any host's config, beside imp's own
-# module (the flake's pinned imp input), and checks the socket and the services it adds, the port it
-# admits in inet cloud_host and opens on imp-host's bridge, and its assertion. Each case evaluates
+# Evaluates services.bridge-relays apart from any host's config, beside imp's own module (the
+# flake's pinned imp input), and checks the socket and the services each relay adds, the ports they
+# admit in inet cloud_host and open on imp-host's bridge, and the assertion of each. Each case evaluates
 # its own config through test-utils/build-module-system.nix and runs on its own, in a fresh
 # directory, under test-support/shell/run-cases.sh, which reports each case and fails the check
 # when any case fails.
-# Run: bun run test:nixos onepassword-connect-relay
+# Run: bun run test:nixos bridge-relays
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -17,14 +17,37 @@ let
   # the relay's module beside imp's, whose IPv6 mode it asserts on
   relayModule = {
     imports = [
-      ../modules/onepassword-connect-relay.nix
+      ../modules/bridge-relays.nix
       imp.nixosModules.imp
     ];
   };
 
+  relay = {
+    interface = "podman0";
+    address = "10.88.0.1";
+    allowedSubnet = "10.88.0.0/16";
+  };
+  # the host's three relays, the Connect relay with the label and the values it had as the module's
+  # only relay
+  relays = {
+    onepassword-connect-relay = relay // {
+      label = "the Connect relay";
+      port = 18081;
+      target = "10.43.82.198:8000";
+    };
+    pepys-ingest-relay = relay // {
+      port = 18083;
+      target = "10.43.82.200:8080";
+    };
+    boxxy-worker-relay = relay // {
+      port = 18084;
+      target = "10.43.0.80:8091";
+    };
+  };
+
   cases = [
     {
-      title = "it proxies the socket on the relay address to the target, hardened, and restarts the socket and the proxy at a switch that moves the address";
+      title = "it proxies the Connect relay socket on the relay address to the target, hardened, with the unit names and descriptions it had as the only relay, and restarts the socket and the proxy at a switch that moves the address";
       script =
         let
           system = buildModuleSystem relayModule {
@@ -32,14 +55,7 @@ let
               enable = true;
               flushRuleset = false;
             };
-            services.onepassword-connect-relay = {
-              enable = true;
-              interface = "podman0";
-              address = "10.88.0.1";
-              port = 18081;
-              allowedSubnet = "10.88.0.0/16";
-              target = "10.43.82.198:8000";
-            };
+            services.bridge-relays = relays;
           };
           socket = system.config.systemd.sockets.onepassword-connect-relay;
           service = system.config.systemd.services.onepassword-connect-relay;
@@ -103,7 +119,7 @@ let
         '';
     }
     {
-      title = "it admits the podman0 subnet to the relay in the host table and opens its port on podman0";
+      title = "it admits the podman0 subnet to each relay in the host table and opens each port on podman0";
       script =
         let
           system = buildModuleSystem relayModule {
@@ -111,34 +127,84 @@ let
               enable = true;
               flushRuleset = false;
             };
-            services.onepassword-connect-relay = {
-              enable = true;
-              interface = "podman0";
-              address = "10.88.0.1";
-              port = 18081;
-              allowedSubnet = "10.88.0.0/16";
-              target = "10.43.82.198:8000";
-            };
+            services.bridge-relays = relays;
+          };
+          admission = port: {
+            inherit port;
+            interface = "podman0";
+            sourceCIDR = "10.88.0.0/16";
+            destinationAddress = "10.88.0.1";
           };
         in
         ''
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
-                {
-                  port = 18081;
-                  interface = "podman0";
-                  sourceCIDR = "10.88.0.0/16";
-                  destinationAddress = "10.88.0.1";
-                }
+                (admission 18084)
+                (admission 18081)
+                (admission 18083)
               ]
             )
           } ${lib.escapeShellArg (builtins.toJSON system.config.networking.cloudHost.admissions)} "the cloud_host admissions"
-          assert_equals '[18081]' ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces.podman0.allowedTCPPorts)} "the ports nixos-fw opens on podman0"
+          assert_equals '[18081,18083,18084]' ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces.podman0.allowedTCPPorts)} "the ports nixos-fw opens on podman0"
         '';
     }
     {
-      title = "it admits nothing and opens no port when the relay is off, with no interface given";
+      title = "it gives the pepys ingest and boxxy worker relays units of their own, each dialing its Service";
+      script =
+        let
+          system = buildModuleSystem relayModule {
+            networking.nftables = {
+              enable = true;
+              flushRuleset = false;
+            };
+            services.bridge-relays = relays;
+          };
+          units = system.config.systemd;
+          proxy = "${units.package}/lib/systemd/systemd-socket-proxyd";
+        in
+        ''
+          jq -S . > expected <<'EOF'
+          ${builtins.toJSON {
+            sockets = {
+              pepys-ingest-relay = [ "10.88.0.1:18083" ];
+              boxxy-worker-relay = [ "10.88.0.1:18084" ];
+            };
+            proxies = {
+              pepys-ingest-relay = "${proxy} 10.43.82.200:8080";
+              boxxy-worker-relay = "${proxy} 10.43.0.80:8091";
+            };
+            listens = {
+              pepys-ingest-relay = {
+                description = "the relay pepys-ingest-relay's socket on its listen address";
+                after = [ "pepys-ingest-relay.socket" ];
+              };
+              boxxy-worker-relay = {
+                description = "the relay boxxy-worker-relay's socket on its listen address";
+                after = [ "boxxy-worker-relay.socket" ];
+              };
+            };
+          }}
+          EOF
+          jq -S . > actual <<'EOF'
+          ${builtins.toJSON {
+            sockets = lib.genAttrs [ "pepys-ingest-relay" "boxxy-worker-relay" ] (
+              name: units.sockets.${name}.listenStreams
+            );
+            proxies = lib.genAttrs [ "pepys-ingest-relay" "boxxy-worker-relay" ] (
+              name: units.services.${name}.serviceConfig.ExecStart
+            );
+            listens = lib.genAttrs [ "pepys-ingest-relay" "boxxy-worker-relay" ] (name: {
+              inherit (units.services."${name}-listen") description after;
+            });
+          }}
+          EOF
+
+          assert_files_equal expected actual
+        '';
+    }
+    {
+      title = "it admits nothing and opens no port when no relay is given, so no interface either";
       script =
         let
           system = buildModuleSystem relayModule {
@@ -162,14 +228,7 @@ let
               enable = true;
               flushRuleset = false;
             };
-            services.onepassword-connect-relay = {
-              enable = true;
-              interface = "podman0";
-              address = "10.88.0.1";
-              port = 18081;
-              allowedSubnet = "10.88.0.0/16";
-              target = "10.43.82.198:8000";
-            };
+            services.bridge-relays = relays;
           };
         in
         ''
@@ -177,7 +236,7 @@ let
         '';
     }
     {
-      title = "it fails an assertion when imps IPv6 mode moves imp-host off podman0";
+      title = "it fails an assertion for each relay when imps IPv6 mode moves imp-host off podman0";
       script =
         let
           system = buildModuleSystem relayModule {
@@ -186,21 +245,16 @@ let
               flushRuleset = false;
             };
             services.imp.ipv6.enable = true;
-            services.onepassword-connect-relay = {
-              enable = true;
-              interface = "podman0";
-              address = "10.88.0.1";
-              port = 18081;
-              allowedSubnet = "10.88.0.0/16";
-              target = "10.43.82.198:8000";
-            };
+            services.bridge-relays = relays;
           };
         in
         ''
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
+                "the relay boxxy-worker-relay assumes imp-host on podman0; services.imp.ipv6.enable moves it to br-imphost"
                 "the Connect relay assumes imp-host on podman0; services.imp.ipv6.enable moves it to br-imphost"
+                "the relay pepys-ingest-relay assumes imp-host on podman0; services.imp.ipv6.enable moves it to br-imphost"
               ]
             )
           } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
@@ -208,7 +262,7 @@ let
     }
   ];
 in
-pkgs.runCommand "onepassword-connect-relay-check"
+pkgs.runCommand "bridge-relays-check"
   {
     nativeBuildInputs = [
       pkgs.diffutils
@@ -221,7 +275,7 @@ pkgs.runCommand "onepassword-connect-relay-check"
     source ${testLib}/run-cases.sh
     source ${testLib}/assert-equals.sh
     source ${testLib}/assert-files-equal.sh
-    source ${pkgs.writeText "onepassword-connect-relay-cases.sh" (renderCases cases)}
+    source ${pkgs.writeText "bridge-relays-cases.sh" (renderCases cases)}
     run_cases
     touch $out
   ''

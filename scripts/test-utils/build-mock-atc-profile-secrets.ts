@@ -30,5 +30,17 @@ export function buildMockATCProfileSecrets(): Record<string, unknown>[] {
         rules: [{ host: 'op-connect.imp.internal', header: 'authorization', scheme: 'bearer' }],
       }),
     },
+    {
+      ...buildMockImpSecret({
+        name: 'pepys-telemetry',
+        rules: [{ host: 'pepys.imp.internal', header: 'authorization', scheme: 'bearer' }],
+      }),
+    },
+    {
+      ...buildMockImpSecret({
+        name: 'boxxy',
+        rules: [{ host: 'boxxy.imp.internal', header: 'authorization', scheme: 'bearer' }],
+      }),
+    },
   ];
 }

@@ -214,16 +214,29 @@ in
         "flannel.1"
       ];
 
-  # 1Password Connect for imps, relayed from podman0 to the Service's pinned ClusterIP; the
-  # module admits podman0's subnet to the relay in cloud_host and opens its port on podman0
-  services.onepassword-connect-relay = {
-    enable = true;
-    interface = topology.podman.bridge;
-    address = topology.podman.bridgeAddress;
-    inherit (getHostPort "onepassword-connect-relay") port;
-    allowedSubnet = topology.podman.subnet;
-    target = "${topology.onePasswordConnect.clusterIP}:${toString topology.onePasswordConnect.port}";
-  };
+  # Services for imps, relayed from podman0 to each Service's pinned ClusterIP: 1Password Connect,
+  # pepys ingest for the sessions' telemetry, and the boxxy worker Service. The module admits
+  # podman0's subnet to each relay in cloud_host and opens its port on podman0. kube-router admits
+  # the node's own addresses before any network policy, so a relay needs no policy of its own.
+  services.bridge-relays =
+    let
+      relay = name: target: {
+        inherit (getHostPort name) port;
+        interface = topology.podman.bridge;
+        address = topology.podman.bridgeAddress;
+        allowedSubnet = topology.podman.subnet;
+        inherit target;
+      };
+    in
+    {
+      onepassword-connect-relay =
+        relay "onepassword-connect-relay" "${topology.onePasswordConnect.clusterIP}:${toString topology.onePasswordConnect.port}"
+        // {
+          label = "the Connect relay";
+        };
+      pepys-ingest-relay = relay "pepys-ingest-relay" "${topology.pepysIngest.clusterIP}:${toString topology.pepysIngest.port}";
+      boxxy-worker-relay = relay "boxxy-worker-relay" "${topology.boxxy.workerClusterIP}:${toString topology.boxxy.workerPort}";
+    };
 
   services.openssh = {
     enable = true;
@@ -341,7 +354,7 @@ in
   };
 
   # Podman's default network, which imp-host runs on, pinned to the topology's bridge and subnet:
-  # the Connect relay, the model route listener and the pod drops above name them
+  # the relays, the model route listener and the pod drops above name them
   virtualisation.podman.defaultNetwork.settings = {
     network_interface = topology.podman.bridge;
     subnets = [
@@ -432,84 +445,147 @@ in
   # the agents and the auth profiles match the home-pc daemon's `cloud` target. The profiles name
   # the same impd secrets as home-pc's, so a renamed or added profile changes both daemons'
   # configs, and the daemon's impd token must list each secret as grantable.
-  services.atc-daemon = {
-    enable = true;
-    package = atc;
-    listen = "${atcDaemonAddress}:${toString atcDaemonPort}";
-    tokenFile = "/var/lib/atc-daemon-secrets/gateway-token";
-    impTokenFile = "/var/lib/atc-daemon-secrets/imp-token";
-    targets.geoffcloud = {
-      provider = "imp";
-      url = impdLoopbackURL;
-      tokenFile = "/run/credentials/atc-daemon.service/imp-token";
-      impPrefix = "harness-";
-      # the agent image (docs/runbooks/agent-image.md) built from the commit that pins this
-      # daemon's atc release, so hooks run the image's atc and no spawn copies the daemon's in
-      image = "agent-da7d870";
-      guestATC = "/usr/local/bin/atc";
-    };
-    defaultTarget = "geoffcloud";
-    authProfiles = {
-      claude = {
-        secret = "claude-setup-token";
-        host = "api.anthropic.com";
-        header = "authorization";
-        scheme = "bearer";
-      };
-      github = {
-        secret = "github-imp-agents";
-        kind = "github";
-      };
-      linear = {
-        secret = "linear-imp-agents";
-        host = "mcp.linear.app";
-        header = "authorization";
-        scheme = "bearer";
-      };
-      op-connect = {
-        secret = "op-connect";
-        host = "op-connect.imp.internal";
-        header = "authorization";
-        scheme = "bearer";
-        env = {
-          OP_CONNECT_HOST = "https://op-connect.imp.internal";
-          OP_CONNECT_TOKEN = "broker-placeholder";
+  services.atc-daemon =
+    let
+      # the made-up host that the broker serves pepys ingest as: the stack config's
+      # pepys.impIdentityAudience names it, and the imp identity tokens name it as their audience
+      pepysTelemetryHost = "pepys.imp.internal";
+      # the profiles a Claude session signs in through. A boxxy session takes the same ones, the
+      # github profile included: it clones, fetches pinned skills, pushes its branch and opens the
+      # pull request.
+      claudeProfiles = [
+        "claude"
+        "github"
+        "linear"
+        "op-connect"
+        "pepys-telemetry"
+      ];
+      # the Linear MCP server and the variables of a Claude session, shared by the claude and boxxy
+      # entries so a boxxy session behaves like a Claude session.
+      #
+      # The pr-evidence skill uploads to the files service with PR_EVIDENCE_*: its API address, and
+      # the vault/item/field path of its agent token, which the skill reads with `op read` through
+      # the op-connect profile. The path has no op:// prefix, because `op run` resolves every op://
+      # value in its environment and fails on one its token can't read. They sit on the entry
+      # because atc takes only the profile's own host as a profile URL.
+      #
+      # The telemetry variables switch on Claude Code's OpenTelemetry export. A profile's variable
+      # may hold only the broker placeholder or an https origin of the profile's host, so the
+      # endpoint sits on the pepys-telemetry profile and the other three, plain values, sit in the
+      # entry's env (which may not repeat a variable that a selected profile sets). atc appends
+      # atc.session.id to OTEL_RESOURCE_ATTRIBUTES in every session it starts, so the entries set
+      # no resource attributes.
+      claudeAuth = {
+        mcpServers.linear = {
+          url = "https://mcp.linear.app/mcp";
+          profile = "linear";
         };
       };
-    };
-    agents = {
-      claude = {
-        auth = {
-          profiles = [
-            "claude"
-            "github"
-            "linear"
-            "op-connect"
-          ];
-          mcpServers.linear = {
-            url = "https://mcp.linear.app/mcp";
-            profile = "linear";
+      claudeEnv = {
+        PR_EVIDENCE_URL = "https://${filesExposure.hostname}/api/files";
+        PR_EVIDENCE_TOKEN_PATH = "imp/files-agent-token/credential";
+        CLAUDE_CODE_ENABLE_TELEMETRY = "1";
+        OTEL_LOGS_EXPORTER = "otlp";
+        OTEL_EXPORTER_OTLP_PROTOCOL = "http/json";
+      };
+    in
+    {
+      enable = true;
+      package = atc;
+      listen = "${atcDaemonAddress}:${toString atcDaemonPort}";
+      tokenFile = "/var/lib/atc-daemon-secrets/gateway-token";
+      impTokenFile = "/var/lib/atc-daemon-secrets/imp-token";
+      targets.geoffcloud = {
+        provider = "imp";
+        url = impdLoopbackURL;
+        tokenFile = "/run/credentials/atc-daemon.service/imp-token";
+        impPrefix = "harness-";
+        # the agent image (docs/runbooks/agent-image.md) built from the commit that pins this
+        # daemon's atc release, so hooks run the image's atc and no spawn copies the daemon's in
+        image = "agent-da7d870";
+        guestATC = "/usr/local/bin/atc";
+      };
+      defaultTarget = "geoffcloud";
+      authProfiles = {
+        claude = {
+          secret = "claude-setup-token";
+          host = "api.anthropic.com";
+          header = "authorization";
+          scheme = "bearer";
+        };
+        github = {
+          secret = "github-imp-agents";
+          kind = "github";
+        };
+        linear = {
+          secret = "linear-imp-agents";
+          host = "mcp.linear.app";
+          header = "authorization";
+          scheme = "bearer";
+        };
+        op-connect = {
+          secret = "op-connect";
+          host = "op-connect.imp.internal";
+          header = "authorization";
+          scheme = "bearer";
+          env = {
+            OP_CONNECT_HOST = "https://op-connect.imp.internal";
+            OP_CONNECT_TOKEN = "broker-placeholder";
           };
         };
-        # the pr-evidence skill uploads to the files service with these: its API address, and
-        # the vault/item/field path of its agent token, which the skill reads with `op read` through
-        # the op-connect profile. The path has no op:// prefix, because `op run` resolves every
-        # op:// value in its environment and fails on one its token can't read. They sit on the
-        # entry because atc takes only the profile's own host as a profile URL.
-        env = {
-          PR_EVIDENCE_URL = "https://${filesExposure.hostname}/api/files";
-          PR_EVIDENCE_TOKEN_PATH = "imp/files-agent-token/credential";
+        # Claude Code's telemetry to pepys ingest. The broker adds the bearer token and the imp
+        # identity token itself, so the session holds neither and sends no placeholder.
+        pepys-telemetry = {
+          secret = "pepys-telemetry";
+          host = pepysTelemetryHost;
+          header = "authorization";
+          scheme = "bearer";
+          env.OTEL_EXPORTER_OTLP_ENDPOINT = "https://${pepysTelemetryHost}";
+        };
+        # the boxxy server's worker listener, through the host's relay. The broker adds the worker
+        # token and the imp identity token; the boxxy CLI in the session reads BOXXY_URL.
+        boxxy = {
+          secret = "boxxy";
+          host = topology.boxxy.brokerHost;
+          header = "authorization";
+          scheme = "bearer";
+          env.BOXXY_URL = "https://${topology.boxxy.brokerHost}";
         };
       };
-      # atc refuses a Codex auth without an oauth profile for chatgpt.com, which this daemon
-      # does not have, so Codex runs with no brokered sign-in
-      codex = { };
+      agents = {
+        claude = {
+          auth = claudeAuth // {
+            profiles = claudeProfiles;
+          };
+          env = claudeEnv;
+        };
+        # a worker session of the boxxy server (docs/architecture/workloads/boxxy.md): a Claude
+        # session with the boxxy profile beside the claude entry's, and the boxxy CLI's hook
+        # plug-in, which the agent image holds. A stock entry's auth takes no args (only a gateway
+        # entry's does), so the plug-in goes in the entry's args, which apply on an imp.
+        boxxy = {
+          kind = "claude";
+          args = [
+            "--plugin-dir"
+            "/opt/boxxy/hook-plugin"
+          ];
+          auth = claudeAuth // {
+            profiles = claudeProfiles ++ [ "boxxy" ];
+          };
+          env = claudeEnv;
+        };
+        # atc refuses a Codex auth without an oauth profile for chatgpt.com, which this daemon
+        # does not have, so Codex runs with no brokered sign-in
+        codex = { };
+      };
+      principals = {
+        # ChatGPT's connector, added 2026-10-04
+        "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY".targets = [ "geoffcloud" ];
+        # the boxxy server's service token at the atc gateway
+        # (docs/architecture/workloads/atc-gateway.md#service-tokens)
+        "service:boxxy".targets = [ "geoffcloud" ];
+      };
     };
-    principals = {
-      # ChatGPT's connector, added 2026-10-04
-      "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY".targets = [ "geoffcloud" ];
-    };
-  };
 
   # The preview service (docs/architecture/workloads/preview.md, docs/runbooks/preview.md). Its
   # secrets sit on host-secrets, staged by the runbook; until they exist, the unit is skipped.

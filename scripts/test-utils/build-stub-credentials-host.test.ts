@@ -155,6 +155,8 @@ test('it mints atc-cloud into imp-token and impd’s tokens, with imp’s notice
       'glm',
       'linear-imp-agents',
       'op-connect',
+      'pepys-telemetry',
+      'boxxy',
     ],
   });
 });
