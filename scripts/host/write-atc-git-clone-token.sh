@@ -22,8 +22,9 @@ write_git_clone_token() {
   # -T: a directory in the way fails the move instead of taking the file inside it
   mv -T "$temp" "$dir/git-clone-token"
   trap - EXIT
+  # exit inside the function: bash has parsed the whole body before it reads the token, so it
+  # ends here and never runs a later stdin line as a command.
+  exit
 }
 
-# `exit` shares the call's line, so bash parses it before the call reads the token. bash then ends
-# there and never runs a later stdin line as a command.
-write_git_clone_token "$@"; exit
+write_git_clone_token "$@"
