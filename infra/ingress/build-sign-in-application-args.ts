@@ -1,28 +1,33 @@
 import type { ZeroTrustAccessApplicationArgs } from '@pulumi/cloudflare';
 import type { Output } from '@pulumi/pulumi';
-import { atcGatewayPaths } from './atc-gateway-paths.ts';
 
-interface GatewayApplicationInputs {
+interface SignInApplicationInputs {
   readonly accountID: string;
 
+  // the application's display name
+  readonly name: string;
+
   readonly hostname: string;
+
+  // the origin's browser paths; the first is the application's domain
+  readonly browserPaths: readonly [string, ...string[]];
 
   readonly identityProviderID: Output<string>;
 
   readonly policyID: Output<string>;
 }
 
-export function buildGatewayApplicationArgs(
-  inputs: GatewayApplicationInputs,
+export function buildSignInApplicationArgs(
+  inputs: SignInApplicationInputs,
 ): ZeroTrustAccessApplicationArgs {
   return {
     accountId: inputs.accountID,
-    name: 'atc gateway sign-in',
+    name: inputs.name,
     type: 'self_hosted',
-    domain: `${inputs.hostname}${atcGatewayPaths.browser[0]}`,
+    domain: `${inputs.hostname}${inputs.browserPaths[0]}`,
 
     // browser paths only, so the machine paths carry no Access challenge or cookie
-    destinations: atcGatewayPaths.browser.map((path) => ({
+    destinations: inputs.browserPaths.map((path) => ({
       type: 'public',
       uri: `${inputs.hostname}${path}`,
     })),

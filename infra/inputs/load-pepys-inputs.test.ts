@@ -193,3 +193,120 @@ test('it refuses an s2-lite key that Garage would not import', () => {
     ),
   ).toThrowWithMessage(Error, /^PEPYS_S2_GARAGE_ACCESS_KEY_ID must be GK and 24 hex digits/u);
 });
+
+test('it carries the API hostname while the image is pepys 0.3.0 or later', () => {
+  const fixture = setupTest();
+
+  const config = buildStubConfig({
+    pepys: JSON.stringify({
+      image: fixture.image,
+      webhookHostname: 'pepys-webhook.geoff.cloud',
+      apiHostname: 'pepys.geoff.cloud',
+    }),
+  });
+
+  expect(
+    loadPepysInputs(config, fixture.coreEnv, ['PEPYS_WIDGET_SECRET']).pepys?.config,
+  ).toStrictEqual({
+    image: fixture.image,
+    webhookHostname: 'pepys-webhook.geoff.cloud',
+    apiHostname: 'pepys.geoff.cloud',
+  });
+});
+
+test.each([
+  [
+    'pepys 0.2.0',
+    'ghcr.io/zgeoff/cloud-pepys:0.2.0-9c1b151f62c7@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+  ],
+  [
+    'pepys 0.2.9',
+    'ghcr.io/zgeoff/cloud-pepys:0.2.9-9c1b151f62c7@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+  ],
+])(
+  'it refuses the API hostname on an image of %s, whose API serves /mcp to any caller',
+  (release: string, image: string) => {
+    const fixture = setupTest();
+
+    expect(() =>
+      loadPepysInputs(
+        buildStubConfig({
+          pepys: JSON.stringify({
+            image,
+            webhookHostname: 'pepys-webhook.geoff.cloud',
+            apiHostname: 'pepys.geoff.cloud',
+          }),
+        }),
+        fixture.coreEnv,
+        [],
+      ),
+    ).toThrowWithMessage(
+      Error,
+      `stack config "pepys.apiHostname" needs a "pepys.image" of pepys 0.3.0 or later, whose API checks a token on /mcp; the image is ${release}`,
+    );
+  },
+);
+
+test('it refuses the API hostname on an image whose tag names no release', () => {
+  const fixture = setupTest();
+
+  expect(() =>
+    loadPepysInputs(
+      buildStubConfig({
+        pepys: JSON.stringify({
+          image:
+            'ghcr.io/zgeoff/cloud-pepys:latest@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+          webhookHostname: 'pepys-webhook.geoff.cloud',
+          apiHostname: 'pepys.geoff.cloud',
+        }),
+      }),
+      fixture.coreEnv,
+      [],
+    ),
+  ).toThrowWithMessage(
+    Error,
+    'stack config "pepys.apiHostname" needs a "pepys.image" of pepys 0.3.0 or later, whose API checks a token on /mcp; the image is not a release tag',
+  );
+});
+
+test("it refuses an API hostname equal to ingest's webhook hostname", () => {
+  const fixture = setupTest();
+
+  expect(() =>
+    loadPepysInputs(
+      buildStubConfig({
+        pepys: JSON.stringify({
+          image: fixture.image,
+          webhookHostname: 'pepys-webhook.geoff.cloud',
+          apiHostname: 'pepys-webhook.geoff.cloud',
+        }),
+      }),
+      fixture.coreEnv,
+      [],
+    ),
+  ).toThrowWithMessage(
+    Error,
+    'stack config "pepys.apiHostname" must differ from "pepys.webhookHostname"',
+  );
+});
+
+test('it refuses an API hostname outside geoff.cloud', () => {
+  const fixture = setupTest();
+
+  expect(() =>
+    loadPepysInputs(
+      buildStubConfig({
+        pepys: JSON.stringify({
+          image: fixture.image,
+          webhookHostname: 'pepys-webhook.geoff.cloud',
+          apiHostname: 'pepys.example.test',
+        }),
+      }),
+      fixture.coreEnv,
+      [],
+    ),
+  ).toThrowWithMessage(
+    Error,
+    'stack config "pepys.apiHostname" must name a host under geoff.cloud',
+  );
+});

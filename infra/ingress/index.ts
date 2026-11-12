@@ -1,16 +1,19 @@
 import {
+  ZeroTrustAccessIdentityProvider,
   ZeroTrustTunnelCloudflared,
   getZeroTrustTunnelCloudflaredTokenOutput,
 } from '@pulumi/cloudflare';
 import type { Provider } from '@pulumi/kubernetes';
 import type { Output } from '@pulumi/pulumi';
 import { secret } from '@pulumi/pulumi';
+import { atcGatewayPaths } from './atc-gateway-paths.ts';
 import type { TunnelRoute } from './build-tunnel-ingresses.ts';
-import type { GatewayIngress } from './build-tunnel-route-specs.ts';
+import type { GatewayIngress, SignInIngress } from './build-tunnel-route-specs.ts';
 import type { ATCTunnel } from './create-atc-tunnel.ts';
 import { createCloudflared } from './create-cloudflared.ts';
-import { createGatewayAccess } from './create-gateway-access.ts';
+import { createOwnerAccess } from './create-owner-access.ts';
 import { createTunnelRoutes } from './create-tunnel-routes.ts';
+import { pepysAPIPaths } from './pepys-api-paths.ts';
 
 export { cloudflaredNames } from './cloudflared-names.ts';
 
@@ -25,9 +28,9 @@ interface IngressInputs {
   // set only with the gateway
   readonly atcRoute: TunnelRoute | undefined;
 
-  // the one address the Access policy in front of the gateway's sign-in pages lets in, set with
-  // the gateway
-  readonly atcOwnerEmail: Output<string> | undefined;
+  // the one address that the Access policies in front of the sign-in pages let in, set with the
+  // gateway
+  readonly ownerEmail: Output<string> | undefined;
 
   // set only with the gateway
   readonly atcTunnel: ATCTunnel | undefined;
@@ -37,6 +40,9 @@ interface IngressInputs {
 
   // set only with pepys, while a route of its deployment is public
   readonly pepysRoute: TunnelRoute | undefined;
+
+  // set only with pepys, while its API serves /mcp on its public hostname
+  readonly pepysAPIRoute: TunnelRoute | undefined;
 }
 
 interface IngressOutputs {
@@ -46,6 +52,7 @@ interface IngressOutputs {
   readonly atcURL?: Output<string>;
   readonly filesURL?: Output<string>;
   readonly pepysWebhookURL?: Output<string>;
+  readonly pepysAPIURL?: Output<string>;
   readonly previewWebhookURL: Output<string>;
 }
 
@@ -66,13 +73,19 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
     createCloudflared(inputs.cluster, tunnelToken);
   }
 
+  const identityProviderID =
+    inputs.atcRoute === undefined && inputs.pepysAPIRoute === undefined
+      ? undefined
+      : createOneTimePin(inputs.accountID);
+
   const routes = createTunnelRoutes({
     accountID: inputs.accountID,
     zoneID: inputs.zoneID,
     tunnelID: tunnel.id,
-    gateway: createGatewayIngress(inputs),
+    gateway: createGatewayIngress(inputs, identityProviderID),
     files: inputs.filesRoute,
     pepys: inputs.pepysRoute,
+    pepysAPI: createPepysAPIIngress(inputs, identityProviderID),
   });
 
   return {
@@ -84,22 +97,37 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
     ...(routes.atcURL === undefined ? {} : { atcURL: routes.atcURL }),
     ...(routes.filesURL === undefined ? {} : { filesURL: routes.filesURL }),
     ...(routes.pepysURL === undefined ? {} : { pepysWebhookURL: routes.pepysURL }),
+    ...(routes.pepysAPIURL === undefined ? {} : { pepysAPIURL: routes.pepysAPIURL }),
     previewWebhookURL: routes.previewWebhookURL,
   };
 }
 
+// the account's one-time PIN login, which needs no outside identity provider; every owner-only
+// Access policy shares it
+function createOneTimePin(accountID: string): Output<string> {
+  return new ZeroTrustAccessIdentityProvider('one-time-pin', {
+    accountId: accountID,
+    name: 'One-time PIN',
+    type: 'onetimepin',
+    config: {},
+  }).id;
+}
+
 // the program sets the route, the owner address and the tunnel together, so one without the
 // others is a wiring fault
-function createGatewayIngress(inputs: IngressInputs): GatewayIngress | undefined {
+function createGatewayIngress(
+  inputs: IngressInputs,
+  identityProviderID: Output<string> | undefined,
+): GatewayIngress | undefined {
   const atcRoute = inputs.atcRoute;
-  const atcOwnerEmail = inputs.atcOwnerEmail;
+  const ownerEmail = inputs.ownerEmail;
   const atcTunnel = inputs.atcTunnel;
 
-  if (atcRoute === undefined) {
+  if (atcRoute === undefined || identityProviderID === undefined) {
     return undefined;
   }
 
-  if (atcOwnerEmail === undefined) {
+  if (ownerEmail === undefined) {
     throw new Error("the atc gateway's route has no owner address for its Access policy");
   }
 
@@ -110,10 +138,47 @@ function createGatewayIngress(inputs: IngressInputs): GatewayIngress | undefined
   return {
     hostname: atcRoute.hostname,
     tunnelID: atcTunnel.tunnelID,
-    access: createGatewayAccess({
+    access: createOwnerAccess({
       accountID: inputs.accountID,
+      resourceName: 'atc-gateway',
+      displayName: 'atc gateway',
       hostname: atcRoute.hostname,
-      ownerEmail: atcOwnerEmail,
+      browserPaths: atcGatewayPaths.browser,
+      identityProviderID,
+      ownerEmail,
+    }),
+  };
+}
+
+// the browser paths sign the owner in, so the route needs the owner address for their Access
+// policy
+function createPepysAPIIngress(
+  inputs: IngressInputs,
+  identityProviderID: Output<string> | undefined,
+): SignInIngress | undefined {
+  const route = inputs.pepysAPIRoute;
+  const ownerEmail = inputs.ownerEmail;
+
+  if (route === undefined || identityProviderID === undefined) {
+    return undefined;
+  }
+
+  if (ownerEmail === undefined) {
+    throw new Error(
+      "the pepys API's route has no owner address for its Access policy; it takes the atc gateway's",
+    );
+  }
+
+  return {
+    route,
+    access: createOwnerAccess({
+      accountID: inputs.accountID,
+      resourceName: 'pepys-api',
+      displayName: 'pepys API',
+      hostname: route.hostname,
+      browserPaths: pepysAPIPaths.browser,
+      identityProviderID,
+      ownerEmail,
     }),
   };
 }
