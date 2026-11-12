@@ -7,12 +7,12 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@pepys/api": "0.1.0",
-    "@pepys/cli": "0.1.0",
-    "@pepys/ingest": "0.1.0",
-    "@pepys/kit": "0.1.0",
-    "@pepys/source-github": "0.1.0",
-    "@pepys/source-telemetry": "0.1.0"
+    "@pepys/api": "0.1.1",
+    "@pepys/cli": "0.1.1",
+    "@pepys/ingest": "0.1.1",
+    "@pepys/kit": "0.1.1",
+    "@pepys/source-github": "0.1.1",
+    "@pepys/source-telemetry": "0.1.1"
   },
   "devDependencies": {
     "@types/bun": "1.4.4",

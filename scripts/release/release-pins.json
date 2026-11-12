@@ -45,8 +45,8 @@
     "version": "0.70.1"
   },
   "pepys-host": {
-    "version": "0.1.0",
-    "sum": "9f627017f0d76d472a8300fa46bcd7cb01d006ac09d46abbbe483952ad232020"
+    "version": "0.1.1",
+    "sum": "9fc80b05b7466fdfc83b2898137b1fab80e9cbcadf463d43e362071c878f9bee"
   },
   "auto-mode": {
     "version": "4.0.0",
