@@ -105,4 +105,6 @@ The `boxxy image` workflow compiles `deploy/boxxy/server.ts` and the `@boxxy/ser
 `package.json` pins into one binary, adds the rules, and publishes the image from `main` to GHCR as
 `ghcr.io/zgeoff/cloud-boxxy:<commit>`. The Pulumi program deploys the server only when stack config
 `boxxy` is set, so the deploy needs the owner's change to stack config. The pod runs as a nonroot
-user on a read-only root filesystem with every capability dropped.
+user on a read-only root filesystem with every capability dropped. A small memory-backed `/tmp`
+takes the temp file SQLite writes for a statement journal; its pages count against the container's
+memory limit.

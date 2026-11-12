@@ -7,7 +7,7 @@ function setupTest(): string {
   return 'ghcr.io/zgeoff/cloud-boxxy:0123456@sha256:4444444444444444444444444444444444444444444444444444444444444444';
 }
 
-test('it runs the boxxy server as one nonroot replica on a read-only root, with a retained 1 GiB volume, its configuration file and both tokens from its Secret', () => {
+test('it runs the boxxy server as one nonroot replica on a read-only root, with a retained 1 GiB volume, a 16 MiB memory-backed /tmp, its configuration file and both tokens from its Secret', () => {
   const image = setupTest();
   const serviceName = output('boxxy');
   const configMap = output('boxxy-config-0a1b2c3d');
@@ -40,7 +40,10 @@ test('it runs the boxxy server as one nonroot replica on a read-only root, with 
         automountServiceAccountToken: false,
         enableServiceLinks: false,
         imagePullSecrets: [{ name: 'ghcr-pull' }],
-        volumes: [{ name: 'config', configMap: { name: configMap } }],
+        volumes: [
+          { name: 'config', configMap: { name: configMap } },
+          { name: 'tmp', emptyDir: { medium: 'Memory', sizeLimit: '16Mi' } },
+        ],
         containers: [
           {
             name: 'boxxy',
@@ -77,6 +80,7 @@ test('it runs the boxxy server as one nonroot replica on a read-only root, with 
             volumeMounts: [
               { name: 'data', mountPath: '/data' },
               { name: 'config', mountPath: '/etc/boxxy', readOnly: true },
+              { name: 'tmp', mountPath: '/tmp' },
             ],
             securityContext: {
               allowPrivilegeEscalation: false,
@@ -125,6 +129,7 @@ test('it mounts each trust document read-only as a regular file in the issuers f
     spec: {
       volumes: [
         { name: 'config', configMap: { name: expect.toBeObject() } },
+        { name: 'tmp', emptyDir: { medium: 'Memory', sizeLimit: '16Mi' } },
         { name: 'issuers', configMap: { name: configMap } },
       ],
       containers: [
@@ -132,6 +137,7 @@ test('it mounts each trust document read-only as a regular file in the issuers f
           volumeMounts: [
             { name: 'data', mountPath: '/data' },
             { name: 'config', mountPath: '/etc/boxxy', readOnly: true },
+            { name: 'tmp', mountPath: '/tmp' },
             {
               name: 'issuers',
               mountPath: '/etc/boxxy-issuers/geoffcloud.json',

@@ -58,6 +58,10 @@ export function buildBoxxySpec(inputs: BoxxySpecInputs): input.apps.v1.StatefulS
         imagePullSecrets: [{ name: inputs.pullSecret }],
         volumes: [
           { name: 'config', configMap: { name: inputs.configMap } },
+
+          // SQLite writes a statement journal's temp file to /tmp, and the root is read-only; the
+          // pages count against the container's memory limit
+          { name: 'tmp', emptyDir: { medium: 'Memory', sizeLimit: '16Mi' } },
           ...(inputs.trustDocuments === undefined
             ? []
             : [{ name: 'issuers', configMap: { name: inputs.trustDocuments.configMap } }]),
@@ -146,6 +150,7 @@ function buildBoxxyContainer(inputs: BoxxySpecInputs): input.core.v1.Container {
     volumeMounts: [
       { name: 'data', mountPath: '/data' },
       { name: 'config', mountPath: configFolder, readOnly: true },
+      { name: 'tmp', mountPath: '/tmp' },
 
       // one subPath mount per document, so the folder holds regular files: a ConfigMap volume
       // shows each key as a symlink, which a server before 0.1.5 skips
