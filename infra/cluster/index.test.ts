@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { output, runtime } from '@pulumi/pulumi';
+import { output, runtime, secret } from '@pulumi/pulumi';
 import { z } from 'zod';
+import type { BoxxyRepos } from '../inputs/index.ts';
 import { buildMockATCGatewayConfig } from '../test-utils/build-mock-atc-gateway-config.ts';
 import { buildStubResourceMocks } from '../test-utils/build-stub-resource-mocks.ts';
 import { resolveOutput } from '../test-utils/resolve-output.ts';
@@ -83,8 +84,11 @@ test("it returns the boxxy server's owner Service and pins only the worker Servi
         'ghcr.io/zgeoff/cloud-boxxy:0123456@sha256:4444444444444444444444444444444444444444444444444444444444444444',
       runner: 'runner-for-tests',
       atc: { trustedFolders: {} },
-      spawn: { target: 'target-for-tests', repoPaths: {} },
+      spawn: { target: 'target-for-tests' },
     },
+    repos: secret<BoxxyRepos>({
+      'owner/repo': { url: 'https://github.com/owner/repo', ref: 'main' },
+    }),
     pullCredential: {
       username: 'octo-puller',
       token: output('ghp_fake0token0for0tests0only0000000000'),
@@ -95,6 +99,7 @@ test("it returns the boxxy server's owner Service and pins only the worker Servi
     },
   };
 
+  const gatewayConfig = buildMockATCGatewayConfig();
   const stub = buildStubResourceMocks();
 
   await runtime.setMocks(stub.mocks, 'geoff-cloud', 'test');
@@ -112,7 +117,7 @@ test("it returns the boxxy server's owner Service and pins only the worker Servi
       onePasswordConnect: { credentials: output('{}') },
       atcGateway: {
         inputs: {
-          config: buildMockATCGatewayConfig(),
+          config: gatewayConfig,
           secrets: {
             pullCredential: {
               username: 'octo-puller',
@@ -140,14 +145,28 @@ test("it returns the boxxy server's owner Service and pins only the worker Servi
   await stub.whenRegistered('kubernetes:core/v1:Service::boxxy');
   await stub.whenRegistered('kubernetes:core/v1:ConfigMap::boxxy-config');
 
+  // the repos are a secret, so Pulumi registers the data as one, which it hides in a preview
+  const secretData = z.object({
+    [runtime.specialSigKey]: z.literal(runtime.specialSecretSig),
+    value: z.object({ 'config.json': z.string() }),
+  });
+
   const config = z
-    .object({ data: z.object({ 'config.json': z.string() }) })
+    .object({ data: secretData })
     .parse(stub.inputs.get('kubernetes:core/v1:ConfigMap::boxxy-config'));
 
   expect(service).toBe('http://boxxy.boxxy.svc.cluster.local:8090');
 
-  expect(JSON.parse(config.data['config.json'])).toMatchObject({
-    atc: { url: 'http://atc-gateway.atc.svc.cluster.local:8414/rpc', trustedFolders: {} },
+  expect(JSON.parse(config.data.value['config.json'])).toMatchObject({
+    spawn: {
+      target: 'target-for-tests',
+      repos: { 'owner/repo': { url: 'https://github.com/owner/repo', ref: 'main' } },
+    },
+    atc: {
+      url: 'http://atc-gateway.atc.svc.cluster.local:8414/mcp',
+      host: new URL(gatewayConfig.publicURL).host,
+      trustedFolders: {},
+    },
   });
 
   expect(stub.inputs.get('kubernetes:core/v1:Service::boxxy-worker')?.['spec']).toStrictEqual({
@@ -181,8 +200,9 @@ test('it refuses boxxy without the atc gateway, which the server calls atc throu
             'ghcr.io/zgeoff/cloud-boxxy:0123456@sha256:4444444444444444444444444444444444444444444444444444444444444444',
           runner: 'runner-for-tests',
           atc: { trustedFolders: {} },
-          spawn: { target: 'target-for-tests', repoPaths: {} },
+          spawn: { target: 'target-for-tests' },
         },
+        repos: secret<BoxxyRepos>({}),
         pullCredential: {
           username: 'octo-puller',
           token: output('ghp_fake0token0for0tests0only0000000000'),

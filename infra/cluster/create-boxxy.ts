@@ -4,7 +4,7 @@ import { StatefulSet } from '@pulumi/kubernetes/apps/v1';
 import { ConfigMap, Secret, Service } from '@pulumi/kubernetes/core/v1';
 import { NetworkPolicy } from '@pulumi/kubernetes/networking/v1';
 import type { Output } from '@pulumi/pulumi';
-import { interpolate } from '@pulumi/pulumi';
+import { all, interpolate } from '@pulumi/pulumi';
 import type { BoxxyInputs } from '../inputs/index.ts';
 import { createNamespace } from '../shared/create-namespace.ts';
 import { buildBoxxyNetworkPolicySpec } from './build-boxxy-network-policy-spec.ts';
@@ -27,13 +27,20 @@ interface BoxxyOutputs {
   readonly ownerServiceURL: Output<string>;
 }
 
-// the atc gateway's oRPC route, under its in-cluster Service URL
-const atcRoute = '/rpc';
+// the atc gateway's MCP route, under its in-cluster Service URL
+const atcRoute = '/mcp';
+
+// the gateway answers only requests whose Host is its public host, so the server sends that Host
+// on each call to the in-cluster Service
+interface BoxxyATCGateway {
+  readonly serviceURL: Output<string>;
+  readonly publicHost: string;
+}
 
 export function createBoxxy(
   cluster: Provider,
   inputs: BoxxyInputs,
-  atcGatewayServiceURL: Output<string>,
+  atcGateway: BoxxyATCGateway,
 ): BoxxyOutputs {
   const ns = createNamespace('boxxy', cluster);
   const namespace = ns.metadata.name;
@@ -74,8 +81,14 @@ export function createBoxxy(
     {
       metadata: { namespace },
       data: {
-        [configFileName]: atcGatewayServiceURL.apply((serviceURL) =>
-          renderBoxxyConfig({ config: inputs.config, atcURL: `${serviceURL}${atcRoute}`, trusted }),
+        // the repos are a secret, so the file is one: Pulumi hides the data in every preview
+        [configFileName]: all([atcGateway.serviceURL, inputs.repos]).apply(([serviceURL, repos]) =>
+          renderBoxxyConfig({
+            config: inputs.config,
+            repos,
+            atc: { url: `${serviceURL}${atcRoute}`, host: atcGateway.publicHost },
+            trusted,
+          }),
         ),
       },
     },

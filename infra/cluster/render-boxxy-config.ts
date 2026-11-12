@@ -1,5 +1,5 @@
 import { topology } from '@zgeoff/cloud-topology';
-import type { BoxxyConfig } from '../inputs/index.ts';
+import type { BoxxyConfig, BoxxyRepos } from '../inputs/index.ts';
 
 export const boxxyOwnerPort = topology.boxxy.ownerPort;
 export const boxxyWorkerPort = topology.boxxy.workerPort;
@@ -16,16 +16,20 @@ export const boxxyTrustedIssuersFolder = '/etc/boxxy-issuers';
 interface BoxxyConfigFileInputs {
   readonly config: Pick<BoxxyConfig, 'runner' | 'atc' | 'spawn'>;
 
-  // the oRPC route the server calls atc on: the atc gateway's Service in the cluster
-  readonly atcURL: string;
+  // the server's spawn.repos, which the stack holds as a secret of their own
+  readonly repos: BoxxyRepos;
+
+  // the MCP route the server calls atc on, at the atc gateway's Service in the cluster, and the
+  // gateway's public host, which the server sends as Host
+  readonly atc: { readonly url: string; readonly host: string };
 
   // true when the pod mounts at least one trust document; with none, the file has no
   // trustedIssuers section, so the server refuses every session and hook call
   readonly trusted: boolean;
 }
 
-// The boxxy server's configuration file (its serverConfigSchema), as JSON. It holds no secret: the
-// server reads each token from the environment. The audience is the broker's made-up host, which
+// The boxxy server's configuration file (its serverConfigSchema), as JSON. It holds no token: the
+// server reads each one from the environment. The audience is the broker's made-up host, which
 // the broker's imp identity tokens name.
 export function renderBoxxyConfig(inputs: BoxxyConfigFileInputs): string {
   const file = {
@@ -36,8 +40,8 @@ export function renderBoxxyConfig(inputs: BoxxyConfigFileInputs): string {
       listen: { hostname: '0.0.0.0', port: boxxyOwnerPort },
       workerListen: { hostname: '0.0.0.0', port: boxxyWorkerPort },
     },
-    spawn: inputs.config.spawn,
-    atc: { url: inputs.atcURL, ...inputs.config.atc },
+    spawn: { ...inputs.config.spawn, repos: inputs.repos },
+    atc: { url: inputs.atc.url, host: inputs.atc.host, ...inputs.config.atc },
     ...(inputs.trusted
       ? {
           trustedIssuers: {

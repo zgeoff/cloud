@@ -151,11 +151,13 @@ export interface BoxxyConfig {
     // the session that gets the hold notices; with none, no notice is sent
     readonly noticeSession?: string;
   };
-  readonly spawn: {
-    readonly target: string;
-    readonly repoPaths: Readonly<Record<string, string>>;
-  };
+  readonly spawn: { readonly target: string };
 }
+
+// by repo: its folder on the target, or the git source that atc clones there
+export type BoxxyRepos = Readonly<
+  Record<string, string | { readonly url: string; readonly ref: string }>
+>;
 
 // a nightly restic backup of the boxxy store to its own repository in R2, run by the atc gateway's
 // backup image
@@ -171,6 +173,9 @@ export interface BoxxyBackupInputs {
 
 export interface BoxxyInputs {
   readonly config: BoxxyConfig;
+
+  // the server's spawn.repos, a secret: a private repo's name stays out of the preview
+  readonly repos: Output<BoxxyRepos>;
 
   readonly pullCredential: GHCRPullCredential;
   readonly secrets: {
