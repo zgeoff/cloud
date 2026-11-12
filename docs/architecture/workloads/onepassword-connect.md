@@ -26,13 +26,16 @@ flowchart LR
 4. The Service sends the request to the Connect server, which answers from its synced copy of the
    vault.
 
-The relay exists because imp's forward table drops imp-host's traffic to the cluster's ranges, and
-the drop holds even after kube-proxy rewrites a destination, so the container can reach neither the
-Service, nor a pod, nor a NodePort. The host is not under that rule, so the host dials the Service
-for it. systemd holds the relay's socket and starts the proxy on the first connection, so the socket
-can bind the host's address on Podman's bridge before Podman's network backend creates the bridge
-for imp-host. A NixOS switch never restarts a changed socket unit, so a switch that moves the
-relay's address restarts the socket through a unit of its own, and the proxy stops with the socket.
+The relay is one instance of the module that also relays pepys ingest and the boxxy worker Service
+([firewalls](../network/firewalls.md#the-narrowing-table)); its unit names, address and port are its
+own. The relay exists because imp's forward table drops imp-host's traffic to the cluster's ranges,
+and the drop holds even after kube-proxy rewrites a destination, so the container can reach neither
+the Service, nor a pod, nor a NodePort. The host is not under that rule, so the host dials the
+Service for it. systemd holds the relay's socket and starts the proxy on the first connection, so
+the socket can bind the host's address on Podman's bridge before Podman's network backend creates
+the bridge for imp-host. A NixOS switch never restarts a changed socket unit, so a switch that moves
+the relay's address restarts the socket through a unit of its own, and the proxy stops with the
+socket.
 
 The relay dials the Service by its cluster address, so the Service pins that address, and Pulumi
 ignores any later change to it. Recreating the Service at a new address would silently break the

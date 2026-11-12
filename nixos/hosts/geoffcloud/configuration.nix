@@ -214,16 +214,27 @@ in
         "flannel.1"
       ];
 
-  # 1Password Connect for imps, relayed from podman0 to the Service's pinned ClusterIP; the
-  # module admits podman0's subnet to the relay in cloud_host and opens its port on podman0
-  services.onepassword-connect-relay = {
-    enable = true;
-    interface = topology.podman.bridge;
-    address = topology.podman.bridgeAddress;
-    inherit (getHostPort "onepassword-connect-relay") port;
-    allowedSubnet = topology.podman.subnet;
-    target = "${topology.onePasswordConnect.clusterIP}:${toString topology.onePasswordConnect.port}";
-  };
+  # Services for imps, relayed from podman0 to each Service's pinned ClusterIP: 1Password Connect,
+  # pepys ingest for the sessions' telemetry, and the boxxy worker Service. The module admits
+  # podman0's subnet to each relay in cloud_host and opens its port on podman0. kube-router admits
+  # the node's own addresses before any network policy, so a relay needs no policy of its own.
+  services.bridge-relays =
+    let
+      relay = name: target: {
+        inherit (getHostPort name) port;
+        interface = topology.podman.bridge;
+        address = topology.podman.bridgeAddress;
+        allowedSubnet = topology.podman.subnet;
+        inherit target;
+      };
+    in
+    {
+      onepassword-connect-relay = relay "onepassword-connect-relay" "${topology.onePasswordConnect.clusterIP}:${toString topology.onePasswordConnect.port}" // {
+        label = "the Connect relay";
+      };
+      pepys-ingest-relay = relay "pepys-ingest-relay" "${topology.pepysIngest.clusterIP}:${toString topology.pepysIngest.port}";
+      boxxy-worker-relay = relay "boxxy-worker-relay" "${topology.boxxy.workerClusterIP}:${toString topology.boxxy.workerPort}";
+    };
 
   services.openssh = {
     enable = true;
@@ -341,7 +352,7 @@ in
   };
 
   # Podman's default network, which imp-host runs on, pinned to the topology's bridge and subnet:
-  # the Connect relay, the model route listener and the pod drops above name them
+  # the relays, the model route listener and the pod drops above name them
   virtualisation.podman.defaultNetwork.settings = {
     network_interface = topology.podman.bridge;
     subnets = [

@@ -31,6 +31,13 @@ host's own table therefore drops pod traffic to Podman's subnet
 ([firewalls](../network/firewalls.md#the-narrowing-table)), and on Podman's bridge only the host and
 the containers reach imp-host.
 
+Three relays on the host's address on that bridge carry the broker's requests for three made-up host
+names to Services in the cluster, because imp's forward table drops imp-host's own traffic to the
+cluster's ranges: `op-connect.imp.internal` to 1Password Connect, `pepys.imp.internal` to pepys
+ingest and `boxxy.imp.internal` to the boxxy worker Service
+([firewalls](../network/firewalls.md#the-narrowing-table)). The pepys and boxxy secrets ask for an
+imp identity token, which the next paragraph covers.
+
 impd signs an imp identity token for each request of a broker secret that asks for one, and names
 itself `geoffcloud` in the token. A service behind the broker pins impd's public keys under that
 name, from `impz identity jwks`, and so tells one imp from another. A change of the name orphans

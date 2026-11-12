@@ -35,7 +35,7 @@
         ./modules/drift-check.nix
         ./modules/atc-daemon.nix
         ./modules/cloud-host-firewall.nix
-        ./modules/onepassword-connect-relay.nix
+        ./modules/bridge-relays.nix
         ./modules/preview.nix
         ./modules/public-front.nix
         ./modules/tank-cloud.nix
@@ -67,7 +67,7 @@
       # booted VM's cgroups through node-exporter, and drift-check-vm, which runs the drift check's
       # unit in its own sandbox, and public-front-vm, which sends requests through the TLS front to
       # a stand-in upstream, and atc-daemon-vm, which starts the atc daemon on its gateway token as
-      # the host does, and onepassword-connect-relay-vm, which switches the Connect relay to another
+      # the host does, and bridge-relays-vm, which switches the relays to another
       # bridge, and preview-image-vm, which starts the preview-image unit under real Podman before
       # a stand-in imp-host container exists, and agent-image-build-switch-vm, which starts the agent image
       # build while a switch recreates imp-host, and disk-read-ahead-vm, which sets a disk's read-ahead
@@ -113,11 +113,11 @@
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
       checks.x86_64-linux.public-front-vm = import ./checks/public-front-vm.nix { inherit nixpkgs; };
-      checks.x86_64-linux.onepassword-connect-relay = import ./checks/onepassword-connect-relay.nix {
+      checks.x86_64-linux.bridge-relays = import ./checks/bridge-relays.nix {
         inherit nixpkgs imp;
       };
-      checks.x86_64-linux.onepassword-connect-relay-vm =
-        import ./checks/onepassword-connect-relay-vm.nix
+      checks.x86_64-linux.bridge-relays-vm =
+        import ./checks/bridge-relays-vm.nix
           {
             inherit nixpkgs;
           };

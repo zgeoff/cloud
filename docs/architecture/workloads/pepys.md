@@ -113,6 +113,18 @@ The ingest Service has the pinned ClusterIP that `pepysIngest` in
 [`constants.json`](../../../packages/topology/constants.json) names, so a relay on the host can dial
 it.
 
+### The telemetry path from a session
+
+A Claude session in an imp reaches ingest without a tunnel. The atc daemon's `pepys-telemetry` auth
+profile sets the session's OpenTelemetry endpoint to `https://pepys.imp.internal`, a made-up host
+that exists only inside imp's broker. The broker adds the bearer token and the imp identity token to
+each request, so the session holds neither, and sends the request to the pepys relay on the host's
+address on Podman's bridge. The relay dials the ingest Service at its pinned ClusterIP. Ingest's
+policy admits only the shared tunnel's cloudflared, and the relay still passes: kube-router accepts
+a packet whose source is one of the node's own addresses before it applies any policy, so the policy
+needs no `ipBlock`. Ingest then checks the bearer token and the identity token as above. The
+secret's setup is in [the pepys runbook](../../runbooks/pepys.md#let-sessions-send-telemetry).
+
 ## Network policies
 
 Each pod admits only its callers:

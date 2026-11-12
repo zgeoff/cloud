@@ -42,8 +42,8 @@ through the trusted interfaces. It trusts the tailnet interface and the cluster'
 interfaces as sources, because pods reach the API server and the kubelet on the host, and the
 tailnet is already filtered by the policy. It filters forwarded traffic too, so no public packet
 reaches a pod or a NodePort, and it forwards the pods' own traffic. It does not trust Podman's
-bridge, so a container on it reaches the host only on the one port opened there, the Connect
-relay's.
+bridge, so a container on it reaches the host only on the ports opened there, the three bridge
+relays'.
 
 ### The narrowing table
 
@@ -57,11 +57,15 @@ The table drops the port from every other source, the rest of the tailnet and th
 included. A drop in any input chain is final, and an accept here only passes the packet on to
 NixOS's table, which trusts both interfaces.
 
-The same table admits the Connect relay's port only from Podman's subnet on Podman's bridge, so only
-a container on the host reaches the relay
-([1Password Connect](../workloads/onepassword-connect.md)). Both rules are narrower than the trust
-they sit under, and neither stops a pod on the host from reaching the daemon's port: the daemon's
-bearer token is the gate for that.
+The same table admits the port of each bridge relay only from Podman's subnet on Podman's bridge, so
+only a container on the host reaches a relay. The relays carry imp-host's requests to 1Password
+Connect ([1Password Connect](../workloads/onepassword-connect.md)), to pepys ingest
+([pepys](../workloads/pepys.md)) and to the boxxy worker Service ([boxxy](../workloads/boxxy.md)),
+each on its own port and each from one module. kube-router accepts a packet whose source is one of
+the node's own addresses before it applies any network policy, so a relay's dial from the host needs
+no ipBlock in the Service's policy. These rules are narrower than the trust they sit under, and
+neither stops a pod on the host from reaching the daemon's port: the daemon's bearer token is the
+gate for that.
 
 The same input chain drops SSH's port from the pod and overlay interfaces before any admission runs.
 NixOS's table trusts those interfaces, so without the drop every pod would reach sshd, and no pod
@@ -76,8 +80,8 @@ forward chain accepts the pods' traffic, and kube-router accepts traffic that it
 allow with a mark in iptables' forward chain. The drop in this repo's table is final whatever those
 chains accept, because a drop in any base chain is final. The host loads it with the rest of its
 firewall, so it holds before kube-router programs a new pod. A pod that a NetworkPolicy lets use
-impd reaches it at its tailnet name instead, and the Connect relay takes traffic from Podman's
-bridge to the host itself, so neither path crosses the drop.
+impd reaches it at its tailnet name instead, and a bridge relay takes traffic from Podman's bridge
+to the host itself, so neither path crosses the drop.
 
 ### imp's tables
 

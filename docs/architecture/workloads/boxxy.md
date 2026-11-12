@@ -24,10 +24,12 @@ own loopback, which no NetworkPolicy filters.
 A worker session runs in an imp, which reaches neither the tailnet nor the cluster. It calls a
 made-up host, the broker host in the shared constants, and impd's credential broker sends the
 request to a relay on the host, which dials the `boxxy-worker` Service at its pinned ClusterIP. The
-broker adds the worker token and the session's imp identity token, so the session holds neither. No
-pod reaches port 8091: kube-router admits the node's own addresses before any policy, so the relay
-still passes. The worker Service carries the worker port alone, so the relay's address never leads
-to the listener with no token.
+broker adds the worker token and the session's imp identity token, so the session holds neither. The
+atc daemon's `boxxy` auth profile gives a boxxy session `BOXXY_URL=https://boxxy.imp.internal`, and
+the daemon's `boxxy` agent loads the boxxy hook plug-in. No pod reaches port 8091: kube-router
+admits the node's own addresses before any policy, so the relay still passes, and the Service's
+policy needs no `ipBlock`. The worker Service carries the worker port alone, so the relay's address
+never leads to the listener with no token.
 
 Both listeners refuse with 403 a request with an `Origin` header, or a `Sec-Fetch-Site` header other
 than `none`, so a proxy in front of either must add neither.

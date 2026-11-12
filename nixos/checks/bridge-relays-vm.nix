@@ -1,39 +1,43 @@
-# services.onepassword-connect-relay on a booted VM, through a switch that moves the relay from
+# services.bridge-relays on a booted VM, through a switch that moves its relays from
 # Docker's bridge to Podman's, as the host's move of imp-host from Docker to Podman does. The boot
 # config listens on docker0's 172.17.0.1, and its podman specialisation on podman0's 10.88.0.1.
 # Each bridge has a network namespace on it that stands for a container, and Python's http.server
 # on the VM's loopback stands for the Connect Service the relay dials. A request through the relay
 # before the switch leaves the proxy running, holding the socket it was started with, as an imp's
 # requests leave it on the host.
-# It needs KVM: run `bun run test:nixos onepassword-connect-relay-vm`.
+# It needs KVM: run `bun run test:nixos bridge-relays-vm`.
 { nixpkgs }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  port = 18081;
+  # two relays to the one stand-in Service, as the host runs three to three Services
+  relayPorts = {
+    onepassword-connect-relay = 18081;
+    pepys-ingest-relay = 18082;
+  };
+  port = relayPorts.onepassword-connect-relay;
   targetPort = 8000;
 in
 pkgs.testers.runNixOSTest {
-  name = "onepassword-connect-relay-vm";
+  name = "bridge-relays-vm";
   nodes.machine = {
-    imports = [ ../modules/onepassword-connect-relay.nix ];
+    imports = [ ../modules/bridge-relays.nix ];
     networking.nftables = {
       enable = true;
       flushRuleset = false;
     };
-    services.onepassword-connect-relay = {
-      enable = true;
+    services.bridge-relays = lib.mapAttrs (_: relayPort: {
       interface = "docker0";
       address = "172.17.0.1";
-      inherit port;
+      port = relayPort;
       allowedSubnet = "172.17.0.0/16";
       target = "127.0.0.1:${toString targetPort}";
-    };
-    specialisation.podman.configuration.services.onepassword-connect-relay = {
+    }) relayPorts;
+    specialisation.podman.configuration.services.bridge-relays = lib.mapAttrs (_: _: {
       interface = lib.mkForce "podman0";
       address = lib.mkForce "10.88.0.1";
       allowedSubnet = lib.mkForce "10.88.0.0/16";
-    };
+    }) relayPorts;
     systemd.services.stub-connect = {
       wantedBy = [ "multi-user.target" ];
       serviceConfig.ExecStart = "${pkgs.python3}/bin/python3 -m http.server --bind 127.0.0.1 --directory /var/empty ${toString targetPort}";
@@ -58,13 +62,13 @@ pkgs.testers.runNixOSTest {
         )
 
 
-    def read_listeners():
-        return sorted(machine.succeed("ss -Hltn sport = :${toString port} | awk '{print $4}'").split())
+    def read_listeners(port=${toString port}):
+        return sorted(machine.succeed(f"ss -Hltn sport = :{port} | awk '{{print $4}}'").split())
 
 
-    def request(container, address):
+    def request(container, address, port=${toString port}):
         return machine.succeed(
-            f"ip netns exec {container} curl -sS -m 5 -o /dev/null -w '%{{http_code}}' http://{address}:${toString port}/"
+            f"ip netns exec {container} curl -sS -m 5 -o /dev/null -w '%{{http_code}}' http://{address}:{port}/"
         )
 
 
@@ -90,6 +94,16 @@ pkgs.testers.runNixOSTest {
         assert read_listeners() == ["172.17.0.1:${toString port}"], read_listeners()
 
 
+    with subtest("it relays a request on the second relay's port to the same target, through units of its own"):
+        second = ${toString relayPorts.pepys-ingest-relay}
+        status = request("docker-container", "172.17.0.1", second)
+        proxy = machine.succeed("systemctl show -p ActiveState --value pepys-ingest-relay.service").strip()
+
+        assert status == "200", f"the second relay answered {status}"
+        assert proxy == "active", f"the second proxy is {proxy}"
+        assert read_listeners(second) == [f"172.17.0.1:{second}"], read_listeners(second)
+
+
     with subtest("it listens on podman0's address alone after the switch, and relays a request from a container there"):
         machine.succeed("/run/current-system/specialisation/podman/bin/switch-to-configuration test")
         machine.wait_for_unit("onepassword-connect-relay.socket")
@@ -97,5 +111,10 @@ pkgs.testers.runNixOSTest {
         assert read_listeners() == ["10.88.0.1:${toString port}"], read_listeners()
         status = request("podman-container", "10.88.0.1")
         assert status == "200", f"the relay answered {status}"
+
+        machine.wait_for_unit("pepys-ingest-relay.socket")
+        assert read_listeners(second) == [f"10.88.0.1:{second}"], read_listeners(second)
+        status = request("podman-container", "10.88.0.1", second)
+        assert status == "200", f"the second relay answered {status}"
   '';
 }

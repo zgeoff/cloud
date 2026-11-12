@@ -63,8 +63,12 @@ The second disk, vdb, keeps the read-ahead the kernel derives, because ZFS does 
 - **The TLS front** is Caddy on the public HTTPS port, which passes the listed paths of imp's public
   MCP route to impd's loopback listener
   ([the host's TLS front](../network/public-ingress.md#the-hosts-tls-front)).
-- **The Connect relay** is a socket-activated proxy that carries imp-host's requests to 1Password
-  Connect in the cluster ([1Password Connect](../workloads/onepassword-connect.md)).
+- **The bridge relays** are socket-activated proxies that carry imp-host's requests to three
+  Services in the cluster: 1Password Connect
+  ([1Password Connect](../workloads/onepassword-connect.md)), pepys ingest for the sessions'
+  telemetry ([pepys](../workloads/pepys.md)) and the boxxy worker Service
+  ([boxxy](../workloads/boxxy.md)). One module makes all three
+  ([firewalls](../network/firewalls.md#the-narrowing-table)).
 - **impd's health probe** is a timer that asks impd's loopback health endpoint and writes the result
   where node-exporter reads it ([observability](../workloads/observability.md)).
 - **The cgroup CPU writer** is a service that writes the CPU time of the host's slices and units

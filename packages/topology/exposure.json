@@ -58,6 +58,26 @@
       "reason": "imp-host's containers reach 1Password Connect through the host's relay, which inet cloud_host admits from podman0's subnet only"
     },
     {
+      "name": "pepys-ingest-relay",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 18082,
+      "scope": "host",
+      "interface": "podman0",
+      "admission": true,
+      "reason": "imp-host's containers send their sessions' telemetry to pepys ingest through the host's relay, which inet cloud_host admits from podman0's subnet only"
+    },
+    {
+      "name": "boxxy-worker-relay",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 18083,
+      "scope": "host",
+      "interface": "podman0",
+      "admission": true,
+      "reason": "imp-host's containers reach the boxxy worker Service through the host's relay, which inet cloud_host admits from podman0's subnet only"
+    },
+    {
       "name": "preview-link",
       "kind": "host-port",
       "protocol": "tcp",
