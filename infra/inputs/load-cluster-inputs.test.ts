@@ -234,7 +234,7 @@ test("it runs the boxxy server's backup in the gateway's backup image", () => {
       GHCR_PULL_USERNAME: 'octo-puller',
       GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
       BOXXY_WORKER_TOKEN: 'worker-token-for-tests',
-      BOXXY_ATC_TOKEN: 'atc-token-for-tests',
+      BOXXY_ATC_TOKEN: `atcs_${'t'.repeat(32)}`,
       BOXXY_RESTIC_PASSWORD: 'p'.repeat(32),
       BOXXY_R2_ACCESS_KEY_ID: 'a'.repeat(32),
       BOXXY_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
