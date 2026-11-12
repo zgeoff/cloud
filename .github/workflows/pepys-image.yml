@@ -1,8 +1,8 @@
 name: pepys image
 
-# Type-checks the pepys deployment and runs the pepys image test on every push to main that changes
-# the image or what it builds from, then builds the image from the release that
-# images/pepys/versions.env pins and publishes it as
+# Type-checks the pepys deployment, runs its compiled API once and runs the pepys image test on
+# every push to main that changes the image or what it builds from, then builds the image from the
+# release that images/pepys/versions.env pins and publishes it as
 # ghcr.io/zgeoff/cloud-pepys:<release>-<commit>. A newer push cancels an older run's check, and that
 # run publishes nothing, since the newer commit's image holds its changes. CI's bun job runs the
 # same check on a pull request, which never publishes. Pin a published digest in the stack config's
@@ -53,6 +53,11 @@ jobs:
 
       - name: Typecheck the deployment
         run: bun run check:pepys-deployment
+
+      # compiles the API as the image does and runs it once, so a bundle that stops at start never
+      # publishes
+      - name: Check the API binary
+        run: bun run check:pepys-api-binary
 
       - name: Image test
         run: bun run test:pepys-image
