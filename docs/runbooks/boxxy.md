@@ -176,6 +176,33 @@ passes the flag. The server calls atc as the principal `service:boxxy`, which th
   user, copies the file to a memory volume with mode 0600, and the gateway mounts that volume
   read-only.
 
+## The daemon's clone token
+
+The atc daemon on the host clones a session's git workspace itself, before the session exists, so
+the session's GitHub broker profile does not apply. For a private repo it reads the clone token from
+the environment variable that the spawn's `source.credentialRef.name` names. The boxxy server sends
+`ATC_GIT_CLONE_TOKEN`, and atc runs `git ls-remote` on the host with the same token to resolve the
+ref. Without the variable, a spawn of a private repo fails with `clone_failed` and git's
+`could not read Username` message.
+
+- The token is a read-only fine-grained GitHub token (Contents and Pull requests read on the boxxy
+  repos) in the item `boxxy-github-token`, field `credential`, in the `cloud` vault.
+- The host keeps it in `/var/lib/atc-daemon-secrets/git-clone-token`, mode 0400, owned by root. The
+  NixOS option `services.atc-daemon.environmentCredentials` passes the file in as a systemd
+  credential and sets the variable in the daemon's process only. atc withholds the variable from
+  every harness it starts. A check unit names a missing or empty file before the daemon starts.
+- Install or refresh the file with the repo name that the token must read, which stays out of the
+  repo:
+
+  ```bash
+  ATC_GIT_CLONE_CHECK_REPO=<owner>/<repo> bun scripts/install-atc-git-clone-token.ts
+  ```
+
+  The script sends the token on SSH's stdin. It skips when the file's token already reads that repo,
+  and otherwise writes it and checks it again.
+
+- A new token reaches the daemon only after `systemctl restart atc-daemon`.
+
 ## Add a trust document
 
 1. Write the impd's document, as `impz identity jwks` prints it on that impd's host, to
