@@ -135,6 +135,48 @@ from `.env`. The backup variables are all or none: without them, the cluster run
 The backup copies each bucket to its own folder of an R2 bucket with `rclone copy`, which never
 deletes a copied object. The host's store needs no backup: the host rebuilds it from the fact log.
 
+## Deploy the first time
+
+**CAUTION:** The first apply adds a public route. Its `Deploy prod` run holds on the tunnel route
+change until the owner approves it, as [the prod apply job](../../runbooks/prod-apply.md) describes.
+
+The Pulumi program deploys pepys only when stack config `pepys` exists, so the service merges first
+and changes nothing in prod.
+
+1. Merge the service. The `pepys image` workflow publishes
+   `ghcr.io/zgeoff/cloud-pepys:<release>-<commit>` from `main`, and its run summary gives the
+   digest.
+2. In a PR, add the `pepys` object to `infra/Pulumi.prod.yaml`:
+
+   ```yaml
+   geoff-cloud:pepys:
+     image: ghcr.io/zgeoff/cloud-pepys:<release>-<commit>@sha256:<digest>
+     webhookHostname: pepys-webhook.geoff.cloud
+     impIdentityAudience: pepys.imp.internal
+   ```
+
+   Run `bun run preview` and check that it adds the `pepys` namespace, its network policies,
+   Secrets, Services, workloads and backup CronJob, and the shared tunnel's rule and the proxied
+   record for `pepys-webhook.geoff.cloud`, and changes nothing else.
+
+3. Merge the PR, and approve the held `Deploy prod` run once its plan matches the preview.
+4. Check that the workloads are up:
+
+   ```bash
+   ssh root@geoffcloud k3s kubectl -n pepys rollout status statefulset/pepys-host --timeout=300s
+   ```
+
+   Expect `statefulset rolling update complete`. Check `statefulset/pepys-garage`,
+   `deployment/pepys-s2` and `deployment/pepys-ingest` the same way.
+
+5. Check that the public route refuses an unsigned delivery:
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST https://pepys-webhook.geoff.cloud/webhook/github
+   ```
+
+   Expect `401`.
+
 ## Later work
 
 - A tailnet route to the API, through the cluster's Traefik, so a tailnet client reaches it without
