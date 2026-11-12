@@ -209,6 +209,18 @@ let
         '';
     }
     {
+      title = "it puts tar on the service PATH, which atc runs to upload a workspace it cloned with a credential";
+      script =
+        let
+          service = (buildDaemonSystem { }).config.systemd.services.atc-daemon;
+        in
+        ''
+          actual=$(PATH='${service.environment.PATH}' tar --version | head -n 1)
+
+          assert_equals 'tar (GNU tar) ${pkgs.gnutar.version}' "$actual" "tar on the service's PATH"
+        '';
+    }
+    {
       title = "it links a config.json of the targets, principals, default target, agents and auth profiles where atc reads it";
       script =
         let

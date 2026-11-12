@@ -313,8 +313,12 @@ in
       ++ lib.optional (cfg.environmentCredentials != { }) "atc-daemon-env-credentials.service";
       wants = [ "network-online.target" ];
       requires = lib.optional (cfg.environmentCredentials != { }) "atc-daemon-env-credentials.service";
-      # atc runs git on this host to resolve a git workspace's ref before an imp clones it
-      path = [ pkgs.git ];
+      # atc runs git on this host to resolve a git workspace's ref before an imp clones it. For a
+      # git source with a credential, it clones here and uploads the workspace to the imp with tar.
+      path = [
+        pkgs.git
+        pkgs.gnutar
+      ];
       environment = {
         HOME = home;
         XDG_RUNTIME_DIR = "/run/atc-daemon";
