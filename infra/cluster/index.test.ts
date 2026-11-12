@@ -219,7 +219,7 @@ test("it writes the gateway's service token Secret, with the public URL's /mcp a
   // the mock keeps a secret value under `value`, beside Pulumi's secret signature
   const tokenFile = z.object({ 'service-tokens.json': z.string() });
 
-  const secret = z
+  const tokenSecret = z
     .object({
       metadata: z.object({ name: z.string().optional() }),
       stringData: z.object({ value: tokenFile }),
@@ -229,9 +229,9 @@ test("it writes the gateway's service token Secret, with the public URL's /mcp a
   const registered = stub.inputs.get('kubernetes:apps/v1:Deployment::atc-gateway');
   const deployment = JSON.stringify(registered);
 
-  expect(secret.metadata.name).toBeUndefined();
+  expect(tokenSecret.metadata.name).toBeUndefined();
 
-  expect(JSON.parse(secret.stringData.value['service-tokens.json'])).toStrictEqual({
+  expect(JSON.parse(tokenSecret.stringData.value['service-tokens.json'])).toStrictEqual({
     resource: 'https://atc.geoff.cloud/mcp',
     clients: { boxxy: { scopes: ['read', 'spawn', 'message', 'kill'], tokens: [token] } },
   });
