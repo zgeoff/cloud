@@ -40,7 +40,10 @@ pkgs.testers.runNixOSTest {
     # of mode 0700, written before the daemon's first start
     systemd.services.fixture-atc-tokens = {
       requiredBy = [ "atc-daemon.service" ];
-      before = [ "atc-daemon.service" ];
+      before = [
+        "atc-daemon.service"
+        "atc-daemon-env-credentials.service"
+      ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
@@ -115,9 +118,9 @@ pkgs.testers.runNixOSTest {
         machine.succeed(f"mv {secrets}/git-clone-token {secrets}/git-clone-token.away")
         machine.fail("systemctl start atc-daemon.service")
 
-        log = machine.succeed("journalctl --no-pager -u atc-daemon.service -b")
-        assert "git-clone-token" in log or "env-ATC_GIT_CLONE_TOKEN" in log, log
-        assert "${cloneToken}" not in log, "the journal holds the token"
+        unit_log = machine.succeed("journalctl --no-pager -u atc-daemon-env-credentials.service -b")
+        assert "credential env-ATC_GIT_CLONE_TOKEN (for ATC_GIT_CLONE_TOKEN) is missing or empty" in unit_log, unit_log
+        assert "${cloneToken}" not in unit_log, "the journal holds the token"
 
         machine.succeed(f"mv {secrets}/git-clone-token.away {secrets}/git-clone-token")
         machine.succeed("systemctl reset-failed atc-daemon.service; systemctl start atc-daemon.service")

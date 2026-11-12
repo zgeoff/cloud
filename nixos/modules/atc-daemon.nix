@@ -73,6 +73,21 @@ let
     exec "$@"
   '';
 
+  # systemd fails a start with a bare "Failed to set up credentials" when a LoadCredential file is
+  # missing, and names no credential. So this check unit runs first, as root, and names it.
+  checkEnvCredentials = pkgs.writeShellScript "atc-daemon-check-env-credentials" ''
+    set -u
+    status=0
+    ${lib.concatStrings (
+      lib.mapAttrsToList (variable: file: ''
+        if [ ! -s ${lib.escapeShellArg file} ]; then
+          echo "atc-daemon: credential ${credentialName variable} (for ${variable}) is missing or empty: ${file}" >&2
+          status=1
+        fi
+      '') cfg.environmentCredentials
+    )}exit "$status"
+  '';
+
   # each auth profile that an agent or one of its MCP servers selects and the config does not
   # define
   unknownProfiles = lib.concatLists (
@@ -167,8 +182,9 @@ in
         Environment variables for the daemon process, each set from a root-only file: the name of
         the variable maps to the file. Each file is passed in with LoadCredential as
         `env-<name>`, and a small wrapper reads it into the variable before it starts atc, so the
-        value is never in the unit, the store or the journal. A trailing newline is dropped. The
-        start fails, naming the credential and never its value, when a file is missing or empty.
+        value is never in the unit, the store or the journal. A trailing newline is dropped. A check unit
+        that runs before each start names the credential, never its value, when a file is missing or
+        empty, because systemd itself fails a missing file without a name; the wrapper checks again.
         atc withholds a variable it reads this way from the harnesses it starts. As with tokenFile,
         a new value reaches the daemon only after `systemctl restart atc-daemon`.
       '';
@@ -272,14 +288,25 @@ in
     };
     users.groups.atc = { };
 
+    systemd.services.atc-daemon-env-credentials = lib.mkIf (cfg.environmentCredentials != { }) {
+      description = "Check the atc daemon's environment credential files";
+      # no RemainAfterExit: the check runs again at each start of the daemon
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = checkEnvCredentials;
+      };
+    };
+
     systemd.services.atc-daemon = {
       description = "atc daemon";
       wantedBy = [ "multi-user.target" ];
       after = [
         "network-online.target"
         "tailscaled.service"
-      ];
+      ]
+      ++ lib.optional (cfg.environmentCredentials != { }) "atc-daemon-env-credentials.service";
       wants = [ "network-online.target" ];
+      requires = lib.optional (cfg.environmentCredentials != { }) "atc-daemon-env-credentials.service";
       # atc runs git on this host to resolve a git workspace's ref before an imp clones it
       path = [ pkgs.git ];
       environment = {
