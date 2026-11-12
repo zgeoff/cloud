@@ -118,13 +118,13 @@ relay and the daemon's new config.
    op read op://cloud/boxxy-worker-token/credential \
      | ssh root@geoffcloud podman exec -i imp-host impz secret add boxxy \
          --kind static --hosts boxxy.imp.internal --header authorization --scheme bearer \
-         --upstream http://10.88.0.1:18083 --identity
+         --upstream http://10.88.0.1:18084 --identity
    ```
 
    Read the token on your machine with `op`: imp-host has neither `op` nor a vault credential, so
    the secret travels over SSH's stdin into `impz` in the container. Never put it on the SSH command
    line, because the host's journal records that line. Expect `impz secret ls` to show
-   `boxxy.imp.internal -> http://10.88.0.1:18083 (identity)`. Impd signs identity tokens only with
+   `boxxy.imp.internal -> http://10.88.0.1:18084 (identity)`. Impd signs identity tokens only with
    `IMP_IDENTITY_ISSUER` set, which the host's config sets to `geoffcloud`. Replacing the token of a
    secret that exists takes `--replace`, and a change of host, upstream or `--identity` takes
    `--replace --rebind`, which drops the secret's grants.

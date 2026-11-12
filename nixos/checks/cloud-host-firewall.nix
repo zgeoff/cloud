@@ -383,6 +383,10 @@ let
             tcp dport 18081 drop
             tcp dport 18082 iifname "podman0" ip saddr 10.88.0.0/16 ip daddr 10.88.0.1 accept
             tcp dport 18082 drop
+            tcp dport 18083 iifname "podman0" ip saddr 10.88.0.0/16 ip daddr 10.88.0.1 accept
+            tcp dport 18083 drop
+            tcp dport 18084 iifname "podman0" ip saddr 10.88.0.0/16 ip daddr 10.88.0.1 accept
+            tcp dport 18084 drop
           }
           chain forward {
             type filter hook forward priority filter - 10; policy accept;

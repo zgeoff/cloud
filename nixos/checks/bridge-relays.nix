@@ -36,11 +36,11 @@ let
       target = "10.43.82.198:8000";
     };
     pepys-ingest-relay = relay // {
-      port = 18082;
+      port = 18083;
       target = "10.43.82.200:8080";
     };
     boxxy-worker-relay = relay // {
-      port = 18083;
+      port = 18084;
       target = "10.43.0.80:8091";
     };
   };
@@ -140,13 +140,13 @@ let
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
-                (admission 18083)
+                (admission 18084)
                 (admission 18081)
-                (admission 18082)
+                (admission 18083)
               ]
             )
           } ${lib.escapeShellArg (builtins.toJSON system.config.networking.cloudHost.admissions)} "the cloud_host admissions"
-          assert_equals '[18081,18082,18083]' ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces.podman0.allowedTCPPorts)} "the ports nixos-fw opens on podman0"
+          assert_equals '[18081,18083,18084]' ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces.podman0.allowedTCPPorts)} "the ports nixos-fw opens on podman0"
         '';
     }
     {
@@ -167,8 +167,8 @@ let
           jq -S . > expected <<'EOF'
           ${builtins.toJSON {
             sockets = {
-              pepys-ingest-relay = [ "10.88.0.1:18082" ];
-              boxxy-worker-relay = [ "10.88.0.1:18083" ];
+              pepys-ingest-relay = [ "10.88.0.1:18083" ];
+              boxxy-worker-relay = [ "10.88.0.1:18084" ];
             };
             proxies = {
               pepys-ingest-relay = "${proxy} 10.43.82.200:8080";

@@ -13,7 +13,7 @@ let
   # two relays to the one stand-in Service, as the host runs three to three Services
   relayPorts = {
     onepassword-connect-relay = 18081;
-    pepys-ingest-relay = 18082;
+    pepys-ingest-relay = 18083;
   };
   port = relayPorts.onepassword-connect-relay;
   targetPort = 8000;

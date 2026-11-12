@@ -413,7 +413,12 @@ test.each(['7.14.0', '7.14.1', '7.15.0', '8.0.0', '10.0.0'])(
     const result = loadATCGatewayInputs(
       buildMockATCGatewayStackConfig(),
       buildMockATCGatewayEnvironment({ BOXXY_ATC_TOKEN: `atcs_${'b'.repeat(40)}` }),
-      { readRelease: () => release, warn: (line) => warnings.push(line) },
+      {
+        readRelease: () => release,
+        warn: (line) => {
+          warnings.push(line);
+        },
+      },
     );
 
     expect(result.atcGateway?.secrets).toHaveProperty('serviceTokens');
@@ -430,7 +435,12 @@ test.each(['7.12.1', '7.13.9', '6.99.99', '2.24.0'])(
     const result = loadATCGatewayInputs(
       buildMockATCGatewayStackConfig(),
       buildMockATCGatewayEnvironment({ BOXXY_ATC_TOKEN: token }),
-      { readRelease: () => release, warn: (line) => warnings.push(line) },
+      {
+        readRelease: () => release,
+        warn: (line) => {
+          warnings.push(line);
+        },
+      },
     );
 
     expect(result.atcGateway?.secrets).not.toHaveProperty('serviceTokens');
@@ -452,7 +462,12 @@ test.each(['7.12.1', '7.13.9'])(
         image: `ghcr.io/zgeoff/atc-gateway:${imageRelease}@sha256:${'c'.repeat(64)}`,
       }),
       buildMockATCGatewayEnvironment({ BOXXY_ATC_TOKEN: token }),
-      { readRelease: () => '7.14.0', warn: (line) => warnings.push(line) },
+      {
+        readRelease: () => '7.14.0',
+        warn: (line) => {
+          warnings.push(line);
+        },
+      },
     );
 
     expect(result.atcGateway?.secrets).not.toHaveProperty('serviceTokens');
@@ -471,7 +486,12 @@ test('it leaves the service token out, with one warning, while the configured im
       image: `ghcr.io/zgeoff/atc-gateway:latest-build@sha256:${'c'.repeat(64)}`,
     }),
     buildMockATCGatewayEnvironment({ BOXXY_ATC_TOKEN: `atcs_${'b'.repeat(40)}` }),
-    { readRelease: () => '7.14.0', warn: (line) => warnings.push(line) },
+    {
+      readRelease: () => '7.14.0',
+      warn: (line) => {
+        warnings.push(line);
+      },
+    },
   );
 
   expect(result.atcGateway?.secrets).not.toHaveProperty('serviceTokens');
@@ -485,7 +505,12 @@ test('it loads, with the warning, a BOXXY_ATC_TOKEN of the older shape while the
   const result = loadATCGatewayInputs(
     buildMockATCGatewayStackConfig(),
     buildMockATCGatewayEnvironment({ BOXXY_ATC_TOKEN: 'f'.repeat(64) }),
-    { readRelease: () => '7.12.1', warn: (line) => warnings.push(line) },
+    {
+      readRelease: () => '7.12.1',
+      warn: (line) => {
+        warnings.push(line);
+      },
+    },
   );
 
   expect(result.atcGateway?.secrets).not.toHaveProperty('serviceTokens');
@@ -503,7 +528,12 @@ test.each([
     const result = loadATCGatewayInputs(
       buildMockATCGatewayStackConfig(),
       buildMockATCGatewayEnvironment({ BOXXY_ATC_TOKEN: value }),
-      { readRelease: () => '7.14.0', warn: (line) => warnings.push(line) },
+      {
+        readRelease: () => '7.14.0',
+        warn: (line) => {
+          warnings.push(line);
+        },
+      },
     );
 
     expect(result.atcGateway?.secrets).not.toHaveProperty('serviceTokens');
