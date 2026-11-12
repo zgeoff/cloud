@@ -7,7 +7,8 @@
 #   bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s window
 #   bash scripts/switch-geoffcloud.sh --stop-ordinary-page-imps  # the hugetlb pool's window
 #
-# A switch first needs a green NixOS checks run that covers the commit; with none, it stops
+# A switch first needs a green NixOS checks run on main that covers the commit, or the green nixos
+# check of the merged pull request that produced it; with none, it stops
 # before the build and names the command that starts one. It also stops, before the build and
 # again before the activation, when the commit's atc daemon pin and a running atc gateway pod's
 # image differ in atc major version, since atc breaks its daemon protocol only in a major release,
@@ -149,8 +150,10 @@ tar -x -f "$snapshot.tar" -C "$snapshot"
 rm -f "$snapshot.tar"
 
 # The NixOS checks gate the switch, not the merge: a switch takes only a commit that a green run
-# of the checks covers (scripts/find-nixos-check-run.sh). --build-only reaches no host, so it
-# builds any commit. A gh failure stops the script (set -e) rather than reading as unchecked.
+# of the checks on main covers, or whose merged pull request's green nixos check covers because no
+# NixOS input differs between its head and the commit (scripts/find-nixos-check-run.sh).
+# --build-only reaches no host, so it builds any commit. A gh failure stops the script (set -e)
+# rather than reading as unchecked.
 if [[ "$mode" == switch ]]; then
   checked_by="$(bash "$(dirname "${BASH_SOURCE[0]}")/find-nixos-check-run.sh" "$commit")"
   if [[ -z "$checked_by" ]]; then
