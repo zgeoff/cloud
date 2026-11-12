@@ -56,8 +56,8 @@ it_skips_the_checks_for_a_dispatch_on_a_covered_commit_and_says_so() {
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
   jq -cn --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/7" '{
     argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
-      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
-      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+      "-f", "branch=main", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""],
     stdout: "\($runs)\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -70,7 +70,7 @@ it_skips_the_checks_for_a_dispatch_on_a_covered_commit_and_says_so() {
   diff - "$tree/output" <<< 'needed=false'
   diff - "$tree/summary" <<< 'No input of the NixOS checks changed since https://github.com/zgeoff/cloud/actions/runs/7, so the checks did not run.'
   diff - "$tree/calls" << 'EOF'
-["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main","-f","status=success","-f","per_page=100","--jq",".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""]
+["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main","-f","per_page=100","--jq",".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""]
 EOF
   assert_status 0 "$status"
 }
@@ -82,8 +82,8 @@ it_skips_the_checks_for_a_nightly_run_on_a_covered_commit_and_says_so() {
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
   jq -cn --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/7" '{
     argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
-      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
-      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+      "-f", "branch=main", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""],
     stdout: "\($runs)\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -96,7 +96,7 @@ it_skips_the_checks_for_a_nightly_run_on_a_covered_commit_and_says_so() {
   diff - "$tree/output" <<< 'needed=false'
   diff - "$tree/summary" <<< 'No input of the NixOS checks changed since https://github.com/zgeoff/cloud/actions/runs/7, so the checks did not run.'
   diff - "$tree/calls" << 'EOF'
-["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main","-f","status=success","-f","per_page=100","--jq",".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""]
+["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main","-f","per_page=100","--jq",".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""]
 EOF
   assert_status 0 "$status"
 }
@@ -109,8 +109,8 @@ it_needs_the_checks_for_a_nightly_run_on_a_commit_no_run_covers() {
   # no green run: the --jq filter prints nothing
   jq -cn '{
     argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
-      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
-      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""]}' \
+      "-f", "branch=main", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""]}' \
     > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -123,7 +123,7 @@ it_needs_the_checks_for_a_nightly_run_on_a_commit_no_run_covers() {
   diff - "$tree/output" <<< 'needed=true'
   diff /dev/null "$tree/summary"
   diff - "$tree/calls" << 'EOF'
-["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main","-f","status=success","-f","per_page=100","--jq",".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""]
+["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main","-f","per_page=100","--jq",".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""]
 EOF
   assert_status 0 "$status"
 }
@@ -137,8 +137,8 @@ it_fails_with_the_gh_error_and_writes_nothing_when_gh_fails() {
   # command, such as an API error
   jq -cn '{
     argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
-      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
-      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+      "-f", "branch=main", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""],
     stderr: "HTTP 503: Service Unavailable\n", exit: 1}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \

@@ -39,8 +39,8 @@ it_prints_the_url_of_a_green_run_on_the_commit_itself() {
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
   jq -cn --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/7" '{
     argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
-      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
-      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+      "-f", "branch=main", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""],
     stdout: "\($runs)\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -50,7 +50,7 @@ it_prints_the_url_of_a_green_run_on_the_commit_itself() {
   diff - "$tree/out" <<< https://github.com/zgeoff/cloud/actions/runs/7
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
-["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main","-f","status=success","-f","per_page=100","--jq",".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""]
+["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main","-f","per_page=100","--jq",".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""]
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
@@ -75,8 +75,8 @@ it_prints_the_newest_run_on_an_ancestor_when_no_input_changed_since() {
   jq -cn --arg runs "$newer https://github.com/zgeoff/cloud/actions/runs/9
 $older https://github.com/zgeoff/cloud/actions/runs/8" '{
     argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
-      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
-      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+      "-f", "branch=main", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""],
     stdout: "\($runs)\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -101,8 +101,8 @@ it_prints_nothing_when_nixos_changed_since_the_newest_green_run() {
   git -C "$tree/repo" commit -qam 'change the flake'
   jq -cn --arg runs "$checked https://github.com/zgeoff/cloud/actions/runs/8" '{
     argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
-      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
-      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+      "-f", "branch=main", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""],
     stdout: "\($runs)\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -131,8 +131,8 @@ it_skips_a_run_on_a_commit_the_checkout_lacks_and_a_run_off_the_history_of_the_c
 $side https://github.com/zgeoff/cloud/actions/runs/10
 $checked https://github.com/zgeoff/cloud/actions/runs/8" '{
     argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
-      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
-      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+      "-f", "branch=main", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""],
     stdout: "\($runs)\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -151,8 +151,8 @@ it_prints_nothing_when_gh_lists_no_green_run() {
   # no green run: the --jq filter prints nothing
   jq -cn '{
     argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
-      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
-      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""]}' \
+      "-f", "branch=main", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""]}' \
     > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -172,8 +172,8 @@ it_fails_with_the_exit_and_error_of_gh_when_gh_fails() {
   # authentication
   jq -cn '{
     argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
-      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
-      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+      "-f", "branch=main", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""],
     stderr: "To get started with GitHub CLI, please run:  gh auth login\n", exit: 4}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \

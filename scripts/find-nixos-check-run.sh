@@ -8,10 +8,11 @@
 # hold. The nightly run reads it to skip a commit that is already covered, and
 # scripts/switch-geoffcloud.sh to refuse a commit that is not.
 #
-# It reads the 100 newest green runs, newest first, with gh, which resolves {owner}/{repo} from
-# the checkout's remote. A gh failure fails the script with gh's exit and error, so a caller
-# never reads an outage as "not covered" or as "covered". A run whose commit the checkout does not
-# have is skipped.
+# It reads the 100 newest runs, newest first, with gh, which resolves {owner}/{repo} from the
+# checkout's remote, and keeps the green ones itself: GitHub's status=success filter can omit a
+# run for more than 30 minutes after it ends green. A gh failure fails the script with gh's exit
+# and error, so a caller never reads an outage as "not covered" or as "covered". A run whose
+# commit the checkout does not have is skipped.
 #
 #   bash scripts/find-nixos-check-run.sh <commit>
 set -euo pipefail
@@ -28,8 +29,8 @@ commit="$(git rev-parse --verify --quiet "$1^{commit}")" || {
 runs="$(mktemp)"
 trap 'rm -f "$runs"' EXIT
 gh api -X GET "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs" \
-  -f branch=main -f status=success -f per_page=100 \
-  --jq '.workflow_runs[] | select(.event == "schedule" or .event == "workflow_dispatch") | "\(.head_sha) \(.html_url)"' \
+  -f branch=main -f per_page=100 \
+  --jq '.workflow_runs[] | select(.conclusion == "success" and (.event == "schedule" or .event == "workflow_dispatch")) | "\(.head_sha) \(.html_url)"' \
   > "$runs"
 
 while read -r sha url; do
