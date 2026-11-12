@@ -156,8 +156,9 @@ and changes nothing in prod.
    ```
 
    Run `bun run preview` and check that it adds the `pepys` namespace, its network policies,
-   Secrets, Services, workloads and backup CronJob, and the shared tunnel's rule and the proxied
-   record for `pepys-webhook.geoff.cloud`, and changes nothing else.
+   Secrets, Services and workloads, and the shared tunnel's rule and the proxied record for
+   `pepys-webhook.geoff.cloud`, and changes nothing else. The backup CronJob comes only with the
+   backup variables in `.env`.
 
 3. Merge the PR, and approve the held `Deploy prod` run once its plan matches the preview.
 4. Check that the workloads are up:
