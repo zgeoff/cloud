@@ -24,4 +24,6 @@ write_git_clone_token() {
   trap - EXIT
 }
 
-write_git_clone_token "$@"
+# `exit` shares the call's line, so bash parses it before the call reads the token. bash then ends
+# there and never runs a later stdin line as a command.
+write_git_clone_token "$@"; exit

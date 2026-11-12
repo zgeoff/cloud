@@ -47,7 +47,7 @@ let
 
   # Starts atc with each environment credential in its variable. For each entry the wrapper reads
   # systemd's copy of the file from $CREDENTIALS_DIRECTORY, drops the trailing newline, and exports
-  # it. It names a missing or empty credential in its message and never prints a value. Wrapping
+  # it. It holds the value in no shell variable of its own, so no configured name can collide with one. It names a missing or empty credential in its message and never prints a value. Wrapping
   # only when entries exist leaves the command line alone otherwise.
   atcCommand = [
     "${cfg.package}/bin/atc"
@@ -62,15 +62,13 @@ let
     set -eu
     ${lib.concatStrings (
       lib.mapAttrsToList (variable: _: ''
-        value=$(cat "$CREDENTIALS_DIRECTORY/${credentialName variable}" 2>/dev/null) || value=""
-        if [ -z "$value" ]; then
+        if [ -z "$(cat "$CREDENTIALS_DIRECTORY/${credentialName variable}" 2>/dev/null)" ]; then
           echo "atc-daemon: credential ${credentialName variable} (for ${variable}) is missing or empty" >&2
           exit 1
         fi
-        export ${variable}="$value"
+        export ${variable}="$(cat "$CREDENTIALS_DIRECTORY/${credentialName variable}")"
       '') cfg.environmentCredentials
-    )}unset value
-    exec "$@"
+    )}exec "$@"
   '';
 
   # systemd fails a start with a bare "Failed to set up credentials" when a LoadCredential file is

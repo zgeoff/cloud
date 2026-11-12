@@ -9,13 +9,19 @@ interface SetupConfig {
   // the host check's exit codes, one per call, in order
   readonly checkExits: readonly number[];
   readonly env?: Readonly<Record<string, string>>;
+  readonly token?: string;
 }
 
 async function setupTest(config: SetupConfig) {
   const out: string[] = [];
   const err: string[] = [];
   const checkExits = [...config.checkExits];
-  const op = buildStubOp({ vaults: { cloud: { 'boxxy-github-token': 'ghp_fixture_token' } } });
+
+  const op = buildStubOp({
+    vaults: {
+      cloud: { 'boxxy-github-token': config.token ?? 'ghp_fixture_token' },
+    },
+  });
 
   const checkBytes = await readHostScript('check-atc-git-clone-token.sh');
   const writeBytes = await readHostScript('write-atc-git-clone-token.sh');
@@ -120,10 +126,28 @@ test('it changes nothing when the check cannot run', async () => {
 });
 
 test('it fails with a usage message when no check repo is set', async () => {
-  const ctx = await setupTest({ checkExits: [], env: { ATC_GIT_CLONE_CHECK_REPO: '' } });
+  const ctx = await setupTest({
+    checkExits: [],
+    env: { ATC_GIT_CLONE_CHECK_REPO: '' },
+  });
+
   const exitCode = await ctx.run();
 
   expect(exitCode).toBe(2);
   expect(ctx.err.join('')).toContain('ATC_GIT_CLONE_CHECK_REPO');
   expect(ctx.calls).toStrictEqual([]);
+});
+
+test('it refuses a multiline 1Password value, and sends nothing to the host', async () => {
+  const ctx = await setupTest({
+    checkExits: [120],
+    token: 'ghp_fixture_token\ntouch /unexpected',
+  });
+
+  const exitCode = await ctx.run();
+
+  expect(exitCode).toBe(1);
+  expect(ctx.err.join('')).toContain('not a single token');
+  expect(ctx.calls.filter((call) => call.stdin.startsWith(ctx.writeScript))).toStrictEqual([]);
+  expect(ctx.err.join('')).not.toContain('touch /unexpected');
 });

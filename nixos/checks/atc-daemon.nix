@@ -160,6 +160,25 @@ let
         '';
     }
     {
+      title = "it exports an environment credential whose variable is named like a shell variable of its own";
+      script =
+        let
+          service =
+            (buildDaemonSystem {
+              environmentCredentials.value = "/run/fixture/value-token";
+            }).config.systemd.services.atc-daemon;
+        in
+        ''
+          start='${service.serviceConfig.ExecStart}'
+          wrapper=''${start%% *}
+          dir=$(mktemp -d)
+          printf 'fixture-value\n' > "$dir/env-value"
+          actual=$(CREDENTIALS_DIRECTORY="$dir" "$wrapper" sh -c 'printf %s "''${value-absent}"')
+
+          assert_equals 'fixture-value' "$actual" "the value variable"
+        '';
+    }
+    {
       title = "it rejects an environment credential whose name is not a valid variable name";
       script =
         let

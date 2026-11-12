@@ -80,3 +80,20 @@ test('it fails without a file when the secrets directory is missing', async () =
 
   expect(files).toStrictEqual([]);
 });
+
+test('it runs no command from a line after the token', async () => {
+  const ctx = await setupTest();
+
+  const marker = join(ctx.directory, 'unexpected');
+
+  const result = await runProcess(['bash', '-s', '--', ctx.directory], {
+    stdin: Buffer.concat([ctx.script, Buffer.from(`fixture-clone-token\ntouch ${marker}\n`)]),
+    env: ctx.env,
+  });
+
+  expect(result.exitCode).toBe(0);
+
+  const files = await readdir(ctx.directory);
+
+  expect(files).toStrictEqual(['git-clone-token']);
+});

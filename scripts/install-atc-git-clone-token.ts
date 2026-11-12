@@ -83,6 +83,14 @@ async function writeHostFile(context: Readonly<ATCCredentialsContext>, item: str
     throw new ExitError(1, `the 1Password item ${item} holds no credential; nothing changed`);
   }
 
+  // the host script reads one line, so a value of several lines or with spaces is not a token
+  if (/\s/u.test(value.trimEnd())) {
+    throw new ExitError(
+      1,
+      `the 1Password item ${item} holds a value that is not a single token; nothing changed`,
+    );
+  }
+
   const script = await readHostScript('write-atc-git-clone-token.sh');
 
   const line = value.endsWith('\n') ? value : `${value}\n`;
