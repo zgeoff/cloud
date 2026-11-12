@@ -101,6 +101,74 @@ ssh -L 8090:localhost:8090 root@geoffcloud k3s kubectl -n boxxy port-forward svc
 
 Then set `BOXXY_URL=http://localhost:8090` for the boxxy CLI.
 
+## Let sessions reach the server
+
+A worker session in an imp reaches the worker listener at `https://boxxy.imp.internal`, the broker
+host in the shared constants. The atc daemon's `boxxy` agent loads the boxxy hook plug-in and its
+`boxxy` auth profile sets `BOXXY_URL` in the session. The broker adds the worker token and an imp
+identity token, and forwards the request to the boxxy relay on the host's address on Podman's
+bridge, which dials the `boxxy-worker` Service. These steps follow the host switch that adds the
+relay and the daemon's new config.
+
+1. Add the worker token to impd. Send it on stdin, and never put it on a command line. The upstream
+   is the host's address on Podman's bridge (`podman.bridgeAddress` in the shared constants) and the
+   port of the `boxxy-worker-relay` entry in the exposure registry:
+
+   ```sh
+   op read op://cloud/boxxy-worker-token/credential \
+     | impz secret add boxxy --kind static --hosts boxxy.imp.internal \
+         --header authorization --scheme bearer --upstream http://10.88.0.1:18083 --identity
+   ```
+
+   Run it in imp-host. Expect `impz secret ls` to show
+   `boxxy.imp.internal -> http://10.88.0.1:18083 (identity)`. Impd signs identity tokens only with
+   `IMP_IDENTITY_ISSUER` set, which the host's config sets to `geoffcloud`. Replacing the token of a
+   secret that exists takes `--replace`, and a change of host, upstream or `--identity` takes
+   `--replace --rebind`, which drops the secret's grants.
+
+2. List `boxxy` and `pepys-telemetry` in the grantable list of the atc daemon's impd token, so the
+   daemon may grant them to a session. The command replaces the whole list, which
+   `scripts/atc-cloud-grantable.ts` holds:
+
+   ```sh
+   ssh root@geoffcloud podman exec imp-host impz token set atc-cloud \
+     --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy \
+     < /dev/null
+   ```
+
+   `bun scripts/install-atc-gateway-credentials.ts` stops with this command when the token exists
+   with another list.
+
+3. Restart the atc daemon if the switch did not, so it reads the new `boxxy` agent and profiles. A
+   switch that changes the daemon's config restarts it.
+
+[The pepys runbook](./pepys.md#let-sessions-send-telemetry) covers the telemetry secret, which every
+Claude session uses.
+
+## The service token at the atc gateway
+
+The boxxy server signs in to the atc gateway with a service token, which the gateway reads from a
+file at start (`atc-gateway --service-token-file`, atc 7.14.0 and later). Pulumi builds the file
+from `BOXXY_ATC_TOKEN` and the gateway's public URL, puts it in a Secret with no fixed name, and
+passes the flag. The server calls atc as the principal `service:boxxy`, which the daemon's
+`principals` lists with the target `geoffcloud`.
+
+- Mint the token as `atcs_` and 64 hex characters, and put it in the item `boxxy-atc-token` in
+  `cloud` and in its `cloud-deploy` copy:
+
+  ```bash
+  printf 'atcs_%s' "$(openssl rand -hex 32)"
+  ```
+
+- While `images/atc-gateway/versions.env` pins an atc release older than 7.14.0, Pulumi leaves the
+  file, the mount and the flag out and prints one warning when it loads the inputs. The token then
+  need not have that shape. After the pin moves to 7.14.0 or later and the gateway image rolls, the
+  next apply adds the Secret, an init container and the flag.
+- The gateway refuses a token file that another user owns or that its group or others can open, and
+  Kubernetes gives a Secret volume's files to root. So an init container, running as the gateway's
+  user, copies the file to a memory volume with mode 0600, and the gateway mounts that volume
+  read-only.
+
 ## Add a trust document
 
 1. Write the impd's document, as `impz identity jwks` prints it on that impd's host, to
@@ -118,12 +186,15 @@ Then set `BOXXY_URL=http://localhost:8090` for the boxxy CLI.
 
 ## Rotate a token
 
-1. Mint a new value with `openssl rand -hex 32`, and put it in the item in `cloud` and in its
-   `cloud-deploy` copy. For the worker token, also replace impd's `boxxy` secret.
+1. Mint a new value with `openssl rand -hex 32` (for the atc token, `atcs_` and that value, as
+   [the service token](#the-service-token-at-the-atc-gateway) says), and put it in the item in
+   `cloud` and in its `cloud-deploy` copy. For the worker token, also replace impd's `boxxy` secret.
 2. [Apply by hand](./workflows.md#apply-by-hand) from `main`. The `Deploy prod` job applies only a
    new commit, so it never runs for a change in 1Password alone. Both drift checks and the preview
    show one change: Pulumi replaces the Secret `boxxy-tokens`. Expect nothing else.
-3. The new Secret rolls `boxxy-0`, and the old token stops working once the new pod is ready.
+3. The new Secret rolls `boxxy-0`, and the old token stops working once the new pod is ready. A new
+   atc token also replaces the gateway's `atc-gateway-service-tokens` Secret, which rolls the
+   gateway.
 
 ## Back up now
 

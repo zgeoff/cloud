@@ -92,6 +92,27 @@ restore overrides, and from the stack config's one pin of the backup image. A CI
 the committed YAML differs from the generated one, so a restore always runs as the backup's user,
 with its claim and Secret and in its image.
 
+## Service tokens
+
+A service in the cluster that cannot sign in with a browser calls `/mcp` with a fixed bearer token,
+which the gateway reads from a file at start (`--service-token-file`, atc 7.14.0 and later). The
+boxxy server is the one such client. Pulumi builds the file from the stack's `BOXXY_ATC_TOKEN` and
+the public URL: the resource is the public URL's origin and `/mcp`, and the gateway refuses to start
+when the file names another. The client `boxxy` holds the scopes `read`, `spawn`, `message` and
+`kill`, and its principal is `service:boxxy`, which the daemon's `principals` lists.
+
+atc refuses a token file that another user owns or that its group or others can open. Kubernetes
+makes the files of a Secret volume root's, so no mode on that volume passes for the gateway's user.
+An init container in the backup image, running as the gateway's user, copies the file into a memory
+volume with mode 0600, and the gateway mounts that volume read-only. The Secret has no fixed name,
+so a new token rolls the Deployment.
+
+The input is optional. While `BOXXY_ATC_TOKEN` is unset, the pod has no Secret, no init container,
+no mount and no flag. While `images/atc-gateway/versions.env` pins an atc release older than 7.14.0,
+which has no such flag, Pulumi leaves them out and prints one warning, so a deploy never starts a
+gateway that cannot read its arguments
+([the boxxy runbook](../../runbooks/boxxy.md#the-service-token-at-the-atc-gateway)).
+
 ## The cloud daemon
 
 The cloud daemon is a NixOS service on the host, running an unpatched atc release that the flake
@@ -116,11 +137,31 @@ The target boots each imp from the [agent image](../../runbooks/agent-image.md),
 hooks run the image's own atc while it matches the daemon's release, so a spawn uploads no binary.
 The daemon offers Claude and Codex. A Claude session signs in through impd's credential broker with
 the same profiles as the home-pc daemon's `cloud` target: the Claude subscription, GitHub, Linear's
-MCP server and 1Password Connect. The profiles name impd's secrets, never their values, so a renamed
-or added profile changes both daemons' configs. The daemon's impd token lists each of those secrets
-as grantable, so the token, not the config, bounds what a session can reach. impd ties each entry of
-that list to the secret it named, so a secret made again under the same name needs a new grantable
-list on each daemon's token. A Codex session has no brokered sign-in.
+MCP server and 1Password Connect. The cloud daemon adds the `pepys-telemetry` profile, so every
+Claude session sends its OpenTelemetry logs to pepys ingest through the broker
+([the telemetry path](./pepys.md#the-telemetry-path-from-a-session)). The profiles name impd's
+secrets, never their values, so a renamed or added profile changes the daemons' configs. The
+daemon's impd token lists each of those secrets as grantable, so the token, not the config, bounds
+what a session can reach. impd ties each entry of that list to the secret it named, so a secret made
+again under the same name needs a new grantable list on each daemon's token. A Codex session has no
+brokered sign-in.
+
+The daemon also offers the `boxxy` agent for the boxxy server's worker sessions
+([boxxy](./boxxy.md)). It is a Claude entry with the same profiles and variables as `claude`, and
+the `boxxy` profile beside them, which gives the session `BOXXY_URL` and the broker's token for the
+worker listener. Its `args` load the boxxy hook plug-in that the agent image holds. A stock Claude
+entry's `auth` takes no `args`, and the plug-in's folder exists only in the guest, so the plug-in
+sits in the entry's `args`. atc adds `atc.session.id` to `OTEL_RESOURCE_ATTRIBUTES` in every session
+it starts, which joins a session's telemetry to the session.
+
+Two lists name every secret the daemon may grant. The profiles in the host's config name them, and
+the grantable list of the daemon's impd token (`scripts/atc-cloud-grantable.ts`) bounds them: `glm`,
+`claude-setup-token`, `github-imp-agents`, `linear-imp-agents`, `op-connect`, `pepys-telemetry` and
+`boxxy`. A new profile changes both, and the token's list changes by hand
+([the boxxy runbook](../../runbooks/boxxy.md#let-sessions-reach-the-server)).
+
+The daemon's `principals` lists the OAuth clients of the gateway and, as `service:boxxy`, the boxxy
+server's service token ([service tokens](#service-tokens)). Each is granted the target `geoffcloud`.
 
 A Claude session runs its prompt only in a folder that Claude Code trusts, and the imp's Claude
 config trusts only the root of a workspace that the spawn cloned with trust opted in. The daemon

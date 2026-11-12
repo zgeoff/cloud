@@ -1,6 +1,8 @@
 import { secret } from '@pulumi/pulumi';
 import type { Output } from '@pulumi/pulumi';
 import { findResticBackup } from './find-restic-backup.ts';
+import { loadATCGatewayServiceTokens } from './load-atc-gateway-service-tokens.ts';
+import type { ATCGatewayServiceTokenOptions } from './load-atc-gateway-service-tokens.ts';
 import { requireATCGatewayInputs } from './require-atc-gateway-inputs.ts';
 import { requireGHCRPullCredential } from './require-ghcr-pull-credential.ts';
 import type {
@@ -13,6 +15,7 @@ import type {
 export function loadATCGatewayInputs(
   stackConfig: Pick<StackConfig, 'getObject' | 'getSecret'>,
   env: Environment,
+  serviceTokenOptions?: ATCGatewayServiceTokenOptions,
 ): { readonly atcGateway?: ATCGatewayInputs } {
   const raw = stackConfig.getObject('atcGateway');
 
@@ -24,6 +27,7 @@ export function loadATCGatewayInputs(
   const pull = requireGHCRPullCredential(env);
   const backup = findBackupSecrets(env);
   const ownerEmail = requireOwnerEmail(stackConfig);
+  const serviceTokens = loadATCGatewayServiceTokens(env, serviceTokenOptions);
 
   return {
     atcGateway: {
@@ -34,6 +38,7 @@ export function loadATCGatewayInputs(
           Object.entries(checked.tokens).map(([name, token]) => [name, secret(token)]),
         ),
         ...(backup === undefined ? {} : { backup }),
+        ...(serviceTokens === undefined ? {} : { serviceTokens }),
         ownerEmail,
       },
     },

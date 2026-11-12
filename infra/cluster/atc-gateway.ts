@@ -3,12 +3,17 @@ import { Deployment } from '@pulumi/kubernetes/apps/v1';
 import type { DeploymentArgs } from '@pulumi/kubernetes/apps/v1';
 import { ConfigMap, PersistentVolumeClaim, Secret, Service } from '@pulumi/kubernetes/core/v1';
 import { StorageClass } from '@pulumi/kubernetes/storage/v1';
+import { all } from '@pulumi/pulumi';
 import type { Output } from '@pulumi/pulumi';
 import type { ATCGatewayInputs } from '../inputs/index.ts';
 import { createEgressAllow } from '../shared/create-egress-allow.ts';
 import { createNamespace } from '../shared/create-namespace.ts';
 import { egressAllows } from '../shared/egress-allows.ts';
 import { buildATCGatewayRegistry } from './build-atc-gateway-registry.ts';
+import {
+  atcGatewayServiceTokenFile,
+  buildATCGatewayServiceTokenFile,
+} from './build-atc-gateway-service-token-file.ts';
 import {
   atcGatewayLabels,
   atcGatewayPort,
@@ -117,6 +122,7 @@ function createConfigObjects(
   readonly registry: Output<string>;
   readonly pullSecret: Output<string>;
   readonly tunnelToken: Output<string>;
+  readonly serviceTokens?: Output<string>;
 } {
   const tokens = new Secret(
     'atc-gateway-daemon-tokens',
@@ -157,12 +163,44 @@ function createConfigObjects(
     { provider: cluster },
   );
 
+  const serviceTokens = createServiceTokenSecret(cluster, namespace, inputs);
+
   return {
     tokens: tokens.metadata.name,
     registry: registry.metadata.name,
     pullSecret: pull.metadata.name,
     tunnelToken: tunnel.metadata.name,
+    ...(serviceTokens === undefined ? {} : { serviceTokens: serviceTokens.metadata.name }),
   };
+}
+
+// the service token file, built from the clients' tokens and the public URL. No fixed name, so a
+// change rolls the Deployment: the gateway reads the file only at start.
+function createServiceTokenSecret(
+  cluster: Provider,
+  namespace: Output<string>,
+  inputs: ATCGatewayInputs,
+): Secret | undefined {
+  const serviceTokens = inputs.secrets.serviceTokens;
+
+  if (serviceTokens === undefined) {
+    return undefined;
+  }
+
+  const names = Object.keys(serviceTokens);
+
+  const file = all(Object.values(serviceTokens)).apply((tokens) =>
+    buildATCGatewayServiceTokenFile({
+      publicURL: inputs.config.publicURL,
+      tokens: Object.fromEntries(names.map((name, index) => [name, tokens[index] ?? ''])),
+    }),
+  );
+
+  return new Secret(
+    'atc-gateway-service-tokens',
+    { metadata: { namespace }, stringData: { [atcGatewayServiceTokenFile]: file } },
+    { provider: cluster },
+  );
 }
 
 function createDeployment(

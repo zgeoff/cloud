@@ -57,8 +57,10 @@ pod:
 
 - `BOXXY_WORKER_TOKEN`: the bearer token the broker adds to every worker call. The broker holds the
   second copy.
-- `BOXXY_ATC_TOKEN`: the atc service token that the server sends to the atc gateway, issued to the
-  gateway client `service:boxxy`.
+- `BOXXY_ATC_TOKEN`: the bearer token the server sends to the atc gateway, as an atc service token
+  (`atcs_` and 32 or more characters). The gateway reads it from a file that Pulumi builds from the
+  same variable ([service tokens](./atc-gateway.md#service-tokens)), and the server is the principal
+  `service:boxxy` at the atc daemon.
 
 ## The rules
 

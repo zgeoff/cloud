@@ -55,6 +55,10 @@ export interface ATCGatewayInputs {
 
     // the one address the Access policy in front of the gateway's sign-in pages lets in
     readonly ownerEmail: Output<string>;
+
+    // the fixed bearer token of each service client of /mcp, by client name. Present only while
+    // the gateway image knows --service-token-file (atc 7.14.0 and later)
+    readonly serviceTokens?: Readonly<Record<string, Output<string>>>;
   };
 }
 
