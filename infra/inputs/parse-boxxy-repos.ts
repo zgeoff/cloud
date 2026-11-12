@@ -13,8 +13,13 @@ const gitSourceURL = z
   .refine(isURLWithoutCredential, 'a git source url must carry no credential');
 
 // the NAME of the atc daemon's environment variable that holds the clone token, never the token;
-// atc's own rule for the name
-const credentialRef = z.strictObject({ name: z.string().regex(/^[A-Za-z_]\w*$/u) });
+// atc's own rule for the name, and the server's length cap
+const credentialRef = z.strictObject({
+  name: z
+    .string()
+    .max(255)
+    .regex(/^[A-Za-z_]\w*$/u),
+});
 
 const gitSource = z.strictObject({
   url: gitSourceURL,
