@@ -145,7 +145,8 @@ and changes nothing in prod.
 
 1. Merge the service. The `pepys image` workflow publishes
    `ghcr.io/zgeoff/cloud-pepys:<release>-<commit>` from `main`, and its run summary gives the
-   digest.
+   digest. When the package does not exist yet, the first push creates it and then fails with
+   `denied`: rerun the failed job, which publishes the tag.
 2. In a PR, add the `pepys` object to `infra/Pulumi.prod.yaml`:
 
    ```yaml
