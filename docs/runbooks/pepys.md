@@ -73,8 +73,9 @@ set to `pepys.imp.internal`.
 **CAUTION:** This adds a public route. Its `Deploy prod` run holds on the tunnel route change until
 the owner approves it.
 
-1. In the pull request that pins a `cloud-pepys` image of pepys 0.3.0 or later, add
+1. In the pull request that pins a `cloud-pepys` image of pepys 0.3.1 or later, add
    `apiHostname: pepys.geoff.cloud` to the `geoff-cloud:pepys` object in `infra/Pulumi.prod.yaml`.
+   The program takes 0.3.0, but its compiled API stops at start.
 2. Run `bun run preview`. Expect it to add the claim `pepys-auth`, the Access policy and application
    `pepys-api-owner` and `pepys-api-sign-in`, and the record `pepys-api`, and to update the host's
    StatefulSet, the host's network policy and the shared tunnel's configuration. Expect no replace.
