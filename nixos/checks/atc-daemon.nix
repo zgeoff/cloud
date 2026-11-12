@@ -133,6 +133,51 @@ let
         '';
     }
     {
+      title = "it starts atc through a wrapper that reads each environment credential into its variable, and passes each file in as a credential";
+      script =
+        let
+          service =
+            (buildDaemonSystem {
+              environmentCredentials.ATC_GIT_CLONE_TOKEN = "/run/fixture/git-clone-token";
+            }).config.systemd.services.atc-daemon;
+        in
+        ''
+          start='${service.serviceConfig.ExecStart}'
+          wrapper=''${start%% *}
+          rest=''${start#* }
+          grep -q 'export ATC_GIT_CLONE_TOKEN=' "$wrapper"
+          grep -q 'CREDENTIALS_DIRECTORY/env-ATC_GIT_CLONE_TOKEN' "$wrapper"
+          assert_equals '${atc}/bin/atc daemon --listen 100.64.0.1:8415 --token-file /run/atc-daemon/gateway-token' "$rest" "the atc command line"
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "gateway-token:/run/fixture/gateway-token"
+                "imp-token:/run/fixture/imp-token"
+                "env-ATC_GIT_CLONE_TOKEN:/run/fixture/git-clone-token"
+              ]
+            )
+          } ${lib.escapeShellArg (builtins.toJSON service.serviceConfig.LoadCredential)} "credentials"
+        '';
+    }
+    {
+      title = "it rejects an environment credential whose name is not a valid variable name";
+      script =
+        let
+          system = buildDaemonSystem {
+            environmentCredentials."BAD-NAME" = "/run/fixture/x";
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "services.atc-daemon.environmentCredentials names variables that are not valid environment variable names (^[A-Za-z_][A-Za-z0-9_]*$): BAD-NAME"
+              ]
+            )
+          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+        '';
+    }
+    {
       title = "it puts git on the service PATH, which atc runs to resolve the ref of a git workspace";
       script =
         let

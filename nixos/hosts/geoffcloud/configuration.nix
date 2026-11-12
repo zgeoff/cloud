@@ -495,6 +495,10 @@ in
       listen = "${atcDaemonAddress}:${toString atcDaemonPort}";
       tokenFile = "/var/lib/atc-daemon-secrets/gateway-token";
       impTokenFile = "/var/lib/atc-daemon-secrets/imp-token";
+      # atc clones a session's git workspace on this host before the session exists, so the
+      # session's GitHub broker profile does not apply. A private repo's clone and ref lookup use
+      # this token, which is read-only: contents and pull requests read on the boxxy repos.
+      environmentCredentials.ATC_GIT_CLONE_TOKEN = "/var/lib/atc-daemon-secrets/git-clone-token";
       targets.geoffcloud = {
         provider = "imp";
         url = impdLoopbackURL;

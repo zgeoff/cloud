@@ -45,6 +45,34 @@ let
     install -m 0600 "$CREDENTIALS_DIRECTORY/gateway-token" ${stagedTokenFile}
   '';
 
+  # Starts atc with each environment credential in its variable. For each entry the wrapper reads
+  # systemd's copy of the file from $CREDENTIALS_DIRECTORY, drops the trailing newline, and exports
+  # it. It names a missing or empty credential in its message and never prints a value. Wrapping
+  # only when entries exist leaves the command line alone otherwise.
+  atcCommand = [
+    "${cfg.package}/bin/atc"
+    "daemon"
+    "--listen"
+    cfg.listen
+    "--token-file"
+    stagedTokenFile
+  ];
+  credentialName = variable: "env-${variable}";
+  envWrapper = pkgs.writeShellScript "atc-daemon-start" ''
+    set -eu
+    ${lib.concatStrings (
+      lib.mapAttrsToList (variable: _: ''
+        value=$(cat "$CREDENTIALS_DIRECTORY/${credentialName variable}" 2>/dev/null) || value=""
+        if [ -z "$value" ]; then
+          echo "atc-daemon: credential ${credentialName variable} (for ${variable}) is missing or empty" >&2
+          exit 1
+        fi
+        export ${variable}="$value"
+      '') cfg.environmentCredentials
+    )}unset value
+    exec "$@"
+  '';
+
   # each auth profile that an agent or one of its MCP servers selects and the config does not
   # define
   unknownProfiles = lib.concatLists (
@@ -66,6 +94,10 @@ let
       )
     ) (if cfg.agents == null then { } else cfg.agents)
   );
+
+  invalidVariableNames = lib.filter (
+    variable: builtins.match "[A-Za-z_][A-Za-z0-9_]*" variable == null
+  ) (lib.attrNames cfg.environmentCredentials);
 
   # each grant that names a target the config does not define
   unknownGrants = lib.concatLists (
@@ -122,6 +154,23 @@ in
         LoadCredential as `imp-token`. An imp target reads it at
         /run/credentials/atc-daemon.service/imp-token. As with tokenFile, a new token reaches
         the daemon only after `systemctl restart atc-daemon`.
+      '';
+    };
+
+    environmentCredentials = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = { };
+      example = {
+        ATC_GIT_CLONE_TOKEN = "/var/lib/atc-daemon-secrets/git-clone-token";
+      };
+      description = ''
+        Environment variables for the daemon process, each set from a root-only file: the name of
+        the variable maps to the file. Each file is passed in with LoadCredential as
+        `env-<name>`, and a small wrapper reads it into the variable before it starts atc, so the
+        value is never in the unit, the store or the journal. A trailing newline is dropped. The
+        start fails, naming the credential and never its value, when a file is missing or empty.
+        atc withholds a variable it reads this way from the harnesses it starts. As with tokenFile,
+        a new value reaches the daemon only after `systemctl restart atc-daemon`.
       '';
     };
 
@@ -199,6 +248,10 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
+        assertion = invalidVariableNames == [ ];
+        message = "services.atc-daemon.environmentCredentials names variables that are not valid environment variable names (^[A-Za-z_][A-Za-z0-9_]*$): ${lib.concatStringsSep ", " invalidVariableNames}";
+      }
+      {
         assertion = unknownGrants == [ ];
         message = "services.atc-daemon.principals grants targets that services.atc-daemon.targets does not define: ${lib.concatStringsSep ", " unknownGrants}";
       }
@@ -240,14 +293,9 @@ in
           stageGatewayToken
         ];
 
-        ExecStart = lib.escapeShellArgs [
-          "${cfg.package}/bin/atc"
-          "daemon"
-          "--listen"
-          cfg.listen
-          "--token-file"
-          stagedTokenFile
-        ];
+        ExecStart = lib.escapeShellArgs (
+          lib.optional (cfg.environmentCredentials != { }) envWrapper ++ atcCommand
+        );
         User = "atc";
         Group = "atc";
         StateDirectory = "atc-daemon";
@@ -259,7 +307,10 @@ in
         LoadCredential = [
           "gateway-token:${cfg.tokenFile}"
         ]
-        ++ lib.optional (cfg.impTokenFile != null) "imp-token:${cfg.impTokenFile}";
+        ++ lib.optional (cfg.impTokenFile != null) "imp-token:${cfg.impTokenFile}"
+        ++ lib.mapAttrsToList (
+          variable: file: "${credentialName variable}:${file}"
+        ) cfg.environmentCredentials;
         Restart = "on-failure";
         RestartSec = 5;
         NoNewPrivileges = true;
