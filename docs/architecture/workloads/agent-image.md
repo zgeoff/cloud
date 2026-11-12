@@ -11,16 +11,19 @@ on it.
 ## What the image holds
 
 The Dockerfile pins every input. The base image is pinned by digest, and every download other than
-an Ubuntu package carries a checksum taken from its publisher's signed or attested release. Google
-publishes no checksum for Chrome for Testing, so its checksum is taken after the download matches
-the MD5 that Google's storage lists for it. When a connection for the Chrome download stays under
-the speed floor that the Chrome step of the Dockerfile in `images/agent/` sets with `--speed-limit`
-and `--speed-time`, the build step opens a new one that goes on from the last byte, so a slow build
-network still finishes the download. apt resolves the Ubuntu packages and their dependencies against
-Ubuntu's snapshot archive at a fixed moment, so a build installs the same versions after Ubuntu
-replaces one in its live archive. apt fetches each package file from the live archive when it still
-holds that version, and from the snapshot archive otherwise. The build step fetches again after a
-wait when either archive answers with an error, because apt does not retry an HTTP error by itself.
+an Ubuntu package or one of noslop's npm packages carries a checksum taken from its publisher's
+signed or attested release. noslop's packages install from a `bun.lock`, and Bun checks each one
+against the sha512 that the lock took from the npm registry; the build checks no signature or
+attestation for them. Google publishes no checksum for Chrome for Testing, so its checksum is taken
+after the download matches the MD5 that Google's storage lists for it. When a connection for the
+Chrome download stays under the speed floor that the Chrome step of the Dockerfile in
+`images/agent/` sets with `--speed-limit` and `--speed-time`, the build step opens a new one that
+goes on from the last byte, so a slow build network still finishes the download. apt resolves the
+Ubuntu packages and their dependencies against Ubuntu's snapshot archive at a fixed moment, so a
+build installs the same versions after Ubuntu replaces one in its live archive. apt fetches each
+package file from the live archive when it still holds that version, and from the snapshot archive
+otherwise. The build step fetches again after a wait when either archive answers with an error,
+because apt does not retry an HTTP error by itself.
 
 The tools are the coding agents, atc, boxxy's CLI with its hook plug-in, auto-mode with its mod, the
 noslop reviewer, GitHub's CLI, the language toolchains, 1Password's CLI, gitleaks, the shell and
