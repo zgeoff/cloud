@@ -88,7 +88,7 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
   const boxxy =
     inputs.boxxy === undefined
       ? undefined
-      : createBoxxy(cluster, inputs.boxxy, requireGateway(gateway));
+      : createBoxxy(cluster, requirePepys(inputs.boxxy, pepys), requireGateway(gateway));
 
   return {
     onePasswordConnectServiceURL: connect.serviceURL,
@@ -98,6 +98,17 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
     ...(nixie === undefined ? {} : { nixieURL: nixie.url, nixieReadinessURL }),
     ...(gateway === undefined ? {} : buildATCGatewayRouteOutputs(gateway)),
   };
+}
+
+// the server's facts and reports go to the pepys in this cluster, so its section needs pepys here
+function requirePepys(boxxy: BoxxyInputs, pepys: unknown): BoxxyInputs {
+  if (boxxy.config.pepys !== undefined && pepys === undefined) {
+    throw new Error(
+      'stack config "boxxy.pepys" needs stack config "pepys": the boxxy server sends its facts to the pepys in the cluster',
+    );
+  }
+
+  return boxxy;
 }
 
 // the boxxy server calls atc through the gateway's Service, so it deploys only beside the gateway

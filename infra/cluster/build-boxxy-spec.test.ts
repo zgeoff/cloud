@@ -19,6 +19,8 @@ test('it runs the boxxy server as one nonroot replica on a read-only root, with 
       serviceName,
       configMap,
       tokenSecret,
+      pepysSigningSecret: false,
+      githubToken: false,
       pullSecret: 'ghcr-pull',
     }),
   ).toStrictEqual({
@@ -114,6 +116,8 @@ test('it mounts each trust document read-only as a regular file in the issuers f
     configMap: output('boxxy-config-0a1b2c3d'),
     trustDocuments: { configMap, files: ['geoffcloud.json', 'other-host.json'] },
     tokenSecret: output('boxxy-tokens-0a1b2c3d'),
+    pepysSigningSecret: false,
+    githubToken: false,
     pullSecret: 'ghcr-pull',
   });
 
@@ -141,6 +145,39 @@ test('it mounts each trust document read-only as a regular file in the issuers f
               readOnly: true,
             },
           ],
+        },
+      ],
+    },
+  });
+});
+
+test('it reads the pepys signing secret and the GitHub token from the Secret when the config needs them', () => {
+  const tokenSecret = output('boxxy-tokens-0a1b2c3d');
+
+  const spec = buildBoxxySpec({
+    image: setupTest(),
+    serviceName: output('boxxy'),
+    configMap: output('boxxy-config-0a1b2c3d'),
+    tokenSecret,
+    pepysSigningSecret: true,
+    githubToken: true,
+    pullSecret: 'ghcr-pull',
+  });
+
+  expect(spec.template).toMatchObject({
+    spec: {
+      containers: [
+        {
+          env: expect.arrayContaining([
+            {
+              name: 'BOXXY_PEPYS_SIGNING_SECRET',
+              valueFrom: { secretKeyRef: { name: tokenSecret, key: 'pepys-signing-secret' } },
+            },
+            {
+              name: 'BOXXY_GITHUB_TOKEN',
+              valueFrom: { secretKeyRef: { name: tokenSecret, key: 'github-token' } },
+            },
+          ]),
         },
       ],
     },

@@ -90,3 +90,28 @@ test('it ends the file with one newline', () => {
     }),
   ).toEndWith('}\n');
 });
+
+test('it writes the pepys section it is given and the GitHub root of the config', () => {
+  const fixture = setupTest();
+
+  const pepys = {
+    ingestUrl: 'http://pepys-ingest.fixture.invalid:8080/boxxy/facts',
+    apiUrl: 'http://pepys-host.fixture.invalid:8081/rpc',
+    environment: 'production',
+  };
+
+  expect(
+    JSON.parse(
+      renderBoxxyConfig({
+        config: { ...fixture.config, github: { baseUrl: 'https://api.github.com' } },
+        repos: fixture.repos,
+        atc: {
+          url: 'http://atc-gateway.atc.svc.cluster.local:8414/mcp',
+          host: 'atc.fixture.invalid',
+        },
+        pepys,
+        trusted: false,
+      }),
+    ),
+  ).toMatchObject({ pepys, github: { baseUrl: 'https://api.github.com' } });
+});
