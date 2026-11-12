@@ -22,15 +22,19 @@ replaces one in its live archive. apt fetches each package file from the live ar
 holds that version, and from the snapshot archive otherwise. The build step fetches again after a
 wait when either archive answers with an error, because apt does not retry an HTTP error by itself.
 
-The tools are the coding agents, atc, boxxy's CLI with its hook plug-in, auto-mode with its mod,
-GitHub's CLI, the language toolchains, 1Password's CLI, gitleaks, the shell and workflow linters,
-and Chrome for a repo's browser lanes. Chrome refuses to start as root without `--no-sandbox`, and a
-session runs as root, so `BUN_CHROME_PATH` names a script that adds the flag for root. Claude Code
-is installed with its own updates turned off, so a session runs the version the image pins.
+The tools are the coding agents, atc, boxxy's CLI with its hook plug-in, auto-mode with its mod, the
+noslop reviewer, GitHub's CLI, the language toolchains, 1Password's CLI, gitleaks, the shell and
+workflow linters, and Chrome for a repo's browser lanes. Chrome refuses to start as root without
+`--no-sandbox`, and a session runs as root, so `BUN_CHROME_PATH` names a script that adds the flag
+for root. Claude Code is installed with its own updates turned off, so a session runs the version
+the image pins.
 
 The build runs no tool, because a tool can write state the first time it runs: a version check alone
 can create a tool's config directory. That keeps the image free of anything a session could inherit
-from another.
+from another. The one exception is Bun, which installs noslop's npm packages from the `bun.lock` in
+`images/agent/noslop/` with no lifecycle scripts, and keeps its download cache in a folder that the
+same build step removes. A Bun bundle runs on the Bun that the image's `bun` shim picks from the
+nearest `.bun-version`, so the `noslop` command runs the bundle on the image's default Bun instead.
 
 Two boot services adapt a small imp to the tools. One sets the kernel's memory overcommit, so a tool
 whose allocator reserves large buffers can start. The other sizes a swapfile from the free space on
@@ -63,10 +67,10 @@ build before any session can run on it.
 
 The [release check](../../runbooks/release-check.md) opens the bump pull requests that move the
 image's pins to new releases: atc, together with the host's daemon and the gateway images, the imp
-base image, boxxy's CLI with its hook plug-in, and auto-mode, the CLI and mod that gateway sessions
-load. atc's own release knows nothing about this repo. A later release replaces its dependency's
-branch and turns the old auto-merge off first, so a newer pin always waits for its own checks, and a
-pin never moves backwards. Every other pin change is an ordinary reviewed PR.
+base image, boxxy's CLI with its hook plug-in, noslop, and auto-mode, the CLI and mod that gateway
+sessions load. atc's own release knows nothing about this repo. A later release replaces its
+dependency's branch and turns the old auto-merge off first, so a newer pin always waits for its own
+checks, and a pin never moves backwards. Every other pin change is an ordinary reviewed PR.
 
 ## How a daemon uses the image
 

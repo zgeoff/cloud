@@ -1,13 +1,13 @@
 # Release check
 
-The `release check` workflow finds new atc, imp, nixie, pepys, boxxy CLI and auto-mode releases and
-opens one bump pull request per dependency, so the release repositories know nothing about cloud. It
-runs on a schedule and on dispatch. Its check job compares each dependency's newest release with the
-pins on `main`, and its bump job runs only when a pin is older. The `release bump merge` workflow
-then merges a bump that may merge on its own once its checks pass. A merged nixie bump changes the
-stack config, so the `Deploy prod` workflow applies it to prod with no person involved, unless its
-guard holds the plan ([the prod apply job](./prod-apply.md)). The same holds for the later pull
-request that pins the atc-gateway images an atc bump publishes
+The `release check` workflow finds new atc, imp, nixie, pepys, boxxy CLI, auto-mode and noslop
+releases and opens one bump pull request per dependency, so the release repositories know nothing
+about cloud. It runs on a schedule and on dispatch. Its check job compares each dependency's newest
+release with the pins on `main`, and its bump job runs only when a pin is older. The
+`release bump merge` workflow then merges a bump that may merge on its own once its checks pass. A
+merged nixie bump changes the stack config, so the `Deploy prod` workflow applies it to prod with no
+person involved, unless its guard holds the plan ([the prod apply job](./prod-apply.md)). The same
+holds for the later pull request that pins the atc-gateway images an atc bump publishes
 ([The atc-gateway images](#the-atc-gateway-images)). A host switch and an agent image rebuild stay
 with a person, and each pull request's body lists the steps its merge leaves. An atc major release
 reaches the host's atc daemon only after the atc gateway runs that major, because the host switch
@@ -24,6 +24,7 @@ daemon.
 | pepys              | `release-check/pepys`              | the host binary in the cloud-pepys image's context                                     |
 | boxxy-cli          | `release-check/boxxy-cli`          | the boxxy CLI and its hook plug-in in the agent image                                  |
 | auto-mode          | `release-check/auto-mode`          | the auto-mode tarball in the agent image                                               |
+| noslop             | `release-check/noslop`             | noslop's package and its lock in the agent image                                       |
 | atc-gateway-images | `release-check/atc-gateway-images` | the atc-gateway and backup images in the stack config                                  |
 
 The release registry in `scripts/release/` holds one record per dependency: its repository, its tag
@@ -32,10 +33,12 @@ writes from the release itself: the atc and boxxy CLI pins take their sums from 
 SHA256SUMS, the nixie pins take their digests from the release notes' `## Images` list, the imp pins
 take the tag's commit and the images' digests from GitHub and GHCR, and the auto-mode pin takes its
 sum from the npm tarball, which it checks against npm's integrity hash and the release's version.
-Before it writes anything, it checks every pin line of the dependency, so a pin at the release with
-another sum fails the bump and changes no file. The bump never moves a pin back to an older release.
-The check finds a dependency's newest release among the newest 30 releases of its repository. The
-boxxy CLI record reads 300, because boxxy publishes other packages' releases beside the CLI's.
+The noslop pin holds only a version: the bump waits until npm lists the release, and the lock it
+writes holds each package's integrity hash. Before it writes anything, it checks every pin line of
+the dependency, so a pin at the release with another sum fails the bump and changes no file. The
+bump never moves a pin back to an older release. The check finds a dependency's newest release among
+the newest 30 releases of its repository. The boxxy CLI record reads 300, because boxxy publishes
+other packages' releases beside the CLI's.
 
 A restore Job names the backup image of its workload, so a bump that moves `backupImage` in the
 stack config also runs `infra/cluster/write-restore-jobs.ts` on the checkout and commits the restore
@@ -49,6 +52,13 @@ that release. The scripts' nixie calls type-check against the package, so CI on 
 request fails only when the release drops or changes a procedure that a script calls. The
 release-age gate in `bunfig.toml` excludes the package, so the lock resolves it on the day nixie
 publishes it, and Renovate leaves it to this bump, so the package never moves without the images.
+
+The noslop bump writes the version to `ARG NOSLOP_VERSION` in the agent image's Dockerfile and to
+`images/agent/noslop/package.json`, then runs `bun install --lockfile-only` in
+`images/agent/noslop/` and checks that its `bun.lock` resolves `@noslop/cli` at the release. Bun
+reads the `bunfig.toml` of the folder it runs in only, so that folder holds its own copy of the
+release-age gate, which excludes `@noslop/cli` and keeps noslop's own dependencies behind the gate.
+Renovate leaves the folder to this bump.
 
 The pin table (`scripts/release/release-pins.json`) holds every registry pin's parts, and each bump
 writes its entries beside the pins. CI's release pin check (`bun run check:release-pins`) fails a

@@ -100,6 +100,7 @@ check_tool atc "$ATC_VERSION" /usr/local/bin/atc --version
 # boxxy's compiled Bun binary stops on a CPU that lacks the instructions its build targets, so this
 # line run in an imp is the check that it runs on the agent hosts' CPU
 check_tool boxxy "$BOXXY_CLI_VERSION" /usr/local/bin/boxxy --version
+check_tool noslop "$NOSLOP_VERSION" /usr/local/bin/noslop --version
 check_tool codex "$CODEX_VERSION" codex --version
 check_tool gh "$GH_VERSION" gh --version
 check_package git "$GIT_VERSION"

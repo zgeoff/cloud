@@ -1,0 +1,7 @@
+{
+  "name": "agent-image-noslop",
+  "private": true,
+  "dependencies": {
+    "@noslop/cli": "0.4.29"
+  }
+}

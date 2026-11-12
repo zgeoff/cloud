@@ -89,7 +89,8 @@ call, the path of a change, the topology and the data.
 - [The boxxy server](./runbooks/boxxy.md): deploy the server, add a trust document, upgrade, rotate
   a token, back up and restore.
 - [Release check](./runbooks/release-check.md): the bump pull requests for new atc, imp, nixie,
-  pepys, boxxy CLI and auto-mode releases, when they merge on their own, and the app they run as.
+  pepys, boxxy CLI, auto-mode and noslop releases, when they merge on their own, and the app they
+  run as.
 - [Previews](./runbooks/preview.md): set up the preview service, opt a repository in, check a
   preview live.
 - [imp's e2e nodes](./runbooks/imp-e2e-tailnet.md): where imp's end-to-end suites run, and how to

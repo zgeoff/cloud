@@ -14,6 +14,9 @@ type ReleaseSource =
   | { readonly kind: 'release-notes' }
   | { readonly kind: 'npm-tarball'; readonly packageName: string }
 
+  // a package that a bun.lock installs, which pins its version and each package's sha512
+  | { readonly kind: 'npm-package'; readonly packageName: string }
+
   // the workflow that publishes the images opens their pull request, and the first image's tag is
   // the bump's version
   | { readonly kind: 'published-images'; readonly images: readonly PublishedImage[] };
@@ -49,8 +52,8 @@ export interface PinLine {
 }
 
 // runs after the pin's lines are written: a flake lock must lock the input at the pinned commit,
-// a bun lock must lock the package at the pinned version, and the restore Jobs must name the
-// pinned backup image, which CI's check:restore-job compares
+// a bun lock, written in its own folder, must lock the package at the pinned version, and the
+// restore Jobs must name the pinned backup image, which CI's check:restore-job compares
 export type PinLock =
   | {
       readonly kind: 'nix-flake-lock';
@@ -426,5 +429,37 @@ export const releaseRegistry: readonly ReleaseRecord[] = [
     ],
     rollout:
       'Rebuild the agent image (`docs/runbooks/agent-image.md`). Gateway sessions load the new mod from `/opt/auto-mode/mods/auto-mode` once they start on the new image.',
+  },
+  {
+    name: 'noslop',
+    repo: 'zgeoff/noslop',
+    tagPrefix: '@noslop/cli@',
+    source: { kind: 'npm-package', packageName: '@noslop/cli' },
+    pins: [
+      // the image check reads the version from the ARG, and the build fails when the two differ
+      {
+        id: 'noslop',
+        title: 'noslop in the agent image (`images/agent/noslop/`)',
+        lines: [
+          {
+            file: 'images/agent/Dockerfile',
+            pattern: String.raw`^ARG NOSLOP_VERSION=(?<version>\d+\.\d+\.\d+)$`,
+            parts: { version },
+          },
+          {
+            file: 'images/agent/noslop/package.json',
+            pattern: String.raw`^ {4}"@noslop\/cli": "(?<version>\d+\.\d+\.\d+)",?$`,
+            parts: { version },
+          },
+        ],
+        lock: {
+          kind: 'bun-lock',
+          packageName: '@noslop/cli',
+          lockFile: 'images/agent/noslop/bun.lock',
+        },
+      },
+    ],
+    rollout:
+      'Rebuild the agent image (`docs/runbooks/agent-image.md`). Sessions run the new noslop once they start on the new image.',
   },
 ];

@@ -19,8 +19,9 @@ service prints its choice and the free space it read, which `impz logs <name> sw
 
 Beside them, the image holds one Claude Code hook, which [Locked packages](#locked-packages) covers.
 It holds no other configuration, no login state and no secret: atc sets up grants, placeholder
-variables, the config bundle and the seed for each session at launch. Its build runs no tool,
-because a tool can write state when it runs (`codex --version` creates `~/.codex`).
+variables, the config bundle and the seed for each session at launch. Its build runs no tool but
+Bun's install of noslop's lock, because a tool can write state when it runs (`codex --version`
+creates `~/.codex`).
 
 | Path                                  | Holds                                                     |
 | ------------------------------------- | --------------------------------------------------------- |
@@ -31,6 +32,8 @@ because a tool can write state when it runs (`codex --version` creates `~/.codex
 | `/usr/local/bin/atc`                  | atc in the guest, which the `cloud` target's hooks use    |
 | `/usr/local/bin/boxxy`                | boxxy's CLI, which its hook plug-in runs                  |
 | `/opt/boxxy/hook-plugin`              | boxxy's hook plug-in, for `--plugin-dir`                  |
+| `images/agent/noslop/`                | noslop's package, its `bun.lock` and the release-age gate |
+| `/usr/local/bin/noslop`               | the start script that runs noslop on the default Bun      |
 | `/usr/local/bin/bun`                  | the shim that runs the Bun a checkout pins                |
 | `/usr/local/bin/chromium`             | the Chrome start script that `BUN_CHROME_PATH` names      |
 | `/etc/imp/services.d/overcommit.json` | the boot service that sets `vm.overcommit_memory=1`       |
@@ -295,6 +298,22 @@ Only a session that passes `--plugin-dir /opt/boxxy/hook-plugin` runs the plug-i
 a file under `/etc/claude-code` names boxxy, and when the plug-in's session-start hook runs without
 `BOXXY_URL` and does not refuse. The CLI is a compiled Bun binary, so its version check on a live
 imp also shows that it runs on the host's CPU.
+
+## A new noslop release
+
+The [release check](./release-check.md) opens the `release-check/noslop` pull request for each new
+`@noslop/cli` release, once npm lists it. It writes the version to `ARG NOSLOP_VERSION` and to
+`images/agent/noslop/package.json`, and regenerates that folder's `bun.lock`. The image build fails
+when the two versions differ. To pin a release by hand, run the manual pin from a clean checkout of
+`main`:
+
+```sh
+bun scripts/release/run-release-pin.ts noslop "$VERSION"
+```
+
+The build installs the lock with `bun install --frozen-lockfile --ignore-scripts`, so a release that
+adds a package with a lifecycle script, such as a native build, installs without it. The image check
+runs `noslop --version`, which loads the CLI and its dependencies on the default Bun.
 
 ## A new auto-mode release
 

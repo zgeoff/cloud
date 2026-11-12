@@ -50,7 +50,8 @@ RUN /tmp/install-ubuntu-packages "https://snapshot.ubuntu.com/ubuntu/$UBUNTU_SNA
 
 # Each download below is checked against a sha256 taken from its publisher's
 # signed or attested release. The comment above each pin says where the sum
-# comes from; a bump repeats that check.
+# comes from; a bump repeats that check. noslop's install instead checks each
+# npm package against the sha512 that its bun.lock records.
 
 # Every download retries. Plain --retry skips a dropped connection (curl exit 56)
 # and an HTTP/2 stream that did not close cleanly (exit 92), so it needs
@@ -278,6 +279,20 @@ RUN curl -fsSL ${CURL_RETRY} -o /tmp/auto-mode.tgz \
  && chmod 0755 /opt/auto-mode/dist/cli.js \
  && ln -s /opt/auto-mode/dist/cli.js /usr/local/bin/auto-mode \
  && rm /tmp/auto-mode.tgz
+
+# noslop, the pull request reviewer, from the npm package @noslop/cli. It needs
+# its npm dependencies, so noslop/ holds a package.json and the bun.lock that
+# pins every package with its sha512, and the build installs that lock with no
+# lifecycle scripts. noslop/bunfig.toml carries the repository's release-age
+# gate. NOSLOP_VERSION repeats the version noslop/package.json pins, so the
+# image check knows it, and the build fails when the two differ. The release
+# bump (scripts/release/) writes both and regenerates the lock:
+#   cd images/agent/noslop && bun install --lockfile-only --no-cache
+# bin/noslop runs the CLI on /opt/bun/default, whatever Bun a checkout pins.
+ARG NOSLOP_VERSION=0.4.29
+COPY noslop/package.json noslop/bun.lock noslop/bunfig.toml /opt/noslop/
+RUN jq -e --arg version "$NOSLOP_VERSION" '.dependencies["@noslop/cli"] == $version'       /opt/noslop/package.json > /dev/null  && cd /opt/noslop  && BUN_INSTALL_CACHE_DIR=/tmp/noslop-cache /opt/bun/default/bun install       --frozen-lockfile --production --ignore-scripts  && rm -rf /tmp/noslop-cache
+COPY bin/noslop /usr/local/bin/noslop
 
 # gitleaks, which the zgeoff repos' pre-commit hooks run on every commit. The sum
 # is the linux_x64 tarball's line in the release's gitleaks_<version>_checksums.txt:
