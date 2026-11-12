@@ -62,16 +62,19 @@ the items, with their copies, before the PR that adds the lines merges.
    { "<owner>/<repo>": { "url": "https://github.com/<owner>/<repo>", "ref": "<branch>" } }
    ```
 
+   For a private repo, add `"credentialRef": { "name": "ATC_GIT_CLONE_TOKEN" }` to its git source.
+   It names the atc daemon's environment variable that holds a read-only clone token, never the
+   token itself, and it needs a server that takes `credentialRef`.
+
    ```bash
    cd infra
    op run --env-file=../.env -- pulumi config set --stack prod --secret boxxySpawnRepos < <file of JSON>
    ```
 
    Check that the diff of `infra/Pulumi.prod.yaml` adds only a `secure:` value under
-   `geoff-cloud:boxxySpawnRepos`. Each imp is a fresh machine, so each repo is a git source that atc
-   clones in the imp over the imp's own network. The broker adds the GitHub credential from the
-   session's grants, so the URL carries none, and the server skips the trusted-folder check for a
-   git source.
+   `geoff-cloud:boxxySpawnRepos`. Each imp is a fresh machine, so each repo is a git source. The atc
+   daemon clones it, with the token that its `credentialRef` names for a private repo, so the URL
+   carries no credential, and the server skips the trusted-folder check for a git source.
 
    The image must hold a server that calls atc over MCP. Leave out the `BOXXY_RESTIC_*` and
    `BOXXY_R2_*` lines until both of their items exist: the backup takes all five variables or none,
