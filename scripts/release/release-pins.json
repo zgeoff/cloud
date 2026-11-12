@@ -56,5 +56,8 @@
   "auto-mode": {
     "version": "4.0.0",
     "sum": "b4f876ed5c586abd72ef3bf47b1a4ace3eefe81fb589397fd5be0c3307cfa58b"
+  },
+  "noslop": {
+    "version": "0.4.29"
   }
 }

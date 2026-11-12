@@ -1,0 +1,9 @@
+# The gate of the repository's bunfig.toml, which Bun reads from the install's own folder only, so
+# this folder repeats it: only install versions published 7 days ago or more.
+[install]
+exact = true
+minimumReleaseAge = 604800
+
+# noslop is first-party, and the release check pins each release on the day it publishes;
+# its own dependencies stay behind the gate
+minimumReleaseAgeExcludes = ["@noslop/cli"]

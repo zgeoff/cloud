@@ -19,7 +19,7 @@ async function setupTest() {
     [
       'nixos/hosts/geoffcloud',
       'nixos/packages',
-      'images/agent',
+      'images/agent/noslop',
       'images/atc-gateway',
       'infra',
       'deploy/nixie',
@@ -1070,6 +1070,65 @@ test('it refuses a lock that resolves the contract package at another version', 
   );
 
   expect(tree).toStrictEqual(Object.values(files));
+});
+
+test('it pins noslop in the image and its package, and locks the package in the folder of its lock', async () => {
+  const ctx = await setupTest();
+
+  const files = {
+    'images/agent/Dockerfile': 'ARG BUN_VERSION=1.4.4\nARG NOSLOP_VERSION=0.4.0\n',
+    'images/agent/noslop/package.json':
+      '{\n  "private": true,\n  "dependencies": {\n    "@noslop/cli": "0.4.0"\n  }\n}\n',
+    'images/agent/noslop/bun.lock':
+      '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@noslop/cli": ["@noslop/cli@0.4.0", "", {}, "sha512-old"],\n  },\n}\n',
+    'scripts/release/release-pins.json': '{}\n',
+  };
+
+  await Promise.all(
+    Object.entries(files).map((entry: readonly [string, string]) =>
+      writeFile(join(ctx.root, entry[0]), entry[1]),
+    ),
+  );
+
+  const lock =
+    '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@noslop/cli": ["@noslop/cli@0.5.0", "", {}, "sha512-new"],\n  },\n}\n';
+
+  const stub = buildStubRunner(buildStubBunInstall({ lock }));
+
+  const applied = await applyReleasePins({
+    record: getReleaseRecord('noslop'),
+    version: '0.5.0',
+    values: {},
+    root: ctx.root,
+    run: stub.run,
+    readText: ctx.readText,
+    env: {},
+    printOut: ctx.printOut,
+  });
+
+  const tree = await Promise.all(
+    [
+      'images/agent/Dockerfile',
+      'images/agent/noslop/package.json',
+      'images/agent/noslop/bun.lock',
+    ].map((path) => readFile(join(ctx.root, path), 'utf8')),
+  );
+
+  expect(applied).toBeUndefined();
+
+  expect(tree).toStrictEqual([
+    'ARG BUN_VERSION=1.4.4\nARG NOSLOP_VERSION=0.5.0\n',
+    '{\n  "private": true,\n  "dependencies": {\n    "@noslop/cli": "0.5.0"\n  }\n}\n',
+    lock,
+  ]);
+
+  expect(stub.calls).toStrictEqual([
+    {
+      argv: ['bun', 'install', '--lockfile-only'],
+      stdin: '',
+      options: { cwd: join(ctx.root, 'images/agent/noslop'), env: {} },
+    },
+  ]);
 });
 
 test('it refuses a checkout that lacks a pin file', async () => {

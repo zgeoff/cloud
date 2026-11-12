@@ -1,6 +1,7 @@
 import type { Runner } from '../run-process.ts';
 import type { ReleaseValues } from './plan-pin-edits.ts';
 import { readImageDigestValues } from './read-image-digest-values.ts';
+import { readNPMPackageValues } from './read-npm-package-values.ts';
 import { readNPMTarballValues } from './read-npm-tarball-values.ts';
 import { readReleaseNotesValues } from './read-release-notes-values.ts';
 import type { ReleaseRecord } from './release-registry.ts';
@@ -46,6 +47,7 @@ const sourceReaders: SourceReaders = {
   'image-digests': (read, source) => readImageDigestValues(read, source.images),
   'release-notes': (read) => readReleaseNotesValues(read),
   'npm-tarball': (read, source) => readNPMTarballValues(read, source.packageName),
+  'npm-package': (read, source) => readNPMPackageValues(read, source.packageName),
   'published-images': (read) =>
     Promise.resolve(
       new Error(

@@ -1,0 +1,5 @@
+#!/bin/sh
+# The agent image's noslop: run its CLI on the image's default Bun. The CLI's own shebang runs
+# `bun`, which the image's bun shim maps to the Bun that the nearest .bun-version pins, and a
+# review runs inside a checkout, whose pin can be older than the Bun noslop's release needs.
+exec /opt/bun/default/bun /opt/noslop/node_modules/@noslop/cli/cli.js "$@"

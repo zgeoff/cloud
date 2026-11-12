@@ -28,10 +28,12 @@ test('it writes each bump as the bumps output and lists them', async () => {
   const ctx = await setupTest();
 
   const checkout = await createCloudCheckout({
-    'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
     'nixos/packages/atc.nix': '  version = "4.2.0";\n',
     'images/atc-gateway/versions.env': 'ATC_RELEASE=@zgeoff/atc@4.3.0\n',
     'images/pepys/versions.env': 'PEPYS_RELEASE=v0.4.0\n',
+    'images/agent/noslop/package.json':
+      '{\n  "dependencies": {\n    "@noslop/cli": "0.4.0"\n  }\n}\n',
     'nixos/hosts/geoffcloud/configuration.nix': `    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:${'1'.repeat(64)}";\n`,
     'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
@@ -46,6 +48,7 @@ test('it writes each bump as the bumps output and lists them', async () => {
         'zgeoff/pepys': [{ tag: 'v0.4.0' }],
         'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
+        'zgeoff/noslop': [{ tag: '@noslop/cli@0.4.0' }],
       },
     }),
   );
@@ -83,10 +86,12 @@ test('it says every pin is current and writes no output', async () => {
   const ctx = await setupTest();
 
   const checkout = await createCloudCheckout({
-    'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
     'nixos/packages/atc.nix': '  version = "4.3.0";\n',
     'images/atc-gateway/versions.env': 'ATC_RELEASE=@zgeoff/atc@4.3.0\n',
     'images/pepys/versions.env': 'PEPYS_RELEASE=v0.4.0\n',
+    'images/agent/noslop/package.json':
+      '{\n  "dependencies": {\n    "@noslop/cli": "0.4.0"\n  }\n}\n',
     'nixos/hosts/geoffcloud/configuration.nix': `    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:${'1'.repeat(64)}";\n`,
     'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
@@ -101,6 +106,7 @@ test('it says every pin is current and writes no output', async () => {
         'zgeoff/pepys': [{ tag: 'v0.4.0' }],
         'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
+        'zgeoff/noslop': [{ tag: '@noslop/cli@0.4.0' }],
       },
     }),
   );
@@ -129,10 +135,12 @@ test('it fails with the search error and writes nothing', async () => {
   const ctx = await setupTest();
 
   const checkout = await createCloudCheckout({
-    'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
     'nixos/packages/atc.nix': '  version = "4.3.0";\n',
     'images/atc-gateway/versions.env': 'ATC_RELEASE=@zgeoff/atc@4.3.0\n',
     'images/pepys/versions.env': 'PEPYS_RELEASE=v0.4.0\n',
+    'images/agent/noslop/package.json':
+      '{\n  "dependencies": {\n    "@noslop/cli": "0.4.0"\n  }\n}\n',
     'nixos/hosts/geoffcloud/configuration.nix': `    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:${'1'.repeat(64)}";\n`,
     'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
     'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',

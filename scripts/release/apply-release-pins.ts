@@ -1,5 +1,5 @@
 import { chmod, rename, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { match } from 'ts-pattern';
 import { findJSONField } from '../find-json-field.ts';
 import type { Runner } from '../run-process.ts';
@@ -222,11 +222,12 @@ async function checkLockedCommit(options: Readonly<ApplyReleasePinsOptions>, loc
 
 type BunLock = Extract<PinLock, { readonly kind: 'bun-lock' }>;
 
-// the release-age gate in bunfig.toml excludes the package, so its release locks on the day it
-// publishes; the package's own dependencies stay behind the gate
+// the release-age gate in the lock folder's bunfig.toml excludes the package, so its release locks
+// on the day it publishes; the package's own dependencies stay behind the gate. Bun reads the
+// bunfig.toml of the folder it runs in only, so the lock runs there
 async function runBunLock(options: Readonly<ApplyReleasePinsOptions>, lock: BunLock) {
   const locked = await runChecked(options.run, ['bun', 'install', '--lockfile-only'], {
-    cwd: options.root,
+    cwd: join(options.root, dirname(lock.lockFile)),
     env: options.env,
   });
 
