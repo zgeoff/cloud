@@ -34,6 +34,9 @@ interface IngressInputs {
 
   // set only with the files service
   readonly filesRoute: TunnelRoute | undefined;
+
+  // set only with pepys, while a route of its deployment is public
+  readonly pepysRoute: TunnelRoute | undefined;
 }
 
 interface IngressOutputs {
@@ -42,6 +45,7 @@ interface IngressOutputs {
   readonly atcTunnelConfigVersion?: Output<number>;
   readonly atcURL?: Output<string>;
   readonly filesURL?: Output<string>;
+  readonly pepysWebhookURL?: Output<string>;
   readonly previewWebhookURL: Output<string>;
 }
 
@@ -68,6 +72,7 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
     tunnelID: tunnel.id,
     gateway: createGatewayIngress(inputs),
     files: inputs.filesRoute,
+    pepys: inputs.pepysRoute,
   });
 
   return {
@@ -78,6 +83,7 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
       : { atcTunnelConfigVersion: routes.atcConfigVersion }),
     ...(routes.atcURL === undefined ? {} : { atcURL: routes.atcURL }),
     ...(routes.filesURL === undefined ? {} : { filesURL: routes.filesURL }),
+    ...(routes.pepysURL === undefined ? {} : { pepysWebhookURL: routes.pepysURL }),
     previewWebhookURL: routes.previewWebhookURL,
   };
 }

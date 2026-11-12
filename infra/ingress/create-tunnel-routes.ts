@@ -13,6 +13,9 @@ interface TunnelRoutesInputs {
 
   // set only with the files service
   readonly files?: TunnelRoute | undefined;
+
+  // set only with pepys, while a route of its deployment is public
+  readonly pepys?: TunnelRoute | undefined;
 }
 
 interface TunnelRoutesOutputs {
@@ -20,13 +23,14 @@ interface TunnelRoutesOutputs {
   readonly atcConfigVersion?: Output<number>;
   readonly atcURL?: Output<string>;
   readonly filesURL?: Output<string>;
+  readonly pepysURL?: Output<string>;
 
   // the payload URL each opted-in repository's webhook posts to
   readonly previewWebhookURL: Output<string>;
 }
 
 export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutputs {
-  const specs = buildTunnelRouteSpecs(inputs.tunnelID, inputs.gateway, inputs.files);
+  const specs = buildTunnelRouteSpecs(inputs.tunnelID, inputs.gateway, inputs.files, inputs.pepys);
 
   const atc =
     specs.atc === undefined
@@ -59,12 +63,18 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
       ? undefined
       : createRecord('files', inputs.zoneID, specs.filesRecord);
 
+  const pepys =
+    specs.pepysRecord === undefined
+      ? undefined
+      : createRecord('pepys-webhook', inputs.zoneID, specs.pepysRecord);
+
   return {
     configVersion: config.version,
     ...(atc === undefined
       ? {}
       : { atcConfigVersion: atc.config.version, atcURL: toURL(atc.record) }),
     ...(files === undefined ? {} : { filesURL: toURL(files) }),
+    ...(pepys === undefined ? {} : { pepysURL: toURL(pepys) }),
     previewWebhookURL: toURL(previewWebhook).apply((url) => `${url}/webhook`),
   };
 }

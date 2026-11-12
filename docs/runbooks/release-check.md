@@ -1,7 +1,7 @@
 # Release check
 
-The `release check` workflow finds new atc, imp, nixie and auto-mode releases and opens one bump
-pull request per dependency, so the release repositories know nothing about cloud. It runs on a
+The `release check` workflow finds new atc, imp, nixie, pepys and auto-mode releases and opens one
+bump pull request per dependency, so the release repositories know nothing about cloud. It runs on a
 schedule and on dispatch. Its check job compares each dependency's newest release with the pins on
 `main`, and its bump job runs only when a pin is older. The `release bump merge` workflow then
 merges a bump that may merge on its own once its checks pass. A merged nixie bump changes the stack
@@ -21,6 +21,7 @@ daemon.
 | atc                | `release-check/atc`                | the agent image, the host's atc daemon, the atc-gateway images' release                |
 | imp                | `release-check/imp`                | imp's NixOS module and its lock with the imp-host image, the imp-base image            |
 | nixie              | `release-check/nixie`              | the nixie, nixie-web and nixie-backup images in the stack config, the contract package |
+| pepys              | `release-check/pepys`              | the host binary in the cloud-pepys image's context                                     |
 | auto-mode          | `release-check/auto-mode`          | the auto-mode tarball in the agent image                                               |
 | atc-gateway-images | `release-check/atc-gateway-images` | the atc-gateway and backup images in the stack config                                  |
 

@@ -3,6 +3,7 @@ import { Namespace } from '@pulumi/kubernetes/core/v1';
 import { buildNamespaceMetadata } from './build-namespace-metadata.ts';
 import type { PulumiNamespace } from './cluster-namespaces.ts';
 import { clusterNamespaces } from './cluster-namespaces.ts';
+import { createEgressDenyAll } from './create-egress-deny-all.ts';
 import { createEgressDeny } from './create-egress-deny.ts';
 
 export function createNamespace(name: PulumiNamespace, cluster: Provider): Namespace {
@@ -14,6 +15,10 @@ export function createNamespace(name: PulumiNamespace, cluster: Provider): Names
 
   if (clusterNamespaces[name].egress === 'deny') {
     createEgressDeny(name, namespace.metadata.name, cluster);
+  }
+
+  if (clusterNamespaces[name].egress === 'deny-all') {
+    createEgressDenyAll(name, namespace.metadata.name, cluster);
   }
 
   return namespace;

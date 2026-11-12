@@ -1,0 +1,24 @@
+{
+  "name": "@zgeoff/cloud-pepys-deployment",
+  "private": true,
+  "description": "The pepys deployment that the cloud-pepys image builds and runs, installed on its own, apart from the repo's workspaces",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@pepys/api": "0.1.1",
+    "@pepys/cli": "0.1.1",
+    "@pepys/ingest": "0.1.1",
+    "@pepys/kit": "0.1.1",
+    "@pepys/source-github": "0.1.1",
+    "@pepys/source-telemetry": "0.1.1"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "typescript": "7.0.2"
+  },
+  "trustedDependencies": [
+    "scriptc"
+  ]
+}

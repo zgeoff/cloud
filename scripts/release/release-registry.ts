@@ -324,6 +324,40 @@ export const releaseRegistry: readonly ReleaseRecord[] = [
       'The `Deploy prod` workflow applies the stack config once CI passes on main, unless its guard holds the plan (`docs/runbooks/prod-apply.md`). Check the deploy (`docs/runbooks/nixie.md`).',
   },
   {
+    name: 'pepys',
+    repo: 'zgeoff/pepys',
+    tagPrefix: 'v',
+    source: { kind: 'sha256sums' },
+    pins: [
+      {
+        id: 'pepys-host',
+        title: 'the pepys host binary in the cloud-pepys image (`images/pepys/versions.env`)',
+        lines: [
+          {
+            file: 'images/pepys/versions.env',
+            pattern: String.raw`^PEPYS_RELEASE=v(?<version>\d+\.\d+\.\d+)$`,
+            parts: { version },
+          },
+          {
+            file: 'images/pepys/versions.env',
+            pattern: String.raw`^PEPYS_HOST_ASSET_SHA256=(?<sum>[0-9a-f]{64})$`,
+            parts: {
+              sum: {
+                kind: 'sum',
+                asset: {
+                  file: 'images/pepys/versions.env',
+                  pattern: String.raw`^PEPYS_HOST_ASSET=(?<asset>.+)$`,
+                },
+              },
+            },
+          },
+        ],
+      },
+    ],
+    rollout:
+      'Build and publish the cloud-pepys image from the new release, then pin its digest in the stack config (`docs/architecture/workloads/pepys.md`).',
+  },
+  {
     name: 'auto-mode',
     repo: 'zgeoff/auto-mode',
     tagPrefix: 'auto-mode-v',

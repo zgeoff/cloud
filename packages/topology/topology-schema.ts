@@ -65,6 +65,9 @@ export const topologySchema = z.strictObject({
 
   // the Connect Service's pinned ClusterIP and port, which the host's relay dials
   onePasswordConnect: z.strictObject({ clusterIP: z.ipv4(), port: portSchema }),
+
+  // pepys ingest's pinned ClusterIP and port, which the host's telemetry relay dials
+  pepysIngest: z.strictObject({ clusterIP: z.ipv4(), port: portSchema }),
   nodeExporter: z.strictObject({ textfileDir: z.string().startsWith('/') }),
 });
 

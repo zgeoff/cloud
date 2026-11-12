@@ -1,6 +1,6 @@
 import type { Provider } from '@pulumi/kubernetes';
 import type { Output } from '@pulumi/pulumi';
-import type { ATCGatewayInputs, FilesInputs, NixieInputs } from '../inputs/index.ts';
+import type { ATCGatewayInputs, FilesInputs, NixieInputs, PepysInputs } from '../inputs/index.ts';
 import { createK3sNamespaceEgressDenies } from '../shared/create-k3s-namespace-egress-denies.ts';
 import { createK3sNamespacePatches } from '../shared/create-k3s-namespace-patches.ts';
 import { createATCGateway } from './atc-gateway.ts';
@@ -8,6 +8,8 @@ import type { ATCGatewayRoute } from './build-atc-gateway-route-outputs.ts';
 import { buildATCGatewayRouteOutputs } from './build-atc-gateway-route-outputs.ts';
 import type { FilesRoute } from './create-files.ts';
 import { createFiles } from './create-files.ts';
+import type { PepysRoute } from './create-pepys.ts';
+import { createPepys } from './create-pepys.ts';
 import { nixieReadinessURL } from './nixie-readiness-url.ts';
 import { createNixie } from './nixie.ts';
 import type { OnePasswordConnectInputs } from './onepassword-connect.ts';
@@ -28,6 +30,9 @@ interface ClusterInputs {
   // set only after the owner approves the deploy
   readonly files?: FilesInputs;
 
+  // set only after the owner approves the deploy
+  readonly pepys?: PepysInputs;
+
   // geoff.cloud's zone, for nixie's DNS record
   readonly zoneID: Output<string>;
 
@@ -44,6 +49,7 @@ interface ClusterOutputs {
   // the in-cluster URL of nixie's readiness report, for the probe of its advisory parts
   readonly nixieReadinessURL?: string;
   readonly filesRoute?: FilesRoute;
+  readonly pepysRoute?: PepysRoute;
 }
 
 export function createCluster(cluster: Provider, inputs: ClusterInputs): ClusterOutputs {
@@ -66,10 +72,12 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
         });
 
   const files = inputs.files === undefined ? undefined : createFiles(cluster, inputs.files);
+  const pepys = inputs.pepys === undefined ? undefined : createPepys(cluster, inputs.pepys);
 
   return {
     onePasswordConnectServiceURL: connect.serviceURL,
     ...(files === undefined ? {} : { filesRoute: files.route }),
+    ...(pepys?.route === undefined ? {} : { pepysRoute: pepys.route }),
     ...(nixie === undefined ? {} : { nixieURL: nixie.url, nixieReadinessURL }),
     ...(gateway === undefined ? {} : buildATCGatewayRouteOutputs(gateway)),
   };

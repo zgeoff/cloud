@@ -152,6 +152,14 @@
       "auth": "Reads are public by an unguessable 22-character ID. Each write needs a bearer token that the service checks against hashes of the agent and owner tokens. Access stays off, because camo cannot sign in."
     },
     {
+      "name": "pepys-webhook",
+      "kind": "tunnel-hostname",
+      "hostname": "pepys-webhook.geoff.cloud",
+      "scope": "public",
+      "reason": "GitHub's webhook deliveries to pepys ingest. The tunnel carries only the routes that deploy/pepys/ingest-routes.json marks public, by one anchored path pattern, and answers 404 on every other path",
+      "auth": "GitHub's webhook signature: ingest checks the HMAC-SHA256 of every delivery against the webhook secret and stores nothing from a delivery that fails"
+    },
+    {
       "name": "impd-mcp",
       "kind": "front-route",
       "hostname": "imp.geoff.cloud",

@@ -12,10 +12,18 @@ async function setupTest() {
   onTestFinished(() => rm(root, { recursive: true, force: true }));
 
   await Promise.all(
-    ['images/agent', 'nixos/packages', 'nixos/hosts/geoffcloud', 'images/atc-gateway', 'infra'].map(
-      (directory) => mkdir(join(root, directory), { recursive: true }),
-    ),
+    [
+      'images/agent',
+      'nixos/packages',
+      'nixos/hosts/geoffcloud',
+      'images/atc-gateway',
+      'images/pepys',
+      'infra',
+    ].map((directory) => mkdir(join(root, directory), { recursive: true })),
   );
+
+  // pepys at its newest release in every case, so each case reads the pins it names
+  await writeFile(join(root, 'images/pepys/versions.env'), 'PEPYS_RELEASE=v0.4.0\n');
 
   return { root };
 }
@@ -56,6 +64,7 @@ test('it finds nothing when every pin holds its newest release', async () => {
         'zgeoff/atc': [{ tag: '@zgeoff/atc@4.3.0' }],
         'zgeoff/impz': [{ tag: 'v1.0.1' }],
         'zgeoff/nixie': [{ tag: 'v0.7.0' }],
+        'zgeoff/pepys': [{ tag: 'v0.4.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
       },
     }),
@@ -69,6 +78,7 @@ test('it finds nothing when every pin holds its newest release', async () => {
     ['gh', 'release', 'list', '-R', 'zgeoff/atc'],
     ['gh', 'release', 'list', '-R', 'zgeoff/impz'],
     ['gh', 'release', 'list', '-R', 'zgeoff/nixie'],
+    ['gh', 'release', 'list', '-R', 'zgeoff/pepys'],
     ['gh', 'release', 'list', '-R', 'zgeoff/auto-mode'],
   ]);
 });
@@ -109,6 +119,7 @@ test('it finds the atc line with every pinned version when one pin is older', as
         'zgeoff/atc': [{ tag: '@zgeoff/atc@4.3.0' }],
         'zgeoff/impz': [{ tag: 'v1.0.1' }],
         'zgeoff/nixie': [{ tag: 'v0.7.0' }],
+        'zgeoff/pepys': [{ tag: 'v0.4.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
       },
     }),
@@ -155,6 +166,7 @@ test('it finds the imp and nixie lines when their pins are older', async () => {
         'zgeoff/atc': [{ tag: '@zgeoff/atc@4.3.0' }],
         'zgeoff/impz': [{ tag: 'v1.0.1' }],
         'zgeoff/nixie': [{ tag: 'v0.7.0' }],
+        'zgeoff/pepys': [{ tag: 'v0.4.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
       },
     }),
@@ -201,6 +213,7 @@ test('it finds the auto-mode line when the agent image pin is older', async () =
         'zgeoff/atc': [{ tag: '@zgeoff/atc@4.3.0' }],
         'zgeoff/impz': [{ tag: 'v1.0.1' }],
         'zgeoff/nixie': [{ tag: 'v0.7.0' }],
+        'zgeoff/pepys': [{ tag: 'v0.4.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
       },
     }),
@@ -252,6 +265,7 @@ test('it takes the highest version among the tags of the dependency own form', a
         ],
         'zgeoff/impz': [{ tag: 'v1.2.3-rc.1' }, { tag: 'v1.0.1' }],
         'zgeoff/nixie': [{ tag: 'v0.7.0' }],
+        'zgeoff/pepys': [{ tag: 'v0.4.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
       },
     }),
@@ -298,6 +312,7 @@ test('it finds nothing for a pin newer than the newest release', async () => {
         'zgeoff/atc': [{ tag: '@zgeoff/atc@4.3.0' }],
         'zgeoff/impz': [{ tag: 'v1.0.1' }],
         'zgeoff/nixie': [{ tag: 'v0.7.0' }],
+        'zgeoff/pepys': [{ tag: 'v0.4.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
       },
     }),

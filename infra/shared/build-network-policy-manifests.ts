@@ -1,11 +1,18 @@
 import type { input } from '@pulumi/kubernetes/types';
 import { buildEgressAllowNetworkPolicySpec } from './build-egress-allow-network-policy-spec.ts';
 import {
+  buildEgressDenyAllNetworkPolicySpec,
+  egressDenyAllPolicyName,
+} from './build-egress-deny-all-network-policy-spec.ts';
+import {
   buildEgressDenyNetworkPolicySpec,
   egressDenyPolicyName,
 } from './build-egress-deny-network-policy-spec.ts';
+import { buildPepysEgressPolicySpecs } from './build-pepys-egress-policy-specs.ts';
+import { clusterNamespaceNames, clusterNamespaces } from './cluster-namespaces.ts';
 import { collectEgressDenyNamespaces } from './collect-egress-deny-namespaces.ts';
 import { egressAllows } from './egress-allows.ts';
+import { pepysWorkloads } from './pepys-workloads.ts';
 
 interface NetworkPolicyManifest {
   readonly apiVersion: 'networking.k8s.io/v1';
@@ -24,7 +31,17 @@ export function buildNetworkPolicyManifests(): NetworkPolicyManifest[] {
     buildManifest(allow.name, allow.namespace, buildEgressAllowNetworkPolicySpec(allow)),
   );
 
-  return [...denies, ...allows];
+  const denyAlls = clusterNamespaceNames
+    .filter((namespace) => clusterNamespaces[namespace].egress === 'deny-all')
+    .map((namespace) =>
+      buildManifest(egressDenyAllPolicyName, namespace, buildEgressDenyAllNetworkPolicySpec()),
+    );
+
+  const pepys = Object.entries(buildPepysEgressPolicySpecs()).map(([name, spec]) =>
+    buildManifest(name, pepysWorkloads.namespace, spec),
+  );
+
+  return [...denies, ...allows, ...denyAlls, ...pepys];
 }
 
 function buildManifest(

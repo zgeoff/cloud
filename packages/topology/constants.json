@@ -52,6 +52,10 @@
     "clusterIP": "10.43.82.198",
     "port": 8000
   },
+  "pepysIngest": {
+    "clusterIP": "10.43.82.200",
+    "port": 8080
+  },
   "nodeExporter": {
     "textfileDir": "/var/lib/node-exporter/textfile"
   }

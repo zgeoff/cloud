@@ -5,9 +5,11 @@
 # geoffcloud's grants: the atc daemon, the preview links and the preview webhook on the host's
 # tailnet address, local delivery as on the host; home-pc's daemon and impd on tailnet peers in a
 # network namespace behind tailscale0; and impd's plain API on Podman's subnet in another, both
-# forwarded as on the host. The VM leaves out inet cloud_host, so kube-router alone refuses a
-# path. Each test pod runs the same image and differs only by its labels. It needs KVM: run
-# `bun run test:nixos network-policy`.
+# forwarded as on the host. A public address on a dummy link stands in for the internet, which of
+# pepys's pods only ingest and the backup reach, on 443 only; a private and a link-local address on
+# the same link show that the 443 rule excludes them. The VM leaves out inet cloud_host, so
+# kube-router alone refuses a path. Each test pod runs the same image and differs only by its
+# labels, and pepys's Garage pod by its port. It needs KVM: run `bun run test:nixos network-policy`.
 { nixpkgs, geoffcloud }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -42,6 +44,12 @@ let
       "/www"
     ];
   };
+
+  # a documentation address, so no real host answers it
+  internetAddress = "203.0.113.10";
+  # a private address and a link-local one, which pepys's 443 rule excludes
+  privateAddress = "172.16.0.10";
+  linkLocalAddress = "169.254.169.254";
 
   # each stand-in answers its own name, so a reply shows which listener the pod reached
   standIns = [
@@ -80,6 +88,30 @@ let
       netns = "podman";
       address = "10.88.0.2";
       port = topology.imp.apiPort;
+    }
+    {
+      name = "internet-https";
+      netns = null;
+      address = internetAddress;
+      port = 443;
+    }
+    {
+      name = "internet-http";
+      netns = null;
+      address = internetAddress;
+      port = 80;
+    }
+    {
+      name = "private-https";
+      netns = null;
+      address = privateAddress;
+      port = 443;
+    }
+    {
+      name = "link-local-https";
+      netns = null;
+      address = linkLocalAddress;
+      port = 443;
     }
   ];
 
@@ -161,6 +193,38 @@ let
       name = "traefik";
       labels."app.kubernetes.io/name" = "traefik";
     }
+    # pepys's pods, each on the port of its Service
+    {
+      namespace = "pepys";
+      name = "garage";
+      labels.app = "pepys-garage";
+      port = 3900;
+    }
+    {
+      namespace = "pepys";
+      name = "s2";
+      labels.app = "pepys-s2";
+    }
+    {
+      namespace = "pepys";
+      name = "ingest";
+      labels.app = "pepys-ingest";
+    }
+    {
+      namespace = "pepys";
+      name = "host";
+      labels.app = "pepys-host";
+    }
+    {
+      namespace = "pepys";
+      name = "backup";
+      labels.app = "pepys-backup";
+    }
+    {
+      namespace = "pepys";
+      name = "stranger";
+      labels = { };
+    }
   ];
 
   createdNamespaces = [
@@ -171,6 +235,18 @@ let
     "nixie-ingress"
     "observability"
     "onepassword"
+    "pepys"
+  ];
+
+  pepysServices = [
+    {
+      name = "pepys-garage";
+      port = 3900;
+    }
+    {
+      name = "pepys-s2";
+      port = 8080;
+    }
   ];
 
   toList = items: {
@@ -192,11 +268,22 @@ let
           kind = "Pod";
           metadata = { inherit (pod) name namespace labels; };
           spec.containers = [
-            {
-              name = "test";
-              image = "test.local/network-policy:local";
-              imagePullPolicy = "Never";
-            }
+            (
+              {
+                name = "test";
+                image = "test.local/network-policy:local";
+                imagePullPolicy = "Never";
+              }
+              // lib.optionalAttrs (pod ? port) {
+                args = [
+                  "-f"
+                  "-p"
+                  (toString pod.port)
+                  "-h"
+                  "/www"
+                ];
+              }
+            )
           ];
         }) pods
         ++ [
@@ -213,6 +300,18 @@ let
             };
           }
         ]
+        ++ map (service: {
+          apiVersion = "v1";
+          kind = "Service";
+          metadata = {
+            inherit (service) name;
+            namespace = "pepys";
+          };
+          spec = {
+            selector.app = service.name;
+            ports = [ { inherit (service) port; } ];
+          };
+        }) pepysServices
       )
     )
   );
@@ -288,6 +387,12 @@ pkgs.testers.runNixOSTest {
             ip -n tailnet route add ${nodes.geoffcloud.address}/32 dev eth0
             ip -n tailnet route add default via ${nodes.geoffcloud.address} dev eth0 onlink
 
+            ip link add internet0 type dummy
+            ip addr add ${internetAddress}/32 dev internet0
+            ip addr add ${privateAddress}/32 dev internet0
+            ip addr add ${linkLocalAddress}/32 dev internet0
+            ip link set internet0 up
+
             ip netns add podman
             ip link add ${topology.podman.bridge} type veth peer name eth0 netns podman
             ip addr add ${topology.podman.bridgeAddress}/16 dev ${topology.podman.bridge}
@@ -327,7 +432,8 @@ pkgs.testers.runNixOSTest {
     pods = ["atc/gateway", "atc/stranger", "observability/daemon-probe", "observability/imp-probe",
             "observability/stranger", "ingress/cloudflared", "ingress/stranger", "kube-system/stranger",
             "default/stranger", "nixie/nixie", "nixie/web", "nixie/sandbox-images", "nixie/stranger",
-            "nixie-ingress/traefik"]
+            "nixie-ingress/traefik", "pepys/garage", "pepys/s2", "pepys/ingest", "pepys/host",
+            "pepys/backup", "pepys/stranger"]
 
 
     def dial(pod, url):
@@ -381,11 +487,17 @@ pkgs.testers.runNixOSTest {
 
     with subtest("it lets each allowed pod reach only its own addresses and ports, and refuses every other pod in a namespace with the deny"):
         machine.succeed("kubectl apply -f ${policyList}")
+        # the deny leaves the internet open; pepys's deny of all egress leaves its pods only 443
+        outside_pepys = {pod for pod in pods if not pod.startswith("pepys/")}
         expected = expect_reach({
             "host-daemon": {"atc/gateway", "observability/daemon-probe"},
             "home-pc-daemon": {"atc/gateway", "observability/daemon-probe"},
             "impd": {"observability/imp-probe", "nixie/nixie", "nixie/sandbox-images"},
             "preview-webhook": {"ingress/cloudflared"},
+            "internet-https": outside_pepys | {"pepys/ingest", "pepys/backup"},
+            "internet-http": outside_pepys,
+            "private-https": outside_pepys,
+            "link-local-https": outside_pepys,
         })
         observed = {}
 
@@ -414,5 +526,41 @@ pkgs.testers.runNixOSTest {
         assert by_name == (0, "pod"), by_name
         assert api_status == 0, api_body
         assert json.loads(api_body)["gitVersion"] == "v${hostK3s.package.version}", api_body
+
+
+    with subtest("it lets each pepys pod reach DNS and only the pepys peers it calls"):
+        garage = "http://pepys-garage.pepys.svc.cluster.local:3900/"
+        s2 = "http://pepys-s2.pepys.svc.cluster.local:8080/"
+        s2_ip = machine.succeed("kubectl get pod -n pepys s2 -o jsonpath='{.status.podIP}'").strip()
+        reached = {
+            "s2 -> garage": dial("pepys/s2", garage),
+            "backup -> garage": dial("pepys/backup", garage),
+            "ingest -> s2": dial("pepys/ingest", s2),
+            "host -> s2": dial("pepys/host", s2),
+            "ingest -> garage": dial("pepys/ingest", garage)[0] == 0,
+            "host -> garage": dial("pepys/host", garage)[0] == 0,
+            "garage -> s2": dial("pepys/garage", f"http://{s2_ip}:8080/")[0] == 0,
+            "stranger -> s2": dial("pepys/stranger", f"http://{s2_ip}:8080/")[0] == 0,
+            "stranger -> nixie web": dial("pepys/stranger", "http://web.nixie.svc.cluster.local:8080/")[0] == 0,
+            "ingest -> nixie web": dial("pepys/ingest", "http://web.nixie.svc.cluster.local:8080/")[0] == 0,
+        }
+        api_status, _ = machine.execute(
+            "kubectl exec -n pepys stranger -- curl -sk --max-time 5 https://kubernetes.default.svc/version"
+        )
+        reached["stranger -> kubernetes api"] = api_status == 0
+
+        assert reached == {
+            "s2 -> garage": (0, "pod"),
+            "backup -> garage": (0, "pod"),
+            "ingest -> s2": (0, "pod"),
+            "host -> s2": (0, "pod"),
+            "ingest -> garage": False,
+            "host -> garage": False,
+            "garage -> s2": False,
+            "stranger -> s2": False,
+            "stranger -> nixie web": False,
+            "ingest -> nixie web": False,
+            "stranger -> kubernetes api": False,
+        }, json.dumps(reached, indent=2)
   '';
 }

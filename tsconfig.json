@@ -11,5 +11,7 @@
     "scripts/**/*.ts",
     "e2e/**/*.ts",
     "rig.config.ts"
-  ]
+  ],
+  // the pepys deployment installs and type-checks on its own (deploy/pepys/package.json)
+  "exclude": ["node_modules", "bower_components", "jspm_packages", "deploy/pepys/**"]
 }

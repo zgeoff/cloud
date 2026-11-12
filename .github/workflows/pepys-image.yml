@@ -1,0 +1,115 @@
+name: pepys image
+
+# Type-checks the pepys deployment and runs the pepys image test on every push to main that changes
+# the image or what it builds from, then builds the image from the release that
+# images/pepys/versions.env pins and publishes it as
+# ghcr.io/zgeoff/cloud-pepys:<release>-<commit>. A newer push cancels an older run's check, and that
+# run publishes nothing, since the newer commit's image holds its changes. CI's bun job runs the
+# same check on a pull request, which never publishes. Pin a published digest in the stack config's
+# pepys.image to deploy it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - deploy/pepys/*.ts
+      - deploy/pepys/package.json
+      - deploy/pepys/bunfig.toml
+      - deploy/pepys/bun.lock
+      - deploy/pepys/tsconfig.json
+      - deploy/pepys/ingest-routes.json
+      - images/pepys/**
+      - images/atc-gateway/versions.env
+      - scripts/write-pepys-image-context.sh
+      - scripts/fetch-pepys-release.sh
+      - scripts/publish-pepys-image.sh
+      - scripts/check-pepys-routes.ts
+      - scripts/build-pepys-route-table.ts
+      - scripts/run-shell-suites.sh
+      - test-support/shell/**
+      - .bun-version
+      - .github/workflows/pepys-image.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: pepys-image-check-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck the deployment
+        run: bun run check:pepys-deployment
+
+      - name: Image test
+        run: bun run test:pepys-image
+
+  publish:
+    name: Release the image
+    needs: [check]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # one publish at a time; each commit's tag is its own, so a later push never replaces an earlier
+    concurrency:
+      group: pepys-image-publish
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install the deployment
+        working-directory: deploy/pepys
+        run: bun install --frozen-lockfile
+
+      # `pepys build` compiles each consumer with scriptc, which needs these two at the versions
+      # pepys's own CI pins
+      - name: Install zig
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - name: Install wasm-tools
+        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+        with:
+          tool: wasm-tools@1.262.0
+
+      - name: Export the zig and wasm-tools paths
+        run: |
+          echo "PEPYS_ZIG_BIN=$(command -v zig)" >> "$GITHUB_ENV"
+          echo "PEPYS_WASM_TOOLS_BIN=$(command -v wasm-tools)" >> "$GITHUB_ENV"
+
+      # gh downloads the host binary of the pinned release
+      - name: Write the build context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun run ci:write-pepys-image-context context-pepys
+
+      - name: Build and push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun run ci:publish-pepys-image context-pepys

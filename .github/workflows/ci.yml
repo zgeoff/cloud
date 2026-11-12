@@ -46,6 +46,7 @@ jobs:
       agent-image: ${{ steps.decide.outputs.agent-image }}
       atc-gateway: ${{ steps.decide.outputs.atc-gateway }}
       files-image: ${{ steps.decide.outputs.files-image }}
+      pepys-image: ${{ steps.decide.outputs.pepys-image }}
       files-backup: ${{ steps.decide.outputs.files-backup }}
       nixie-backup: ${{ steps.decide.outputs.nixie-backup }}
       nixie-config: ${{ steps.decide.outputs.nixie-config }}
@@ -75,7 +76,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >-
           bun run --silent ci:decide-ci-gates provider onidel-vendor full agent-image atc-gateway
-          files-image files-backup nixie-backup nixie-config alert-rules
+          files-image pepys-image files-backup nixie-backup nixie-config alert-rules
 
   # the Bun checks and tests, the shell suites and the secret scan
   bun:
@@ -206,6 +207,17 @@ jobs:
           needs.decide.outputs.reused != 'true' && (github.event_name == 'pull_request' &&
           needs.decide.outputs.files-image != 'false')
         run: bun run test:files-image
+
+      # the pepys deployment installs on its own, so the root type check leaves it out
+      - name: Typecheck pepys Deployment
+        if: needs.decide.outputs.reused != 'true' && needs.decide.outputs.pepys-image != 'false'
+        run: bun run check:pepys-deployment
+
+      - name: Test pepys Image
+        if:
+          needs.decide.outputs.reused != 'true' && (github.event_name == 'pull_request' &&
+          needs.decide.outputs.pepys-image != 'false')
+        run: bun run test:pepys-image
 
       - name: Dead Code
         if: needs.decide.outputs.reused != 'true'
@@ -533,7 +545,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >-
           bun run --silent ci:decide-ci-gates provider onidel-vendor full agent-image atc-gateway
-          files-image files-backup nixie-backup nixie-config alert-rules
+          files-image pepys-image files-backup nixie-backup nixie-config alert-rules
 
       - name: Install
         if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
@@ -621,6 +633,18 @@ jobs:
           ${{ github.event.repository.private && github.event_name == 'pull_request' &&
           steps.decide.outputs.files-image != 'false' }}
         run: bun run test:files-image
+
+      - name: Typecheck pepys Deployment
+        if: >-
+          ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' &&
+          steps.decide.outputs.pepys-image != 'false' }}
+        run: bun run check:pepys-deployment
+
+      - name: Test pepys Image
+        if: >-
+          ${{ github.event.repository.private && github.event_name == 'pull_request' &&
+          steps.decide.outputs.pepys-image != 'false' }}
+        run: bun run test:pepys-image
 
       - name: Dead Code
         if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
