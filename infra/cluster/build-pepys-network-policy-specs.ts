@@ -1,8 +1,17 @@
 import type { input } from '@pulumi/kubernetes/types';
 import { pepysWorkloads } from '../shared/pepys-workloads.ts';
 import { podLabels } from '../shared/pod-labels.ts';
+import { boxxyLabels } from './build-boxxy-spec.ts';
 
 type NetworkPolicySpec = input.networking.v1.NetworkPolicySpec;
+
+type NetworkPolicyPeer = input.networking.v1.NetworkPolicyPeer;
+
+// one peer with both selectors: as two peers, they would admit every pod of the namespace
+const boxxyServerPeer: NetworkPolicyPeer = {
+  namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'boxxy' } },
+  podSelector: { matchLabels: boxxyLabels },
+};
 
 // Each pepys pod admits only its callers. kube-router admits the node's own addresses before any
 // policy, so a relay on the host still reaches a Service.
@@ -18,7 +27,8 @@ export function buildPepysNetworkPolicySpecs(): Readonly<Record<string, NetworkP
       { port: workloads.s2.port, from: [toPeer(workloads.ingest), toPeer(workloads.host)] },
     ]),
 
-    // the shared tunnel's cloudflared carries the public routes
+    // the shared tunnel's cloudflared carries the public routes, and the boxxy server sends its
+    // facts to a private one
     [workloads.ingest.name]: buildIngressPolicy(workloads.ingest.labels, [
       {
         port: workloads.ingest.port,
@@ -27,17 +37,20 @@ export function buildPepysNetworkPolicySpecs(): Readonly<Record<string, NetworkP
             namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'ingress' } },
             podSelector: { matchLabels: podLabels.cloudflared },
           },
+          boxxyServerPeer,
         ],
       },
     ]),
 
-    // no pod calls the API or the backup
-    [workloads.host.name]: buildIngressPolicy(workloads.host.labels, []),
+    // the boxxy server queries the API, which checks no caller
+    [workloads.host.name]: buildIngressPolicy(workloads.host.labels, [
+      { port: workloads.host.apiPort, from: [boxxyServerPeer] },
+    ]),
+
+    // no pod calls the backup
     [workloads.backup.name]: buildIngressPolicy(workloads.backup.labels, []),
   };
 }
-
-type NetworkPolicyPeer = input.networking.v1.NetworkPolicyPeer;
 
 interface Admission {
   readonly port: number;

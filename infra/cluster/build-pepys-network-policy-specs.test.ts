@@ -29,7 +29,7 @@ test('it admits s2-lite only from ingest and the host', () => {
   ]);
 });
 
-test("it admits ingest only from the shared tunnel's cloudflared", () => {
+test("it admits ingest only from the shared tunnel's cloudflared and the boxxy server, on the ingest port", () => {
   expect(buildPepysNetworkPolicySpecs()['pepys-ingest']?.ingress).toStrictEqual([
     {
       from: [
@@ -37,12 +37,30 @@ test("it admits ingest only from the shared tunnel's cloudflared", () => {
           namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'ingress' } },
           podSelector: { matchLabels: { app: 'cloudflared' } },
         },
+        {
+          namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'boxxy' } },
+          podSelector: { matchLabels: { app: 'boxxy-server' } },
+        },
       ],
       ports: [{ protocol: 'TCP', port: 8080 }],
     },
   ]);
 });
 
-test.each(['pepys-host', 'pepys-backup'])('it admits no pod to %s', (name) => {
-  expect(buildPepysNetworkPolicySpecs()[name]?.ingress).toStrictEqual([]);
+test('it admits the host only from the boxxy server, on the API port', () => {
+  expect(buildPepysNetworkPolicySpecs()['pepys-host']?.ingress).toStrictEqual([
+    {
+      from: [
+        {
+          namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'boxxy' } },
+          podSelector: { matchLabels: { app: 'boxxy-server' } },
+        },
+      ],
+      ports: [{ protocol: 'TCP', port: 8081 }],
+    },
+  ]);
+});
+
+test('it admits no pod to the backup', () => {
+  expect(buildPepysNetworkPolicySpecs()['pepys-backup']?.ingress).toStrictEqual([]);
 });
