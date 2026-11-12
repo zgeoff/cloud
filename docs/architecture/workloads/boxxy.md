@@ -47,13 +47,22 @@ target's repos, each a folder or a git source, come from the secret stack config
 because a repo's name can be private and this repo is public. Pulumi then marks the whole file a
 secret, so a preview shows no line of it, and an error about the repos names none of them. The file
 holds no token. The namespace's egress deny refuses only the tailnet and Podman's subnet, so the
-call to the gateway's Service needs no egress allow.
+calls to the gateway's Service, to pepys's Services and to GitHub on 443 need no egress allow. The
+NixOS check `network-policy` shows the server's pod reach pepys ingest and the pepys API.
+
+Two sections of stack config `boxxy` are optional. With `pepys: { environment }`, the file gets a
+`pepys` section: the boxxy route of pepys ingest and the oRPC route of the pepys API, at their
+Services, which needs stack config `pepys`. The server then sends its facts there and reads its two
+reports there. pepys ingest and the pepys API must admit the server's pod, which their own policies
+decide. With `github: { baseUrl }`, the server links and watches the pull requests of its repos. It
+only reads them, and it never merges one. The pod has no broker to add a GitHub credential, so the
+token comes from `.env`.
 
 A server before the release that moves its atc calls to MCP calls `/rpc` and sends no `Host`
 override, and the gateway refuses both. Run an image built from that release or a later one.
 
 Two tokens reach the pod as variables from a Secret with no fixed name, so a new token rolls the
-pod:
+pod, and two more come from the same Secret when their section is set:
 
 - `BOXXY_WORKER_TOKEN`: the bearer token the broker adds to every worker call. The broker holds the
   second copy.
@@ -61,6 +70,10 @@ pod:
   (`atcs_` and 32 or more characters). The gateway reads it from a file that Pulumi builds from the
   same variable ([service tokens](./atc-gateway.md#service-tokens)), and the server is the principal
   `service:boxxy` at the atc daemon.
+- `BOXXY_PEPYS_SIGNING_SECRET`, with `pepys`: the key that signs each batch of facts. pepys ingest
+  reads the same item.
+- `BOXXY_GITHUB_TOKEN`, with `github`: the server's fine-grained token, with `Pull requests: read`
+  on the owner's repos, which must cover every repo in `boxxySpawnRepos`.
 
 ## The rules
 

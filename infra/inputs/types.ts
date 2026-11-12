@@ -156,6 +156,13 @@ export interface BoxxyConfig {
     readonly noticeSession?: string;
   };
   readonly spawn: { readonly target: string };
+
+  // with it, the server sends its facts to pepys and reads its two reports there; the cluster sets
+  // the addresses
+  readonly pepys?: { readonly environment: string };
+
+  // with it, the server links and watches pull requests
+  readonly github?: { readonly baseUrl: string };
 }
 
 // by repo: its folder on the target, or the git source that atc clones there
@@ -188,6 +195,12 @@ export interface BoxxyInputs {
 
     // the bearer token the server sends to the atc daemon
     readonly atcToken: Output<string>;
+
+    // with config pepys: the key the server signs its fact batches with
+    readonly pepysSigningSecret?: Output<string>;
+
+    // with config github: the token of its pull request reads
+    readonly githubToken?: Output<string>;
   };
 
   // without it there is no backup CronJob

@@ -95,13 +95,13 @@ The shared tunnel carries the `public` routes to ingest at `pepys-webhook.geoff.
 pattern anchored at both ends. It answers 404 on every other path of that host. Ingest checks the
 signature of every GitHub delivery.
 
-The telemetry routes are `private`, and no route reaches them yet. Ingest refuses a telemetry export
-without a proven sender. The trust documents of the sender proof are the JSON files in
-`deploy/pepys/imp-issuers/`, which a ConfigMap mounts at `PEPYS_IMP_IDENTITY_ISSUERS`, and the
-audience is the stack config's `pepys.impIdentityAudience`, `pepys.imp.internal`. The folder holds
-`geoffcloud.json`, the public key of the issuer `geoffcloud`, so ingest accepts an export whose
-identity token that issuer signed for that audience, and refuses every other export. An invalid
-document stops ingest at start.
+The telemetry routes are `private`, so the tunnel never forwards them. The telemetry relay on the
+node and the boxxy server's pod reach them. Ingest refuses a telemetry export without a proven
+sender. The trust documents of the sender proof are the JSON files in `deploy/pepys/imp-issuers/`,
+which a ConfigMap mounts at `PEPYS_IMP_IDENTITY_ISSUERS`, and the audience is the stack config's
+`pepys.impIdentityAudience`, `pepys.imp.internal`. The folder holds `geoffcloud.json`, the public
+key of the issuer `geoffcloud`, so ingest accepts an export whose identity token that issuer signed
+for that audience, and refuses every other export. An invalid document stops ingest at start.
 
 The boxxy route, `/boxxy/facts`, is `private`. It takes a batch of facts whose body the sender
 signed with `PEPYS_BOXXY_SIGNING_SECRET`, and ingest answers 401 to a batch with no signature or a
@@ -120,10 +120,10 @@ profile sets the session's OpenTelemetry endpoint to `https://pepys.imp.internal
 that exists only inside imp's broker. The broker adds the bearer token and the imp identity token to
 each request, so the session holds neither, and sends the request to the pepys relay on the host's
 address on Podman's bridge. The relay dials the ingest Service at its pinned ClusterIP. Ingest's
-policy admits only the shared tunnel's cloudflared, and the relay still passes: kube-router accepts
-a packet whose source is one of the node's own addresses before it applies any policy, so the policy
-needs no `ipBlock`. Ingest then checks the bearer token and the identity token as above. The
-secret's setup is in [the pepys runbook](../../runbooks/pepys.md#let-sessions-send-telemetry).
+policy has no rule for the relay, and the relay still passes: kube-router accepts a packet whose
+source is one of the node's own addresses before it applies any policy, so the policy needs no
+`ipBlock`. Ingest then checks the bearer token and the identity token as above. The secret's setup
+is in [the pepys runbook](../../runbooks/pepys.md#let-sessions-send-telemetry).
 
 ## Network policies
 
@@ -131,13 +131,19 @@ Each pod admits only its callers:
 
 - Garage admits s2-lite and the backup on 3900.
 - s2-lite admits ingest and the host.
-- ingest admits only the shared tunnel's cloudflared, which forwards only the `public` routes. The
-  policy matches a pod and a port, never a path, so an admitted pod reaches every route. The tunnel
-  never forwards a `private` route, so no pod reaches `/boxxy/facts` or a telemetry route: a pod
-  that sends boxxy facts needs a rule of its own in ingest's policy. A process on the node needs no
-  rule, because kube-router admits the node's own addresses before any policy.
-- The host and the backup admit no pod, so no route reaches the API yet. Until the tailnet route in
-  [Later work](#later-work) exists, reach the API with `kubectl port-forward`.
+- ingest admits two pods on 8080: the shared tunnel's cloudflared, and
+  [the boxxy server](./boxxy.md), which decides the next task of the fleet of coding agents. The
+  boxxy server is the pod with the label `app: boxxy-server` in the namespace `boxxy`, and it sends
+  its facts to `/boxxy/facts`. The policy matches a pod and a port, never a path, so an admitted pod
+  reaches every ingest route. The tunnel forwards only the `public` routes. The boxxy server reaches
+  the `public` routes and the telemetry routes too, and each route's own check still applies. A
+  process on the node needs no rule, because kube-router admits the node's own addresses before any
+  policy.
+- The host's pod admits only the boxxy server, on 8081, the API's port. The API checks no caller, so
+  the boxxy server reads every query under `/rpc` and at `/mcp`. The policy never admits another pod
+  to the API, and never admits a pod to another port of the host's pod. A person reaches the API
+  with `kubectl port-forward`.
+- The backup admits no pod.
 
 Unlike every other namespace, pepys denies all egress, because ingest takes traffic from the
 internet. Its namespace sets `egress: 'deny-all'` in

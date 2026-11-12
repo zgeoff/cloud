@@ -14,6 +14,8 @@ listeners, the configuration and the caller proof.
 | `boxxy-atc-token`         | the bearer token the server sends to the atc gateway     | Pulumi                |
 | `boxxy-restic`            | the restic repository's password                         | Pulumi, the backup    |
 | `r2-boxxy-backup`         | the R2 key, endpoint and bucket of the restic repository | Pulumi, the backup    |
+| `boxxy-pepys-signing`     | the key the server signs its facts with                  | Pulumi, pepys ingest  |
+| `boxxy-github-token`      | the token of the server's pull request reads             | Pulumi                |
 
 The prod apply job reads the same items from the `cloud-deploy` vault, so each item has a copy there
 under the same name. A `.env` line whose item is missing fails every preview and apply, so create
@@ -181,6 +183,45 @@ passes the flag. The server calls atc as the principal `service:boxxy`, which th
 2. Merge it in a PR. The preview shows the new `boxxy-issuers` ConfigMap, a new `boxxy-config`
    ConfigMap that gains the `trustedIssuers` section, and an update of the StatefulSet. The pod
    rolls, and session and hook calls from that impd's imps pass the caller proof.
+
+## Send facts to pepys and read pull requests
+
+The server sends its facts to pepys and reads its two reports there once stack config `boxxy` has a
+`pepys` section, and it links and watches pull requests once it has a `github` section. Each section
+needs its token in `.env`, and the program stops with the name of the variable when it is unset.
+
+1. For pepys, check that stack config `pepys` is set and that pepys ingest and the pepys API admit
+   the boxxy server's pod, as [the pepys workload doc](../architecture/workloads/pepys.md) says. Add
+   the line that reads the item pepys ingest reads too:
+
+   ```bash
+   BOXXY_PEPYS_SIGNING_SECRET=op://cloud/boxxy-pepys-signing/credential
+   ```
+
+2. For GitHub, create a fine-grained token on the owner's repos, with the permission
+   `Pull requests: read` and nothing else, and store it as `boxxy-github-token` in `cloud` and
+   `cloud-deploy`. Its repository access must cover every repo in `boxxySpawnRepos`. The server only
+   reads pull requests; it never merges one. Add the line:
+
+   ```bash
+   BOXXY_GITHUB_TOKEN=op://cloud/boxxy-github-token/credential
+   ```
+
+3. Add the sections to the `boxxy` object in `infra/Pulumi.prod.yaml`:
+
+   ```yaml
+   pepys:
+     environment: production
+   github:
+     baseUrl: https://api.github.com
+   ```
+
+   `environment` names the deploy environment whose deploys the stage times count. The cluster sets
+   the pepys addresses itself, from pepys's Services and the boxxy route in
+   `deploy/pepys/ingest-routes.json`.
+
+4. Run `bun run preview` and check that it replaces the Secret `boxxy-tokens` and the ConfigMap
+   `boxxy-config`, updates the StatefulSet, and changes nothing else.
 
 ## Upgrade the server
 

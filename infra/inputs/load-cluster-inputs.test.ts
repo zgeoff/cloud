@@ -234,6 +234,9 @@ test("it runs the boxxy server's backup in the gateway's backup image", () => {
       GHCR_PULL_USERNAME: 'octo-puller',
       GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
       BOXXY_WORKER_TOKEN: 'worker-token-for-tests',
+
+      // the shape atc takes: the mock gateway image's tag is random, and from 7.14.0 the loader
+      // checks the token's shape
       BOXXY_ATC_TOKEN: `atcs_${'t'.repeat(32)}`,
       BOXXY_RESTIC_PASSWORD: 'p'.repeat(32),
       BOXXY_R2_ACCESS_KEY_ID: 'a'.repeat(32),
