@@ -32,9 +32,14 @@ otherwise, and no Service reaches a loopback listener.
 
 ## The image
 
-`cloud-pepys` holds three binaries and the consumer modules.
-[`write-pepys-image-context.sh`](../../../scripts/write-pepys-image-context.sh) writes its build
-context:
+`cloud-pepys` holds three binaries and the consumer modules. The deployment that it builds lives in
+`deploy/pepys`: `deployment.ts`, the entry files `ingest.ts` and `api.ts`, and a `package.json` with
+the `@pepys/*` packages. That folder installs on its own, apart from the repo's workspaces, with its
+own `bunfig.toml` and lock, so the root type check and lint leave its TypeScript out, and
+`bun run check:pepys-deployment` installs and type-checks it.
+
+[`write-pepys-image-context.sh`](../../../scripts/write-pepys-image-context.sh) writes the build
+context, after `bun install --frozen-lockfile` in `deploy/pepys`:
 
 1. It checks `ingest-routes.json` against the deployment, as [Routes](#routes) says, and stops on a
    difference before it downloads or builds anything.
@@ -42,14 +47,25 @@ context:
    [`images/pepys/versions.env`](../../../images/pepys/versions.env) pins, and checks the binary
    against the release's `SHA256SUMS` and against the pin.
 3. It runs `pepys build` on the deployment file for the modules.
-4. It compiles the ingest and API entry files with `bun build --compile`.
+4. It compiles the two entry files with
+   [`compile-entries.ts`](../../../deploy/pepys/compile-entries.ts).
 
 The `@pepys/*` packages must carry the version that `PEPYS_RELEASE` names, so that the binaries and
-the modules come from one release. The deployment file, the two entry files and the packages are not
-in the repo yet, so the image does not build yet.
+the modules come from one release.
+
+The compile embeds Turso's native addon in the API. Turso's loader reaches the addon through
+`createRequire`, which `bun build --compile` does not follow, so the compile script drops that call,
+and fails when a Turso release no longer holds it. At start the API writes the addon to `/tmp` and
+loads it from there, so the API's `/tmp` must allow exec. An emptyDir does; Docker's `--tmpfs` does
+not, unless it is mounted with `exec`.
 
 `bun run test:pepys-image` builds the image from a stand-in context and runs its suite: each program
-starts as nonroot from a 0555 file, and that user reads the modules, which root owns.
+starts as nonroot from a 0555 file, and that user reads the modules, which root owns. CI runs it on
+a pull request that changes the image, with the deployment's type check.
+
+The [pepys image workflow](../../../.github/workflows/pepys-image.yml) runs the same checks on a
+push to `main`, then writes the context and publishes the image as
+`ghcr.io/zgeoff/cloud-pepys:<release>-<commit>`. The stack config's `pepys.image` pins its digest.
 
 ## Routes
 
@@ -102,5 +118,3 @@ deletes a copied object. The host's store needs no backup: the host rebuilds it 
 
 - A tailnet route to the API, through the cluster's Traefik, so a tailnet client reaches it without
   a port-forward.
-- A CI job for `bun run test:pepys-image`, in the pepys image workflow, as `test:files-image` runs
-  in CI for the files image.

@@ -89,7 +89,9 @@ function buildAPIContainer(inputs: PepysHostSpecInputs): input.core.v1.Container
     ],
     readinessProbe: { tcpSocket: { port: host.apiPort }, periodSeconds: 10, failureThreshold: 3 },
 
-    // read-write: the store's database files keep their lock and WAL index beside them
+    // read-write: the store's database files keep their lock and WAL index beside them. The
+    // compiled API writes Turso's embedded native addon to /tmp and loads it from there, so /tmp
+    // must allow exec, as an emptyDir does
     volumeMounts: [
       { name: 'store', mountPath: storeDirectory },
       { name: 'tmp', mountPath: '/tmp' },

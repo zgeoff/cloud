@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Write the cloud-pepys image's build context into <dir>: the pinned host binary, the deployment's
-# consumer modules from `pepys build`, ingest and the API compiled for linux-x64 with
-# `bun build --compile`, and images/pepys/Dockerfile. Run it after `bun install`, since the build
-# and the compiles read the @pepys/* packages from node_modules.
+# consumer modules from `pepys build`, ingest and the API compiled for linux-x64 by
+# deploy/pepys/compile-entries.ts, and images/pepys/Dockerfile. Run it after
+# `bun install --frozen-lockfile` in deploy/pepys, which installs the deployment's @pepys/*
+# packages apart from the repo's workspaces.
 #
 #   bash scripts/write-pepys-image-context.sh <dir>
 set -euo pipefail
@@ -12,7 +13,12 @@ if [ "$#" != 1 ]; then
   echo "usage: write-pepys-image-context.sh <dir>" >&2
   exit 2
 fi
-context="$1"
+if [ ! -x deploy/pepys/node_modules/.bin/pepys ]; then
+  echo "write-pepys-image-context: deploy/pepys is not installed: run bun install --frozen-lockfile there" >&2
+  exit 1
+fi
+mkdir -p "$1"
+context="$(cd "$1" && pwd)"
 route_projection='
 import { deployment } from "./deploy/pepys/deployment.ts";
 const toPath = (path) => path === undefined ? undefined : {
@@ -24,12 +30,10 @@ console.log(JSON.stringify({ plugins: deployment.plugins.map((plugin) => ({
     recovery: toPath(source.recovery), backfill: toPath(source.backfill), resync: toPath(source.resync) })),
 })) }));
 '
-mkdir -p "$context"
 # the route table must match the deployment's routes and variables before any build; the
 # projection keeps the fields the check reads, since a plug-in's schemas do not serialize
 bun -e "$route_projection" | bun scripts/check-pepys-routes.ts deploy/pepys/ingest-routes.json
 bash scripts/fetch-pepys-release.sh "$context"
-bun x pepys build deploy/pepys/deployment.ts --out "$context/modules"
-bun build --compile --minify --target=bun-linux-x64 deploy/pepys/ingest.ts --outfile "$context/pepys-ingest"
-bun build --compile --minify --target=bun-linux-x64 deploy/pepys/api.ts --outfile "$context/pepys-api"
+(cd deploy/pepys && ./node_modules/.bin/pepys build deployment.ts --out "$context/modules")
+bun deploy/pepys/compile-entries.ts "$context"
 cp images/pepys/Dockerfile "$context/"

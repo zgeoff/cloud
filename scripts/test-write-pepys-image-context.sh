@@ -2,8 +2,8 @@
 # Test for write-pepys-image-context.sh: in a copy of the scripts with a small deployment, it checks
 # the route table, then writes the host binary, the modules, the two compiled programs and the
 # Dockerfile into <dir>; on a route table that differs from the deployment it stops before the
-# release download. gh and the build steps of bun are stand-ins, so no case reaches GitHub or
-# compiles; the route check runs on the real bun.
+# release download. gh, `pepys build` and the compile script are stand-ins, so no case reaches
+# GitHub or compiles; the route check runs on the real bun.
 #
 #   bash scripts/test-write-pepys-image-context.sh
 #   CASE='mismatch' bash scripts/test-write-pepys-image-context.sh
@@ -20,7 +20,7 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 real_bun="$(command -v bun)"
 
 # write_stub_bun <bin> <log>: a bun that runs `-e` and the route check on the real bun, and for
-# `x pepys build` and `build --compile` logs the call and writes a stand-in output
+# deploy/pepys/compile-entries.ts logs the call and writes stand-in programs
 write_stub_bun() {
   local bin="$1" log="$2"
   {
@@ -31,13 +31,10 @@ write_stub_bun() {
 case "$1" in
   -e | scripts/check-pepys-routes.ts) exec "$real" "$@" ;;
 esac
-printf '%s\n' "$*" >> "$log"
-if [ "$1 $2 $3" = "x pepys build" ]; then
-  mkdir -p "$6/ledger"
-  echo module > "$6/ledger/0123abcd.wasm"
-  echo '{"consumers":[]}' > "$6/consumers.json"
-elif [ "$1 $2" = "build --compile" ]; then
-  echo program > "${!#}"
+printf 'bun %s\n' "$*" >> "$log"
+if [ "$#" = 2 ] && [ "$1" = deploy/pepys/compile-entries.ts ]; then
+  echo program > "$2/pepys-ingest"
+  echo program > "$2/pepys-api"
 else
   echo "unexpected: $*" >&2
   exit 97
@@ -77,6 +74,27 @@ EOF2
       downloads: {"pepys-host-linux-x64": $asset, SHA256SUMS: $sums}}' > "$tree/responses"
   create_stub_gh "$tree/bin" "$tree/calls" "$tree/responses"
   write_stub_bun "$tree/bin" "$tree/builds"
+  write_stub_pepys "$tree/repo/deploy/pepys/node_modules/.bin" "$tree/builds"
+}
+
+# write_stub_pepys <bin> <log>: the deployment's pepys, which logs the call with its folder and
+# writes one module and consumers.json for `build deployment.ts --out <dir>`
+write_stub_pepys() {
+  local bin="$1" log="$2"
+  mkdir -p "$bin"
+  {
+    echo '#!/usr/bin/env bash'
+    echo 'set -euo pipefail'
+    printf 'log=%q\n' "$log"
+    cat << 'STUB'
+printf 'pepys %s in %s\n' "$*" "$(basename "$PWD")" >> "$log"
+[ "$1 $2 $3" = "build deployment.ts --out" ] || exit 97
+mkdir -p "$4/ledger"
+echo module > "$4/ledger/0123abcd.wasm"
+echo '{"consumers":[]}' > "$4/consumers.json"
+STUB
+  } > "$bin/pepys"
+  chmod +x "$bin/pepys"
 }
 
 run_write() {
@@ -87,11 +105,12 @@ run_write() {
 }
 
 it_writes_the_binaries_the_modules_and_the_dockerfile_into_the_context() {
-  local status=0
+  local status=0 context
   create_case_tree
   setup_test "$tree" /hooks/example
 
   run_write "$tree" "$tree/context" > "$tree/out" 2> "$tree/err" || status=$?
+  context="$(cd "$tree/context" && pwd)"
 
   assert_status 0 "$status"
   diff /dev/null "$tree/err"
@@ -104,9 +123,8 @@ it_writes_the_binaries_the_modules_and_the_dockerfile_into_the_context() {
 ./pepys-ingest
 EOF2
   diff - "$tree/builds" << EOF2
-x pepys build deploy/pepys/deployment.ts --out $tree/context/modules
-build --compile --minify --target=bun-linux-x64 deploy/pepys/ingest.ts --outfile $tree/context/pepys-ingest
-build --compile --minify --target=bun-linux-x64 deploy/pepys/api.ts --outfile $tree/context/pepys-api
+pepys build deployment.ts --out $context/modules in pepys
+bun deploy/pepys/compile-entries.ts $context
 EOF2
 }
 
@@ -119,6 +137,20 @@ it_stops_before_the_download_when_the_route_table_differs_from_the_deployment() 
 
   assert_status 1 "$status"
   grep -q '/hooks/example' "$tree/err"
+  [ ! -e "$tree/calls" ]
+  [ ! -e "$tree/builds" ]
+}
+
+it_stops_before_any_step_when_the_deployment_is_not_installed() {
+  local status=0
+  create_case_tree
+  setup_test "$tree" /hooks/example
+  rm -r "$tree/repo/deploy/pepys/node_modules"
+
+  run_write "$tree" "$tree/context" > "$tree/out" 2> "$tree/err" || status=$?
+
+  assert_status 1 "$status"
+  grep -q 'deploy/pepys is not installed' "$tree/err"
   [ ! -e "$tree/calls" ]
   [ ! -e "$tree/builds" ]
 }
