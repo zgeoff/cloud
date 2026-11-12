@@ -51,6 +51,22 @@ test('it builds a default credentials host scenario', () => {
         imps: [],
         createdAt: '2026-10-07T12:00:00.000Z',
       },
+      {
+        name: 'pepys-telemetry',
+        kind: 'static',
+        rules: [{ host: 'pepys.imp.internal', header: 'authorization', scheme: 'bearer' }],
+        env: [],
+        imps: [],
+        createdAt: '2026-10-07T12:00:00.000Z',
+      },
+      {
+        name: 'boxxy',
+        kind: 'static',
+        rules: [{ host: 'boxxy.imp.internal', header: 'authorization', scheme: 'bearer' }],
+        env: [],
+        imps: [],
+        createdAt: '2026-10-07T12:00:00.000Z',
+      },
     ],
     tokens: [
       {
@@ -64,6 +80,8 @@ test('it builds a default credentials host scenario', () => {
           'glm',
           'linear-imp-agents',
           'op-connect',
+          'pepys-telemetry',
+          'boxxy',
         ],
         createdAt: '2026-10-07T12:00:00.000Z',
       },
@@ -94,6 +112,6 @@ test('it builds fresh state on each call, so one test’s changes never reach an
 
   first.files['extra'] = { content: '', mode: '600' };
 
-  expect(second.secrets).toHaveLength(5);
+  expect(second.secrets).toHaveLength(7);
   expect(Object.keys(second.files)).toStrictEqual(['gateway-token', 'imp-token']);
 });

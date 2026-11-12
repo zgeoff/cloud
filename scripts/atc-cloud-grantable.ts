@@ -5,4 +5,6 @@ export const atcCloudGrantable: readonly string[] = [
   'github-imp-agents',
   'linear-imp-agents',
   'op-connect',
+  'pepys-telemetry',
+  'boxxy',
 ];

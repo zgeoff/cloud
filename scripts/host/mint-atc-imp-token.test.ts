@@ -74,7 +74,7 @@ test('it runs impz token new once with atc-cloud’s limits, and passes imp’s 
   );
 
   expect(calls).toBe(
-    '["podman","exec","imp-host","impz","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect"]\n',
+    '["podman","exec","imp-host","impz","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy"]\n',
   );
 });
 

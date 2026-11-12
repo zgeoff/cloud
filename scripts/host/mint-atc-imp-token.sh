@@ -25,7 +25,7 @@ mint_atc_imp_token() {
   trap 'rm -f "$temp"' EXIT
   # podman exec without -i leaves stdin alone, which holds the rest of this script
   "$@" token new atc-cloud --scope manage --imps 'harness-*' \
-    --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect > "$temp"
+    --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy > "$temp"
   test "$(wc -l < "$temp")" -eq 1
   chmod 0400 "$temp"
   mv -T "$temp" "$dir/imp-token"

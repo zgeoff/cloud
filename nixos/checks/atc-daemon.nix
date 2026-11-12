@@ -406,17 +406,35 @@ let
         '';
     }
     {
-      title = "it links geoffcloud a config.json whose target names the agent image and its atc, and whose claude signs in through the claude, github, linear and op-connect profiles of the broker and gets the pr-evidence file host address and the token path with no op:// prefix";
+      title = "it links geoffcloud a config.json whose target names the agent image and its atc, whose claude and boxxy sign in through the broker profiles and send telemetry to pepys, whose boxxy loads the hook plug-in and the boxxy profile, whose boxxy service client may use the target, and which gets the pr-evidence file host address and the token path with no op:// prefix";
       script = ''
         jq -S . > expected <<'EOF'
         {
           "agents": {
+            "boxxy": {
+              "args": ["--plugin-dir", "/opt/boxxy/hook-plugin"],
+              "auth": {
+                "mcpServers": { "linear": { "profile": "linear", "url": "https://mcp.linear.app/mcp" } },
+                "profiles": ["claude", "github", "linear", "op-connect", "pepys-telemetry", "boxxy"]
+              },
+              "env": {
+                "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+                "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+                "OTEL_LOGS_EXPORTER": "otlp",
+                "PR_EVIDENCE_TOKEN_PATH": "imp/files-agent-token/credential",
+                "PR_EVIDENCE_URL": "https://files.geoff.cloud/api/files"
+              },
+              "kind": "claude"
+            },
             "claude": {
               "auth": {
                 "mcpServers": { "linear": { "profile": "linear", "url": "https://mcp.linear.app/mcp" } },
-                "profiles": ["claude", "github", "linear", "op-connect"]
+                "profiles": ["claude", "github", "linear", "op-connect", "pepys-telemetry"]
               },
               "env": {
+                "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+                "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+                "OTEL_LOGS_EXPORTER": "otlp",
                 "PR_EVIDENCE_TOKEN_PATH": "imp/files-agent-token/credential",
                 "PR_EVIDENCE_URL": "https://files.geoff.cloud/api/files"
               }
@@ -424,6 +442,13 @@ let
             "codex": {}
           },
           "authProfiles": {
+            "boxxy": {
+              "env": { "BOXXY_URL": "https://boxxy.imp.internal" },
+              "header": "authorization",
+              "host": "boxxy.imp.internal",
+              "scheme": "bearer",
+              "secret": "boxxy"
+            },
             "claude": {
               "header": "authorization",
               "host": "api.anthropic.com",
@@ -446,11 +471,19 @@ let
               "host": "op-connect.imp.internal",
               "scheme": "bearer",
               "secret": "op-connect"
+            },
+            "pepys-telemetry": {
+              "env": { "OTEL_EXPORTER_OTLP_ENDPOINT": "https://pepys.imp.internal" },
+              "header": "authorization",
+              "host": "pepys.imp.internal",
+              "scheme": "bearer",
+              "secret": "pepys-telemetry"
             }
           },
           "defaultTarget": "geoffcloud",
           "principals": {
-            "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] }
+            "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] },
+            "service:boxxy": { "targets": ["geoffcloud"] }
           },
           "targets": {
             "geoffcloud": {

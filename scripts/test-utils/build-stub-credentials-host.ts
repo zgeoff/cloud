@@ -274,6 +274,8 @@ const mintGrantable = [
   'github-imp-agents',
   'linear-imp-agents',
   'op-connect',
+  'pepys-telemetry',
+  'boxxy',
 ];
 
 function createImpToken(state: HostState) {
@@ -302,6 +304,8 @@ function createImpToken(state: HostState) {
       'glm',
       'linear-imp-agents',
       'op-connect',
+      'pepys-telemetry',
+      'boxxy',
     ],
     createdAt: '2026-10-07T12:00:00.000Z',
   });

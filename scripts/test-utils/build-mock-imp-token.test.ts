@@ -13,6 +13,8 @@ test('it builds a default imp token', () => {
       'glm',
       'linear-imp-agents',
       'op-connect',
+      'pepys-telemetry',
+      'boxxy',
     ],
     createdAt: '2026-10-07T12:00:00.000Z',
   });
