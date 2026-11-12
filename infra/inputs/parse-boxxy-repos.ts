@@ -6,11 +6,19 @@ import type { BoxxyRepos } from './types.ts';
 export const boxxyReposKey = 'boxxySpawnRepos';
 const name = z.string().min(1);
 
-// a repo's git source, which atc clones on a target that gives each session a fresh machine; a URL
-// that carries a credential is refused, as the server refuses it
+// a git source by the server's own rules (@boxxy/model's gitSourceSchema), so a value this passes
+// never stops the server; a leading - would read as a git option
 const gitSourceURL = z
   .url()
+  .max(2048)
+  .refine((url) => !url.startsWith('-'), 'a git source url must not start with -')
   .refine(isURLWithoutCredential, 'a git source url must carry no credential');
+
+const gitSourceRef = z
+  .string()
+  .min(1)
+  .max(255)
+  .refine((ref) => !ref.startsWith('-'), 'a git source ref must not start with -');
 
 // the NAME of the atc daemon's environment variable that holds the clone token, never the token;
 // atc's own rule for the name, and the server's length cap
@@ -23,7 +31,7 @@ const credentialRef = z.strictObject({
 
 const gitSource = z.strictObject({
   url: gitSourceURL,
-  ref: name,
+  ref: gitSourceRef,
   credentialRef: credentialRef.exactOptional(),
 });
 
