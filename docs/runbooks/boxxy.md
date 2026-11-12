@@ -86,15 +86,15 @@ the items, with their copies, before the PR that adds the lines merges.
    with no backup.
 
 4. Merge the PR. `Deploy prod` applies it, since every step is a create.
-5. Check that the pod is up and both listeners started:
+5. Check that the pod is up and its listeners started:
 
    ```bash
    ssh root@geoffcloud k3s kubectl -n boxxy rollout status statefulset/boxxy --timeout=300s
    ssh root@geoffcloud k3s kubectl -n boxxy logs boxxy-0 | grep 'boxxy server listening'
    ```
 
-   Expect `statefulset rolling update complete`, then one line with `"ownerPort":8090` and
-   `"workerPort":8091`.
+   Expect `statefulset rolling update complete`, then one line with `"ownerPort":8090`,
+   `"workerPort":8091` and `"publicPort":null`, or `"publicPort":8092` with the public door.
 
 ## Reach the owner listener
 
@@ -105,6 +105,63 @@ ssh -L 8090:localhost:8090 root@geoffcloud k3s kubectl -n boxxy port-forward svc
 ```
 
 Then set `BOXXY_URL=http://localhost:8090` for the boxxy CLI.
+
+## Turn on the public door
+
+The public door serves the owner's MCP tools at `https://boxxy.geoff.cloud/mcp`, behind the server's
+own OAuth, through a tunnel of its own
+([the workload doc](../architecture/workloads/boxxy.md#the-public-door)). It needs an image with
+`@boxxy/server` 0.2.1 or later, because an older server refuses a configuration with a `publicDoor`
+section and does not start.
+
+1. In a PR, add the section to the `boxxy` object in `infra/Pulumi.prod.yaml`:
+
+   ```yaml
+   publicDoor:
+     publicURL: https://boxxy.geoff.cloud
+     trustForwardedFrom:
+       - 127.0.0.1
+   ```
+
+   Run `bun run preview`. Expect it to create the `boxxy` tunnel, its configuration and its DNS
+   record, the `boxxy-door-owner` Access policy and the `boxxy-door-sign-in` Access application, and
+   the Secret `boxxy-door-tunnel-token`. Expect it to replace the ConfigMap `boxxy-config` and
+   update the StatefulSet, and to change nothing else.
+
+2. Merge it. The guard of `Deploy prod` holds the plan, because it creates a tunnel's routes, a DNS
+   record and an Access application. Read the held plan and dispatch it, as
+   [the prod apply runbook](./prod-apply.md#answer-a-held-run) says.
+3. Check the route from any machine:
+
+   ```bash
+   curl -sS -o /dev/null -w '%{http_code}\n' https://boxxy.geoff.cloud/.well-known/oauth-protected-resource
+   curl -sS -o /dev/null -w '%{http_code}\n' -X POST https://boxxy.geoff.cloud/mcp
+   curl -sS -o /dev/null -w '%{http_code}\n' https://boxxy.geoff.cloud/rpc
+   ```
+
+   Expect `200`, then `401`, then `404`.
+
+4. [Reach the owner listener](#reach-the-owner-listener), and enroll a passkey:
+
+   ```bash
+   BOXXY_URL=http://localhost:8090 boxxy auth enroll
+   ```
+
+   Expect `Enrollment link: https://boxxy.geoff.cloud/enroll?token=<token>`. Open the link in your
+   browser, sign in to Access with the one-time PIN, and save the passkey before the link expires.
+
+5. Add each MCP client with its redirect URI:
+
+   ```bash
+   BOXXY_URL=http://localhost:8090 boxxy auth clients add <client_name> --redirect-uri <redirect_uri>
+   ```
+
+   `<client_name>` is the name the consent page shows, and `<redirect_uri>` is the callback URL the
+   client's OAuth settings give. Expect `Added <client_name>. Its client ID is <client_id>`, and
+   give the client that ID with `https://boxxy.geoff.cloud/mcp` as its server URL.
+
+`boxxy auth clients` and `boxxy auth grants` list and remove clients and grants. The backup copies
+the door's auth database with the store, and a restore puts both back.
 
 ## Let sessions reach the server
 

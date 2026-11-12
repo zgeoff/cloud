@@ -3,8 +3,10 @@ import type { BoxxyConfig, BoxxyRepos } from '../inputs/index.ts';
 
 export const boxxyOwnerPort = topology.boxxy.ownerPort;
 export const boxxyWorkerPort = topology.boxxy.workerPort;
+export const boxxyDoorPort = topology.boxxy.doorPort;
 
-// the volume holds the store; the atc gateway's backup image copies every *.db in it
+// The volume holds the store, and the door's auth database beside it, `boxxy-auth.db`; the atc
+// gateway's backup image copies and restores every *.db in it.
 const boxxyStoreFile = '/data/boxxy.db';
 
 // the image's own rules folder, which has no .git, so the server loads it as a plain folder
@@ -14,7 +16,7 @@ const boxxyRulesFolder = '/rules';
 export const boxxyTrustedIssuersFolder = '/etc/boxxy-issuers';
 
 interface BoxxyConfigFileInputs {
-  readonly config: Pick<BoxxyConfig, 'runner' | 'atc' | 'spawn' | 'github'>;
+  readonly config: Pick<BoxxyConfig, 'runner' | 'atc' | 'spawn' | 'github' | 'publicDoor'>;
 
   // the server's spawn.repos, which the stack holds as a secret of their own
   readonly repos: BoxxyRepos;
@@ -60,6 +62,11 @@ export function renderBoxxyConfig(inputs: BoxxyConfigFileInputs): string {
       : {}),
     ...(inputs.pepys === undefined ? {} : { pepys: inputs.pepys }),
     ...(inputs.config.github === undefined ? {} : { github: inputs.config.github }),
+
+    // on the pod's loopback, the default, where only the tunnel's sidecar reaches it
+    ...(inputs.config.publicDoor === undefined
+      ? {}
+      : { publicDoor: { port: boxxyDoorPort, ...inputs.config.publicDoor } }),
   };
 
   return `${JSON.stringify(file, null, 2)}\n`;

@@ -504,3 +504,149 @@ test('it creates the egress deny in a namespace it creates itself', async () => 
     },
   });
 });
+
+test("it puts the door tunnel's token in a Secret of the boxxy namespace and gives it to the server's pod alone, when boxxy has a public door", async () => {
+  const boxxyInputs = {
+    config: {
+      image:
+        'ghcr.io/zgeoff/cloud-boxxy:0123456@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+      runner: 'runner-for-tests',
+      atc: { trustedFolders: {} },
+      spawn: { target: 'target-for-tests' },
+      publicDoor: { publicURL: 'https://boxxy.example.com', trustForwardedFrom: ['127.0.0.1'] },
+    },
+    repos: secret<BoxxyRepos>({}),
+    pullCredential: {
+      username: 'octo-puller',
+      token: output('ghp_fake0token0for0tests0only0000000000'),
+    },
+    secrets: {
+      workerToken: output('worker-token-for-tests'),
+      atcToken: output('atc-token-for-tests'),
+    },
+  };
+
+  const stub = buildStubResourceMocks();
+
+  await runtime.setMocks(stub.mocks, 'geoff-cloud', 'test');
+
+  onTestFinished(() => {
+    stub.release();
+    runtime.resetOptions('', '', -1, '', '', false, '');
+  });
+
+  createCluster(createClusterProvider('k3s', { kubeconfig: output('kubeconfig-for-tests') }), {
+    onePasswordConnect: { credentials: output('{}') },
+    atcGateway: {
+      inputs: {
+        config: buildMockATCGatewayConfig({
+          daemons: { 'daemon-a': {} },
+          defaultDaemon: 'daemon-a',
+        }),
+        secrets: {
+          pullCredential: {
+            username: 'octo-puller',
+            token: output('ghp_fake0token0for0tests0only0000000000'),
+          },
+          tokens: { 'daemon-a': output('daemon-token-for-tests') },
+          ownerEmail: output('owner@fixture.invalid'),
+        },
+      },
+      tunnelToken: output('tunnel-token-for-tests'),
+    },
+    boxxy: boxxyInputs,
+    boxxyDoorTunnelToken: output('door-tunnel-token-for-tests'),
+    zoneID: output('zone'),
+    kubeconfig: output('kubeconfig-for-tests'),
+  });
+
+  await stub.whenRegistered('kubernetes:apps/v1:StatefulSet::boxxy');
+
+  const volume = z.object({ name: z.string(), secret: z.unknown().optional() });
+  const container = z.object({ name: z.string() });
+  const podSpec = z.object({ containers: z.array(container), volumes: z.array(volume) });
+  const template = z.object({ spec: podSpec });
+
+  const statefulSet = z
+    .object({ spec: z.object({ template }) })
+    .parse(stub.inputs.get('kubernetes:apps/v1:StatefulSet::boxxy'));
+
+  expect({
+    secret: stub.inputs.get('kubernetes:core/v1:Secret::boxxy-door-tunnel-token'),
+    containers: statefulSet.spec.template.spec.containers.map((entry) => entry.name),
+    tunnelVolume: statefulSet.spec.template.spec.volumes.find(
+      (candidate) => candidate.name === 'tunnel-token',
+    ),
+  }).toStrictEqual({
+    secret: {
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: { namespace: 'boxxy' },
+
+      // Pulumi registers a Secret's data as a secret, which it hides in a preview
+      stringData: {
+        [runtime.specialSigKey]: runtime.specialSecretSig,
+        value: { token: 'door-tunnel-token-for-tests' },
+      },
+    },
+    containers: ['boxxy', 'cloudflared'],
+
+    // the mock leaves the Secret's generated name unknown, so the volume carries no name yet
+    tunnelVolume: { name: 'tunnel-token', secret: { defaultMode: 0o440 } },
+  });
+});
+
+test("it refuses boxxy's public door without the door tunnel's token", async () => {
+  const stub = buildStubResourceMocks();
+
+  await runtime.setMocks(stub.mocks, 'geoff-cloud', 'test');
+
+  onTestFinished(() => {
+    stub.release();
+    runtime.resetOptions('', '', -1, '', '', false, '');
+  });
+
+  expect(() =>
+    createCluster(createClusterProvider('k3s', { kubeconfig: output('kubeconfig-for-tests') }), {
+      onePasswordConnect: { credentials: output('{}') },
+      atcGateway: {
+        inputs: {
+          config: buildMockATCGatewayConfig({
+            daemons: { 'daemon-a': {} },
+            defaultDaemon: 'daemon-a',
+          }),
+          secrets: {
+            pullCredential: {
+              username: 'octo-puller',
+              token: output('ghp_fake0token0for0tests0only0000000000'),
+            },
+            tokens: { 'daemon-a': output('daemon-token-for-tests') },
+            ownerEmail: output('owner@fixture.invalid'),
+          },
+        },
+        tunnelToken: output('tunnel-token-for-tests'),
+      },
+      boxxy: {
+        config: {
+          image:
+            'ghcr.io/zgeoff/cloud-boxxy:0123456@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+          runner: 'runner-for-tests',
+          atc: { trustedFolders: {} },
+          spawn: { target: 'target-for-tests' },
+          publicDoor: { publicURL: 'https://boxxy.example.com', trustForwardedFrom: [] },
+        },
+        repos: secret<BoxxyRepos>({}),
+        pullCredential: {
+          username: 'octo-puller',
+          token: output('ghp_fake0token0for0tests0only0000000000'),
+        },
+        secrets: {
+          workerToken: output('worker-token-for-tests'),
+          atcToken: output('atc-token-for-tests'),
+        },
+      },
+      zoneID: output('zone'),
+      kubeconfig: output('kubeconfig-for-tests'),
+    }),
+  ).toThrowWithMessage(Error, "the boxxy server's public door has no tunnel token");
+});

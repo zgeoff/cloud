@@ -1,7 +1,8 @@
 import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildMockTunnelRoute } from '../test-utils/build-mock-tunnel-route.ts';
-import { buildATCGatewayRoutes } from './build-atc-gateway-routes.ts';
+import { atcGatewayPaths } from './atc-gateway-paths.ts';
+import { buildSignInRoutes } from './build-sign-in-routes.ts';
 import { buildTunnelIngresses } from './build-tunnel-ingresses.ts';
 
 test("it sends the gateway's browser paths through cloudflared's Access check, then its machine paths without one", () => {
@@ -9,7 +10,11 @@ test("it sends the gateway's browser paths through cloudflared's Access check, t
   const access = { teamName: output('example-team'), audience: output('0123456789abcdef') };
 
   expect(
-    buildATCGatewayRoutes(buildMockTunnelRoute({ hostname: 'atc.geoff.cloud', service }), access),
+    buildSignInRoutes(
+      buildMockTunnelRoute({ hostname: 'atc.geoff.cloud', service }),
+      atcGatewayPaths,
+      access,
+    ),
   ).toStrictEqual([
     {
       hostname: 'atc.geoff.cloud',
@@ -33,7 +38,7 @@ test.each([
   ['GET /error', '/error'],
 ])('it sends %s to the Access-checked rule', (_route: string, path: string) => {
   const rules = buildTunnelIngresses(
-    buildATCGatewayRoutes(buildMockTunnelRoute({ hostname: 'atc.geoff.cloud' }), {
+    buildSignInRoutes(buildMockTunnelRoute({ hostname: 'atc.geoff.cloud' }), atcGatewayPaths, {
       teamName: output('example-team'),
       audience: output('0123456789abcdef'),
     }),
@@ -60,7 +65,7 @@ test.each([
   ["the MCP resource's metadata", '/.well-known/oauth-protected-resource/mcp'],
 ])('it sends %s to the rule without an Access check', (_route: string, path: string) => {
   const rules = buildTunnelIngresses(
-    buildATCGatewayRoutes(buildMockTunnelRoute({ hostname: 'atc.geoff.cloud' }), {
+    buildSignInRoutes(buildMockTunnelRoute({ hostname: 'atc.geoff.cloud' }), atcGatewayPaths, {
       teamName: output('example-team'),
       audience: output('0123456789abcdef'),
     }),
@@ -94,7 +99,7 @@ test.each([
   'it answers %s on the gateway hostname with the 404 catch-all',
   (_variant: string, path: string) => {
     const rules = buildTunnelIngresses(
-      buildATCGatewayRoutes(buildMockTunnelRoute({ hostname: 'atc.geoff.cloud' }), {
+      buildSignInRoutes(buildMockTunnelRoute({ hostname: 'atc.geoff.cloud' }), atcGatewayPaths, {
         teamName: output('example-team'),
         audience: output('0123456789abcdef'),
       }),
@@ -114,7 +119,7 @@ test.each(['/login', '/enroll', '/consent', '/oauth2/authorize'])(
   'it answers the browser path %s on the preview webhook hostname with the 404 catch-all',
   (path: string) => {
     const rules = buildTunnelIngresses(
-      buildATCGatewayRoutes(buildMockTunnelRoute({ hostname: 'atc.geoff.cloud' }), {
+      buildSignInRoutes(buildMockTunnelRoute({ hostname: 'atc.geoff.cloud' }), atcGatewayPaths, {
         teamName: output('example-team'),
         audience: output('0123456789abcdef'),
       }),

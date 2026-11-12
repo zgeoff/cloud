@@ -41,6 +41,10 @@ interface ClusterInputs {
   readonly pepys?: PepysInputs;
   readonly boxxy?: BoxxyInputs;
 
+  // set with the boxxy server's public door: the token of the door's tunnel, whose connector runs
+  // in the server's pod
+  readonly boxxyDoorTunnelToken?: Output<string>;
+
   // geoff.cloud's zone, for nixie's DNS record
   readonly zoneID: Output<string>;
 
@@ -88,7 +92,12 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
   const boxxy =
     inputs.boxxy === undefined
       ? undefined
-      : createBoxxy(cluster, requirePepys(inputs.boxxy, pepys), requireGateway(gateway));
+      : createBoxxy(
+          cluster,
+          requirePepys(inputs.boxxy, pepys),
+          requireGateway(gateway),
+          inputs.boxxyDoorTunnelToken,
+        );
 
   return {
     onePasswordConnectServiceURL: connect.serviceURL,

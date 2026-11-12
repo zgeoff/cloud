@@ -189,3 +189,78 @@ test('it reads the pepys signing secret and the GitHub token from the Secret whe
     },
   });
 });
+
+test("it runs the door tunnel's connector beside the server, with the tunnel's token mounted in it alone, when the door has a tunnel", () => {
+  const doorTunnelToken = output('boxxy-door-tunnel-token-0a1b2c3d');
+
+  const spec = buildBoxxySpec({
+    image: setupTest(),
+    serviceName: output('boxxy'),
+    configMap: output('boxxy-config-0a1b2c3d'),
+    tokenSecret: output('boxxy-tokens-0a1b2c3d'),
+    pepysSigningSecret: false,
+    githubToken: false,
+    pullSecret: 'ghcr-pull',
+    doorTunnelToken,
+  });
+
+  expect(spec.template).toMatchObject({
+    spec: {
+      volumes: [
+        { name: 'config' },
+        { name: 'tmp' },
+        { name: 'tunnel-token', secret: { secretName: doorTunnelToken, defaultMode: 0o440 } },
+      ],
+      containers: [
+        {
+          name: 'boxxy',
+          volumeMounts: [
+            { name: 'data', mountPath: '/data' },
+            { name: 'config', mountPath: '/etc/boxxy', readOnly: true },
+            { name: 'tmp', mountPath: '/tmp' },
+          ],
+        },
+        {
+          name: 'cloudflared',
+          image: 'cloudflare/cloudflared:2026.9.3',
+          args: [
+            'tunnel',
+            '--no-autoupdate',
+            '--metrics',
+            '127.0.0.1:2000',
+            'run',
+            '--token-file',
+            '/etc/cloudflared/token',
+          ],
+          volumeMounts: [{ name: 'tunnel-token', mountPath: '/etc/cloudflared', readOnly: true }],
+          resources: {
+            requests: { cpu: '10m', memory: '32Mi' },
+            limits: { cpu: '200m', memory: '128Mi' },
+          },
+          securityContext: {
+            runAsNonRoot: true,
+            readOnlyRootFilesystem: true,
+            allowPrivilegeEscalation: false,
+            capabilities: { drop: ['ALL'] },
+          },
+        },
+      ],
+    },
+  });
+});
+
+test('it runs no connector and mounts no tunnel token without a door tunnel', () => {
+  const spec = buildBoxxySpec({
+    image: setupTest(),
+    serviceName: output('boxxy'),
+    configMap: output('boxxy-config-0a1b2c3d'),
+    tokenSecret: output('boxxy-tokens-0a1b2c3d'),
+    pepysSigningSecret: false,
+    githubToken: false,
+    pullSecret: 'ghcr-pull',
+  });
+
+  expect(spec.template).toMatchObject({
+    spec: { containers: [{ name: 'boxxy' }], volumes: [{ name: 'config' }, { name: 'tmp' }] },
+  });
+});

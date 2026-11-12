@@ -2,9 +2,9 @@ import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
 import { topology } from '@zgeoff/cloud-topology';
 import type { ATCGatewayConfig } from '../inputs/index.ts';
-import { cloudflaredImage } from '../shared/cloudflared-image.ts';
 import { podLabels } from '../shared/pod-labels.ts';
 import { atcGatewayServiceTokenFile } from './build-atc-gateway-service-token-file.ts';
+import { buildCloudflaredSidecar } from './build-cloudflared-sidecar.ts';
 
 export const atcGatewayLabels = podLabels.atcGateway;
 const nonrootID = 65_532;
@@ -38,7 +38,7 @@ export function buildATCGatewaySpec(inputs: GatewaySpecInputs) {
         ...(inputs.serviceTokens === undefined
           ? {}
           : { initContainers: [buildServiceTokenContainer(inputs.config.backupImage)] }),
-        containers: [buildGatewayContainer(inputs), buildTunnelContainer()],
+        containers: [buildGatewayContainer(inputs), buildCloudflaredSidecar()],
         volumes: [
           { name: 'state', persistentVolumeClaim: { claimName: inputs.claim } },
           { name: 'config', emptyDir: {} },
@@ -171,38 +171,6 @@ function buildProbe(path: string, host: string): input.core.v1.Probe {
     // the server answers only its public Host (403 otherwise), so every probe sends it
     httpGet: { path, port: atcGatewayPort, httpHeaders: [{ name: 'Host', value: host }] },
   };
-}
-
-const tunnelTokenDir = '/etc/cloudflared';
-
-function buildTunnelContainer() {
-  return {
-    name: 'cloudflared',
-    image: cloudflaredImage,
-    args: [
-      'tunnel',
-      '--no-autoupdate',
-      '--metrics',
-
-      // loopback, so nothing outside the pod reaches the metrics, which leaves kubelet no port to
-      // probe
-      '127.0.0.1:2000',
-      'run',
-      '--token-file',
-      `${tunnelTokenDir}/token`,
-    ],
-    volumeMounts: [{ name: 'tunnel-token', mountPath: tunnelTokenDir, readOnly: true }],
-    resources: {
-      requests: { cpu: '10m', memory: '32Mi' },
-      limits: { cpu: '200m', memory: '128Mi' },
-    },
-    securityContext: {
-      runAsNonRoot: true,
-      readOnlyRootFilesystem: true,
-      allowPrivilegeEscalation: false,
-      capabilities: { drop: ['ALL'] },
-    },
-  } satisfies input.core.v1.Container;
 }
 
 function buildServiceTokenVolumes(secretName: Output<string> | undefined): input.core.v1.Volume[] {

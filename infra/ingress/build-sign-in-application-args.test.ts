@@ -1,15 +1,19 @@
 import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
-import { buildGatewayApplicationArgs } from './build-gateway-application-args.ts';
+import { atcGatewayPaths } from './atc-gateway-paths.ts';
+import { boxxyDoorPaths } from './boxxy-door-paths.ts';
+import { buildSignInApplicationArgs } from './build-sign-in-application-args.ts';
 
 test("it fronts only the gateway's browser paths, with the one-time PIN and the owner policy alone", () => {
   const identityProviderID = output('one-time-pin-id');
   const policyID = output('owner-policy-id');
 
   expect(
-    buildGatewayApplicationArgs({
+    buildSignInApplicationArgs({
       accountID: 'account-id',
+      name: 'atc gateway sign-in',
       hostname: 'atc.geoff.cloud',
+      browserPaths: atcGatewayPaths.browser,
       identityProviderID,
       policyID,
     }),
@@ -61,3 +65,44 @@ test.each([
     ),
   ).toStrictEqual([]);
 });
+
+test("it fronts the boxxy door's browser paths alone", () => {
+  expect(
+    buildSignInApplicationArgs({
+      accountID: 'account-id',
+      name: 'boxxy door sign-in',
+      hostname: 'boxxy.geoff.cloud',
+      browserPaths: boxxyDoorPaths.browser,
+      identityProviderID: output('one-time-pin-id'),
+      policyID: output('owner-policy-id'),
+    }).destinations,
+  ).toStrictEqual([
+    { type: 'public', uri: 'boxxy.geoff.cloud/oauth2/authorize' },
+    { type: 'public', uri: 'boxxy.geoff.cloud/login' },
+    { type: 'public', uri: 'boxxy.geoff.cloud/enroll' },
+    { type: 'public', uri: 'boxxy.geoff.cloud/consent' },
+    { type: 'public', uri: 'boxxy.geoff.cloud/error' },
+  ]);
+});
+
+// Access covers a destination's path and every path under it
+test.each(boxxyDoorPaths.machine)(
+  "it leaves the boxxy door's machine path %s outside every destination",
+  (path: string) => {
+    const url = `boxxy.geoff.cloud${path}`;
+
+    const destinations = [
+      { type: 'public', uri: 'boxxy.geoff.cloud/oauth2/authorize' },
+      { type: 'public', uri: 'boxxy.geoff.cloud/login' },
+      { type: 'public', uri: 'boxxy.geoff.cloud/enroll' },
+      { type: 'public', uri: 'boxxy.geoff.cloud/consent' },
+      { type: 'public', uri: 'boxxy.geoff.cloud/error' },
+    ];
+
+    expect(
+      destinations.filter(
+        (destination) => url === destination.uri || url.startsWith(`${destination.uri}/`),
+      ),
+    ).toStrictEqual([]);
+  },
+);

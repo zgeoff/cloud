@@ -7,7 +7,12 @@ test("it allows only the owner's address, signed in with the one-time PIN", () =
   const ownerEmail = output('owner@example.test');
 
   expect(
-    buildOwnerPolicyArgs({ accountID: 'account-id', identityProviderID, ownerEmail }),
+    buildOwnerPolicyArgs({
+      accountID: 'account-id',
+      name: 'atc gateway owner',
+      identityProviderID,
+      ownerEmail,
+    }),
   ).toStrictEqual({
     accountId: 'account-id',
     name: 'atc gateway owner',

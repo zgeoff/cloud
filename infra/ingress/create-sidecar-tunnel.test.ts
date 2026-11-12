@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { isSecret, runtime } from '@pulumi/pulumi';
 import { resolveOutput } from '../test-utils/resolve-output.ts';
-import { createATCTunnel } from './create-atc-tunnel.ts';
+import { createSidecarTunnel } from './create-sidecar-tunnel.ts';
 
 test("it returns the tunnel's connector token as a secret", async () => {
   await runtime.setMocks(
@@ -17,7 +17,10 @@ test("it returns the tunnel's connector token as a secret", async () => {
     runtime.resetOptions('', '', -1, '', '', false, '');
   });
 
-  const tunnel = createATCTunnel('account');
+  const tunnel = createSidecarTunnel('account', {
+    resourceName: 'atc',
+    tunnelName: 'geoff-cloud-atc',
+  });
 
   expect(isSecret(tunnel.tunnelToken)).resolves.toBeTrue();
   expect(resolveOutput(tunnel.tunnelToken)).resolves.toBe('atc-tunnel-token-4f2a');

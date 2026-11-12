@@ -156,6 +156,14 @@
       "auth": "The gateway's own OAuth 2.1 server authenticates every MCP call, and an owner-only Cloudflare Access login fronts its sign-in pages"
     },
     {
+      "name": "boxxy-door",
+      "kind": "tunnel-hostname",
+      "hostname": "boxxy.geoff.cloud",
+      "scope": "public",
+      "reason": "The boxxy server's public door: the owner's MCP tools and their OAuth endpoints, for the owner's hosted assistant, which cannot reach the private owner listener",
+      "auth": "The server's own OAuth server authenticates every MCP call with a scoped token, and an owner-only Cloudflare Access login fronts its sign-in pages"
+    },
+    {
       "name": "preview-webhook-route",
       "kind": "tunnel-hostname",
       "hostname": "preview-webhook.geoff.cloud",

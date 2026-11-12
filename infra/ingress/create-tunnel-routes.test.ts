@@ -162,3 +162,67 @@ test("it holds the shared tunnel's rules while the gateway's CNAME is still regi
     'cloudflare:index/zeroTrustTunnelCloudflaredConfig:ZeroTrustTunnelCloudflaredConfig::edge',
   );
 });
+
+test("it renders the boxxy door's loopback rules on its own tunnel, points its CNAME there and returns its URL", async () => {
+  const stub = buildStubResourceMocks();
+
+  await runtime.setMocks(stub.mocks, 'geoff-cloud', 'test');
+
+  onTestFinished(() => {
+    stub.release();
+    runtime.resetOptions('', '', -1, '', '', false, '');
+  });
+
+  const routes = createTunnelRoutes({
+    accountID: 'account',
+    zoneID: output('zone'),
+    tunnelID: output('shared-tunnel'),
+    boxxyDoor: {
+      hostname: 'boxxy.geoff.cloud',
+      access: { teamName: output('example-team'), audience: output('fedcba9876543210') },
+      tunnelID: output('boxxy-tunnel'),
+    },
+  });
+
+  invariant(routes.boxxyDoorURL);
+
+  const boxxyDoorURL = await resolveOutput(routes.boxxyDoorURL);
+
+  expect(
+    stub.inputs.get(
+      'cloudflare:index/zeroTrustTunnelCloudflaredConfig:ZeroTrustTunnelCloudflaredConfig::boxxy',
+    ),
+  ).toStrictEqual({
+    accountId: 'account',
+    tunnelId: 'boxxy-tunnel',
+    config: {
+      ingresses: [
+        {
+          hostname: 'boxxy.geoff.cloud',
+          path: '^(?:/oauth2/authorize|/login|/enroll|/consent|/error)$',
+          service: 'http://127.0.0.1:8092',
+          originRequest: {
+            access: { required: true, teamName: 'example-team', audTags: ['fedcba9876543210'] },
+          },
+        },
+        {
+          hostname: 'boxxy.geoff.cloud',
+          path: String.raw`^(?:/mcp|/oauth2/token|/oauth2/revoke|/\.well-known/oauth-authorization-server|/\.well-known/oauth-protected-resource|/\.well-known/oauth-protected-resource/mcp)$`,
+          service: 'http://127.0.0.1:8092',
+        },
+        { service: 'http_status:404' },
+      ],
+    },
+  });
+
+  expect(stub.inputs.get('cloudflare:index/dnsRecord:DnsRecord::boxxy')).toStrictEqual({
+    zoneId: 'zone',
+    name: 'boxxy.geoff.cloud',
+    type: 'CNAME',
+    content: 'boxxy-tunnel.cfargotunnel.com',
+    proxied: true,
+    ttl: 1,
+  });
+
+  expect(boxxyDoorURL).toBe('https://boxxy.geoff.cloud');
+});

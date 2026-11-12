@@ -11,6 +11,9 @@ interface TunnelRoutesInputs {
 
   readonly gateway?: GatewayIngress | undefined;
 
+  // set only with the boxxy server's public door
+  readonly boxxyDoor?: GatewayIngress | undefined;
+
   // set only with the files service
   readonly files?: TunnelRoute | undefined;
 
@@ -22,6 +25,8 @@ interface TunnelRoutesOutputs {
   readonly configVersion: Output<number>;
   readonly atcConfigVersion?: Output<number>;
   readonly atcURL?: Output<string>;
+  readonly boxxyDoorConfigVersion?: Output<number>;
+  readonly boxxyDoorURL?: Output<string>;
   readonly filesURL?: Output<string>;
   readonly pepysURL?: Output<string>;
 
@@ -30,7 +35,7 @@ interface TunnelRoutesOutputs {
 }
 
 export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutputs {
-  const specs = buildTunnelRouteSpecs(inputs.tunnelID, inputs.gateway, inputs.files, inputs.pepys);
+  const specs = buildTunnelRouteSpecs(inputs.tunnelID, inputs);
 
   const atc =
     specs.atc === undefined
@@ -42,6 +47,18 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
             config: { ingresses: specs.atc.ingresses },
           }),
           record: createRecord('atc', inputs.zoneID, specs.atc.record),
+        };
+
+  const boxxyDoor =
+    specs.boxxyDoor === undefined
+      ? undefined
+      : {
+          config: new ZeroTrustTunnelCloudflaredConfig('boxxy', {
+            accountId: inputs.accountID,
+            tunnelId: specs.boxxyDoor.record.tunnelID,
+            config: { ingresses: specs.boxxyDoor.ingresses },
+          }),
+          record: createRecord('boxxy', inputs.zoneID, specs.boxxyDoor.record),
         };
 
   // after the gateway's CNAME, so a hostname the shared tunnel drops already points elsewhere; a
@@ -73,6 +90,12 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
     ...(atc === undefined
       ? {}
       : { atcConfigVersion: atc.config.version, atcURL: toURL(atc.record) }),
+    ...(boxxyDoor === undefined
+      ? {}
+      : {
+          boxxyDoorConfigVersion: boxxyDoor.config.version,
+          boxxyDoorURL: toURL(boxxyDoor.record),
+        }),
     ...(files === undefined ? {} : { filesURL: toURL(files) }),
     ...(pepys === undefined ? {} : { pepysURL: toURL(pepys) }),
     previewWebhookURL: toURL(previewWebhook).apply((url) => `${url}/webhook`),

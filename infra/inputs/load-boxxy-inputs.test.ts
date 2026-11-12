@@ -77,7 +77,7 @@ test('it returns the config, the pull credential and both tokens when boxxy is s
   });
 });
 
-test('it keeps the notice session when the stack config names one', () => {
+test('it refuses a notice session in the boxxy block, which the server reads from its environment', () => {
   const fixture = setupTest();
 
   const withSession = {
@@ -90,9 +90,42 @@ test('it keeps the notice session when the stack config names one', () => {
     boxxy: JSON.stringify(withSession),
   });
 
+  expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrowWithMessage(
+    Error,
+    'stack config "boxxy.atc" Unrecognized key: "noticeSession"',
+  );
+});
+
+test('it keeps the public door when the stack config sets one', () => {
+  const fixture = setupTest();
+
+  const withDoor = {
+    ...fixture.boxxy,
+    publicDoor: { publicURL: 'https://boxxy.example.com', trustForwardedFrom: ['127.0.0.1'] },
+  };
+
+  const stackConfig = buildStubConfig({ ...fixture.stackValues, boxxy: JSON.stringify(withDoor) });
   const inputs = loadBoxxyInputs(stackConfig, fixture.tokens, undefined);
 
-  expect(inputs.boxxy?.config.atc.noticeSession).toBe('owner-session');
+  expect(inputs.boxxy?.config.publicDoor).toStrictEqual({
+    publicURL: 'https://boxxy.example.com',
+    trustForwardedFrom: ['127.0.0.1'],
+  });
+});
+
+test.each([
+  ['plain http', 'http://boxxy.example.com'],
+  ['a path', 'https://boxxy.example.com/mcp'],
+  ['a trailing slash', 'https://boxxy.example.com/'],
+])('it refuses a public door URL with %s', (_variant: string, publicURL: string) => {
+  const fixture = setupTest();
+  const withDoor = { ...fixture.boxxy, publicDoor: { publicURL, trustForwardedFrom: [] } };
+  const stackConfig = buildStubConfig({ ...fixture.stackValues, boxxy: JSON.stringify(withDoor) });
+
+  expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrowWithMessage(
+    Error,
+    'stack config "boxxy.publicDoor.publicURL" must be the https:// origin clients reach, with no path, such as https://boxxy.example.com',
+  );
 });
 
 test('it marks the repos secret and carries them', async () => {

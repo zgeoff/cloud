@@ -6,14 +6,16 @@ volume, and a nightly job backs that store up to R2 once the backup is configure
 belongs to [zgeoff/boxxy](https://github.com/zgeoff/boxxy), which publishes it to npm as
 `@boxxy/server`; this repo builds the image and runs it.
 
-## The two listeners
+## The listeners
 
-The server opens two listeners, and each has its own Service:
+The server opens two listeners, each with its own Service, and a third, the public door, when stack
+config `boxxy.publicDoor` is set:
 
-| Listener | Port | Service                               | Serves                     | Token                             |
-| -------- | ---- | ------------------------------------- | -------------------------- | --------------------------------- |
-| owner    | 8090 | `boxxy`, no fixed address             | `/healthz`, `/rpc`, `/mcp` | none                              |
-| worker   | 8091 | `boxxy-worker`, on a pinned ClusterIP | `/rpc`, `/mcp/session`     | the worker token on every request |
+| Listener | Port | Reached through                                   | Serves                                         | Token                             |
+| -------- | ---- | ------------------------------------------------- | ---------------------------------------------- | --------------------------------- |
+| owner    | 8090 | the `boxxy` Service, no fixed address             | `/healthz`, `/rpc`, `/mcp`                     | none                              |
+| worker   | 8091 | the `boxxy-worker` Service, on a pinned ClusterIP | `/rpc`, `/mcp/session`                         | the worker token on every request |
+| door     | 8092 | the boxxy tunnel's sidecar, on the pod's loopback | `/mcp`, the OAuth routes and the sign-in pages | an OAuth access token on `/mcp`   |
 
 The owner listener takes no token, so it gets no route: no Ingress, tunnel or tailnet name points at
 it, and the owner reaches it with a port-forward over SSH
@@ -31,8 +33,29 @@ admits the node's own addresses before any policy, so the relay still passes, an
 policy needs no `ipBlock`. The worker Service carries the worker port alone, so the relay's address
 never leads to the listener with no token.
 
-Both listeners refuse with 403 a request with an `Origin` header, or a `Sec-Fetch-Site` header other
-than `none`, so a proxy in front of either must add neither.
+The owner and worker listeners refuse with 403 a request with an `Origin` header, or a
+`Sec-Fetch-Site` header other than `none`, so a proxy in front of either must add neither.
+
+## The public door
+
+[boxxy's decision record 0018](https://github.com/zgeoff/boxxy/blob/main/docs/decisions/0018-public-owner-mcp.md)
+gives the reason for the door: the owner's hosted assistant must reach the owner's MCP tools from
+anywhere, and the owner listener is private. The door serves those tools behind its own OAuth
+server, and never `/rpc` or `/healthz`
+([boxxy's API and auth](https://github.com/zgeoff/boxxy/blob/main/docs/design/boxxy/v1-api-and-auth.md#the-public-door)).
+
+With stack config `boxxy.publicDoor`, the Pulumi program makes a tunnel of the door's own, runs its
+connector as a sidecar in the server's pod, and writes the door into the configuration file on the
+pod's loopback address. It points the host of `publicURL` at the tunnel, and fronts the door's
+sign-in pages with an owner-only Access application
+([the boxxy tunnel](../network/public-ingress.md#the-boxxy-tunnel)). The sidecar connects to the
+door from `127.0.0.1`, so `trustForwardedFrom` lists that one address: the door then labels the
+`CF-Connecting-IP` header of a request from the sidecar as trusted in its security lines.
+
+The door keeps its OAuth state, which holds the owner's passkeys, clients, grants and tokens, in
+`/data/boxxy-auth.db` beside the store, with mode 0600. The owner enrolls a passkey and adds each
+client with `boxxy auth` commands on the owner listener
+([the runbook](../../runbooks/boxxy.md#turn-on-the-public-door)).
 
 ## Configuration and secrets
 
@@ -52,13 +75,15 @@ The namespace's egress deny refuses only the tailnet and Podman's subnet, so the
 gateway's Service, to pepys's Services and to GitHub on 443 need no egress allow. The NixOS check
 `network-policy` shows the server's pod reach pepys ingest and the pepys API.
 
-Two sections of stack config `boxxy` are optional. With `pepys: { environment }`, the file gets a
+Three sections of stack config `boxxy` are optional. With `pepys: { environment }`, the file gets a
 `pepys` section: the boxxy route of pepys ingest and the oRPC route of the pepys API, at their
 Services, which needs stack config `pepys`. The server then sends its facts there and reads its two
 reports there. pepys ingest and the pepys API must admit the server's pod, which their own policies
 decide. With `github: { baseUrl }`, the server links and watches the pull requests of its repos. It
 only reads them, and it never merges one. The pod has no broker to add a GitHub credential, so the
-token comes from `.env`.
+token comes from `.env`. With `publicDoor: { publicURL, trustForwardedFrom }`, the server serves
+[the public door](#the-public-door); its tunnel's token needs no item in `.env`, because Pulumi
+reads it from Cloudflare.
 
 A server before the release that moves its atc calls to MCP calls `/rpc` and sends no `Host`
 override, and the gateway refuses both. Run an image built from that release or a later one.
@@ -96,10 +121,12 @@ refuses every session and hook call.
 
 The `boxxy-backup` CronJob exists only when the backup's repository and credentials are configured,
 and the server deploys without it otherwise. It runs nightly in the atc gateway's backup image,
-whose own entrypoint copies every `*.db` in the volume with SQLite's online backup, checks each
-copy's integrity, and takes one restic snapshot into the `boxxy` repository in R2. The snapshots
-carry that image's `atc-gateway` tag and host. `deploy/boxxy/restore-job.yaml` restores the store
-from a snapshot while the server is stopped. [The runbook](../../runbooks/boxxy.md) covers both.
+whose own entrypoint copies every `*.db` in the volume, the door's auth database included, with
+SQLite's online backup, checks each copy's integrity, and takes one restic snapshot into the `boxxy`
+repository in R2. The snapshots carry that image's `atc-gateway` tag and host.
+`deploy/boxxy/restore-job.yaml` restores every database from a snapshot while the server is stopped.
+The backup and the restore run as the server's user, so they can read and write the auth database.
+[The runbook](../../runbooks/boxxy.md) covers both.
 
 ## Deployment
 

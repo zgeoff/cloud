@@ -9,16 +9,13 @@ test("it points the gateway's CNAME at the atc tunnel and leaves the shared tunn
   const audience = output('0123456789abcdef');
 
   expect(
-    buildTunnelRouteSpecs(
-      sharedTunnelID,
-      {
+    buildTunnelRouteSpecs(sharedTunnelID, {
+      gateway: {
         hostname: 'atc.geoff.cloud',
         access: { teamName, audience },
         tunnelID: atcTunnelID,
       },
-      undefined,
-      undefined,
-    ),
+    }),
   ).toStrictEqual({
     sharedIngresses: [
       {
@@ -52,7 +49,7 @@ test("it points the gateway's CNAME at the atc tunnel and leaves the shared tunn
 test('it routes only the preview webhook, on the shared tunnel, without the gateway', () => {
   const sharedTunnelID = output('11111111-1111-4111-8111-111111111111');
 
-  expect(buildTunnelRouteSpecs(sharedTunnelID, undefined, undefined, undefined)).toStrictEqual({
+  expect(buildTunnelRouteSpecs(sharedTunnelID, {})).toStrictEqual({
     sharedIngresses: [
       {
         hostname: 'preview-webhook.geoff.cloud',
@@ -70,12 +67,7 @@ test('it routes every path of the files host to the files service on the shared 
   const service = output('http://files.files.svc.cluster.local:8080');
 
   expect(
-    buildTunnelRouteSpecs(
-      sharedTunnelID,
-      undefined,
-      { hostname: 'files.geoff.cloud', service },
-      undefined,
-    ),
+    buildTunnelRouteSpecs(sharedTunnelID, { files: { hostname: 'files.geoff.cloud', service } }),
   ).toStrictEqual({
     sharedIngresses: [
       {
@@ -93,15 +85,12 @@ test('it routes every path of the files host to the files service on the shared 
 
 test('it refuses a files host that the exposure registry does not list as public', () => {
   expect(() =>
-    buildTunnelRouteSpecs(
-      output('11111111-1111-4111-8111-111111111111'),
-      undefined,
-      {
+    buildTunnelRouteSpecs(output('11111111-1111-4111-8111-111111111111'), {
+      files: {
         hostname: 'uploads.geoff.cloud',
         service: output('http://files.files.svc.cluster.local:8080'),
       },
-      undefined,
-    ),
+    }),
   ).toThrowWithMessage(
     Error,
     'tunnel hostname uploads.geoff.cloud is not in packages/topology/exposure.json; a route needs a public tunnel-hostname entry',
@@ -112,10 +101,12 @@ test("it routes only pepys's public paths of its host to ingest on the shared tu
   const sharedTunnelID = output('11111111-1111-4111-8111-111111111111');
 
   expect(
-    buildTunnelRouteSpecs(sharedTunnelID, undefined, undefined, {
-      hostname: 'pepys-webhook.geoff.cloud',
-      service: 'http://pepys-ingest.pepys.svc.cluster.local:8080',
-      path: '^(?:/webhook/github)$',
+    buildTunnelRouteSpecs(sharedTunnelID, {
+      pepys: {
+        hostname: 'pepys-webhook.geoff.cloud',
+        service: 'http://pepys-ingest.pepys.svc.cluster.local:8080',
+        path: '^(?:/webhook/github)$',
+      },
     }),
   ).toStrictEqual({
     sharedIngresses: [

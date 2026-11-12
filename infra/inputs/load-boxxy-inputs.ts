@@ -25,16 +25,17 @@ const githubNeed =
   'the boxxy server reads pull requests with it while stack config "boxxy.github" is set';
 
 const name = z.string().min(1);
+
+const publicURLMessage =
+  'must be the https:// origin clients reach, with no path, such as https://boxxy.example.com';
+
 const folders = z.array(name);
 
 // the image reaches its own check below, which names what the field must hold
 const boxxyConfigSchema = z.strictObject({
   image: z.string().optional(),
   runner: name,
-  atc: z.strictObject({
-    trustedFolders: z.record(name, folders),
-    noticeSession: name.optional(),
-  }),
+  atc: z.strictObject({ trustedFolders: z.record(name, folders) }),
   spawn: z.strictObject({ target: name }),
 
   // the environment whose deploy the stage times count; the cluster sets pepys's addresses
@@ -42,6 +43,18 @@ const boxxyConfigSchema = z.strictObject({
 
   // GitHub's REST root, which the pull request watch and the hook's link read
   github: z.strictObject({ baseUrl: z.url() }).optional(),
+
+  // the owner's MCP tools behind OAuth, on a tunnel of its own; the cluster sets the port
+  publicDoor: z
+    .strictObject({
+      publicURL: z
+        .url({ protocol: /^https$/u, error: publicURLMessage })
+        .refine((url) => new URL(url).origin === url, publicURLMessage),
+
+      // the socket peers whose forwarded client address the door's security events trust
+      trustForwardedFrom: z.array(name),
+    })
+    .optional(),
 });
 
 // setting stack config "boxxy" approves the deploy; BOXXY_RESTIC_* and BOXXY_R2_* add the backup
@@ -88,15 +101,11 @@ export function loadBoxxyInputs(
       config: {
         image: config.image,
         runner: config.runner,
-        atc: {
-          trustedFolders: config.atc.trustedFolders,
-          ...(config.atc.noticeSession === undefined
-            ? {}
-            : { noticeSession: config.atc.noticeSession }),
-        },
+        atc: config.atc,
         spawn: config.spawn,
         ...(config.pepys === undefined ? {} : { pepys: config.pepys }),
         ...(config.github === undefined ? {} : { github: config.github }),
+        ...(config.publicDoor === undefined ? {} : { publicDoor: config.publicDoor }),
       },
       repos: spawnRepos,
       pullCredential: { username: pull.username, token: secret(pull.token) },

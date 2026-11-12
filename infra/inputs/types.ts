@@ -151,9 +151,6 @@ export interface BoxxyConfig {
   readonly atc: {
     // by worker target: the folders the agent trusts
     readonly trustedFolders: Readonly<Record<string, readonly string[]>>;
-
-    // the session that gets the hold notices; with none, no notice is sent
-    readonly noticeSession?: string;
   };
   readonly spawn: { readonly target: string };
 
@@ -163,6 +160,16 @@ export interface BoxxyConfig {
 
   // with it, the server links and watches pull requests
   readonly github?: { readonly baseUrl: string };
+
+  // with it, the server serves the owner's MCP tools on its public door, behind OAuth, through a
+  // tunnel whose connector runs in the server's pod
+  readonly publicDoor?: {
+    // the https origin clients reach the door at: the OAuth issuer
+    readonly publicURL: string;
+
+    // the socket peers whose forwarded client address the door's security events trust
+    readonly trustForwardedFrom: readonly string[];
+  };
 }
 
 // by repo: its folder on the target, or the git source that atc clones there

@@ -1,5 +1,6 @@
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
+import { buildCloudflaredSidecar, tunnelTokenVolume } from './build-cloudflared-sidecar.ts';
 import {
   boxxyOwnerPort,
   boxxyTrustedIssuersFolder,
@@ -32,6 +33,10 @@ export interface BoxxySpecInputs {
   readonly pepysSigningSecret: boolean;
   readonly githubToken: boolean;
   readonly pullSecret: string;
+
+  // the Secret with the token of the public door's tunnel; with it, the pod runs the tunnel's
+  // connector beside the server
+  readonly doorTunnelToken?: Output<string>;
 }
 
 export function buildBoxxySpec(inputs: BoxxySpecInputs): input.apps.v1.StatefulSetSpec {
@@ -65,8 +70,21 @@ export function buildBoxxySpec(inputs: BoxxySpecInputs): input.apps.v1.StatefulS
           ...(inputs.trustDocuments === undefined
             ? []
             : [{ name: 'issuers', configMap: { name: inputs.trustDocuments.configMap } }]),
+
+          // group-readable, so the connector reads it through fsGroup
+          ...(inputs.doorTunnelToken === undefined
+            ? []
+            : [
+                {
+                  name: tunnelTokenVolume,
+                  secret: { secretName: inputs.doorTunnelToken, defaultMode: 0o440 },
+                },
+              ]),
         ],
-        containers: [buildBoxxyContainer(inputs)],
+        containers: [
+          buildBoxxyContainer(inputs),
+          ...(inputs.doorTunnelToken === undefined ? [] : [buildCloudflaredSidecar()]),
+        ],
       },
     },
     volumeClaimTemplates: [
