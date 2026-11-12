@@ -60,15 +60,17 @@ let
   credentialName = variable: "env-${variable}";
   envWrapper = pkgs.writeShellScript "atc-daemon-start" ''
     set -eu
-    ${lib.concatStrings (
-      lib.mapAttrsToList (variable: _: ''
-        if [ -z "$(cat "$CREDENTIALS_DIRECTORY/${credentialName variable}" 2>/dev/null)" ]; then
-          echo "atc-daemon: credential ${credentialName variable} (for ${variable}) is missing or empty" >&2
-          exit 1
-        fi
-        export ${variable}="$(cat "$CREDENTIALS_DIRECTORY/${credentialName variable}")"
-      '') cfg.environmentCredentials
-    )}exec "$@"
+    ${
+      lib.concatStrings (
+        lib.mapAttrsToList (variable: _: ''
+          if [ -z "$(cat "$CREDENTIALS_DIRECTORY/${credentialName variable}" 2>/dev/null)" ]; then
+            echo "atc-daemon: credential ${credentialName variable} (for ${variable}) is missing or empty" >&2
+            exit 1
+          fi
+          export ${variable}="$(cat "$CREDENTIALS_DIRECTORY/${credentialName variable}")"
+        '') cfg.environmentCredentials
+      )
+    }exec "$@"
   '';
 
   # systemd fails a start with a bare "Failed to set up credentials" when a LoadCredential file is
@@ -76,14 +78,16 @@ let
   checkEnvCredentials = pkgs.writeShellScript "atc-daemon-check-env-credentials" ''
     set -u
     status=0
-    ${lib.concatStrings (
-      lib.mapAttrsToList (variable: file: ''
-        if [ ! -s ${lib.escapeShellArg file} ]; then
-          echo "atc-daemon: credential ${credentialName variable} (for ${variable}) is missing or empty: ${file}" >&2
-          status=1
-        fi
-      '') cfg.environmentCredentials
-    )}exit "$status"
+    ${
+      lib.concatStrings (
+        lib.mapAttrsToList (variable: file: ''
+          if [ ! -s ${lib.escapeShellArg file} ]; then
+            echo "atc-daemon: credential ${credentialName variable} (for ${variable}) is missing or empty: ${file}" >&2
+            status=1
+          fi
+        '') cfg.environmentCredentials
+      )
+    }exit "$status"
   '';
 
   # each auth profile that an agent or one of its MCP servers selects and the config does not
