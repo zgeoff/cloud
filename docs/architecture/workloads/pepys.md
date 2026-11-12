@@ -115,10 +115,11 @@ lists:
 
 - Garage dials nothing: it runs one node on a loopback RPC address.
 - s2-lite reaches DNS and Garage on 3900.
-- ingest reaches DNS, s2-lite on 8080, and the internet on TCP 443 for the GitHub API. The cluster's
-  pod and Service ranges, the tailnet and Podman's subnet are excluded.
+- ingest reaches DNS, s2-lite on 8080, and the internet on TCP 443 for the GitHub API. The rule
+  excludes the cluster's pod and Service ranges, the tailnet, Podman's subnet, the private ranges
+  and link-local. It still allows the node's own public address on 443.
 - The host and the API reach DNS and s2-lite. The host keeps no blob, so it never calls Garage.
-- The backup reaches DNS, Garage, and the internet on TCP 443 for R2.
+- The backup reaches DNS, Garage, and the internet on TCP 443 for R2, by the same rule as ingest.
 
 No pepys pod mounts a service account token, so none needs the Kubernetes API. DNS selects the
 CoreDNS pods, because a policy sees the address after kube-proxy's DNAT. The

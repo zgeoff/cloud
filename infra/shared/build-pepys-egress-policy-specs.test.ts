@@ -20,7 +20,16 @@ function setupTest() {
       {
         ipBlock: {
           cidr: '0.0.0.0/0',
-          except: ['10.42.0.0/16', '10.43.0.0/16', '100.64.0.0/10', '10.88.0.0/16'],
+          except: [
+            '10.42.0.0/16',
+            '10.43.0.0/16',
+            '100.64.0.0/10',
+            '10.88.0.0/16',
+            '10.0.0.0/8',
+            '172.16.0.0/12',
+            '192.168.0.0/16',
+            '169.254.0.0/16',
+          ],
         },
       },
     ],
@@ -64,7 +73,7 @@ test('it lets s2-lite reach DNS and Garage on the S3 port', () => {
   });
 });
 
-test('it lets ingest reach DNS, s2-lite, and the internet on 443 only, outside the cluster, tailnet and Podman', () => {
+test('it lets ingest reach DNS, s2-lite, and the internet on 443 only, outside the tailnet, the private ranges and link-local', () => {
   const ctx = setupTest();
 
   expect(buildPepysEgressPolicySpecs()['pepys-ingest-egress']).toStrictEqual({

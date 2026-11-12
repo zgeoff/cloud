@@ -6,7 +6,8 @@
 # tailnet address, local delivery as on the host; home-pc's daemon and impd on tailnet peers in a
 # network namespace behind tailscale0; and impd's plain API on Podman's subnet in another, both
 # forwarded as on the host. A public address on a dummy link stands in for the internet, which of
-# pepys's pods only ingest and the backup reach, on 443 only. The VM leaves out inet cloud_host, so
+# pepys's pods only ingest and the backup reach, on 443 only; a private and a link-local address on
+# the same link show that the 443 rule excludes them. The VM leaves out inet cloud_host, so
 # kube-router alone refuses a path. Each test pod runs the same image and differs only by its
 # labels, and pepys's Garage pod by its port. It needs KVM: run `bun run test:nixos network-policy`.
 { nixpkgs, geoffcloud }:
@@ -46,6 +47,9 @@ let
 
   # a documentation address, so no real host answers it
   internetAddress = "203.0.113.10";
+  # a private address and a link-local one, which pepys's 443 rule excludes
+  privateAddress = "172.16.0.10";
+  linkLocalAddress = "169.254.169.254";
 
   # each stand-in answers its own name, so a reply shows which listener the pod reached
   standIns = [
@@ -96,6 +100,18 @@ let
       netns = null;
       address = internetAddress;
       port = 80;
+    }
+    {
+      name = "private-https";
+      netns = null;
+      address = privateAddress;
+      port = 443;
+    }
+    {
+      name = "link-local-https";
+      netns = null;
+      address = linkLocalAddress;
+      port = 443;
     }
   ];
 
@@ -373,6 +389,8 @@ pkgs.testers.runNixOSTest {
 
             ip link add internet0 type dummy
             ip addr add ${internetAddress}/32 dev internet0
+            ip addr add ${privateAddress}/32 dev internet0
+            ip addr add ${linkLocalAddress}/32 dev internet0
             ip link set internet0 up
 
             ip netns add podman
@@ -478,6 +496,8 @@ pkgs.testers.runNixOSTest {
             "preview-webhook": {"ingress/cloudflared"},
             "internet-https": outside_pepys | {"pepys/ingest", "pepys/backup"},
             "internet-http": outside_pepys,
+            "private-https": outside_pepys,
+            "link-local-https": outside_pepys,
         })
         observed = {}
 
