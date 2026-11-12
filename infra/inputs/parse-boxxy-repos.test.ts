@@ -1,10 +1,15 @@
 import { expect, test } from 'bun:test';
 import { parseBoxxyRepos } from './parse-boxxy-repos.ts';
 
-test('it returns each repo as a folder or a git source', () => {
+test('it returns each repo as a folder or a git source, with the name of its clone credential', () => {
   const repos = {
     'owner/repo': '/workspace/repo',
     'owner/other': { url: 'https://github.com/owner/other', ref: 'main' },
+    'owner/private': {
+      url: 'https://github.com/owner/private',
+      ref: 'main',
+      credentialRef: { name: 'CLONE_TOKEN_FOR_TESTS' },
+    },
   };
 
   expect(parseBoxxyRepos(JSON.stringify(repos))).toStrictEqual(repos);
@@ -20,7 +25,7 @@ test('it refuses a git source whose url carries a credential, and names no repo'
 
   expect(() => parseBoxxyRepos(JSON.stringify(repos))).toThrowWithMessage(
     Error,
-    'stack config "boxxySpawnRepos" must map each repo to a folder or a git source { url, ref } whose url carries no credential',
+    'stack config "boxxySpawnRepos" must map each repo to a folder or a git source { url, ref, credentialRef? } whose url carries no credential',
   );
 });
 
@@ -36,7 +41,7 @@ test('it refuses a repo with no folder or source, and names no repo', () => {
 
   expect(() => parseBoxxyRepos(JSON.stringify(repos))).toThrowWithMessage(
     Error,
-    'stack config "boxxySpawnRepos" must map each repo to a folder or a git source { url, ref } whose url carries no credential',
+    'stack config "boxxySpawnRepos" must map each repo to a folder or a git source { url, ref, credentialRef? } whose url carries no credential',
   );
 });
 
@@ -46,11 +51,27 @@ test.each([
     { url: 'https://github.com/owner/repo', ref: 'main', 'hidden-key': 1 },
   ],
   ['a url that does not parse', { url: 'https://[hidden-repo', ref: 'main' }],
+  [
+    'a credentialRef that names no environment variable',
+    {
+      url: 'https://github.com/owner/repo',
+      ref: 'main',
+      credentialRef: { name: 'hidden-token value' },
+    },
+  ],
+  [
+    'a credentialRef with a key it does not take',
+    {
+      url: 'https://github.com/owner/repo',
+      ref: 'main',
+      credentialRef: { name: 'CLONE_TOKEN', value: 'hidden-token' },
+    },
+  ],
 ])('it refuses a git source with %s, and quotes none of it', (_kind, source) => {
   const repos = { 'owner/repo': source };
 
   expect(() => parseBoxxyRepos(JSON.stringify(repos))).toThrowWithMessage(
     Error,
-    'stack config "boxxySpawnRepos" must map each repo to a folder or a git source { url, ref } whose url carries no credential',
+    'stack config "boxxySpawnRepos" must map each repo to a folder or a git source { url, ref, credentialRef? } whose url carries no credential',
   );
 });

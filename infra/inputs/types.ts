@@ -166,9 +166,14 @@ export interface BoxxyConfig {
 }
 
 // by repo: its folder on the target, or the git source that atc clones there
-export type BoxxyRepos = Readonly<
-  Record<string, string | { readonly url: string; readonly ref: string }>
->;
+export type BoxxyRepos = Readonly<Record<string, string | BoxxyGitSource>>;
+
+// credentialRef names the atc daemon's environment variable that holds the clone token
+export interface BoxxyGitSource {
+  readonly url: string;
+  readonly ref: string;
+  readonly credentialRef?: { readonly name: string };
+}
 
 // a nightly restic backup of the boxxy store to its own repository in R2, run by the atc gateway's
 // backup image

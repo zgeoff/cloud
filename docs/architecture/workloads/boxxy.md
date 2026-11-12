@@ -46,9 +46,11 @@ rest: the runner ID, the trusted folders of each worker target, and the spawn ta
 target's repos, each a folder or a git source, come from the secret stack config `boxxySpawnRepos`,
 because a repo's name can be private and this repo is public. Pulumi then marks the whole file a
 secret, so a preview shows no line of it, and an error about the repos names none of them. The file
-holds no token. The namespace's egress deny refuses only the tailnet and Podman's subnet, so the
-calls to the gateway's Service, to pepys's Services and to GitHub on 443 need no egress allow. The
-NixOS check `network-policy` shows the server's pod reach pepys ingest and the pepys API.
+holds no token: a private repo's git source carries `credentialRef: { name }`, the name of the atc
+daemon's environment variable that holds the clone token, which the server passes to atc's spawn.
+The namespace's egress deny refuses only the tailnet and Podman's subnet, so the calls to the
+gateway's Service, to pepys's Services and to GitHub on 443 need no egress allow. The NixOS check
+`network-policy` shows the server's pod reach pepys ingest and the pepys API.
 
 Two sections of stack config `boxxy` are optional. With `pepys: { environment }`, the file gets a
 `pepys` section: the boxxy route of pepys ingest and the oRPC route of the pepys API, at their
