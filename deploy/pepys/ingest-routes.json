@@ -19,12 +19,18 @@
       "source": "telemetry",
       "route": "/v1/traces",
       "reach": "private"
+    },
+    {
+      "source": "boxxy",
+      "route": "/boxxy/facts",
+      "reach": "private"
     }
   ],
   "secretVariables": [
     "PEPYS_GITHUB_WEBHOOK_SECRET",
     "PEPYS_GITHUB_APP_ID",
     "PEPYS_GITHUB_APP_PRIVATE_KEY",
-    "PEPYS_TELEMETRY_TOKEN"
+    "PEPYS_TELEMETRY_TOKEN",
+    "PEPYS_BOXXY_SIGNING_SECRET"
   ]
 }
