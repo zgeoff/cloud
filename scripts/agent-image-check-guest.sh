@@ -102,8 +102,7 @@ check_tool atc "$ATC_VERSION" /usr/local/bin/atc --version
 check_tool boxxy "$BOXXY_CLI_VERSION" /usr/local/bin/boxxy --version
 # noslop prints its bare version, so the check compares the whole line: check_tool's substring match
 # would pass 0.4.290 for a pin of 0.4.29
-out=$(/usr/local/bin/noslop --version 2>&1)
-if [[ "$out" == "$NOSLOP_VERSION" ]]; then
+if out=$(/usr/local/bin/noslop --version 2>&1) && [[ "$out" == "$NOSLOP_VERSION" ]]; then
   pass noslop "$out"
 else
   fail noslop "\`/usr/local/bin/noslop --version\` gave '${out%%$'\n'*}', want $NOSLOP_VERSION"
