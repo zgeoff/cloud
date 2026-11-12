@@ -166,13 +166,22 @@ CoreDNS pods, because a policy sees the address after kube-proxy's DNAT. The
 
 ## Secrets and the backup
 
-Each workload reads its secrets from its own Kubernetes Secret, whose name Pulumi generates. A
-changed value then replaces the Secret and rolls the workload.
+Each workload reads its secrets from its own Kubernetes Secret, whose name Pulumi generates. When a
+value changes, Pulumi replaces the Secret on the next apply, and Kubernetes rolls the workload.
 [`load-pepys-inputs.ts`](../../../infra/inputs/load-pepys-inputs.ts) names each variable it reads
-from `.env`. The backup variables are all or none: without them, the cluster runs no backup.
+from the repo's root [`.env`](../../../.env). The backup variables are all or none: without them,
+the cluster runs no backup.
 
 The backup copies each bucket to its own folder of an R2 bucket with `rclone copy`, which never
 deletes a copied object. The host's store needs no backup: the host rebuilds it from the fact log.
+
+The backup reads Garage with its own key, which can read each bucket the backup copies and write
+none. `pepysWorkloads.backup.buckets` in
+[`pepys-workloads.ts`](../../../infra/shared/pepys-workloads.ts) lists the buckets, so a bucket
+added there needs a read grant for the backup's key too. Garage creates s2-lite's key at each start,
+but it has no way to create a second key, so an operator imports the backup's key by hand, once and
+again after any rebuild of Garage's data. The
+[pepys runbook](../../runbooks/pepys.md#give-the-backup-its-garage-key) gives the steps.
 
 ## Deploy the first time
 
