@@ -15,8 +15,11 @@ The server opens two listeners, and each has its own Service:
 | owner    | 8090 | `boxxy`, no fixed address             | `/healthz`, `/rpc`, `/mcp` | none                              |
 | worker   | 8091 | `boxxy-worker`, on a pinned ClusterIP | `/rpc`, `/mcp/session`     | the worker token on every request |
 
-The owner listener takes no token, so only the owner's own path may reach it. Its ingress
-NetworkPolicy admits the tailnet Traefik's namespace to port 8090 and no other pod.
+The owner listener takes no token, so it gets no route: no Ingress, tunnel or tailnet name points at
+it, and the owner reaches it with a port-forward over SSH
+([the runbook](../../runbooks/boxxy.md#reach-the-owner-listener)). Its ingress NetworkPolicy admits
+no pod to either port. A port-forward still reaches the owner port, since it connects on the pod's
+own loopback, which no NetworkPolicy filters.
 
 A worker session runs in an imp, which reaches neither the tailnet nor the cluster. It calls a
 made-up host, the broker host in the shared constants, and impd's credential broker sends the
@@ -33,24 +36,27 @@ than `none`, so a proxy in front of either must add neither.
 
 Pulumi writes the server's configuration file into a ConfigMap, mounted at `/etc/boxxy/config.json`.
 The cluster sets the listeners, the store at `/data/boxxy.db`, the rules folder at `/rules`, and the
-atc address: the `/rpc` route of the atc gateway's Service, so stack config `boxxy` needs stack
-config `atcGateway`. Stack config `boxxy` sets the rest: the runner ID, the trusted folders of each
-worker target, and the spawn target with its repo paths. The file holds no secret. The namespace's
-egress deny refuses only the tailnet and Podman's subnet, so the call to the gateway's Service needs
-no egress allow.
+atc address: the `/mcp` route of the atc gateway's Service, with the gateway's public host, so stack
+config `boxxy` needs stack config `atcGateway`. The gateway answers only a request whose `Host` is
+its public host, and the Service's DNS name is not that host, so the server sends the public host,
+which the cluster takes from stack config `atcGateway.publicURL`. Stack config `boxxy` sets the
+rest: the runner ID, the trusted folders of each worker target, and the spawn target. The spawn
+target's repos, each a folder or a git source, come from the secret stack config `boxxySpawnRepos`,
+because a repo's name can be private and this repo is public. Pulumi then marks the whole file a
+secret, so a preview shows no line of it, and an error about the repos names none of them. The file
+holds no token. The namespace's egress deny refuses only the tailnet and Podman's subnet, so the
+call to the gateway's Service needs no egress allow.
 
-The pinned gateway does not answer that address yet, so the server cannot reach atc until a fix
-lands. It refuses each request whose `Host` is not its public host with 403, and the Service's DNS
-name is not that host. It also serves no `/rpc` route, and answers 404 there even on its public
-host. Stack config `boxxy` stays unset until both change.
+A server before the release that moves its atc calls to MCP calls `/rpc` and sends no `Host`
+override, and the gateway refuses both. Run an image built from that release or a later one.
 
 Two tokens reach the pod as variables from a Secret with no fixed name, so a new token rolls the
 pod:
 
 - `BOXXY_WORKER_TOKEN`: the bearer token the broker adds to every worker call. The broker holds the
   second copy.
-- `BOXXY_ATC_TOKEN`: the bearer token the server sends to the atc gateway. How the gateway signs the
-  server in is not settled.
+- `BOXXY_ATC_TOKEN`: the atc service token that the server sends to the atc gateway, issued to the
+  gateway client `service:boxxy`.
 
 ## The rules
 

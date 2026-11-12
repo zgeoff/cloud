@@ -123,7 +123,7 @@
     "test:fixtures": "rig fixtures"
   },
   "dependencies": {
-    "@boxxy/server": "0.1.5",
+    "@boxxy/server": "0.1.7",
     "@pepys/kit": "0.1.1"
   },
   "devDependencies": {

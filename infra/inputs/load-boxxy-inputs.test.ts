@@ -13,7 +13,12 @@ function setupTest() {
     atc: {
       trustedFolders: { 'target-for-tests': ['/workspace'] },
     },
-    spawn: { target: 'target-for-tests', repoPaths: { 'owner/repo': '/workspace/repo' } },
+    spawn: { target: 'target-for-tests' },
+  };
+
+  const repos = {
+    'owner/repo': '/workspace/repo',
+    'owner/other': { url: 'https://github.com/owner/other', ref: 'main' },
   };
 
   const tokens = {
@@ -40,9 +45,10 @@ function setupTest() {
     },
   };
 
-  const stackConfig = buildStubConfig({ boxxy: JSON.stringify(boxxy) });
+  const stackValues = { boxxy: JSON.stringify(boxxy), boxxySpawnRepos: JSON.stringify(repos) };
+  const stackConfig = buildStubConfig(stackValues);
 
-  return { boxxy, stackConfig, tokens, backupVariables, backupImage };
+  return { boxxy, repos, stackValues, stackConfig, tokens, backupVariables, backupImage };
 }
 
 test('it returns nothing while the stack config leaves boxxy out', () => {
@@ -58,6 +64,7 @@ test('it returns the config, the pull credential and both tokens when boxxy is s
   expect(inputs).toStrictEqual({
     boxxy: {
       config: fixture.boxxy,
+      repos: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
       pullCredential: {
         username: 'octo-puller',
         token: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
@@ -78,10 +85,48 @@ test('it keeps the notice session when the stack config names one', () => {
     atc: { ...fixture.boxxy.atc, noticeSession: 'owner-session' },
   };
 
-  const stackConfig = buildStubConfig({ boxxy: JSON.stringify(withSession) });
+  const stackConfig = buildStubConfig({
+    ...fixture.stackValues,
+    boxxy: JSON.stringify(withSession),
+  });
+
   const inputs = loadBoxxyInputs(stackConfig, fixture.tokens, undefined);
 
   expect(inputs.boxxy?.config.atc.noticeSession).toBe('owner-session');
+});
+
+test('it marks the repos secret and carries them', async () => {
+  const fixture = setupTest();
+  const inputs = loadBoxxyInputs(fixture.stackConfig, fixture.tokens, undefined);
+
+  invariant(inputs.boxxy);
+
+  const secretRepos = await isSecret(inputs.boxxy.repos);
+  const repos = await resolveOutput(inputs.boxxy.repos);
+
+  expect(secretRepos).toBeTrue();
+  expect(repos).toStrictEqual(fixture.repos);
+});
+
+test('it refuses boxxy without the repos key', () => {
+  const fixture = setupTest();
+  const stackConfig = buildStubConfig({ boxxy: fixture.stackValues.boxxy });
+
+  expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrowWithMessage(
+    Error,
+    'stack config "boxxySpawnRepos" is unset; the boxxy server spawns only in the repos it names: run `pulumi config set --secret boxxySpawnRepos < <file of JSON>` in infra/',
+  );
+});
+
+test('it refuses repos in the boxxy block, where a private name would show', () => {
+  const fixture = setupTest();
+  const withRepos = { ...fixture.boxxy, spawn: { ...fixture.boxxy.spawn, repos: fixture.repos } };
+  const stackConfig = buildStubConfig({ ...fixture.stackValues, boxxy: JSON.stringify(withRepos) });
+
+  expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrowWithMessage(
+    Error,
+    'stack config "boxxy.spawn" Unrecognized key: "repos"',
+  );
 });
 
 test.each([
@@ -125,7 +170,11 @@ test('it refuses a missing atc token', () => {
 test('it refuses an image without a digest', () => {
   const fixture = setupTest();
   const withTagOnly = { ...fixture.boxxy, image: 'ghcr.io/zgeoff/cloud-boxxy:0123456' };
-  const stackConfig = buildStubConfig({ boxxy: JSON.stringify(withTagOnly) });
+
+  const stackConfig = buildStubConfig({
+    ...fixture.stackValues,
+    boxxy: JSON.stringify(withTagOnly),
+  });
 
   expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrowWithMessage(
     Error,
@@ -135,8 +184,12 @@ test('it refuses an image without a digest', () => {
 
 test('it refuses a config without a spawn target', () => {
   const fixture = setupTest();
-  const withoutTarget = { ...fixture.boxxy, spawn: { repoPaths: {} } };
-  const stackConfig = buildStubConfig({ boxxy: JSON.stringify(withoutTarget) });
+  const withoutTarget = { ...fixture.boxxy, spawn: {} };
+
+  const stackConfig = buildStubConfig({
+    ...fixture.stackValues,
+    boxxy: JSON.stringify(withoutTarget),
+  });
 
   expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrowWithMessage(
     Error,
@@ -147,7 +200,7 @@ test('it refuses a config without a spawn target', () => {
 test('it refuses a key the server configuration does not take', () => {
   const fixture = setupTest();
   const withStore = { ...fixture.boxxy, store: { file: '/tmp/boxxy-test/boxxy.db' } };
-  const stackConfig = buildStubConfig({ boxxy: JSON.stringify(withStore) });
+  const stackConfig = buildStubConfig({ ...fixture.stackValues, boxxy: JSON.stringify(withStore) });
 
   expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrowWithMessage(
     Error,
@@ -163,7 +216,7 @@ test('it refuses an atc address, which the cluster sets from the gateway', () =>
     atc: { ...fixture.boxxy.atc, url: 'http://atc.fixture.invalid:7777/rpc' },
   };
 
-  const stackConfig = buildStubConfig({ boxxy: JSON.stringify(withURL) });
+  const stackConfig = buildStubConfig({ ...fixture.stackValues, boxxy: JSON.stringify(withURL) });
 
   expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrowWithMessage(
     Error,

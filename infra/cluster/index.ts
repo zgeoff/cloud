@@ -101,14 +101,12 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
 }
 
 // the boxxy server calls atc through the gateway's Service, so it deploys only beside the gateway
-function requireGateway(
-  gateway: { readonly serviceURL: Output<string> } | undefined,
-): Output<string> {
+function requireGateway<Gateway>(gateway: Gateway | undefined): Gateway {
   if (gateway === undefined) {
     throw new Error(
       'stack config "boxxy" needs stack config "atcGateway": the boxxy server calls atc through the gateway',
     );
   }
 
-  return gateway.serviceURL;
+  return gateway;
 }

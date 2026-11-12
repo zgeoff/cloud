@@ -223,8 +223,9 @@ test("it runs the boxxy server's backup in the gateway's backup image", () => {
           'ghcr.io/zgeoff/cloud-boxxy:0123456@sha256:4444444444444444444444444444444444444444444444444444444444444444',
         runner: 'runner-for-tests',
         atc: { trustedFolders: {} },
-        spawn: { target: 'target-for-tests', repoPaths: {} },
+        spawn: { target: 'target-for-tests' },
       }),
+      boxxySpawnRepos: '{}',
     }),
     {
       K3S_KUBECONFIG: 'apiVersion: v1',

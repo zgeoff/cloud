@@ -8,23 +8,26 @@ function setupTest() {
       trustedFolders: { 'target-for-tests': ['/workspace'] },
       noticeSession: 'owner-session',
     },
-    spawn: {
-      target: 'target-for-tests',
-      repoPaths: { 'owner/repo': '/workspace/repo' },
-    },
+    spawn: { target: 'target-for-tests' },
   };
 
-  return config;
+  const repos = { 'owner/repo': { url: 'https://github.com/owner/repo', ref: 'main' } };
+
+  return { config, repos };
 }
 
-test('it sets the listeners, the store on the volume and the image rules, with no trustedIssuers section while no trust document is mounted', () => {
-  const config = setupTest();
+test('it sets the listeners, the store on the volume, the image rules and the gateway address with its public host, with no trustedIssuers section while no trust document is mounted', () => {
+  const fixture = setupTest();
 
   expect(
     JSON.parse(
       renderBoxxyConfig({
-        config,
-        atcURL: 'http://atc-gateway.atc.svc.cluster.local:8414/rpc',
+        config: fixture.config,
+        repos: fixture.repos,
+        atc: {
+          url: 'http://atc-gateway.atc.svc.cluster.local:8414/mcp',
+          host: 'atc.fixture.invalid',
+        },
         trusted: false,
       }),
     ),
@@ -38,10 +41,11 @@ test('it sets the listeners, the store on the volume and the image rules, with n
     },
     spawn: {
       target: 'target-for-tests',
-      repoPaths: { 'owner/repo': '/workspace/repo' },
+      repos: { 'owner/repo': { url: 'https://github.com/owner/repo', ref: 'main' } },
     },
     atc: {
-      url: 'http://atc-gateway.atc.svc.cluster.local:8414/rpc',
+      url: 'http://atc-gateway.atc.svc.cluster.local:8414/mcp',
+      host: 'atc.fixture.invalid',
       trustedFolders: { 'target-for-tests': ['/workspace'] },
       noticeSession: 'owner-session',
     },
@@ -49,13 +53,17 @@ test('it sets the listeners, the store on the volume and the image rules, with n
 });
 
 test("it names the mounted issuers folder and the broker's host as the audience when a trust document is mounted", () => {
-  const config = setupTest();
+  const fixture = setupTest();
 
   expect(
     JSON.parse(
       renderBoxxyConfig({
-        config,
-        atcURL: 'http://atc-gateway.atc.svc.cluster.local:8414/rpc',
+        config: fixture.config,
+        repos: fixture.repos,
+        atc: {
+          url: 'http://atc-gateway.atc.svc.cluster.local:8414/mcp',
+          host: 'atc.fixture.invalid',
+        },
         trusted: true,
       }),
     ),
@@ -68,12 +76,16 @@ test("it names the mounted issuers folder and the broker's host as the audience 
 });
 
 test('it ends the file with one newline', () => {
-  const config = setupTest();
+  const fixture = setupTest();
 
   expect(
     renderBoxxyConfig({
-      config,
-      atcURL: 'http://atc-gateway.atc.svc.cluster.local:8414/rpc',
+      config: fixture.config,
+      repos: fixture.repos,
+      atc: {
+        url: 'http://atc-gateway.atc.svc.cluster.local:8414/mcp',
+        host: 'atc.fixture.invalid',
+      },
       trusted: false,
     }),
   ).toEndWith('}\n');

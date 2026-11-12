@@ -172,8 +172,8 @@ write_config() {
     "listen": { "hostname": "0.0.0.0", "port": 8090 },
     "workerListen": { "hostname": "0.0.0.0", "port": 8091 }
   },
-  "spawn": { "target": "image-test", "repoPaths": {} },
-  "atc": { "url": "http://127.0.0.1:1/rpc", "trustedFolders": {} }
+  "spawn": { "target": "image-test", "repos": {} },
+  "atc": { "url": "http://127.0.0.1:1/mcp", "host": "atc.image-test.invalid", "trustedFolders": {} }
 }
 EOF
   chmod a+r "$tree/config.json"

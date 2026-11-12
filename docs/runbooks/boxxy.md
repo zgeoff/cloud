@@ -45,15 +45,35 @@ the items, with their copies, before the PR that adds the lines merges.
    ```yaml
    geoff-cloud:boxxy:
      image: ghcr.io/zgeoff/cloud-boxxy:<commit>@sha256:<digest>
-     runner: <runner id>
+     runner: geoffcloud
      atc:
-       trustedFolders:
-         <worker target>: [<folder>]
+       trustedFolders: {}
      spawn:
-       target: <worker target>
-       repoPaths:
-         <owner>/<repo>: <folder>
+       target: geoffcloud
    ```
+
+   Set the repos as the secret stack config `boxxySpawnRepos`, so no repo name reaches the public
+   file. Write the JSON to a file outside the repo, and pass it on stdin, so the names stay out of
+   the shell history:
+
+   ```json
+   { "<owner>/<repo>": { "url": "https://github.com/<owner>/<repo>", "ref": "<branch>" } }
+   ```
+
+   ```bash
+   cd infra
+   op run --env-file=../.env -- pulumi config set --stack prod --secret boxxySpawnRepos < <file of JSON>
+   ```
+
+   Check that the diff of `infra/Pulumi.prod.yaml` adds only a `secure:` value under
+   `geoff-cloud:boxxySpawnRepos`. Each imp is a fresh machine, so each repo is a git source that atc
+   clones in the imp over the imp's own network. The broker adds the GitHub credential from the
+   session's grants, so the URL carries none, and the server skips the trusted-folder check for a
+   git source.
+
+   The image must hold a server that calls atc over MCP. Leave out the `BOXXY_RESTIC_*` and
+   `BOXXY_R2_*` lines until both of their items exist: the backup takes all five variables or none,
+   and one alone fails the preview.
 
    Run `bun run preview` and check that it adds the `boxxy` namespace, its Secrets, both ConfigMaps,
    both Services, both NetworkPolicies, the StatefulSet, and the backup Secret and CronJob, and
@@ -70,6 +90,16 @@ the items, with their copies, before the PR that adds the lines merges.
 
    Expect `statefulset rolling update complete`, then one line with `"ownerPort":8090` and
    `"workerPort":8091`.
+
+## Reach the owner listener
+
+The owner listener has no route, so forward its port through SSH and leave the command running:
+
+```bash
+ssh -L 8090:localhost:8090 root@geoffcloud k3s kubectl -n boxxy port-forward svc/boxxy 8090
+```
+
+Then set `BOXXY_URL=http://localhost:8090` for the boxxy CLI.
 
 ## Add a trust document
 
