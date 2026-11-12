@@ -3,7 +3,7 @@ import type { BoxxyConfig, BoxxyRepos } from '../inputs/index.ts';
 
 export const boxxyOwnerPort = topology.boxxy.ownerPort;
 export const boxxyWorkerPort = topology.boxxy.workerPort;
-export const boxxyDoorPort = topology.boxxy.doorPort;
+const boxxyDoorPort = topology.boxxy.doorPort;
 
 // The volume holds the store, and the door's auth database beside it, `boxxy-auth.db`; the atc
 // gateway's backup image copies and restores every *.db in it.
