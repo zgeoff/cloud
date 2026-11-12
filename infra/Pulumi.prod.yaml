@@ -31,7 +31,7 @@ config:
     webhookHostname: pepys-webhook.geoff.cloud
     impIdentityAudience: pepys.imp.internal
   geoff-cloud:boxxy:
-    image: ghcr.io/zgeoff/cloud-boxxy:0b3ed6e70c648500e7aa87b6b5a74b13b81f33c6@sha256:4d83371c2d8369b5fee40b7fe92d0070883cd9198250aa3d7efcdeedf3f08f51
+    image: ghcr.io/zgeoff/cloud-boxxy:44ff35ce969c3f9e8b199258bed55705c31892dc@sha256:0609a1a3af636dc2cdda2e59cd707c8f3a5cf81329e1e7a7069d56236ce03886
     runner: geoffcloud
     atc:
       trustedFolders: {}
@@ -44,4 +44,4 @@ config:
   geoff-cloud:atcGatewayOwnerEmail:
     secure: v1:qtn2w/XR0+liFzQ/:W1+yrhJlqaefFrlRSnptVnSirINfeT8elzOilqkmF0VmHbE=
   geoff-cloud:boxxySpawnRepos:
-    secure: v1:Rq5+24roEFKcG544:BfJ+/urUPMOoXmDo+iScEo6CiMj749ut5VR82MuF6gaDijscpAyRwOMZMMKbx6jmj5dNKHeTMQas/c99fcdp2UoFgzunsUR+rk5Rxk9Jo7KF6gFKR3H1zVnycqDlono50LIS7yHamg==
+    secure: v1:DWnc88U9pdSqjBRb:nPCbD6puajW2uUWkgvLypSd71OZPvBDQZuDvHKLeU0Ag1Wp1aeboZ1r6I2wvsd4+KqRCM7AE11FooxpkKb810AjUxhF8L1Ca65eV5pygXMR0yqpBtXA21aRyyoGUSE9N4EvRK1VZEq+tZ9ihpkCjhohKOwonAI3Q6XO8VX5dVZSVORUy5dBo4y+XsqTJjFkerq8=

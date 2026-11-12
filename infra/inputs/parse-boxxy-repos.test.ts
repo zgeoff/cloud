@@ -51,6 +51,12 @@ test.each([
     { url: 'https://github.com/owner/repo', ref: 'main', 'hidden-key': 1 },
   ],
   ['a url that does not parse', { url: 'https://[hidden-repo', ref: 'main' }],
+  ['a ref that starts with -', { url: 'https://github.com/owner/repo', ref: '-hidden-option' }],
+  ['a ref over 255 characters', { url: 'https://github.com/owner/repo', ref: 'r'.repeat(256) }],
+  [
+    'a url over 2048 characters',
+    { url: `https://github.com/owner/${'u'.repeat(2048)}`, ref: 'main' },
+  ],
   [
     'a credentialRef that names no environment variable',
     {
