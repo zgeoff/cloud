@@ -173,9 +173,14 @@ function resolveSum(asset: Extract<PinPart, { kind: 'sum' }>['asset'], input: Pi
     : findAssetSum(input.values.sha256sums ?? '', named.groups['asset'] ?? '');
 }
 
+// a pin may hold the sums of two assets of one release, so a sum named by its asset keys apart
 function toPartKey(part: PinPart) {
-  return part.kind === 'digest' || part.kind === 'image-tag'
-    ? `${part.kind}:${part.image}`
+  if (part.kind === 'digest' || part.kind === 'image-tag') {
+    return `${part.kind}:${part.image}`;
+  }
+
+  return part.kind === 'sum' && typeof part.asset === 'string'
+    ? `${part.kind}:${part.asset}`
     : part.kind;
 }
 

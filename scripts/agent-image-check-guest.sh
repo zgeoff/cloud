@@ -97,6 +97,9 @@ done
 echo "== versions"
 check_tool claude "$CLAUDE_CODE_VERSION" claude --version
 check_tool atc "$ATC_VERSION" /usr/local/bin/atc --version
+# boxxy's compiled Bun binary stops on a CPU that lacks the instructions its build targets, so this
+# line run in an imp is the check that it runs on the agent hosts' CPU
+check_tool boxxy "$BOXXY_CLI_VERSION" /usr/local/bin/boxxy --version
 check_tool codex "$CODEX_VERSION" codex --version
 check_tool gh "$GH_VERSION" gh --version
 check_package git "$GIT_VERSION"
@@ -178,6 +181,27 @@ if [[ -f /opt/auto-mode/mods/auto-mode/.claude-plugin/plugin.json ]]; then
   pass auto-mode-mod "/opt/auto-mode/mods/auto-mode"
 else
   fail auto-mode-mod "/opt/auto-mode/mods/auto-mode/.claude-plugin/plugin.json is missing"
+fi
+# boxxy's hook plug-in, which only a session that passes --plugin-dir loads: no managed setting
+# names it, and its session-start hook refuses to run without the boxxy server's address
+plugin=/opt/boxxy/hook-plugin
+if [[ "$(jq -r .name "$plugin/.claude-plugin/plugin.json" 2> /dev/null)" == boxxy-hooks ]] &&
+  [[ "$(jq -c '[.hooks[][].hooks[].command]' "$plugin/hooks/hooks.json" 2> /dev/null)" == '["boxxy hook session-start","boxxy hook post-tool-use"]' ]]; then
+  pass boxxy-plugin "$plugin"
+else
+  fail boxxy-plugin "$plugin is missing, or its hooks do not run boxxy hook session-start and post-tool-use"
+fi
+if grep -rqs boxxy /etc/claude-code; then
+  fail boxxy-managed "a file under /etc/claude-code names boxxy, so sessions that are not boxxy's would run its hooks"
+else
+  pass boxxy-managed "no managed setting names boxxy"
+fi
+out=$(env -u BOXXY_URL /usr/local/bin/boxxy hook session-start < /dev/null 2>&1)
+status=$?
+if [[ "$status" == 2 && "$out" == "error: BOXXY_URL is not set" ]]; then
+  pass boxxy-hook "session-start without BOXXY_URL exits 2"
+else
+  fail boxxy-hook "session-start without BOXXY_URL exited $status with '$out', want 2 and 'error: BOXXY_URL is not set'"
 fi
 # the boot service that lets oxc's allocator reserve its buffers on a small imp
 overcommit=/etc/imp/services.d/overcommit.json

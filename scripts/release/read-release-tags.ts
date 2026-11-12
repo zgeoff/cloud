@@ -2,7 +2,15 @@ import { findJSONField } from '../find-json-field.ts';
 import type { Runner } from '../run-process.ts';
 import { runChecked } from './run-checked.ts';
 
-export async function readReleaseTags(run: Runner, repo: string): Promise<string[] | Error> {
+// gh lists the newest releases first; a record whose repository publishes other packages' releases
+// beside it asks for more of them (ReleaseRecord.releaseLimit)
+const defaultReleaseLimit = 30;
+
+export async function readReleaseTags(
+  run: Runner,
+  repo: string,
+  limit = defaultReleaseLimit,
+): Promise<string[] | Error> {
   const listed = await runChecked(run, [
     'gh',
     'release',
@@ -12,7 +20,7 @@ export async function readReleaseTags(run: Runner, repo: string): Promise<string
     '--exclude-drafts',
     '--exclude-pre-releases',
     '--limit',
-    '30',
+    String(limit),
     '--json',
     'tagName',
   ]);

@@ -254,6 +254,46 @@ test('it refuses another tarball sum for the pinned auto-mode version', () => {
   );
 });
 
+test('it pins the boxxy CLI and its hook plug-in, each with its own asset sum', () => {
+  const plan = planPinEdits({
+    record: getRecord('boxxy-cli'),
+    version: '0.3.0',
+    values: {
+      sha256sums: `${'4'.repeat(64)}  boxxy-linux-x64\n${'5'.repeat(64)}  boxxy-hook-plugin.tar.gz\n`,
+    },
+    files: {
+      'images/agent/Dockerfile': `ARG BOXXY_CLI_VERSION=0.2.0\nARG BOXXY_CLI_SHA256=${'1'.repeat(64)}\nARG BOXXY_HOOK_PLUGIN_SHA256=${'2'.repeat(64)}\n`,
+    },
+  });
+
+  expect(plan).toStrictEqual({
+    files: {
+      'images/agent/Dockerfile': `ARG BOXXY_CLI_VERSION=0.3.0\nARG BOXXY_CLI_SHA256=${'4'.repeat(64)}\nARG BOXXY_HOOK_PLUGIN_SHA256=${'5'.repeat(64)}\n`,
+    },
+    notes: ['pinned boxxy-cli 0.3.0'],
+    written: getRecord('boxxy-cli').pins,
+  });
+});
+
+test('it refuses a boxxy plug-in sum that the pinned release does not list', () => {
+  expect(
+    planPinEdits({
+      record: getRecord('boxxy-cli'),
+      version: '0.2.0',
+      values: {
+        sha256sums: `${'1'.repeat(64)}  boxxy-linux-x64\n${'5'.repeat(64)}  boxxy-hook-plugin.tar.gz\n`,
+      },
+      files: {
+        'images/agent/Dockerfile': `ARG BOXXY_CLI_VERSION=0.2.0\nARG BOXXY_CLI_SHA256=${'1'.repeat(64)}\nARG BOXXY_HOOK_PLUGIN_SHA256=${'2'.repeat(64)}\n`,
+      },
+    }),
+  ).toStrictEqual(
+    new Error(
+      `boxxy-cli pins 0.2.0 with ${'2'.repeat(64)}, but the release lists ${'5'.repeat(64)}`,
+    ),
+  );
+});
+
 test('it pins an imp release in the flake input, the host image and both imp-base lines', () => {
   const plan = planPinEdits({
     record: getRecord('imp'),

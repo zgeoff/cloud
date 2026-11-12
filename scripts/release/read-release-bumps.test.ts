@@ -33,7 +33,7 @@ test('it finds nothing when every pin holds its newest release', async () => {
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
@@ -65,6 +65,7 @@ test('it finds nothing when every pin holds its newest release', async () => {
         'zgeoff/impz': [{ tag: 'v1.0.1' }],
         'zgeoff/nixie': [{ tag: 'v0.7.0' }],
         'zgeoff/pepys': [{ tag: 'v0.4.0' }],
+        'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
       },
     }),
@@ -79,6 +80,7 @@ test('it finds nothing when every pin holds its newest release', async () => {
     ['gh', 'release', 'list', '-R', 'zgeoff/impz'],
     ['gh', 'release', 'list', '-R', 'zgeoff/nixie'],
     ['gh', 'release', 'list', '-R', 'zgeoff/pepys'],
+    ['gh', 'release', 'list', '-R', 'zgeoff/boxxy'],
     ['gh', 'release', 'list', '-R', 'zgeoff/auto-mode'],
   ]);
 });
@@ -88,7 +90,7 @@ test('it finds the atc line with every pinned version when one pin is older', as
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "2.26.2";\n');
@@ -120,6 +122,7 @@ test('it finds the atc line with every pinned version when one pin is older', as
         'zgeoff/impz': [{ tag: 'v1.0.1' }],
         'zgeoff/nixie': [{ tag: 'v0.7.0' }],
         'zgeoff/pepys': [{ tag: 'v0.4.0' }],
+        'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
       },
     }),
@@ -135,7 +138,7 @@ test('it finds the imp and nixie lines when their pins are older', async () => {
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:0.33.0@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:0.33.0@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
@@ -167,6 +170,7 @@ test('it finds the imp and nixie lines when their pins are older', async () => {
         'zgeoff/impz': [{ tag: 'v1.0.1' }],
         'zgeoff/nixie': [{ tag: 'v0.7.0' }],
         'zgeoff/pepys': [{ tag: 'v0.4.0' }],
+        'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
       },
     }),
@@ -182,7 +186,7 @@ test('it finds the auto-mode line when the agent image pin is older', async () =
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG AUTO_MODE_VERSION=0.17.0\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.17.0\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
@@ -214,6 +218,7 @@ test('it finds the auto-mode line when the agent image pin is older', async () =
         'zgeoff/impz': [{ tag: 'v1.0.1' }],
         'zgeoff/nixie': [{ tag: 'v0.7.0' }],
         'zgeoff/pepys': [{ tag: 'v0.4.0' }],
+        'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
       },
     }),
@@ -224,12 +229,78 @@ test('it finds the auto-mode line when the agent image pin is older', async () =
   expect(bumps).toStrictEqual(['auto-mode 0.19.3 0.17.0']);
 });
 
+test('it finds the boxxy CLI line behind more than 30 newer releases of other boxxy packages', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, 'images/agent/Dockerfile'),
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+  );
+
+  await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
+
+  await writeFile(
+    join(ctx.root, 'images/atc-gateway/versions.env'),
+    'ATC_RELEASE=@zgeoff/atc@4.3.0\n',
+  );
+
+  await writeFile(
+    join(ctx.root, 'nixos/hosts/geoffcloud/configuration.nix'),
+    `    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:${'1'.repeat(64)}";\n`,
+  );
+
+  await writeFile(
+    join(ctx.root, 'infra/Pulumi.prod.yaml'),
+    `    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'3'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'4'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/nixie-backup:0.7.0@sha256:${'6'.repeat(64)}\n`,
+  );
+
+  await writeFile(
+    join(ctx.root, 'package.json'),
+    '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
+  );
+
+  // 40 releases of the server, newer than the CLI's newest
+  const servers = Array.from({ length: 40 }, (_, index) => ({
+    tag: `@boxxy/server@0.3.${39 - index}`,
+  }));
+
+  const stub = buildStubRunner(
+    buildStubReleaseGH({
+      releases: {
+        'zgeoff/atc': [{ tag: '@zgeoff/atc@4.3.0' }],
+        'zgeoff/impz': [{ tag: 'v1.0.1' }],
+        'zgeoff/nixie': [{ tag: 'v0.7.0' }],
+        'zgeoff/pepys': [{ tag: 'v0.4.0' }],
+        'zgeoff/boxxy': [...servers, { tag: '@boxxy/cli@0.3.0' }, { tag: '@boxxy/cli@0.2.0' }],
+        'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
+      },
+    }),
+  );
+
+  const bumps = await readReleaseBumps(ctx.root, stub.run);
+
+  expect(bumps).toStrictEqual(['boxxy-cli 0.3.0 0.2.0']);
+
+  expect(
+    stub.calls
+      .filter((call) => call.argv.includes('--limit'))
+      .map((call) => [call.argv[4], call.argv[8]]),
+  ).toStrictEqual([
+    ['zgeoff/atc', '30'],
+    ['zgeoff/impz', '30'],
+    ['zgeoff/nixie', '30'],
+    ['zgeoff/pepys', '30'],
+    ['zgeoff/boxxy', '300'],
+    ['zgeoff/auto-mode', '30'],
+  ]);
+});
+
 test('it takes the highest version among the tags of the dependency own form', async () => {
   const ctx = await setupTest();
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.2.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.2.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.2.0";\n');
@@ -266,6 +337,7 @@ test('it takes the highest version among the tags of the dependency own form', a
         'zgeoff/impz': [{ tag: 'v1.2.3-rc.1' }, { tag: 'v1.0.1' }],
         'zgeoff/nixie': [{ tag: 'v0.7.0' }],
         'zgeoff/pepys': [{ tag: 'v0.4.0' }],
+        'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
       },
     }),
@@ -281,7 +353,7 @@ test('it finds nothing for a pin newer than the newest release', async () => {
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.4.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
@@ -313,6 +385,7 @@ test('it finds nothing for a pin newer than the newest release', async () => {
         'zgeoff/impz': [{ tag: 'v1.0.1' }],
         'zgeoff/nixie': [{ tag: 'v0.7.0' }],
         'zgeoff/pepys': [{ tag: 'v0.4.0' }],
+        'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
       },
     }),
@@ -371,7 +444,7 @@ test('it fails on a doubled pin', async () => {
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
@@ -416,7 +489,7 @@ test('it fails when a repository has no release of its form', async () => {
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
@@ -460,7 +533,7 @@ test('it gives the gh error when a release list fails', async () => {
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');

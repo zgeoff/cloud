@@ -92,6 +92,27 @@ RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/atc \
  && echo "${ATC_SHA256}  /usr/local/bin/atc" | sha256sum -c - \
  && chmod 0755 /usr/local/bin/atc
 
+# boxxy's compiled linux-x64 CLI and its Claude Code hook plug-in. The plug-in's
+# hooks run `boxxy hook ...`, so the CLI sits on PATH. Only a session that passes
+# --plugin-dir /opt/boxxy/hook-plugin loads the plug-in: atc's `boxxy` agent
+# entry does, and no managed setting does, so other sessions never run its hooks.
+# The sums are the two assets' lines in the release's SHA256SUMS:
+#   gh release download "@boxxy/cli@$VERSION" -R zgeoff/boxxy
+#   sha256sum -c SHA256SUMS
+ARG BOXXY_CLI_VERSION=0.1.6
+ARG BOXXY_CLI_SHA256=ad2768c39e3194b11d8105118fb38ee5257b07252cf59e3924219c3b726215f2
+ARG BOXXY_HOOK_PLUGIN_SHA256=ab8f281102a71182e1465fb8c5a254b012adfc7766737da88acf3dd5adcd4153
+RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/boxxy \
+      "https://github.com/zgeoff/boxxy/releases/download/%40boxxy/cli%40${BOXXY_CLI_VERSION}/boxxy-linux-x64" \
+ && echo "${BOXXY_CLI_SHA256}  /usr/local/bin/boxxy" | sha256sum -c - \
+ && chmod 0755 /usr/local/bin/boxxy \
+ && curl -fsSL ${CURL_RETRY} -o /tmp/boxxy-hook-plugin.tar.gz \
+      "https://github.com/zgeoff/boxxy/releases/download/%40boxxy/cli%40${BOXXY_CLI_VERSION}/boxxy-hook-plugin.tar.gz" \
+ && echo "${BOXXY_HOOK_PLUGIN_SHA256}  /tmp/boxxy-hook-plugin.tar.gz" | sha256sum -c - \
+ && mkdir -p /opt/boxxy \
+ && tar -xzf /tmp/boxxy-hook-plugin.tar.gz -C /opt/boxxy --no-same-owner \
+ && rm /tmp/boxxy-hook-plugin.tar.gz
+
 # Codex's full linux package: the codex binary, its bwrap sandbox helper and
 # rg. The sum is the asset digest GitHub lists on the release:
 #   gh api repos/openai/codex/releases/tags/rust-v$VERSION \
