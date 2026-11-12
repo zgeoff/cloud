@@ -98,9 +98,9 @@ bash scripts/switch-geoffcloud.sh --stop-ordinary-page-imps  # switch in the hug
 
 1. It refuses a branch other than `main`, uncommitted changes, a `main` behind `origin/main`, or any
    git command that fails.
-2. It refuses a commit that no green run of the NixOS checks covers, as
-   [Check the host before a switch](#check-the-host-before-a-switch) describes. `--build-only` skips
-   this gate, because it reaches no host.
+2. It refuses a commit that no green NixOS checks run on `main` and no green `nixos` check of its
+   merged pull request covers, as [Check the host before a switch](#check-the-host-before-a-switch)
+   describes. `--build-only` skips this gate, because it reaches no host.
 3. It refuses a commit whose atc daemon pin is another atc major release than a running atc gateway
    pod's image, or that finds no gateway pod, because atc breaks the daemon protocol only in a major
    release and the daemon handshake does not catch the break. It checks again before the activation.
@@ -199,14 +199,17 @@ snapshot of the working tree's tracked and unignored files. Its Nix store is the
 The NixOS checks gate the switch, not the merge. The `NixOS checks` workflow runs on `main` every
 night and on each dispatch, on `main` or on a branch. It also runs on each push to a pull request
 that changes an input of the checks, a release bump included, so a break shows before the merge; the
-merge does not wait for it, and the switch never counts it. A Renovate pull request starts no run;
-the nightly run checks its bump.
+merge does not wait for it. The switch counts it only as the next paragraph says. A Renovate pull
+request starts no run; the nightly run checks its bump.
 
 A run builds nothing, and passes, in two cases. A green scheduled or dispatched run on `main` covers
 every later commit that changes no input of the checks, which the `nixos` gate of
-[`gates.yml`](../../.github/gates.yml) lists. A run also skips the build when an earlier run built
-and passed the same derivations with the same workflow and build scripts, wherever that run ran; the
-skipped run's summary links it. A dispatch with `-f force=true` always builds.
+[`gates.yml`](../../.github/gates.yml) lists. The green `nixos` check of the merged pull request
+that produced a commit also covers it, when no input of the gate differs between the pull request's
+head and the commit. One gap is accepted: an input change on `main` that was reverted before the
+merge. A run also skips the build when an earlier run built and passed the same derivations with the
+same workflow and build scripts, wherever that run ran; the skipped run's summary links it. A
+dispatch with `-f force=true` always builds.
 
 A newer run on the same ref cancels the older one, on `main` as on a branch or pull request. On
 `main`, the newer run checks the newest commit, which is the one a switch takes. A newer run on a
@@ -235,7 +238,8 @@ To switch before the nightly run covers the commit:
 
 3. Run `bash scripts/switch-geoffcloud.sh`. Expect its first line to be `== checked by <run url>`.
 
-`bash scripts/find-nixos-check-run.sh <commit>` prints the run that covers a commit, or nothing.
+`bash scripts/find-nixos-check-run.sh <commit>` prints the run or check run that covers a commit, or
+nothing.
 
 ## Upgrade imp
 

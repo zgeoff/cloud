@@ -19,7 +19,35 @@ async function setupTest() {
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
 
-  return { directory, repo, runner, printOut, printErr };
+  // a commit with no history behind it, holding just these files
+  const commitOnOrphan = async (branch: string, files: Record<string, string>) => {
+    await repo.git(['-C', repo.seed, 'switch', '-q', '--orphan', branch]);
+    await repo.git(['-C', repo.seed, 'rm', '-rfq', '--ignore-unmatch', '.']);
+
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(join(repo.seed, path, '..'), { recursive: true });
+      await writeFile(join(repo.seed, path), content);
+    }
+
+    await repo.git(['-C', repo.seed, 'add', '-A']);
+    await repo.git(['-C', repo.seed, 'commit', '-qm', `tree of ${branch}`]);
+
+    return repo.git(['-C', repo.seed, 'rev-parse', 'HEAD']);
+  };
+
+  const decideTrees = (args: string[]) =>
+    runDecideGates({
+      args,
+      cwd: repo.seed,
+      manifestPath: join(directory, 'gates.yml'),
+      githubOutput: undefined,
+      githubStepSummary: undefined,
+      run: runner.run,
+      printOut,
+      printErr,
+    });
+
+  return { directory, repo, runner, printOut, printErr, commitOnOrphan, decideTrees };
 }
 
 test('it skips each gate whose paths no commit in the range changes', async () => {
@@ -295,7 +323,7 @@ test('it refuses a call that names no gate', async () => {
   expect(exitCode).toBe(2);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
-    ['usage: run-decide-gates.ts [--github] <base> <head> <gate>...\n'],
+    ['usage: run-decide-gates.ts [--github] [--trees] <base> <head> <gate>...\n'],
   ]);
 });
 
@@ -316,7 +344,7 @@ test('it refuses an option it does not know, before any git call', async () => {
   expect(exitCode).toBe(2);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
-    ['usage: run-decide-gates.ts [--github] <base> <head> <gate>...\n'],
+    ['usage: run-decide-gates.ts [--github] [--trees] <base> <head> <gate>...\n'],
   ]);
 
   expect(ctx.runner.calls).toStrictEqual([]);
@@ -560,4 +588,60 @@ test('it skips the provider and full gates for a docs-only commit when run as th
     'No input of the provider checks changed, so the Go checks did not run.\n' +
       'Only Markdown files changed, so the Nix-image linters and the shell suites did not run.\n',
   );
+});
+
+test('it needs a gate in --trees mode when a matched path differs between two unrelated trees', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'gates.yml'),
+    "gates:\n  apply:\n    paths: [infra/**]\n    ignore: ['**/*.md']\n",
+  );
+
+  const first = await ctx.commitOnOrphan('first', { 'infra/index.ts': 'export {};\n' });
+  const second = await ctx.commitOnOrphan('second', { 'infra/index.ts': 'export const a = 1;\n' });
+  const exitCode = await ctx.decideTrees(['--trees', first, second, 'apply']);
+
+  expect(exitCode).toBe(0);
+  expect(ctx.printOut.mock.calls).toStrictEqual([['apply=true\n']]);
+});
+
+test('it does not need a gate in --trees mode when only ignored or unmatched paths differ', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'gates.yml'),
+    "gates:\n  apply:\n    paths: [infra/**]\n    ignore: ['**/*.md']\n",
+  );
+
+  const first = await ctx.commitOnOrphan('first', {
+    'infra/index.ts': 'export {};\n',
+    'infra/notes.md': '# one\n',
+    'docs/a.txt': 'one\n',
+  });
+
+  const second = await ctx.commitOnOrphan('second', {
+    'infra/index.ts': 'export {};\n',
+    'infra/notes.md': '# two\n',
+    'docs/b.txt': 'two\n',
+  });
+
+  const exitCode = await ctx.decideTrees(['--trees', first, second, 'apply']);
+
+  expect(exitCode).toBe(0);
+  expect(ctx.printOut.mock.calls).toStrictEqual([['apply=false\n']]);
+});
+
+test('it fails with its usage in --trees mode for a missing argument', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'gates.yml'), 'gates:\n  apply:\n    paths: [infra/**]\n');
+
+  const exitCode = await ctx.decideTrees(['--trees', 'HEAD', 'HEAD']);
+
+  expect(exitCode).toBe(2);
+
+  expect(ctx.printErr.mock.calls).toStrictEqual([
+    ['usage: run-decide-gates.ts [--github] [--trees] <base> <head> <gate>...\n'],
+  ]);
 });

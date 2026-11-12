@@ -37,6 +37,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-nix-doc
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-nixos-ssh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-racing-git.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/gh-nixos-pr-calls.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool-stubs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
@@ -807,6 +808,7 @@ it_never_builds_or_switches_a_commit_that_no_green_nixos_run_covers() {
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
   # no green run: the --jq filter prints nothing
   jq -c '{argv: .}' <<< "$gh_runs_call" >> "$tree/gh-responses"
+  gh_pulls_call "$commit" | jq -c '{argv: .}' >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
@@ -817,7 +819,10 @@ it_never_builds_or_switches_a_commit_that_no_green_nixos_run_covers() {
 no green NixOS checks run covers ${commit:0:7}; start one with \`gh workflow run nixos-checks.yml --ref main\` and switch once it passes
 EOF
   diff /dev/null "$tree/out"
-  diff - "$tree/calls" <<< "$gh_runs_call"
+  diff - "$tree/calls" << EOF
+$gh_runs_call
+$(gh_pulls_call "$commit")
+EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
   assert_status 1 "$status"
@@ -839,6 +844,7 @@ it_never_builds_or_switches_a_commit_that_changed_nixos_after_the_last_green_run
   jq -c --arg runs "$checked https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
     <<< "$gh_runs_call" >> "$tree/gh-responses"
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  gh_pulls_call "$commit" | jq -c '{argv: .}' >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
@@ -849,7 +855,10 @@ it_never_builds_or_switches_a_commit_that_changed_nixos_after_the_last_green_run
 no green NixOS checks run covers ${commit:0:7}; start one with \`gh workflow run nixos-checks.yml --ref main\` and switch once it passes
 EOF
   diff /dev/null "$tree/out"
-  diff - "$tree/calls" <<< "$gh_runs_call"
+  diff - "$tree/calls" << EOF
+$gh_runs_call
+$(gh_pulls_call "$commit")
+EOF
   assert_status 1 "$status"
 }
 

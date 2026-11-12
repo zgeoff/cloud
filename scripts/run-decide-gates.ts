@@ -20,17 +20,18 @@ export interface RunDecideGatesOptions extends ScriptIO {
   readonly githubStepSummary: string | undefined;
 }
 
-const usage = 'usage: run-decide-gates.ts [--github] <base> <head> <gate>...';
+const usage = 'usage: run-decide-gates.ts [--github] [--trees] <base> <head> <gate>...';
 
 // A revision git cannot resolve fails with git's status, so a caller never skips a check on an
-// error. With --github each false gate also reports a skipped line, so every run reports a result.
+// error. With --trees the two revisions need no shared history: the paths are those that differ
+// between their trees. With --github each false gate also reports a skipped line, so every run reports a result.
 export function runDecideGates(options: Readonly<RunDecideGatesOptions>): Promise<number> {
   return withExitCode(options.printErr, async () => {
     const args = parseDecideGatesArgs(options.args);
     const github = args.github ? requireGitHubFiles(options) : undefined;
 
     const gates = await loadGates(options.manifestPath, args.gates);
-    const paths = await readChangedPaths(options, args.base, args.head);
+    const paths = await readChangedPaths(options, args.base, args.head, args.trees);
 
     const decisions = gates.map((gate: Gate) => ({
       gate,
@@ -61,6 +62,7 @@ export function runDecideGates(options: Readonly<RunDecideGatesOptions>): Promis
 
 interface DecideGatesArgs {
   readonly github: boolean;
+  readonly trees: boolean;
   readonly base: string;
   readonly head: string;
   readonly gates: readonly string[];
@@ -75,14 +77,20 @@ function parseDecideGatesArgs(args: readonly string[]): DecideGatesArgs {
     throw new ExitError(2, usage);
   }
 
-  return { github: parsed?.values.github === true, base, head, gates };
+  return {
+    github: parsed?.values.github === true,
+    trees: parsed?.values.trees === true,
+    base,
+    head,
+    gates,
+  };
 }
 
 function tryParseArgs(args: readonly string[]) {
   try {
     return parseArgs({
       args: [...args],
-      options: { github: { type: 'boolean' } },
+      options: { github: { type: 'boolean' }, trees: { type: 'boolean' } },
       allowPositionals: true,
       strict: true,
     });
@@ -129,7 +137,21 @@ async function readChangedPaths(
   io: Readonly<RunDecideGatesOptions>,
   base: string,
   head: string,
+  trees: boolean,
 ): Promise<string[] | 'all'> {
+  if (trees) {
+    const diff = await runOrExit(
+      io,
+      ['git', 'diff', '-z', '--no-renames', '--name-only', base, head],
+      { cwd: io.cwd },
+    );
+
+    return diff.stdout
+      .toString()
+      .split('\0')
+      .filter((path: string) => path !== '');
+  }
+
   if (/^0+$/u.test(base)) {
     return 'all';
   }

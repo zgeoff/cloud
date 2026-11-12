@@ -18,6 +18,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/gh-nixos-pr-calls.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-nixos-checks.sh"
 # the real bun, which each case links into its stand-ins' directory, because the script runs
@@ -112,6 +113,8 @@ it_needs_the_checks_for_a_nightly_run_on_a_commit_no_run_covers() {
       "-f", "branch=main", "-f", "per_page=100",
       "--jq", ".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""]}' \
     > "$tree/gh-responses"
+  # and no merged pull request produced the commit
+  gh_pulls_call "$commit" | jq -c '{argv: .}' >> "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
@@ -122,9 +125,12 @@ it_needs_the_checks_for_a_nightly_run_on_a_commit_no_run_covers() {
   diff /dev/null "$tree/err"
   diff - "$tree/output" <<< 'needed=true'
   diff /dev/null "$tree/summary"
-  diff - "$tree/calls" << 'EOF'
+  {
+    cat << 'EOF'
 ["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main","-f","per_page=100","--jq",".workflow_runs[] | select(.conclusion == \"success\" and (.event == \"schedule\" or .event == \"workflow_dispatch\")) | \"\\(.head_sha) \\(.html_url)\""]
 EOF
+    gh_pulls_call "$commit"
+  } | diff - "$tree/calls"
   assert_status 0 "$status"
 }
 
