@@ -31,7 +31,9 @@ export interface PepysRoute {
 // the API's /mcp and OAuth paths, which the shared tunnel carries with Access on the browser paths
 export interface PepysAPIRoute {
   readonly hostname: string;
-  readonly service: string;
+
+  // resolves once the host's StatefulSet has rolled out, so the tunnel's rules wait for it
+  readonly service: Output<string>;
 }
 
 interface PepysOutputs {
@@ -58,7 +60,8 @@ export function createPepys(cluster: Provider, inputs: PepysInputs): PepysOutput
   createGarage(cluster, namespace, inputs);
   createS2(cluster, namespace, inputs);
   createIngest(cluster, namespace, inputs, pull);
-  createHost(cluster, namespace, inputs, pull);
+
+  const host = createHost(cluster, namespace, inputs, pull);
 
   if (inputs.backup !== undefined) {
     createPepysBackupJob(cluster, namespace, inputs.backup);
@@ -78,7 +81,15 @@ export function createPepys(cluster: Provider, inputs: PepysInputs): PepysOutput
         }),
     ...(apiHostname === undefined
       ? {}
-      : { apiRoute: { hostname: apiHostname, service: pepysWorkloads.host.url } }),
+      : {
+          apiRoute: {
+            hostname: apiHostname,
+
+            // an older API serves /mcp to any caller, so the route waits until the pod that runs
+            // the pinned image is ready
+            service: host.metadata.name.apply(() => pepysWorkloads.host.url),
+          },
+        }),
   };
 }
 
