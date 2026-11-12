@@ -49,8 +49,8 @@
     "sum": "9fc80b05b7466fdfc83b2898137b1fab80e9cbcadf463d43e362071c878f9bee"
   },
   "boxxy-cli": {
-    "version": "0.1.6",
-    "sum": "ad2768c39e3194b11d8105118fb38ee5257b07252cf59e3924219c3b726215f2",
+    "version": "0.1.7",
+    "sum": "25f57178f172c46fb08fda7a5b0ad66f3e90959bf7ec173750739c2188dba7e6",
     "pluginSum": "ab8f281102a71182e1465fb8c5a254b012adfc7766737da88acf3dd5adcd4153"
   },
   "auto-mode": {
