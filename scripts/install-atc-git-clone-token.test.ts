@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { installATCGitCloneToken } from './install-atc-git-clone-token.ts';
 import { readHostScript } from './read-host-script.ts';
 import { buildStubOp } from './test-utils/build-stub-op.ts';
-import type { StubHandler } from './test-utils/build-stub-runner.ts';
+import type { StubAnswer, StubHandler } from './test-utils/build-stub-runner.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 
 interface SetupConfig {
@@ -28,16 +28,12 @@ async function setupTest(config: SetupConfig) {
 
   const checkScript = checkBytes.toString();
 
-  const host: StubHandler = (call) => {
-    if (call.argv[0] !== 'ssh') {
-      return;
-    }
-
-    return call.stdin.startsWith(checkScript)
+  const answerSsh = (stdin: string): StubAnswer =>
+    stdin.startsWith(checkScript)
       ? { exitCode: checkExits.shift() ?? 97 }
       : { exitCode: 0, stdout: '' };
-  };
 
+  const host: StubHandler = (call) => (call.argv[0] === 'ssh' ? answerSsh(call.stdin) : undefined);
   const runner = buildStubRunner(op.answer, host);
 
   const run = (env: Readonly<Record<string, string>>) =>

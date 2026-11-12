@@ -292,6 +292,10 @@ in
 
     systemd.services.atc-daemon-env-credentials = lib.mkIf (cfg.environmentCredentials != { }) {
       description = "Check the atc daemon's environment credential files";
+      # the credential files may live on a mount that is absent, as in the lost-disk boot: the
+      # daemon's own LoadCredential adds this dependency, and the check needs it too, so a missing
+      # mount stops the check's job where it would run and fail
+      unitConfig.RequiresMountsFor = lib.attrValues cfg.environmentCredentials;
       # no RemainAfterExit: the check runs again at each start of the daemon
       serviceConfig = {
         Type = "oneshot";
