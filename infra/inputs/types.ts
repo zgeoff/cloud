@@ -134,6 +134,57 @@ export interface FilesInputs {
   readonly backup?: FilesBackupInputs;
 }
 
+// what the boxxy server's configuration file takes from the stack config; the cluster sets the
+// listeners, the store and the rules folder itself
+export interface BoxxyConfig {
+  // by tag and digest
+  readonly image: string;
+
+  // the runner ID the server claims tasks as
+  readonly runner: string;
+
+  // the cluster sets the address: the atc gateway's Service
+  readonly atc: {
+    // by worker target: the folders the agent trusts
+    readonly trustedFolders: Readonly<Record<string, readonly string[]>>;
+
+    // the session that gets the hold notices; with none, no notice is sent
+    readonly noticeSession?: string;
+  };
+  readonly spawn: {
+    readonly target: string;
+    readonly repoPaths: Readonly<Record<string, string>>;
+  };
+}
+
+// a nightly restic backup of the boxxy store to its own repository in R2, run by the atc gateway's
+// backup image
+export interface BoxxyBackupInputs {
+  readonly image: string;
+  readonly secrets: {
+    readonly repository: Output<string>;
+    readonly password: Output<string>;
+    readonly accessKeyID: Output<string>;
+    readonly secretAccessKey: Output<string>;
+  };
+}
+
+export interface BoxxyInputs {
+  readonly config: BoxxyConfig;
+
+  readonly pullCredential: GHCRPullCredential;
+  readonly secrets: {
+    // the bearer token the broker adds to every worker call; the worker listener checks it
+    readonly workerToken: Output<string>;
+
+    // the bearer token the server sends to the atc daemon
+    readonly atcToken: Output<string>;
+  };
+
+  // without it there is no backup CronJob
+  readonly backup?: BoxxyBackupInputs;
+}
+
 export interface AlertWebhook {
   readonly url: string;
 

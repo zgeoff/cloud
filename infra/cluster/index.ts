@@ -1,11 +1,18 @@
 import type { Provider } from '@pulumi/kubernetes';
 import type { Output } from '@pulumi/pulumi';
-import type { ATCGatewayInputs, FilesInputs, NixieInputs, PepysInputs } from '../inputs/index.ts';
+import type {
+  ATCGatewayInputs,
+  BoxxyInputs,
+  FilesInputs,
+  NixieInputs,
+  PepysInputs,
+} from '../inputs/index.ts';
 import { createK3sNamespaceEgressDenies } from '../shared/create-k3s-namespace-egress-denies.ts';
 import { createK3sNamespacePatches } from '../shared/create-k3s-namespace-patches.ts';
 import { createATCGateway } from './atc-gateway.ts';
 import type { ATCGatewayRoute } from './build-atc-gateway-route-outputs.ts';
 import { buildATCGatewayRouteOutputs } from './build-atc-gateway-route-outputs.ts';
+import { createBoxxy } from './create-boxxy.ts';
 import type { FilesRoute } from './create-files.ts';
 import { createFiles } from './create-files.ts';
 import type { PepysRoute } from './create-pepys.ts';
@@ -32,6 +39,7 @@ interface ClusterInputs {
 
   // set only after the owner approves the deploy
   readonly pepys?: PepysInputs;
+  readonly boxxy?: BoxxyInputs;
 
   // geoff.cloud's zone, for nixie's DNS record
   readonly zoneID: Output<string>;
@@ -50,6 +58,9 @@ interface ClusterOutputs {
   readonly nixieReadinessURL?: string;
   readonly filesRoute?: FilesRoute;
   readonly pepysRoute?: PepysRoute;
+
+  // the boxxy server's owner listener in the cluster
+  readonly boxxyServiceURL?: Output<string>;
 }
 
 export function createCluster(cluster: Provider, inputs: ClusterInputs): ClusterOutputs {
@@ -74,11 +85,30 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
   const files = inputs.files === undefined ? undefined : createFiles(cluster, inputs.files);
   const pepys = inputs.pepys === undefined ? undefined : createPepys(cluster, inputs.pepys);
 
+  const boxxy =
+    inputs.boxxy === undefined
+      ? undefined
+      : createBoxxy(cluster, inputs.boxxy, requireGateway(gateway));
+
   return {
     onePasswordConnectServiceURL: connect.serviceURL,
     ...(files === undefined ? {} : { filesRoute: files.route }),
     ...(pepys?.route === undefined ? {} : { pepysRoute: pepys.route }),
+    ...(boxxy === undefined ? {} : { boxxyServiceURL: boxxy.ownerServiceURL }),
     ...(nixie === undefined ? {} : { nixieURL: nixie.url, nixieReadinessURL }),
     ...(gateway === undefined ? {} : buildATCGatewayRouteOutputs(gateway)),
   };
+}
+
+// the boxxy server calls atc through the gateway's Service, so it deploys only beside the gateway
+function requireGateway(
+  gateway: { readonly serviceURL: Output<string> } | undefined,
+): Output<string> {
+  if (gateway === undefined) {
+    throw new Error(
+      'stack config "boxxy" needs stack config "atcGateway": the boxxy server calls atc through the gateway',
+    );
+  }
+
+  return gateway.serviceURL;
 }

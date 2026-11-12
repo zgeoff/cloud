@@ -36,6 +36,8 @@ call, the path of a change, the topology and the data.
     link, the type rules for serving, expiry and the backup.
   - [pepys](./architecture/workloads/pepys.md): the data hub's stores, ingest, host and API, its one
     public route, and the bucket backup.
+  - [The boxxy server](./architecture/workloads/boxxy.md): its two listeners, the broker's path to
+    the worker listener, its configuration, the caller proof and the backup.
   - [Observability](./architecture/workloads/observability.md): metrics, logs, probes, alerts and
     the check from the edge.
 
@@ -82,6 +84,8 @@ call, the path of a change, the topology and the data.
   forgotten item, test a restore.
 - [The files service](./runbooks/files.md): deploy files.geoff.cloud, upload a file, upgrade, revoke
   a token, back up, restore and check a restore.
+- [The boxxy server](./runbooks/boxxy.md): deploy the server, add a trust document, upgrade, rotate
+  a token, back up and restore.
 - [Release check](./runbooks/release-check.md): the bump pull requests for new atc, imp, nixie,
   pepys, boxxy CLI and auto-mode releases, when they merge on their own, and the app they run as.
 - [Previews](./runbooks/preview.md): set up the preview service, opt a repository in, check a

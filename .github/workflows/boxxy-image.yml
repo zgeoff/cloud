@@ -1,0 +1,81 @@
+name: boxxy image
+
+# Builds the boxxy server's image and runs its image test on every push to main that changes the
+# server's entry, its rules, the image or the lockfile that pins @boxxy/server, then publishes it as
+# ghcr.io/zgeoff/cloud-boxxy:<commit>. A newer push cancels an older run's image test, and that run
+# publishes nothing, since the newer commit's image holds its changes. CI's checks job runs the
+# image test on a pull request, which never publishes. Pin a published digest in the stack config's
+# boxxy.image to deploy it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - deploy/boxxy/server.ts
+      - deploy/boxxy/rules/**
+      - images/boxxy/**
+      - images/atc-gateway/versions.env
+      - scripts/write-boxxy-image-context.sh
+      - scripts/publish-boxxy-image.sh
+      - scripts/run-shell-suites.sh
+      - test-support/shell/**
+      - bun.lock
+      - .bun-version
+      - .github/workflows/boxxy-image.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: boxxy-image-check-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Image test
+        run: bun run test:boxxy-image
+
+  publish:
+    name: Release the image
+    needs: [check]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # one publish at a time; each commit's tag is its own, so a later push never replaces an earlier
+    concurrency:
+      group: boxxy-image-publish
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Write the build context
+        run: bun run ci:write-boxxy-image-context context-boxxy
+
+      - name: Build and push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun run ci:publish-boxxy-image context-boxxy

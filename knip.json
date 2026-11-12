@@ -25,11 +25,20 @@
       "project": ["**/*.ts"]
     },
     ".": {
-      "entry": ["scripts/build-agent-image.ts", "scripts/test-utils/run-stub-kubectl-proxy.ts"],
-      "project": ["scripts/**/*.ts", "e2e/**/*.ts"]
+      "entry": [
+        "deploy/boxxy/server.ts",
+        "scripts/build-agent-image.ts",
+        "scripts/test-utils/run-stub-kubectl-proxy.ts"
+      ],
+      "project": ["deploy/boxxy/**/*.ts", "scripts/**/*.ts", "e2e/**/*.ts"]
     }
   },
-  "ignoreDependencies": ["@stylistic/eslint-plugin", "@zgeoff/agent-hooks", "@zgeoff/diet"],
+  "ignoreDependencies": [
+    "@pepys/kit",
+    "@stylistic/eslint-plugin",
+    "@zgeoff/agent-hooks",
+    "@zgeoff/diet"
+  ],
   "ignoreBinaries": ["go", "op"],
   "ignoreWorkspaces": ["sdk/*"]
 }

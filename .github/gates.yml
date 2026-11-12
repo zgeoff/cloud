@@ -193,6 +193,18 @@ gates:
       - images/atc-gateway/versions.env
       - scripts/run-shell-suites.sh
       - test-support/shell/**
+  boxxy-image:
+    skipped: Nothing the boxxy image builds from changed, so its image test did not run.
+    paths:
+      - deploy/boxxy/server.ts
+      - deploy/boxxy/rules/**
+      - images/boxxy/**
+      - images/atc-gateway/versions.env
+      - scripts/write-boxxy-image-context.sh
+      - scripts/publish-boxxy-image.sh
+      - scripts/run-shell-suites.sh
+      - test-support/shell/**
+      - bun.lock
       - .bun-version
       - .github/workflows/ci.yml
 

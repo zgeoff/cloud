@@ -204,6 +204,28 @@ function buildRestoreJobFiles(backupImages: BackupImages): readonly RestoreJobFi
         ),
       }),
     },
+    {
+      path: join('deploy', 'boxxy', 'restore-job.yaml'),
+      header: `${renderGeneratedNote('backup pod', 'infra/cluster/build-atc-gateway-backup-pod-spec.ts', 'atcGateway.backupImage')}# One-off restore of the boxxy server's store, from the boxxy-backup CronJob's repository, with
+# the atc gateway's backup image and its own entrypoint. Stop the server first
+# (docs/runbooks/boxxy.md), then:
+#   ssh root@geoffcloud k3s kubectl create -f - < deploy/boxxy/restore-job.yaml
+# To list the snapshots instead, set args to ['ls']; to restore another snapshot, set SNAPSHOT. The
+# claim is data-boxxy-0, the server's own. The Secret is the CronJob's fixed-name Secret.
+`,
+      job: buildRestoreJob({
+        name: 'boxxy',
+        namespace: 'boxxy',
+        pod: toRestorePod(
+          buildATCGatewayBackupPodSpec({
+            image: backupImages.gateway,
+            claim: 'data-boxxy-0',
+            envSecret: 'boxxy-backup',
+            pullSecret: ghcrPullSecretName,
+          }),
+        ),
+      }),
+    },
   ];
 }
 

@@ -37,6 +37,12 @@ test('it accepts a complete topology as given', () => {
     imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
     onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
     pepysIngest: { clusterIP: '10.43.82.200', port: 8080 },
+    boxxy: {
+      workerClusterIP: '10.43.0.80',
+      ownerPort: 8090,
+      workerPort: 8091,
+      brokerHost: 'boxxy.imp.internal',
+    },
     nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
   };
 
@@ -79,6 +85,12 @@ test('it rejects a key that the schema does not name', () => {
     imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
     onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
     pepysIngest: { clusterIP: '10.43.82.200', port: 8080 },
+    boxxy: {
+      workerClusterIP: '10.43.0.80',
+      ownerPort: 8090,
+      workerPort: 8091,
+      brokerHost: 'boxxy.imp.internal',
+    },
     nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
   });
 
@@ -121,6 +133,12 @@ test('it rejects a port outside 1 to 65535', () => {
     imp: { domain: 'imps.geoff.cloud', apiPort: 70_700 },
     onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
     pepysIngest: { clusterIP: '10.43.82.200', port: 8080 },
+    boxxy: {
+      workerClusterIP: '10.43.0.80',
+      ownerPort: 8090,
+      workerPort: 8091,
+      brokerHost: 'boxxy.imp.internal',
+    },
     nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
   });
 
@@ -163,6 +181,12 @@ test('it rejects a tag without the tag: prefix', () => {
     imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
     onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
     pepysIngest: { clusterIP: '10.43.82.200', port: 8080 },
+    boxxy: {
+      workerClusterIP: '10.43.0.80',
+      ownerPort: 8090,
+      workerPort: 8091,
+      brokerHost: 'boxxy.imp.internal',
+    },
     nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
   });
 
@@ -205,6 +229,12 @@ test('it rejects a CIDR without its prefix length', () => {
     imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
     onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
     pepysIngest: { clusterIP: '10.43.82.200', port: 8080 },
+    boxxy: {
+      workerClusterIP: '10.43.0.80',
+      ownerPort: 8090,
+      workerPort: 8091,
+      brokerHost: 'boxxy.imp.internal',
+    },
     nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
   });
 
@@ -247,6 +277,12 @@ test("it rejects an IPv4 range as the tailnet's IPv6 range", () => {
     imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
     onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
     pepysIngest: { clusterIP: '10.43.82.200', port: 8080 },
+    boxxy: {
+      workerClusterIP: '10.43.0.80',
+      ownerPort: 8090,
+      workerPort: 8091,
+      brokerHost: 'boxxy.imp.internal',
+    },
     nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
   });
 

@@ -1,5 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { output, runtime } from '@pulumi/pulumi';
+import { z } from 'zod';
+import { buildMockATCGatewayConfig } from '../test-utils/build-mock-atc-gateway-config.ts';
 import { buildStubResourceMocks } from '../test-utils/build-stub-resource-mocks.ts';
 import { resolveOutput } from '../test-utils/resolve-output.ts';
 import { createCluster, createClusterProvider } from './index.ts';
@@ -15,7 +17,9 @@ test("it returns the files service's route, from its configured host to its Serv
   });
 
   const workloads = createCluster(
-    createClusterProvider('k3s', { kubeconfig: output('kubeconfig-for-tests') }),
+    createClusterProvider('k3s', {
+      kubeconfig: output('kubeconfig-for-tests'),
+    }),
     {
       onePasswordConnect: { credentials: output('{}') },
       files: {
@@ -28,7 +32,10 @@ test("it returns the files service's route, from its configured host to its Serv
           username: 'octo-puller',
           token: output('ghp_fake0token0for0tests0only0000000000'),
         },
-        tokenHashes: { agent: output('a'.repeat(64)), owner: output('b'.repeat(64)) },
+        tokenHashes: {
+          agent: output('a'.repeat(64)),
+          owner: output('b'.repeat(64)),
+        },
       },
       zoneID: output('zone'),
       kubeconfig: output('kubeconfig-for-tests'),
@@ -56,7 +63,9 @@ test('it returns no files route while files is unset', async () => {
   });
 
   const workloads = createCluster(
-    createClusterProvider('k3s', { kubeconfig: output('kubeconfig-for-tests') }),
+    createClusterProvider('k3s', {
+      kubeconfig: output('kubeconfig-for-tests'),
+    }),
     {
       onePasswordConnect: { credentials: output('{}') },
       zoneID: output('zone'),
@@ -65,6 +74,158 @@ test('it returns no files route while files is unset', async () => {
   );
 
   expect(workloads.filesRoute).toBeUndefined();
+});
+
+test("it returns the boxxy server's owner Service and pins only the worker Service, when boxxy is set", async () => {
+  const boxxyInputs = {
+    config: {
+      image:
+        'ghcr.io/zgeoff/cloud-boxxy:0123456@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+      runner: 'runner-for-tests',
+      atc: { trustedFolders: {} },
+      spawn: { target: 'target-for-tests', repoPaths: {} },
+    },
+    pullCredential: {
+      username: 'octo-puller',
+      token: output('ghp_fake0token0for0tests0only0000000000'),
+    },
+    secrets: {
+      workerToken: output('worker-token-for-tests'),
+      atcToken: output('atc-token-for-tests'),
+    },
+  };
+
+  const stub = buildStubResourceMocks();
+
+  await runtime.setMocks(stub.mocks, 'geoff-cloud', 'test');
+
+  onTestFinished(() => {
+    stub.release();
+    runtime.resetOptions('', '', -1, '', '', false, '');
+  });
+
+  const workloads = createCluster(
+    createClusterProvider('k3s', {
+      kubeconfig: output('kubeconfig-for-tests'),
+    }),
+    {
+      onePasswordConnect: { credentials: output('{}') },
+      atcGateway: {
+        inputs: {
+          config: buildMockATCGatewayConfig(),
+          secrets: {
+            pullCredential: {
+              username: 'octo-puller',
+              token: output('ghp_fake0token0for0tests0only0000000000'),
+            },
+            tokens: { geoffcloud: output('daemon-token-for-tests') },
+            ownerEmail: output('owner@fixture.invalid'),
+          },
+        },
+        tunnelToken: output('tunnel-token-for-tests'),
+      },
+      boxxy: boxxyInputs,
+      zoneID: output('zone'),
+      kubeconfig: output('kubeconfig-for-tests'),
+    },
+  );
+
+  if (workloads.boxxyServiceURL === undefined) {
+    throw new Error('the cluster returned no boxxy Service');
+  }
+
+  const service = await resolveOutput(workloads.boxxyServiceURL);
+
+  await stub.whenRegistered('kubernetes:core/v1:Service::boxxy-worker');
+  await stub.whenRegistered('kubernetes:core/v1:Service::boxxy');
+  await stub.whenRegistered('kubernetes:core/v1:ConfigMap::boxxy-config');
+
+  const config = z
+    .object({ data: z.object({ 'config.json': z.string() }) })
+    .parse(stub.inputs.get('kubernetes:core/v1:ConfigMap::boxxy-config'));
+
+  expect(service).toBe('http://boxxy.boxxy.svc.cluster.local:8090');
+
+  expect(JSON.parse(config.data['config.json'])).toMatchObject({
+    atc: { url: 'http://atc-gateway.atc.svc.cluster.local:8414/rpc', trustedFolders: {} },
+  });
+
+  expect(stub.inputs.get('kubernetes:core/v1:Service::boxxy-worker')?.['spec']).toStrictEqual({
+    clusterIP: '10.43.0.80',
+    selector: { app: 'boxxy-server' },
+    ports: [{ name: 'worker', port: 8091, targetPort: 'worker' }],
+  });
+
+  expect(stub.inputs.get('kubernetes:core/v1:Service::boxxy')?.['spec']).toStrictEqual({
+    selector: { app: 'boxxy-server' },
+    ports: [{ name: 'owner', port: 8090, targetPort: 'owner' }],
+  });
+});
+
+test('it refuses boxxy without the atc gateway, which the server calls atc through', async () => {
+  const stub = buildStubResourceMocks();
+
+  await runtime.setMocks(stub.mocks, 'geoff-cloud', 'test');
+
+  onTestFinished(() => {
+    stub.release();
+    runtime.resetOptions('', '', -1, '', '', false, '');
+  });
+
+  expect(() =>
+    createCluster(createClusterProvider('k3s', { kubeconfig: output('kubeconfig-for-tests') }), {
+      onePasswordConnect: { credentials: output('{}') },
+      boxxy: {
+        config: {
+          image:
+            'ghcr.io/zgeoff/cloud-boxxy:0123456@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+          runner: 'runner-for-tests',
+          atc: { trustedFolders: {} },
+          spawn: { target: 'target-for-tests', repoPaths: {} },
+        },
+        pullCredential: {
+          username: 'octo-puller',
+          token: output('ghp_fake0token0for0tests0only0000000000'),
+        },
+        secrets: {
+          workerToken: output('worker-token-for-tests'),
+          atcToken: output('atc-token-for-tests'),
+        },
+      },
+      zoneID: output('zone'),
+      kubeconfig: output('kubeconfig-for-tests'),
+    }),
+  ).toThrowWithMessage(
+    Error,
+    'stack config "boxxy" needs stack config "atcGateway": the boxxy server calls atc through the gateway',
+  );
+});
+
+test('it creates no boxxy server while boxxy is unset', async () => {
+  const stub = buildStubResourceMocks();
+
+  await runtime.setMocks(stub.mocks, 'geoff-cloud', 'test');
+
+  onTestFinished(() => {
+    stub.release();
+    runtime.resetOptions('', '', -1, '', '', false, '');
+  });
+
+  const workloads = createCluster(
+    createClusterProvider('k3s', {
+      kubeconfig: output('kubeconfig-for-tests'),
+    }),
+    {
+      onePasswordConnect: { credentials: output('{}') },
+      zoneID: output('zone'),
+      kubeconfig: output('kubeconfig-for-tests'),
+    },
+  );
+
+  await stub.whenRegistered('kubernetes:core/v1:Namespace::onepassword');
+
+  expect(workloads.boxxyServiceURL).toBeUndefined();
+  expect(stub.registered.filter((key) => key.includes('boxxy'))).toBeEmpty();
 });
 
 test('it creates the egress deny in each namespace k3s creates, kube-system and default included', async () => {
@@ -77,11 +238,16 @@ test('it creates the egress deny in each namespace k3s creates, kube-system and 
     runtime.resetOptions('', '', -1, '', '', false, '');
   });
 
-  createCluster(createClusterProvider('k3s', { kubeconfig: output('kubeconfig-for-tests') }), {
-    onePasswordConnect: { credentials: output('{}') },
-    zoneID: output('zone'),
-    kubeconfig: output('kubeconfig-for-tests'),
-  });
+  createCluster(
+    createClusterProvider('k3s', {
+      kubeconfig: output('kubeconfig-for-tests'),
+    }),
+    {
+      onePasswordConnect: { credentials: output('{}') },
+      zoneID: output('zone'),
+      kubeconfig: output('kubeconfig-for-tests'),
+    },
+  );
 
   await Promise.all(
     ['default', 'kube-node-lease', 'kube-public', 'kube-system'].map((namespace) =>
@@ -102,7 +268,14 @@ test('it creates the egress deny in each namespace k3s creates, kube-system and 
       policyTypes: ['Egress'],
       egress: [
         {
-          to: [{ ipBlock: { cidr: '0.0.0.0/0', except: ['100.64.0.0/10', '10.88.0.0/16'] } }],
+          to: [
+            {
+              ipBlock: {
+                cidr: '0.0.0.0/0',
+                except: ['100.64.0.0/10', '10.88.0.0/16'],
+              },
+            },
+          ],
         },
       ],
     },
@@ -119,11 +292,16 @@ test('it creates the egress deny in a namespace it creates itself', async () => 
     runtime.resetOptions('', '', -1, '', '', false, '');
   });
 
-  createCluster(createClusterProvider('k3s', { kubeconfig: output('kubeconfig-for-tests') }), {
-    onePasswordConnect: { credentials: output('{}') },
-    zoneID: output('zone'),
-    kubeconfig: output('kubeconfig-for-tests'),
-  });
+  createCluster(
+    createClusterProvider('k3s', {
+      kubeconfig: output('kubeconfig-for-tests'),
+    }),
+    {
+      onePasswordConnect: { credentials: output('{}') },
+      zoneID: output('zone'),
+      kubeconfig: output('kubeconfig-for-tests'),
+    },
+  );
 
   await stub.whenRegistered(
     'kubernetes:networking.k8s.io/v1:NetworkPolicy::onepassword-egress-deny',
@@ -140,7 +318,14 @@ test('it creates the egress deny in a namespace it creates itself', async () => 
       policyTypes: ['Egress'],
       egress: [
         {
-          to: [{ ipBlock: { cidr: '0.0.0.0/0', except: ['100.64.0.0/10', '10.88.0.0/16'] } }],
+          to: [
+            {
+              ipBlock: {
+                cidr: '0.0.0.0/0',
+                except: ['100.64.0.0/10', '10.88.0.0/16'],
+              },
+            },
+          ],
         },
       ],
     },

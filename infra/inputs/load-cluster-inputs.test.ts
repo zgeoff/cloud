@@ -204,3 +204,45 @@ test("it runs the files service's backup in the gateway's backup image", () => {
     'ghcr.io/zgeoff/atc-gateway-backup:4.0.0-r1@sha256:2222222222222222222222222222222222222222222222222222222222222222',
   );
 });
+
+test("it runs the boxxy server's backup in the gateway's backup image", () => {
+  const config = buildMockATCGatewayConfig({
+    backupImage:
+      'ghcr.io/zgeoff/atc-gateway-backup:4.0.0-r1@sha256:2222222222222222222222222222222222222222222222222222222222222222',
+    daemons: { geoffcloud: {} },
+    defaultDaemon: 'geoffcloud',
+  });
+
+  const inputs = loadClusterInputs(
+    buildStubConfig({
+      cluster: 'managed',
+      atcGateway: JSON.stringify(config),
+      atcGatewayOwnerEmail: 'owner@example.test',
+      boxxy: JSON.stringify({
+        image:
+          'ghcr.io/zgeoff/cloud-boxxy:0123456@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+        runner: 'runner-for-tests',
+        atc: { trustedFolders: {} },
+        spawn: { target: 'target-for-tests', repoPaths: {} },
+      }),
+    }),
+    {
+      K3S_KUBECONFIG: 'apiVersion: v1',
+      ONEPASSWORD_CONNECT_CREDENTIALS: '{"verifier":{}}',
+      ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
+      GHCR_PULL_USERNAME: 'octo-puller',
+      GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
+      BOXXY_WORKER_TOKEN: 'worker-token-for-tests',
+      BOXXY_ATC_TOKEN: 'atc-token-for-tests',
+      BOXXY_RESTIC_PASSWORD: 'p'.repeat(32),
+      BOXXY_R2_ACCESS_KEY_ID: 'a'.repeat(32),
+      BOXXY_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
+      BOXXY_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
+      BOXXY_R2_BUCKET: 'backups',
+    },
+  );
+
+  expect(inputs?.boxxy?.backup?.image).toBe(
+    'ghcr.io/zgeoff/atc-gateway-backup:4.0.0-r1@sha256:2222222222222222222222222222222222222222222222222222222222222222',
+  );
+});

@@ -35,6 +35,7 @@ test.each([
   [
     'release-check/atc-gateway-images',
     [
+      'deploy/boxxy/restore-job.yaml',
       'deploy/files/restore-job.yaml',
       'images/atc-gateway/restore-job.yaml',
       'infra/Pulumi.prod.yaml',

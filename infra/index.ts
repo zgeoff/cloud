@@ -51,6 +51,7 @@ const workloads =
         ...(k3s.inputs.nixie === undefined ? {} : { nixie: k3s.inputs.nixie }),
         ...(k3s.inputs.files === undefined ? {} : { files: k3s.inputs.files }),
         ...(k3s.inputs.pepys === undefined ? {} : { pepys: k3s.inputs.pepys }),
+        ...(k3s.inputs.boxxy === undefined ? {} : { boxxy: k3s.inputs.boxxy }),
         zoneID: edge.zoneID,
         kubeconfig: secret(k3s.inputs.kubeconfig),
       });

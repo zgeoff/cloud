@@ -47,6 +47,7 @@ jobs:
       atc-gateway: ${{ steps.decide.outputs.atc-gateway }}
       files-image: ${{ steps.decide.outputs.files-image }}
       pepys-image: ${{ steps.decide.outputs.pepys-image }}
+      boxxy-image: ${{ steps.decide.outputs.boxxy-image }}
       files-backup: ${{ steps.decide.outputs.files-backup }}
       nixie-backup: ${{ steps.decide.outputs.nixie-backup }}
       nixie-config: ${{ steps.decide.outputs.nixie-config }}
@@ -76,7 +77,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >-
           bun run --silent ci:decide-ci-gates provider onidel-vendor full agent-image atc-gateway
-          files-image pepys-image files-backup nixie-backup nixie-config alert-rules
+          files-image pepys-image boxxy-image files-backup nixie-backup nixie-config alert-rules
 
   # the Bun checks and tests, the shell suites and the secret scan
   bun:
@@ -218,6 +219,13 @@ jobs:
           needs.decide.outputs.reused != 'true' && (github.event_name == 'pull_request' &&
           needs.decide.outputs.pepys-image != 'false')
         run: bun run test:pepys-image
+      # A push to main runs the boxxy image's test in its publish workflow, before it publishes, so
+      # this job runs it on a pull request only.
+      - name: Test boxxy Image
+        if:
+          needs.decide.outputs.reused != 'true' && (github.event_name == 'pull_request' &&
+          needs.decide.outputs.boxxy-image != 'false')
+        run: bun run test:boxxy-image
 
       - name: Dead Code
         if: needs.decide.outputs.reused != 'true'
@@ -545,7 +553,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >-
           bun run --silent ci:decide-ci-gates provider onidel-vendor full agent-image atc-gateway
-          files-image pepys-image files-backup nixie-backup nixie-config alert-rules
+          files-image pepys-image boxxy-image files-backup nixie-backup nixie-config alert-rules
 
       - name: Install
         if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
@@ -645,6 +653,11 @@ jobs:
           ${{ github.event.repository.private && github.event_name == 'pull_request' &&
           steps.decide.outputs.pepys-image != 'false' }}
         run: bun run test:pepys-image
+      - name: Test boxxy Image
+        if: >-
+          ${{ github.event.repository.private && github.event_name == 'pull_request' &&
+          steps.decide.outputs.boxxy-image != 'false' }}
+        run: bun run test:boxxy-image
 
       - name: Dead Code
         if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}

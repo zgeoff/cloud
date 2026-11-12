@@ -213,7 +213,11 @@ export const releaseRegistry: readonly ReleaseRecord[] = [
         ],
         lock: {
           kind: 'restore-jobs',
-          lockFiles: ['deploy/files/restore-job.yaml', 'images/atc-gateway/restore-job.yaml'],
+          lockFiles: [
+            'deploy/boxxy/restore-job.yaml',
+            'deploy/files/restore-job.yaml',
+            'images/atc-gateway/restore-job.yaml',
+          ],
         },
       },
     ],
