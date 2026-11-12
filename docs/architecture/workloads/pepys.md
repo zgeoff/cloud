@@ -2,8 +2,9 @@
 
 pepys is the owner's personal data hub. Its ingest takes signed deliveries and stores them as facts
 in a log, its host runs the deployment's consumers over that log into a store, and its API serves
-the store. The cluster runs it in the namespace `pepys` once stack config `pepys` is set. Only the
-GitHub webhook route is public. Everything else stays inside the cluster.
+the store. The cluster runs it in the namespace `pepys` once stack config `pepys` is set. Two routes
+are public: the GitHub webhook route of ingest, and the API's MCP and OAuth paths while stack config
+`pepys.apiHostname` is set. Everything else stays inside the cluster, `/rpc` included.
 
 ## Processes
 
@@ -27,7 +28,8 @@ claim keeps its data.
 
 The host runs `pepys-host run --up`, which deploys each consumer that `/modules/consumers.json`
 lists before it tails the streams. The API runs in the same pod and reads the store files that the
-host writes. Ingest and the API listen on `0.0.0.0`, because each listens on 127.0.0.1 unless told
+host writes. [The API's public route](#the-apis-public-route) covers the volume the API adds for its
+OAuth server. Ingest and the API listen on `0.0.0.0`, because each listens on 127.0.0.1 unless told
 otherwise, and no Service reaches a loopback listener.
 
 ## The image
@@ -113,6 +115,38 @@ The ingest Service has the pinned ClusterIP that `pepysIngest` in
 [`constants.json`](../../../packages/topology/constants.json) names, so a relay on the host can dial
 it.
 
+### The API's public route
+
+The API serves typed queries under `/rpc`, which check no credential, and serves MCP at `/mcp`
+behind its own OAuth 2.1 server. While stack config `pepys.apiHostname` names a host, such as
+`pepys.geoff.cloud`, the shared tunnel carries that host's MCP and OAuth paths to the API's Service.
+[The pepys API's route boundary](../network/public-ingress.md#the-pepys-apis-route-boundary) lists
+the paths. Every other path gets the tunnel's 404, so `/rpc` never leaves the cluster. Cloudflare
+Access fronts the sign-in pages for the owner, and the owner's passkey signs the owner in behind it.
+
+The field turns on these together, and nothing else of the route exists without it:
+
+- the API's settings `PEPYS_API_PUBLIC_URL`, the host's `https://` origin, and `PEPYS_AUTH_DIR`,
+  `/auth`. The API exits at start with a public URL and no auth folder, so the program sets both or
+  neither;
+- the claim `pepys-auth`, on `local-path-retain`, mounted at `/auth` in the API's container only. It
+  holds `mcp-auth.db`, the OAuth server's clients, grants, token hashes and the owner's passkey. A
+  claim of its own keeps the host's StatefulSet in place: a live StatefulSet refuses a new claim
+  template, so one would replace it;
+- the rule in the host pod's network policy that admits the shared tunnel's cloudflared to the API's
+  port;
+- the tunnel's two rules, the Access application and the proxied record of the host.
+
+The Pulumi program refuses the field with a `pepys.image` older than pepys 0.3.0. An older API
+serves `/mcp` to any caller, so a public route to it would open every query to the internet. Set the
+field in the pull request that pins a 0.3.0 or later image.
+
+The backup leaves `mcp-auth.db` out, as pepys decides in its design: a lost database costs one
+passkey enrollment and one sign-in per client. The backup copies Garage's buckets only, and the
+retaining class keeps the volume when its claim goes.
+[The pepys runbook](../../runbooks/pepys.md#turn-on-the-apis-public-route) turns the route on,
+enrolls the passkey and adds a client.
+
 ### The telemetry path from a session
 
 A Claude session in an imp reaches ingest without a tunnel. The atc daemon's `pepys-telemetry` auth
@@ -139,10 +173,12 @@ Each pod admits only its callers:
   the `public` routes and the telemetry routes too, and each route's own check still applies. A
   process on the node needs no rule, because kube-router admits the node's own addresses before any
   policy.
-- The host's pod admits only the boxxy server, on 8081, the API's port. The API checks no caller, so
-  the boxxy server reads every query under `/rpc` and at `/mcp`. The policy never admits another pod
-  to the API, and never admits a pod to another port of the host's pod. A person reaches the API
-  with `kubectl port-forward`.
+- The host's pod admits the boxxy server on 8081, the API's port, and the shared tunnel's
+  cloudflared too while the API's public route is on. `/rpc` checks no caller, so the boxxy server
+  reads every query under `/rpc`. `/mcp` needs an OAuth token and the public host's name in `Host`,
+  so the boxxy server never calls it. The tunnel forwards only the public paths, so cloudflared
+  never reaches `/rpc`. The policy never admits another pod to the API, and never admits a pod to
+  another port of the host's pod. A person reaches the API with `kubectl port-forward`.
 - The backup admits no pod.
 
 Unlike every other namespace, pepys denies all egress, because ingest takes traffic from the

@@ -7,12 +7,14 @@ record that points at that tunnel, and Pulumi declares both. The TLS front serve
 imp's own MCP and OAuth route, which a hosted assistant signs in to and calls directly at
 `https://imp.geoff.cloud/mcp`. Each workload behind a route brings its own authentication. The atc
 tunnel serves `atc.geoff.cloud`, the atc gateway, which runs its own OAuth server. The shared tunnel
-serves two hostnames, and a third while pepys runs. `preview-webhook.geoff.cloud` reaches the
-preview service's webhook listener, which checks the signature of every GitHub delivery.
-`files.geoff.cloud` reaches the files service, which serves each file to anyone who holds its link
-and checks a role token on every write. `pepys-webhook.geoff.cloud` reaches pepys ingest, which
-checks the signature of every GitHub delivery. Cloudflare Access adds an owner-only login in front
-of the gateway's sign-in pages, and nowhere else. [The atc gateway](../workloads/atc-gateway.md),
+serves two hostnames, a third while pepys runs, and a fourth while pepys's API is public.
+`preview-webhook.geoff.cloud` reaches the preview service's webhook listener, which checks the
+signature of every GitHub delivery. `files.geoff.cloud` reaches the files service, which serves each
+file to anyone who holds its link and checks a role token on every write.
+`pepys-webhook.geoff.cloud` reaches pepys ingest, which checks the signature of every GitHub
+delivery. `pepys.geoff.cloud` reaches pepys's API, whose own OAuth server checks every MCP call.
+Cloudflare Access adds an owner-only login in front of the sign-in pages of the gateway and of
+pepys's API, and nowhere else. [The atc gateway](../workloads/atc-gateway.md),
 [the preview service](../workloads/preview.md) [the files service](../workloads/files.md) and
 [pepys](../workloads/pepys.md) cover what answers behind each route.
 
@@ -62,7 +64,11 @@ which the host admits only from pod addresses. It then holds the files service's
 path pattern, so every path of `files.geoff.cloud` reaches the service's cluster address and the
 service answers 404 for any path it does not serve. While pepys runs, pepys's rule follows. Its path
 pattern lists exactly the ingest routes that pepys marks public, so every other path of
-`pepys-webhook.geoff.cloud` gets the tunnel's 404.
+`pepys-webhook.geoff.cloud` gets the tunnel's 404. While pepys's API is public, two rules for
+`pepys.geoff.cloud` come last: the browser paths of
+[the API's route boundary](#the-pepys-apis-route-boundary), which cloudflared admits only with an
+Access token, then its machine paths. Both reach the API's Service, and the API answers only a
+request whose `Host` names its public host, which cloudflared passes through.
 
 ### The atc tunnel
 
@@ -100,7 +106,8 @@ traffic and decides nothing about who may make an MCP call. Its discovery, token
 endpoints and the MCP endpoint must answer a client that has no browser and no Cloudflare login,
 which an Access login in front of them would break. Cloudflare Access therefore never fronts the
 whole hostname. It fronts only the pages that the owner's browser loads to sign in and approve a
-client, which no MCP client calls.
+client, which no MCP client calls. pepys's API follows the same split, with a passkey behind Access
+for the owner's sign-in.
 
 The files service has no Access login either, because GitHub's image proxy fetches each file in a
 pull request without one. A read needs only the link, whose random ID nobody can guess, and every
@@ -134,14 +141,35 @@ A route atc adds later reaches nothing until it joins that list.
 The gateway's liveness and readiness probes are in no row, because the kubelet calls them inside the
 cluster. The external health check reads the MCP resource's metadata instead.
 
-### The owner-only Access application
+### The pepys API's route boundary
 
-One self-hosted Access application covers the browser paths on `atc.geoff.cloud`, and Access covers
-each path and every path under it. Its one policy allows the owner's address, which the stack config
-holds as a secret, signed in with Access's one-time PIN, and the application offers no other login.
-Access denies every identity that no allow policy matches, so any other address gets no PIN-backed
-session. The machine paths lie outside the application, so they get no login redirect, no challenge
-and no Access cookie requirement.
+pepys's API serves the same OAuth and MCP paths as the gateway, from the route table of its own
+OAuth server, which [`pepys-api-paths.ts`](../../../infra/ingress/pepys-api-paths.ts) copies. The
+tunnel and the Access application both read that list. The server takes no dynamic client
+registration, so it serves no register path.
+
+| Path                                                           | Caller            | At the edge  |
+| -------------------------------------------------------------- | ----------------- | ------------ |
+| `/oauth2/authorize`, `/login`, `/enroll`, `/consent`, `/error` | the owner browser | Access login |
+| `/mcp` and its alias `/`                                       | an MCP client     | straight in  |
+| `/oauth2/token`, `/oauth2/revoke`                              | an MCP client     | straight in  |
+| `/.well-known/oauth-authorization-server`                      | an MCP client     | straight in  |
+| `/.well-known/oauth-protected-resource` and its `/mcp` form    | an MCP client     | straight in  |
+| `/rpc` and every path under it, and any other path             | none              | tunnel 404   |
+
+`/rpc` checks no credential, so it must never join the list. A test of the route builder fails when
+an `/rpc` path matches a rule, or when a browser path reaches the API without Access.
+
+### The owner-only Access applications
+
+One self-hosted Access application covers the browser paths on `atc.geoff.cloud`, and a second one
+covers those on `pepys.geoff.cloud`. Access covers each path and every path under it. Each
+application's one policy allows the owner's address, which the stack config holds as a secret in
+`atcGatewayOwnerEmail`, signed in with Access's one-time PIN, and the application offers no other
+login. The two applications share the account's one one-time PIN login. Access denies every identity
+that no allow policy matches, so any other address gets no PIN-backed session. The machine paths lie
+outside the application, so they get no login redirect, no challenge and no Access cookie
+requirement.
 
 cloudflared checks the Access token on the browser rule itself. A request on a browser path reaches
 the gateway only with a token that Access signed for this application, so a request that skipped
