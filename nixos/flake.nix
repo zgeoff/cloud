@@ -116,11 +116,9 @@
       checks.x86_64-linux.bridge-relays = import ./checks/bridge-relays.nix {
         inherit nixpkgs imp;
       };
-      checks.x86_64-linux.bridge-relays-vm =
-        import ./checks/bridge-relays-vm.nix
-          {
-            inherit nixpkgs;
-          };
+      checks.x86_64-linux.bridge-relays-vm = import ./checks/bridge-relays-vm.nix {
+        inherit nixpkgs;
+      };
       checks.x86_64-linux.preview-image-vm = import ./checks/preview-image-vm.nix {
         inherit nixpkgs;
       };

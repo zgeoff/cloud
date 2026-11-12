@@ -229,9 +229,11 @@ in
       };
     in
     {
-      onepassword-connect-relay = relay "onepassword-connect-relay" "${topology.onePasswordConnect.clusterIP}:${toString topology.onePasswordConnect.port}" // {
-        label = "the Connect relay";
-      };
+      onepassword-connect-relay =
+        relay "onepassword-connect-relay" "${topology.onePasswordConnect.clusterIP}:${toString topology.onePasswordConnect.port}"
+        // {
+          label = "the Connect relay";
+        };
       pepys-ingest-relay = relay "pepys-ingest-relay" "${topology.pepysIngest.clusterIP}:${toString topology.pepysIngest.port}";
       boxxy-worker-relay = relay "boxxy-worker-relay" "${topology.boxxy.workerClusterIP}:${toString topology.boxxy.workerPort}";
     };

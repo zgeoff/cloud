@@ -92,13 +92,11 @@ in
       message = "${relay.label} assumes imp-host on ${relay.interface}; services.imp.ipv6.enable moves it to br-imphost";
     }) relays;
 
-    networking.cloudHost.admissions = lib.mapAttrsToList (
-      _: relay: {
-        inherit (relay) port interface;
-        sourceCIDR = relay.allowedSubnet;
-        destinationAddress = relay.address;
-      }
-    ) relays;
+    networking.cloudHost.admissions = lib.mapAttrsToList (_: relay: {
+      inherit (relay) port interface;
+      sourceCIDR = relay.allowedSubnet;
+      destinationAddress = relay.address;
+    }) relays;
 
     # mkMerge over the instances, not an mkIf: with no relay there is no interface to name
     networking.firewall.interfaces = lib.mkMerge (
