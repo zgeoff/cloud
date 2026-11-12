@@ -71,7 +71,7 @@ async function loadFiles(root: string, paths: readonly string[]) {
 }
 
 async function readRecordBump(run: Runner, record: ReleaseRecord, pinned: readonly string[]) {
-  const newest = await readNewest(run, record.repo, record.tagPrefix);
+  const newest = await readNewest(run, record);
 
   if (newest instanceof Error) {
     return newest;
@@ -82,8 +82,11 @@ async function readRecordBump(run: Runner, record: ReleaseRecord, pinned: readon
     : null;
 }
 
-async function readNewest(run: Runner, repo: string, prefix: string) {
-  const tags = await readReleaseTags(run, repo);
+async function readNewest(run: Runner, record: ReleaseRecord) {
+  const repo = record.repo;
+  const prefix = record.tagPrefix;
+
+  const tags = await readReleaseTags(run, repo, record.releaseLimit);
 
   const newest = tags instanceof Error ? undefined : findNewestRelease(tags, prefix);
 

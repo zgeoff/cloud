@@ -50,3 +50,11 @@ test('it gives the gh error when the list fails', async () => {
     new Error('HTTP 401: Bad credentials (https://api.github.com/graphql)'),
   );
 });
+
+test('it asks gh for as many releases as the caller names', async () => {
+  const stub = buildStubRunner(buildStubReleaseGH({ releases: { 'zgeoff/boxxy': [] } }));
+
+  await readReleaseTags(stub.run, 'zgeoff/boxxy', 300);
+
+  expect(stub.calls.map((call) => call.argv.slice(7, 9))).toStrictEqual([['--limit', '300']]);
+});

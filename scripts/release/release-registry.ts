@@ -83,6 +83,10 @@ export interface ReleaseRecord {
 
   // the bump pull request's "After the merge:" text, as Markdown
   readonly rollout: string;
+
+  // how many of the repository's newest releases the check lists to find this record's newest one,
+  // when other packages' releases share the repository; 30 when unset
+  readonly releaseLimit?: number;
 }
 
 const version = { kind: 'version' } as const;
@@ -362,6 +366,10 @@ export const releaseRegistry: readonly ReleaseRecord[] = [
     repo: 'zgeoff/boxxy',
     tagPrefix: '@boxxy/cli@',
     source: { kind: 'sha256sums' },
+
+    // boxxy releases about 15 packages a round, so the newest 30 releases can hold no CLI release;
+    // gh pages through these 300, newest first
+    releaseLimit: 300,
     pins: [
       // the CLI and its hook plug-in come from one release, so they move together
       {

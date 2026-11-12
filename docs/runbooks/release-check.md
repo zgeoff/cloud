@@ -34,6 +34,8 @@ take the tag's commit and the images' digests from GitHub and GHCR, and the auto
 sum from the npm tarball, which it checks against npm's integrity hash and the release's version.
 Before it writes anything, it checks every pin line of the dependency, so a pin at the release with
 another sum fails the bump and changes no file. The bump never moves a pin back to an older release.
+The check finds a dependency's newest release among the newest 30 releases of its repository. The
+boxxy CLI record reads 300, because boxxy publishes other packages' releases beside the CLI's.
 
 A restore Job names the backup image of its workload, so a bump that moves `backupImage` in the
 stack config also runs `infra/cluster/write-restore-jobs.ts` on the checkout and commits the restore
