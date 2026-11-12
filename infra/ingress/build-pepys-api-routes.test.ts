@@ -106,3 +106,18 @@ test.each([
     ),
   ).toBe(2);
 });
+
+// cloudflared matches a rule on the host and the path, never the method, so the API answers a GET
+// on its MCP paths: pepys 0.3.0 gives 405 to any method but POST there. This test keeps the open
+// rule from reaching a browser page, under any path.
+test.each(['/oauth2/authorize', '/login', '/enroll', '/consent', '/error'])(
+  'it keeps %s out of the rule without an Access check, which serves the MCP alias at /',
+  (path: string) => {
+    const machineRule = buildPepysAPIRoutes(
+      buildMockTunnelRoute({ hostname: 'pepys.geoff.cloud' }),
+      { teamName: output('example-team'), audience: output('0123456789abcdef') },
+    ).find((rule) => rule.access === undefined);
+
+    expect(new RegExp(machineRule?.path ?? '', 'u').test(path)).toBeFalse();
+  },
+);

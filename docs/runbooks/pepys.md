@@ -95,7 +95,16 @@ the owner approves it.
 
    Expect `404`.
 
-6. Sign a client in, as [Sign a client in to the API](#sign-a-client-in-to-the-api) says.
+6. Check that the MCP alias at `/` takes only a POST. cloudflared routes on the path alone, so the
+   API refuses the other methods:
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' https://pepys.geoff.cloud/
+   ```
+
+   Expect `405`.
+
+7. Sign a client in, as [Sign a client in to the API](#sign-a-client-in-to-the-api) says.
 
 ## Sign a client in to the API
 
