@@ -5,7 +5,7 @@ import { findVariable } from './find-variable.ts';
 import type { Environment } from './types.ts';
 
 // the first atc release whose atc-gateway takes --service-token-file
-export const serviceTokenRelease = '7.14.0';
+const serviceTokenRelease = '7.14.0';
 const variable = 'BOXXY_ATC_TOKEN';
 
 // atc's own rule: `atcs_` and 32 or more of A-Z, a-z, 0-9, _ and -
