@@ -5,8 +5,10 @@ import { ConfigMap, Secret, Service } from '@pulumi/kubernetes/core/v1';
 import { NetworkPolicy } from '@pulumi/kubernetes/networking/v1';
 import type { Output } from '@pulumi/pulumi';
 import type { PepysInputs } from '../inputs/index.ts';
+import { buildPepysEgressPolicySpecs } from '../shared/build-pepys-egress-policy-specs.ts';
 import { createNamespace } from '../shared/create-namespace.ts';
 import { pepysImages } from '../shared/pepys-images.ts';
+import { pepysWorkloads } from '../shared/pepys-workloads.ts';
 import { readPepysRouteTable } from '../shared/read-pepys-route-table.ts';
 import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
 import { buildPepysGarageSpec } from './build-pepys-garage-spec.ts';
@@ -17,7 +19,6 @@ import { buildPepysPublicPath } from './build-pepys-public-path.ts';
 import { buildPepysS2Spec } from './build-pepys-s2-spec.ts';
 import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
 import { createPepysBackupJob } from './create-pepys-backup-job.ts';
-import { pepysWorkloads } from './pepys-workloads.ts';
 import { readPepysIssuerDocuments } from './read-pepys-issuer-documents.ts';
 
 // the routes of ingest that the shared tunnel carries, by one anchored path pattern
@@ -65,8 +66,11 @@ export function createPepys(cluster: Provider, inputs: PepysInputs): PepysOutput
       };
 }
 
+// each pod's ingress policy and its egress policy, beside the namespace's deny of all egress
 function createNetworkPolicies(cluster: Provider, namespace: Output<string>): NetworkPolicy[] {
-  return Object.entries(buildPepysNetworkPolicySpecs()).map(
+  const specs = { ...buildPepysNetworkPolicySpecs(), ...buildPepysEgressPolicySpecs() };
+
+  return Object.entries(specs).map(
     ([name, spec]) =>
       new NetworkPolicy(name, { metadata: { name, namespace }, spec }, { provider: cluster }),
   );

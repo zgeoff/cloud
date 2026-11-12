@@ -1,5 +1,5 @@
 import type { input } from '@pulumi/kubernetes/types';
-import { pepysUserID } from './pepys-workloads.ts';
+import { pepysUserID } from '../shared/pepys-workloads.ts';
 
 // every pepys pod runs as the nonroot user, with no service account token and no service links
 export function buildPepysPodSecurity() {

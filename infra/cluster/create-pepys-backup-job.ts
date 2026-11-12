@@ -5,8 +5,8 @@ import { ConfigMap, Secret } from '@pulumi/kubernetes/core/v1';
 import type { Output } from '@pulumi/pulumi';
 import type { PepysBackupInputs } from '../inputs/index.ts';
 import { pepysImages } from '../shared/pepys-images.ts';
+import { pepysWorkloads } from '../shared/pepys-workloads.ts';
 import { buildPepysBackupPodSpec } from './build-pepys-backup-pod-spec.ts';
-import { pepysWorkloads } from './pepys-workloads.ts';
 
 export function createPepysBackupJob(
   cluster: Provider,

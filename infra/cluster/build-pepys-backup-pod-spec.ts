@@ -1,8 +1,8 @@
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
+import { pepysWorkloads } from '../shared/pepys-workloads.ts';
 import { buildPepysContainerSecurity } from './build-pepys-container-security.ts';
 import { buildPepysPodSecurity } from './build-pepys-pod-security.ts';
-import { pepysWorkloads } from './pepys-workloads.ts';
 
 interface PepysBackupPodInputs {
   readonly image: string;

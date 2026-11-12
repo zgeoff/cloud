@@ -267,30 +267,6 @@
     "apiVersion": "networking.k8s.io/v1",
     "kind": "NetworkPolicy",
     "metadata": {
-      "name": "egress-deny",
-      "namespace": "pepys"
-    },
-    "spec": {
-      "podSelector": {},
-      "policyTypes": ["Egress"],
-      "egress": [
-        {
-          "to": [
-            {
-              "ipBlock": {
-                "cidr": "0.0.0.0/0",
-                "except": ["100.64.0.0/10", "10.88.0.0/16"]
-              }
-            }
-          ]
-        }
-      ]
-    }
-  },
-  {
-    "apiVersion": "networking.k8s.io/v1",
-    "kind": "NetworkPolicy",
-    "metadata": {
       "name": "atc-gateway-egress",
       "namespace": "atc"
     },
@@ -509,6 +485,312 @@
             {
               "protocol": "TCP",
               "port": 8418
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "egress-deny-all",
+      "namespace": "pepys"
+    },
+    "spec": {
+      "podSelector": {},
+      "policyTypes": ["Egress"],
+      "egress": []
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "pepys-garage-egress",
+      "namespace": "pepys"
+    },
+    "spec": {
+      "podSelector": {
+        "matchLabels": {
+          "app": "pepys-garage"
+        }
+      },
+      "policyTypes": ["Egress"],
+      "egress": []
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "pepys-s2-egress",
+      "namespace": "pepys"
+    },
+    "spec": {
+      "podSelector": {
+        "matchLabels": {
+          "app": "pepys-s2"
+        }
+      },
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "namespaceSelector": {
+                "matchLabels": {
+                  "kubernetes.io/metadata.name": "kube-system"
+                }
+              },
+              "podSelector": {
+                "matchLabels": {
+                  "k8s-app": "kube-dns"
+                }
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "UDP",
+              "port": 53
+            },
+            {
+              "protocol": "TCP",
+              "port": 53
+            }
+          ]
+        },
+        {
+          "to": [
+            {
+              "podSelector": {
+                "matchLabels": {
+                  "app": "pepys-garage"
+                }
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "TCP",
+              "port": 3900
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "pepys-ingest-egress",
+      "namespace": "pepys"
+    },
+    "spec": {
+      "podSelector": {
+        "matchLabels": {
+          "app": "pepys-ingest"
+        }
+      },
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "namespaceSelector": {
+                "matchLabels": {
+                  "kubernetes.io/metadata.name": "kube-system"
+                }
+              },
+              "podSelector": {
+                "matchLabels": {
+                  "k8s-app": "kube-dns"
+                }
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "UDP",
+              "port": 53
+            },
+            {
+              "protocol": "TCP",
+              "port": 53
+            }
+          ]
+        },
+        {
+          "to": [
+            {
+              "podSelector": {
+                "matchLabels": {
+                  "app": "pepys-s2"
+                }
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "TCP",
+              "port": 8080
+            }
+          ]
+        },
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": ["10.42.0.0/16", "10.43.0.0/16", "100.64.0.0/10", "10.88.0.0/16"]
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "TCP",
+              "port": 443
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "pepys-host-egress",
+      "namespace": "pepys"
+    },
+    "spec": {
+      "podSelector": {
+        "matchLabels": {
+          "app": "pepys-host"
+        }
+      },
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "namespaceSelector": {
+                "matchLabels": {
+                  "kubernetes.io/metadata.name": "kube-system"
+                }
+              },
+              "podSelector": {
+                "matchLabels": {
+                  "k8s-app": "kube-dns"
+                }
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "UDP",
+              "port": 53
+            },
+            {
+              "protocol": "TCP",
+              "port": 53
+            }
+          ]
+        },
+        {
+          "to": [
+            {
+              "podSelector": {
+                "matchLabels": {
+                  "app": "pepys-s2"
+                }
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "TCP",
+              "port": 8080
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "pepys-backup-egress",
+      "namespace": "pepys"
+    },
+    "spec": {
+      "podSelector": {
+        "matchLabels": {
+          "app": "pepys-backup"
+        }
+      },
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "namespaceSelector": {
+                "matchLabels": {
+                  "kubernetes.io/metadata.name": "kube-system"
+                }
+              },
+              "podSelector": {
+                "matchLabels": {
+                  "k8s-app": "kube-dns"
+                }
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "UDP",
+              "port": 53
+            },
+            {
+              "protocol": "TCP",
+              "port": 53
+            }
+          ]
+        },
+        {
+          "to": [
+            {
+              "podSelector": {
+                "matchLabels": {
+                  "app": "pepys-garage"
+                }
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "TCP",
+              "port": 3900
+            }
+          ]
+        },
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": ["10.42.0.0/16", "10.43.0.0/16", "100.64.0.0/10", "10.88.0.0/16"]
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "TCP",
+              "port": 443
             }
           ]
         }

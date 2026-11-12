@@ -18,7 +18,10 @@ export type ClusterNamespace = (typeof clusterNamespaceNames)[number];
 interface ClusterNamespaceEntry {
   readonly owner: 'pulumi' | 'k3s';
   readonly podSecurity: 'baseline' | 'exempt';
-  readonly egress: 'deny' | 'open';
+
+  // deny refuses the tailnet and Podman's subnet; deny-all refuses every address, so each pod
+  // reaches only what a policy of its own lists
+  readonly egress: 'deny' | 'deny-all' | 'open';
 }
 
 // exempt from Pod Security: node-exporter in observability needs hostNetwork, nixie's Traefik in
@@ -35,7 +38,7 @@ export const clusterNamespaces = {
   'nixie-ingress': { owner: 'pulumi', podSecurity: 'exempt', egress: 'deny' },
   observability: { owner: 'pulumi', podSecurity: 'exempt', egress: 'deny' },
   onepassword: { owner: 'pulumi', podSecurity: 'baseline', egress: 'deny' },
-  pepys: { owner: 'pulumi', podSecurity: 'baseline', egress: 'deny' },
+  pepys: { owner: 'pulumi', podSecurity: 'baseline', egress: 'deny-all' },
 } as const satisfies Record<ClusterNamespace, ClusterNamespaceEntry>;
 
 export type PulumiNamespace = {

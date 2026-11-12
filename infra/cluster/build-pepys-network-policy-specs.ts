@@ -1,6 +1,6 @@
 import type { input } from '@pulumi/kubernetes/types';
+import { pepysWorkloads } from '../shared/pepys-workloads.ts';
 import { podLabels } from '../shared/pod-labels.ts';
-import { pepysWorkloads } from './pepys-workloads.ts';
 
 type NetworkPolicySpec = input.networking.v1.NetworkPolicySpec;
 

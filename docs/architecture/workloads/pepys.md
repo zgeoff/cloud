@@ -15,7 +15,7 @@ GitHub webhook route is public. Everything else stays inside the cluster.
 | `pepys-host`   | StatefulSet, 1 replica | `cloud-pepys`, two containers | s2-lite; the API reads the host's store |
 | `pepys-backup` | CronJob, 05:00 nightly | rclone, by its publisher      | every bucket in Garage                  |
 
-[`pepys-workloads.ts`](../../../infra/cluster/pepys-workloads.ts) holds each name, port and
+[`pepys-workloads.ts`](../../../infra/shared/pepys-workloads.ts) holds each name, port and
 in-cluster URL. [`pepys-images.ts`](../../../infra/shared/pepys-images.ts) pins the three images
 from their publishers, the same Garage and s2 builds that the pepys repo's test stack runs.
 
@@ -106,8 +106,23 @@ Each pod admits only its callers:
 - The host and the backup admit no pod, so no route reaches the API yet. Until the tailnet route in
   [Later work](#later-work) exists, reach the API with `kubectl port-forward`.
 
-The namespace's egress deny refuses every pod the tailnet and Podman's subnet, as in every other
-namespace.
+Unlike every other namespace, pepys denies all egress, because ingest takes traffic from the
+internet. Its namespace sets `egress: 'deny-all'` in
+[`cluster-namespaces.ts`](../../../infra/shared/cluster-namespaces.ts), so each pod dials only what
+its own policy in
+[`build-pepys-egress-policy-specs.ts`](../../../infra/shared/build-pepys-egress-policy-specs.ts)
+lists:
+
+- Garage dials nothing: it runs one node on a loopback RPC address.
+- s2-lite reaches DNS and Garage on 3900.
+- ingest reaches DNS, s2-lite on 8080, and the internet on TCP 443 for the GitHub API. The cluster's
+  pod and Service ranges, the tailnet and Podman's subnet are excluded.
+- The host and the API reach DNS and s2-lite. The host keeps no blob, so it never calls Garage.
+- The backup reaches DNS, Garage, and the internet on TCP 443 for R2.
+
+No pepys pod mounts a service account token, so none needs the Kubernetes API. DNS selects the
+CoreDNS pods, because a policy sees the address after kube-proxy's DNAT. The
+[network policy check](../../../nixos/checks/network-policy.nix) applies these policies in a VM.
 
 ## Secrets and the backup
 
