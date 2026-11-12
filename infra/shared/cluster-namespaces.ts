@@ -1,5 +1,6 @@
 export const clusterNamespaceNames = [
   'atc',
+  'boxxy',
   'default',
   'files',
   'ingress',
@@ -28,6 +29,7 @@ interface ClusterNamespaceEntry {
 // nixie-ingress a hostPort, and kube-system's local-path helper pods a hostPath
 export const clusterNamespaces = {
   atc: { owner: 'pulumi', podSecurity: 'baseline', egress: 'deny' },
+  boxxy: { owner: 'pulumi', podSecurity: 'baseline', egress: 'deny' },
   default: { owner: 'k3s', podSecurity: 'baseline', egress: 'deny' },
   files: { owner: 'pulumi', podSecurity: 'baseline', egress: 'deny' },
   ingress: { owner: 'pulumi', podSecurity: 'baseline', egress: 'deny' },

@@ -4,6 +4,7 @@ import { collectEgressDenyNamespaces } from './collect-egress-deny-namespaces.ts
 test('it collects every namespace in the cluster, kube-system and default included', () => {
   expect(collectEgressDenyNamespaces()).toStrictEqual([
     'atc',
+    'boxxy',
     'default',
     'files',
     'ingress',

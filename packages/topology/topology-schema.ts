@@ -68,6 +68,16 @@ export const topologySchema = z.strictObject({
 
   // pepys ingest's pinned ClusterIP and port, which the host's telemetry relay dials
   pepysIngest: z.strictObject({ clusterIP: z.ipv4(), port: portSchema }),
+
+  // the boxxy server's two listeners; the worker Service's pinned ClusterIP, which the host's relay
+  // dials; and the made-up host the broker serves it as, which every imp identity token names as
+  // its audience
+  boxxy: z.strictObject({
+    workerClusterIP: z.ipv4(),
+    ownerPort: portSchema,
+    workerPort: portSchema,
+    brokerHost: z.string().regex(/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/u),
+  }),
   nodeExporter: z.strictObject({ textfileDir: z.string().startsWith('/') }),
 });
 

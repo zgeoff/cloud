@@ -14,6 +14,7 @@ async function setupTest() {
   await mkdir(join(root, 'images', 'atc-gateway'), { recursive: true });
   await mkdir(join(root, 'deploy', 'nixie'), { recursive: true });
   await mkdir(join(root, 'deploy', 'files'), { recursive: true });
+  await mkdir(join(root, 'deploy', 'boxxy'), { recursive: true });
 
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
@@ -370,6 +371,7 @@ test('it names each file it writes', async () => {
     ['write-restore-jobs: wrote images/atc-gateway/restore-job.yaml\n'],
     ['write-restore-jobs: wrote deploy/nixie/restore-job.yaml\n'],
     ['write-restore-jobs: wrote deploy/files/restore-job.yaml\n'],
+    ['write-restore-jobs: wrote deploy/boxxy/restore-job.yaml\n'],
   ]);
 });
 
@@ -531,6 +533,9 @@ test('it fails the check when a restore Job is missing', async () => {
     [
       "write-restore-jobs: deploy/files/restore-job.yaml differs from its builder's output; run bun run write:restore-job\n",
     ],
+    [
+      "write-restore-jobs: deploy/boxxy/restore-job.yaml differs from its builder's output; run bun run write:restore-job\n",
+    ],
   ]);
 });
 
@@ -666,6 +671,9 @@ test('it reports each file it cannot format and exits 1 when oxfmt is missing', 
     ],
     [
       `write-restore-jobs: cannot format deploy/files/restore-job.yaml: ENOENT: no such file or directory, posix_spawn '${join(ctx.root, 'oxfmt')}'\n`,
+    ],
+    [
+      `write-restore-jobs: cannot format deploy/boxxy/restore-job.yaml: ENOENT: no such file or directory, posix_spawn '${join(ctx.root, 'oxfmt')}'\n`,
     ],
   ]);
 });

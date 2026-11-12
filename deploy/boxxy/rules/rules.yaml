@@ -1,0 +1,113 @@
+# The boxxy server's live rules, which the cloud-boxxy image holds at /rules: a change here is a
+# new image and a deploy. They start as the v1 example rules of @boxxy/rules: four phases, two
+# limits, five pools and the sleep times. The skills pin below is the example's, and must name the
+# real skills repo and commit before a worker session runs.
+version: 1
+concepts: [pool@2, defer@1, expedite@1] # pool@2 adds the filter field `designMode`
+
+pipelines:
+  standard:
+    - phase: triage
+      maxAttempts: 2
+      timeoutMinutes: 20
+      on: # every outcome of the phase kind, or the load fails
+        accepted: next
+        duplicate: { hold: duplicate } # the owner confirms with `boxxy item close`,
+        declined: { hold: declined } # or sends the item on with `boxxy item retry`
+    - phase: design
+      maxAttempts: 2
+      timeoutMinutes: 90 # the clock of an agent-mode attempt; an attended one sleeps instead
+      on:
+        designed: next
+        blocked: { hold: blocked } # the agent's question; the owner answers with `boxxy item note`
+        abandoned: again # the same phase again, counted against maxAttempts
+    - phase: build
+      maxAttempts: 2
+      timeoutMinutes: 180
+      on:
+        built: next
+        blocked: { hold: blocked }
+        abandoned: again
+    - phase: review
+      maxAttempts: 2
+      timeoutMinutes: 45
+      on:
+        passed: { end: reviewed }
+        changes-requested: { to: build, max: 3, resume: true } # wakes the build's kept session
+
+kinds:
+  core.idea:
+    pipeline: standard
+    recipes:
+      triage: triage-v1
+      design: design-v1
+      design/attended: design-attended-v1
+      build: build-v1
+      review: review-v1
+  core.issue:
+    pipeline: standard
+    recipes:
+      triage: triage-v1
+      design: design-v1
+      design/attended: design-attended-v1
+      build: build-v1
+      review: review-v1
+
+skills: # one commit of the skills repo, for every recipe
+  source: example/skills
+  ref: 4f1c9e07a2b35d68c0e1f7a9b3d5c2e8f6a4b1d0
+
+relationTypes: [blocks, duplicate-of, relates-to]
+
+recipes: # the pin and each recipe's skills are part of the recipe hash
+  triage-v1:
+    agent: claude
+    model: claude-opus-5-5
+    effort: medium
+    prompt: prompts/triage-v1.md
+    source: subscription
+    skills: []
+  design-v1:
+    agent: claude
+    model: claude-opus-5-5
+    effort: medium
+    prompt: prompts/design-v1.md
+    source: subscription
+    skills: [bake-off]
+  design-attended-v1:
+    agent: claude
+    model: claude-opus-5-5
+    effort: medium
+    prompt: prompts/design-attended-v1.md
+    source: subscription
+    skills: [bake-off]
+  build-v1:
+    agent: claude
+    model: claude-opus-5-5
+    effort: medium
+    prompt: prompts/build-v1.md
+    source: subscription
+    skills: []
+  review-v1:
+    agent: claude
+    model: claude-opus-5-5
+    effort: medium
+    prompt: prompts/review-v1.md
+    source: subscription
+    skills: []
+
+limits:
+  - { name: workers, max: 7, counts: {} }
+  - { name: owner-design, max: 1, counts: { phase: design, designMode: attended } }
+
+pools: # a filter and a sort; a limit caps the attempts
+  - { name: triage, takes: { phase: triage }, order: [oldest] }
+  - { name: design-with-owner, takes: { phase: design, designMode: attended }, order: [oldest] }
+  - { name: design, takes: { phase: design, designMode: agent }, order: [oldest] }
+  - { name: review, takes: { phase: review }, order: [oldest] }
+  - { name: build, takes: { phase: build }, order: [oldest] }
+
+sleep:
+  afterIdleMinutes: 30 # a session that waits for the owner this long sleeps
+  afterQuietMinutes: 60 # an attended session with no activity this long counts as waiting
+  afterUnattendedMinutes: 240 # an attended session the owner has not attached to this long sleeps

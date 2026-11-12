@@ -2,6 +2,7 @@ import { secret } from '@pulumi/pulumi';
 import type { Output } from '@pulumi/pulumi';
 import { readPepysRouteTable } from '../shared/read-pepys-route-table.ts';
 import { loadATCGatewayInputs } from './load-atc-gateway-inputs.ts';
+import { loadBoxxyInputs } from './load-boxxy-inputs.ts';
 import { loadFilesInputs } from './load-files-inputs.ts';
 import { loadNixieInputs } from './load-nixie-inputs.ts';
 import { loadPepysInputs } from './load-pepys-inputs.ts';
@@ -9,6 +10,7 @@ import { requireKubeconfig } from './require-kubeconfig.ts';
 import { requireOnePasswordConnectCredentials } from './require-onepassword-connect-credentials.ts';
 import type {
   ATCGatewayInputs,
+  BoxxyInputs,
   Environment,
   FilesInputs,
   NixieInputs,
@@ -22,6 +24,7 @@ interface ClusterConfigInputs {
   readonly nixie?: NixieInputs;
   readonly files?: FilesInputs;
   readonly pepys?: PepysInputs;
+  readonly boxxy?: BoxxyInputs;
 
   // the 1Password Connect server's credentials file
   readonly onePasswordConnectCredentials: Output<string>;
@@ -58,5 +61,6 @@ export function loadClusterInputs(
     ...loadNixieInputs(stackConfig, env, backupImage?.pullCredential),
     ...loadFilesInputs(stackConfig, env, backupImage),
     ...loadPepysInputs(stackConfig, env, readPepysRouteTable().secretVariables),
+    ...loadBoxxyInputs(stackConfig, env, backupImage),
   };
 }

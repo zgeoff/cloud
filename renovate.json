@@ -14,6 +14,12 @@
       "enabled": false
     },
     {
+      "description": "A @boxxy/server bump changes the server that the cloud-boxxy image compiles, and a new server can change the config that infra/cluster/render-boxxy-config.ts writes. automerge false holds it for a reviewer, who reads the boxxy release notes, and groupName keeps it out of the weekly patch group. @pepys/kit, a peer that @boxxy/pepys needs, falls under the @pepys rule above, so it moves by hand beside a server bump",
+      "matchPackageNames": ["@boxxy/**"],
+      "automerge": false,
+      "groupName": "boxxy server"
+    },
+    {
       "description": "A provider/go.mod bump changes the vendored Go modules, whose vendorHash in nixos/packages/onidel-provider.nix Renovate cannot recompute, so CI's onidel vendor hash check fails it until a reviewer commits the new hash. automerge false says so, and groupName null keeps it out of the weekly patch group, whose other bumps would otherwise wait on its failed check",
       "matchManagers": ["gomod"],
       "matchFileNames": ["provider/go.mod"],

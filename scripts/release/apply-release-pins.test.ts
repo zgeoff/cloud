@@ -24,6 +24,7 @@ async function setupTest() {
       'infra',
       'deploy/nixie',
       'deploy/files',
+      'deploy/boxxy',
       'scripts/release',
     ].map((directory) => mkdir(join(root, directory), { recursive: true })),
   );

@@ -229,6 +229,7 @@ let
 
   createdNamespaces = [
     "atc"
+    "boxxy"
     "files"
     "ingress"
     "nixie"

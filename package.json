@@ -42,6 +42,7 @@
     "test:files-image": "bash images/files/run-image-tests.sh",
     "test:pepys-image": "bash images/pepys/run-image-tests.sh",
     "check:pepys-deployment": "cd deploy/pepys && bun install --frozen-lockfile && bun run typecheck",
+    "test:boxxy-image": "bash images/boxxy/run-image-tests.sh",
     "test:agent-image": "docker build -t cloud/agent-image images/agent && bun scripts/check-agent-image.ts --docker cloud/agent-image && bash scripts/run-shell-suites.sh agent-image",
     "typecheck": "bun run sdk:build && tsrs -p tsconfig.json --noEmit && tsrs -p workers/health-check/tsconfig.json --noEmit",
     "format": "oxfmt . && format-codemod --quiet .",
@@ -114,10 +115,16 @@
     "ci:publish-files-image": "bash scripts/publish-files-image.sh",
     "ci:write-pepys-image-context": "bash scripts/write-pepys-image-context.sh",
     "ci:publish-pepys-image": "bash scripts/publish-pepys-image.sh",
+    "ci:write-boxxy-image-context": "bash scripts/write-boxxy-image-context.sh",
+    "ci:publish-boxxy-image": "bash scripts/publish-boxxy-image.sh",
     "ci:pin-atc-gateway-images": "bun scripts/release/run-published-images-bump.ts atc-gateway-images",
     "check:docs": "chex prose length links readmes skill",
     "test:images": "rig images",
     "test:fixtures": "rig fixtures"
+  },
+  "dependencies": {
+    "@boxxy/server": "0.1.5",
+    "@pepys/kit": "0.1.1"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
@@ -132,7 +139,7 @@
     "@types/bun": "1.4.4",
     "@zgeoff/agent-hooks": "0.2.11",
     "@zgeoff/bun-test-extended": "0.2.3",
-    "@zgeoff/chex": "0.3.2",
+    "@zgeoff/chex": "0.3.5",
     "@zgeoff/cloud-preview": "workspace:*",
     "@zgeoff/cloud-topology": "workspace:*",
     "@zgeoff/diet": "0.2.2",

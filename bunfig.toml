@@ -16,17 +16,73 @@ minimumReleaseAge = 604800
 # @heynixie/contract releases with nixie, and the release check bumps it in the
 # same PR as the nixie image pin, so the scripts' nixie calls type-check against
 # the release they deploy.
+# @boxxy/server and the @boxxy packages it depends on release together, and the
+# boxxy image compiles the server from them; @atcx/contract and @pepys/kit are
+# the atc and pepys contracts those packages are built against.
+# @orpc/client 2.0.0-beta.50 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @orpc/contract 2.0.0-beta.50 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @orpc/json-schema 2.0.0-beta.50 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @orpc/mcp 2.0.0-beta.50 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @orpc/openapi 2.0.0-beta.50 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @orpc/server 2.0.0-beta.50 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @orpc/shared 2.0.0-beta.50 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @standard-server/aws-lambda 0.16.0 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @standard-server/core 0.16.0 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @standard-server/fastify 0.16.0 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @standard-server/fetch 0.16.0 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @standard-server/node 0.16.0 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @standard-server/peer 0.16.0 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @standard-server/shared 0.16.0 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @openapi-spec/downgrader 0.8.0 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @openapi-spec/router 0.8.0 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# @openapi-spec/types 0.8.0 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
+# xstate 6.0.0-beta.2 (published 2026-11-11) ages past the gate ~2026-11-18 — remove then (audit-fix)
 minimumReleaseAgeExcludes = [
+  "@atcx/contract",
+  "@boxxy/caller-proof-imp",
+  "@boxxy/closeout",
+  "@boxxy/content-hash",
+  "@boxxy/contract",
+  "@boxxy/dispatch",
+  "@boxxy/forge-github",
+  "@boxxy/model",
+  "@boxxy/notifier-atc",
+  "@boxxy/pepys",
+  "@boxxy/planning",
+  "@boxxy/rules",
+  "@boxxy/server",
+  "@boxxy/store-sqlite",
+  "@boxxy/worker-atc",
   "@heynixie/contract",
   "@impz/client",
+  "@openapi-spec/downgrader",
+  "@openapi-spec/router",
+  "@openapi-spec/types",
+  "@orpc/client",
+  "@orpc/contract",
+  "@orpc/json-schema",
+  "@orpc/mcp",
+  "@orpc/openapi",
+  "@orpc/server",
+  "@orpc/shared",
+  "@pepys/kit",
+  "@standard-server/aws-lambda",
+  "@standard-server/core",
+  "@standard-server/fastify",
+  "@standard-server/fetch",
+  "@standard-server/node",
+  "@standard-server/peer",
+  "@standard-server/shared",
   "@zgeoff/agent-hooks",
   "@zgeoff/bun-test-extended",
   "@zgeoff/chex",
   "@zgeoff/diet",
   "@zgeoff/format-codemod",
+  "@zgeoff/kysely-bun-sqlite",
   "@zgeoff/oxlint-config",
   "@zgeoff/rig",
   "@zgeoff/std",
+  "xstate",
 ]
 
 [test]

@@ -18,6 +18,7 @@ test('it gives every namespace the egress deny, kube-system and default included
       .map((manifest) => manifest.metadata.namespace),
   ).toStrictEqual([
     'atc',
+    'boxxy',
     'default',
     'files',
     'ingress',

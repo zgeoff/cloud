@@ -12,12 +12,14 @@ interface RestoreJobFiles {
   readonly 'images/atc-gateway/restore-job.yaml': string;
   readonly 'deploy/nixie/restore-job.yaml': string;
   readonly 'deploy/files/restore-job.yaml': string;
+  readonly 'deploy/boxxy/restore-job.yaml': string;
 }
 
 const restoreJobPaths = [
   'images/atc-gateway/restore-job.yaml',
   'deploy/nixie/restore-job.yaml',
   'deploy/files/restore-job.yaml',
+  'deploy/boxxy/restore-job.yaml',
 ] as const;
 
 export async function createRestoreJobFiles(stack: string): Promise<RestoreJobFiles> {
@@ -40,15 +42,17 @@ export async function createRestoreJobFiles(stack: string): Promise<RestoreJobFi
     throw new Error(`write-restore-jobs exited ${result.exitCode}: ${result.stderr.toString()}`);
   }
 
-  const [gateway, nixie, files] = await Promise.all([
+  const [gateway, nixie, files, boxxy] = await Promise.all([
     readFile(join(root, restoreJobPaths[0]), 'utf8'),
     readFile(join(root, restoreJobPaths[1]), 'utf8'),
     readFile(join(root, restoreJobPaths[2]), 'utf8'),
+    readFile(join(root, restoreJobPaths[3]), 'utf8'),
   ]);
 
   return {
     'images/atc-gateway/restore-job.yaml': gateway,
     'deploy/nixie/restore-job.yaml': nixie,
     'deploy/files/restore-job.yaml': files,
+    'deploy/boxxy/restore-job.yaml': boxxy,
   };
 }

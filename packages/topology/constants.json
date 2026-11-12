@@ -56,6 +56,12 @@
     "clusterIP": "10.43.82.200",
     "port": 8080
   },
+  "boxxy": {
+    "workerClusterIP": "10.43.0.80",
+    "ownerPort": 8090,
+    "workerPort": 8091,
+    "brokerHost": "boxxy.imp.internal"
+  },
   "nodeExporter": {
     "textfileDir": "/var/lib/node-exporter/textfile"
   }

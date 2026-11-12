@@ -16,7 +16,7 @@ async function setupTest() {
   };
 }
 
-test("it returns the three restore Jobs that the writer's check accepts beside the stack config", async () => {
+test("it returns the four restore Jobs that the writer's check accepts beside the stack config", async () => {
   const ctx = await setupTest();
 
   const stack = `config:
@@ -48,6 +48,7 @@ test("it returns the three restore Jobs that the writer's check accepts beside t
 
   expect({ paths: Object.keys(jobs).toSorted(), exitCode: check.exitCode }).toStrictEqual({
     paths: [
+      'deploy/boxxy/restore-job.yaml',
       'deploy/files/restore-job.yaml',
       'deploy/nixie/restore-job.yaml',
       'images/atc-gateway/restore-job.yaml',
