@@ -318,6 +318,62 @@ test('it refuses boxxy without the atc gateway, which the server calls atc throu
   );
 });
 
+test("it refuses boxxy's pepys section without pepys in the cluster, which gets its facts", async () => {
+  const stub = buildStubResourceMocks();
+
+  await runtime.setMocks(stub.mocks, 'geoff-cloud', 'test');
+
+  onTestFinished(() => {
+    stub.release();
+    runtime.resetOptions('', '', -1, '', '', false, '');
+  });
+
+  expect(() =>
+    createCluster(createClusterProvider('k3s', { kubeconfig: output('kubeconfig-for-tests') }), {
+      onePasswordConnect: { credentials: output('{}') },
+      atcGateway: {
+        inputs: {
+          config: buildMockATCGatewayConfig(),
+          secrets: {
+            pullCredential: {
+              username: 'octo-puller',
+              token: output('ghp_fake0token0for0tests0only0000000000'),
+            },
+            tokens: { geoffcloud: output('daemon-token-for-tests') },
+            ownerEmail: output('owner@fixture.invalid'),
+          },
+        },
+        tunnelToken: output('tunnel-token-for-tests'),
+      },
+      boxxy: {
+        config: {
+          image:
+            'ghcr.io/zgeoff/cloud-boxxy:0123456@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+          runner: 'runner-for-tests',
+          atc: { trustedFolders: {} },
+          spawn: { target: 'target-for-tests' },
+          pepys: { environment: 'production' },
+        },
+        repos: secret<BoxxyRepos>({}),
+        pullCredential: {
+          username: 'octo-puller',
+          token: output('ghp_fake0token0for0tests0only0000000000'),
+        },
+        secrets: {
+          workerToken: output('worker-token-for-tests'),
+          atcToken: output('atc-token-for-tests'),
+          pepysSigningSecret: output('signing-secret-for-tests'),
+        },
+      },
+      zoneID: output('zone'),
+      kubeconfig: output('kubeconfig-for-tests'),
+    }),
+  ).toThrowWithMessage(
+    Error,
+    'stack config "boxxy.pepys" needs stack config "pepys": the boxxy server sends its facts to the pepys in the cluster',
+  );
+});
+
 test('it creates no boxxy server while boxxy is unset', async () => {
   const stub = buildStubResourceMocks();
 

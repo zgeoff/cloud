@@ -7,12 +7,21 @@ import type { Output } from '@pulumi/pulumi';
 import { all, interpolate } from '@pulumi/pulumi';
 import type { BoxxyInputs } from '../inputs/index.ts';
 import { createNamespace } from '../shared/create-namespace.ts';
+import { readPepysRouteTable } from '../shared/read-pepys-route-table.ts';
 import { buildBoxxyNetworkPolicySpec } from './build-boxxy-network-policy-spec.ts';
+import { buildBoxxyPepysAddresses } from './build-boxxy-pepys-addresses.ts';
 import {
   buildBoxxyOwnerServiceSpec,
   buildBoxxyWorkerServiceSpec,
 } from './build-boxxy-service-specs.ts';
-import { atcTokenKey, buildBoxxySpec, configFileName, workerTokenKey } from './build-boxxy-spec.ts';
+import {
+  atcTokenKey,
+  buildBoxxySpec,
+  configFileName,
+  githubTokenKey,
+  pepysSigningSecretKey,
+  workerTokenKey,
+} from './build-boxxy-spec.ts';
 import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
 import { createBoxxyBackupJob } from './create-boxxy-backup-job.ts';
 import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
@@ -60,6 +69,12 @@ export function createBoxxy(
       stringData: {
         [workerTokenKey]: inputs.secrets.workerToken,
         [atcTokenKey]: inputs.secrets.atcToken,
+        ...(inputs.secrets.pepysSigningSecret === undefined
+          ? {}
+          : { [pepysSigningSecretKey]: inputs.secrets.pepysSigningSecret }),
+        ...(inputs.secrets.githubToken === undefined
+          ? {}
+          : { [githubTokenKey]: inputs.secrets.githubToken }),
       },
     },
     { provider: cluster },
@@ -87,6 +102,14 @@ export function createBoxxy(
             config: inputs.config,
             repos,
             atc: { url: `${serviceURL}${atcRoute}`, host: atcGateway.publicHost },
+            ...(inputs.config.pepys === undefined
+              ? {}
+              : {
+                  pepys: buildBoxxyPepysAddresses(
+                    readPepysRouteTable(),
+                    inputs.config.pepys.environment,
+                  ),
+                }),
             trusted,
           }),
         ),
@@ -156,6 +179,8 @@ export function createBoxxy(
               },
             }),
         tokenSecret: tokens.metadata.name,
+        pepysSigningSecret: inputs.secrets.pepysSigningSecret !== undefined,
+        githubToken: inputs.secrets.githubToken !== undefined,
         pullSecret: ghcrPullSecretName,
       }),
     },

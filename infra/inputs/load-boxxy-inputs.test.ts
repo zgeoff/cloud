@@ -246,3 +246,75 @@ test('it refuses the backup variables without the backup image', () => {
     'the boxxy backup runs in stack config "atcGateway.backupImage", which is unset: set atcGateway, or unset the BOXXY backup variables',
   );
 });
+
+test.each([
+  ['pepys', { environment: 'production' }, 'BOXXY_PEPYS_SIGNING_SECRET', 'pepysSigningSecret'],
+  ['github', { baseUrl: 'https://api.github.com' }, 'BOXXY_GITHUB_TOKEN', 'githubToken'],
+] as const)(
+  'it keeps the %s section and marks its token secret',
+  async (section, value, variable, key) => {
+    const fixture = setupTest();
+    const withSection = { ...fixture.boxxy, [section]: value };
+
+    const stackConfig = buildStubConfig({
+      ...fixture.stackValues,
+      boxxy: JSON.stringify(withSection),
+    });
+
+    const env = { ...fixture.tokens, [variable]: `${key}-for-tests` };
+    const inputs = loadBoxxyInputs(stackConfig, env, undefined);
+
+    invariant(inputs.boxxy);
+
+    const token = inputs.boxxy.secrets[key];
+
+    invariant(token);
+
+    const secretToken = await isSecret(token);
+    const resolved = await resolveOutput(token);
+
+    expect(inputs.boxxy.config[section]).toStrictEqual(value);
+    expect(secretToken).toBeTrue();
+    expect(resolved).toBe(`${key}-for-tests`);
+  },
+);
+
+test.each([
+  [
+    'pepys',
+    { environment: 'production' },
+    'BOXXY_PEPYS_SIGNING_SECRET is unset; the boxxy server signs its facts with it while stack config "boxxy.pepys" is set',
+  ],
+  [
+    'github',
+    { baseUrl: 'https://api.github.com' },
+    'BOXXY_GITHUB_TOKEN is unset; the boxxy server reads pull requests with it while stack config "boxxy.github" is set',
+  ],
+] as const)('it refuses the %s section without its token', (section, value, message) => {
+  const fixture = setupTest();
+  const withSection = { ...fixture.boxxy, [section]: value };
+
+  const stackConfig = buildStubConfig({
+    ...fixture.stackValues,
+    boxxy: JSON.stringify(withSection),
+  });
+
+  expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrowWithMessage(
+    Error,
+    message,
+  );
+});
+
+test('it adds no optional token while neither section is set', () => {
+  const fixture = setupTest();
+
+  const env = {
+    ...fixture.tokens,
+    BOXXY_PEPYS_SIGNING_SECRET: 'unused-secret',
+    BOXXY_GITHUB_TOKEN: 'unused-token',
+  };
+
+  const inputs = loadBoxxyInputs(fixture.stackConfig, env, undefined);
+
+  expect(Object.keys(inputs.boxxy?.secrets ?? {})).toStrictEqual(['workerToken', 'atcToken']);
+});
