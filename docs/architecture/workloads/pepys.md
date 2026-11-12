@@ -34,9 +34,16 @@ otherwise, and no Service reaches a loopback listener.
 
 `cloud-pepys` holds three binaries and the consumer modules. The deployment that it builds lives in
 `deploy/pepys`: `deployment.ts`, the entry files `ingest.ts` and `api.ts`, and a `package.json` with
-the `@pepys/*` packages. That folder installs on its own, apart from the repo's workspaces, with its
-own `bunfig.toml` and lock, so the root type check and lint leave its TypeScript out, and
-`bun run check:pepys-deployment` installs and type-checks it.
+the `@pepys/*` packages and `@boxxy/pepys`. That folder installs on its own, apart from the repo's
+workspaces, with its own `bunfig.toml` and lock, so the root type check and lint leave its
+TypeScript out, and `bun run check:pepys-deployment` installs and type-checks it.
+
+The deployment lists three plug-ins: GitHub and telemetry, from the `@pepys/*` packages, and boxxy,
+from `@boxxy/pepys`. The boxxy plug-in takes the facts that the boxxy server records about its work
+items, on a route of its own. It folds them into its own tables with one consumer, and adds two
+queries to the API: what an item cost to land, and how long it spent in each step. Those queries
+read the tables of the GitHub and telemetry consumers too, so `deployment.ts` passes those consumers
+to the function that builds the boxxy plug-in.
 
 [`write-pepys-image-context.sh`](../../../scripts/write-pepys-image-context.sh) writes the build
 context, after `bun install --frozen-lockfile` in `deploy/pepys`:
@@ -57,6 +64,10 @@ again. The shared release tooling changes only `images/pepys/versions.env`, so c
 versions and the lock by hand in its pull request.
 [`collect-pepys-version-mismatches.test.ts`](../../../scripts/collect-pepys-version-mismatches.test.ts)
 fails when the release and a package version differ.
+
+`@boxxy/pepys` carries boxxy's own version, so that test never reads it. It takes `@pepys/kit` as a
+peer, so that the plug-in and the deployment share one copy of the kit. A release bump therefore
+needs an `@boxxy/pepys` whose peer range admits the release.
 
 The compile embeds Turso's native addon in the API. Turso's loader reaches the addon through
 `createRequire`, which `bun build --compile` does not follow, so the compile script drops that call,
@@ -92,6 +103,12 @@ audience is the stack config's `pepys.impIdentityAudience`, `pepys.imp.internal`
 identity token that issuer signed for that audience, and refuses every other export. An invalid
 document stops ingest at start.
 
+The boxxy route, `/boxxy/facts`, is `private`. It takes a batch of facts whose body the sender
+signed with `PEPYS_BOXXY_SIGNING_SECRET`, and ingest answers 401 to a batch with no signature or a
+wrong one. The signature is the route's only check: unlike a telemetry export, a batch needs no
+proven sender, so each holder of the secret can write boxxy facts. A pod reaches the route only when
+ingest's network policy admits that pod, as [Network policies](#network-policies) says.
+
 The ingest Service has the pinned ClusterIP that `pepysIngest` in
 [`constants.json`](../../../packages/topology/constants.json) names, so a relay on the host can dial
 it.
@@ -102,7 +119,11 @@ Each pod admits only its callers:
 
 - Garage admits s2-lite and the backup on 3900.
 - s2-lite admits ingest and the host.
-- ingest admits only the shared tunnel's cloudflared.
+- ingest admits only the shared tunnel's cloudflared, which forwards only the `public` routes. The
+  policy matches a pod and a port, never a path, so an admitted pod reaches every route. The tunnel
+  never forwards a `private` route, so no pod reaches `/boxxy/facts` or a telemetry route: a pod
+  that sends boxxy facts needs a rule of its own in ingest's policy. A process on the node needs no
+  rule, because kube-router admits the node's own addresses before any policy.
 - The host and the backup admit no pod, so no route reaches the API yet. Until the tailnet route in
   [Later work](#later-work) exists, reach the API with `kubectl port-forward`.
 
