@@ -187,6 +187,7 @@ gates:
       - deploy/pepys/*.ts
       - deploy/pepys/package.json
       - deploy/pepys/bunfig.toml
+      - deploy/pepys/bun.lock
       - deploy/pepys/tsconfig.json
       - images/pepys/**
       - images/atc-gateway/versions.env

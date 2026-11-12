@@ -51,6 +51,7 @@ test.each([
   ['files-image', ['images/agent/Dockerfile', 'infra/index.ts'], false],
   ['pepys-image', ['deploy/pepys/deployment.ts'], true],
   ['pepys-image', ['images/pepys/Dockerfile'], true],
+  ['pepys-image', ['deploy/pepys/bun.lock'], true],
   ['pepys-image', ['deploy/pepys/ingest-routes.json', 'infra/index.ts'], false],
   ['files-backup', ['deploy/files/backup/backup.sh'], true],
   ['files-backup', ['infra/Pulumi.prod.yaml'], true],
