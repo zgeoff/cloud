@@ -169,7 +169,7 @@ export interface BoxxyConfig {
 export type BoxxyRepos = Readonly<Record<string, string | BoxxyGitSource>>;
 
 // credentialRef names the atc daemon's environment variable that holds the clone token
-export interface BoxxyGitSource {
+interface BoxxyGitSource {
   readonly url: string;
   readonly ref: string;
   readonly credentialRef?: { readonly name: string };
