@@ -45,6 +45,51 @@ let
     install -m 0600 "$CREDENTIALS_DIRECTORY/gateway-token" ${stagedTokenFile}
   '';
 
+  # Starts atc with each environment credential in its variable. For each entry the wrapper reads
+  # systemd's copy of the file from $CREDENTIALS_DIRECTORY, drops the trailing newline, and exports
+  # it. It holds the value in no shell variable of its own, so no configured name can collide with one. It names a missing or empty credential in its message and never prints a value. Wrapping
+  # only when entries exist leaves the command line alone otherwise.
+  atcCommand = [
+    "${cfg.package}/bin/atc"
+    "daemon"
+    "--listen"
+    cfg.listen
+    "--token-file"
+    stagedTokenFile
+  ];
+  credentialName = variable: "env-${variable}";
+  envWrapper = pkgs.writeShellScript "atc-daemon-start" ''
+    set -eu
+    ${
+      lib.concatStrings (
+        lib.mapAttrsToList (variable: _: ''
+          if [ -z "$(cat "$CREDENTIALS_DIRECTORY/${credentialName variable}" 2>/dev/null)" ]; then
+            echo "atc-daemon: credential ${credentialName variable} (for ${variable}) is missing or empty" >&2
+            exit 1
+          fi
+          export ${variable}="$(cat "$CREDENTIALS_DIRECTORY/${credentialName variable}")"
+        '') cfg.environmentCredentials
+      )
+    }exec "$@"
+  '';
+
+  # systemd fails a start with a bare "Failed to set up credentials" when a LoadCredential file is
+  # missing, and names no credential. So this check unit runs first, as root, and names it.
+  checkEnvCredentials = pkgs.writeShellScript "atc-daemon-check-env-credentials" ''
+    set -u
+    status=0
+    ${
+      lib.concatStrings (
+        lib.mapAttrsToList (variable: file: ''
+          if [ ! -s ${lib.escapeShellArg file} ]; then
+            echo "atc-daemon: credential ${credentialName variable} (for ${variable}) is missing or empty: ${file}" >&2
+            status=1
+          fi
+        '') cfg.environmentCredentials
+      )
+    }exit "$status"
+  '';
+
   # each auth profile that an agent or one of its MCP servers selects and the config does not
   # define
   unknownProfiles = lib.concatLists (
@@ -66,6 +111,10 @@ let
       )
     ) (if cfg.agents == null then { } else cfg.agents)
   );
+
+  invalidVariableNames = lib.filter (
+    variable: builtins.match "[A-Za-z_][A-Za-z0-9_]*" variable == null
+  ) (lib.attrNames cfg.environmentCredentials);
 
   # each grant that names a target the config does not define
   unknownGrants = lib.concatLists (
@@ -122,6 +171,24 @@ in
         LoadCredential as `imp-token`. An imp target reads it at
         /run/credentials/atc-daemon.service/imp-token. As with tokenFile, a new token reaches
         the daemon only after `systemctl restart atc-daemon`.
+      '';
+    };
+
+    environmentCredentials = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = { };
+      example = {
+        ATC_GIT_CLONE_TOKEN = "/var/lib/atc-daemon-secrets/git-clone-token";
+      };
+      description = ''
+        Environment variables for the daemon process, each set from a root-only file: the name of
+        the variable maps to the file. Each file is passed in with LoadCredential as
+        `env-<name>`, and a small wrapper reads it into the variable before it starts atc, so the
+        value is never in the unit, the store or the journal. A trailing newline is dropped. A check unit
+        that runs before each start names the credential, never its value, when a file is missing or
+        empty, because systemd itself fails a missing file without a name; the wrapper checks again.
+        atc withholds a variable it reads this way from the harnesses it starts. As with tokenFile,
+        a new value reaches the daemon only after `systemctl restart atc-daemon`.
       '';
     };
 
@@ -199,6 +266,10 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
+        assertion = invalidVariableNames == [ ];
+        message = "services.atc-daemon.environmentCredentials names variables that are not valid environment variable names (^[A-Za-z_][A-Za-z0-9_]*$): ${lib.concatStringsSep ", " invalidVariableNames}";
+      }
+      {
         assertion = unknownGrants == [ ];
         message = "services.atc-daemon.principals grants targets that services.atc-daemon.targets does not define: ${lib.concatStringsSep ", " unknownGrants}";
       }
@@ -219,14 +290,29 @@ in
     };
     users.groups.atc = { };
 
+    systemd.services.atc-daemon-env-credentials = lib.mkIf (cfg.environmentCredentials != { }) {
+      description = "Check the atc daemon's environment credential files";
+      # the credential files may live on a mount that is absent, as in the lost-disk boot: the
+      # daemon's own LoadCredential adds this dependency, and the check needs it too, so a missing
+      # mount stops the check's job where it would run and fail
+      unitConfig.RequiresMountsFor = lib.attrValues cfg.environmentCredentials;
+      # no RemainAfterExit: the check runs again at each start of the daemon
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = checkEnvCredentials;
+      };
+    };
+
     systemd.services.atc-daemon = {
       description = "atc daemon";
       wantedBy = [ "multi-user.target" ];
       after = [
         "network-online.target"
         "tailscaled.service"
-      ];
+      ]
+      ++ lib.optional (cfg.environmentCredentials != { }) "atc-daemon-env-credentials.service";
       wants = [ "network-online.target" ];
+      requires = lib.optional (cfg.environmentCredentials != { }) "atc-daemon-env-credentials.service";
       # atc runs git on this host to resolve a git workspace's ref before an imp clones it
       path = [ pkgs.git ];
       environment = {
@@ -240,14 +326,9 @@ in
           stageGatewayToken
         ];
 
-        ExecStart = lib.escapeShellArgs [
-          "${cfg.package}/bin/atc"
-          "daemon"
-          "--listen"
-          cfg.listen
-          "--token-file"
-          stagedTokenFile
-        ];
+        ExecStart = lib.escapeShellArgs (
+          lib.optional (cfg.environmentCredentials != { }) envWrapper ++ atcCommand
+        );
         User = "atc";
         Group = "atc";
         StateDirectory = "atc-daemon";
@@ -259,7 +340,10 @@ in
         LoadCredential = [
           "gateway-token:${cfg.tokenFile}"
         ]
-        ++ lib.optional (cfg.impTokenFile != null) "imp-token:${cfg.impTokenFile}";
+        ++ lib.optional (cfg.impTokenFile != null) "imp-token:${cfg.impTokenFile}"
+        ++ lib.mapAttrsToList (
+          variable: file: "${credentialName variable}:${file}"
+        ) cfg.environmentCredentials;
         Restart = "on-failure";
         RestartSec = 5;
         NoNewPrivileges = true;

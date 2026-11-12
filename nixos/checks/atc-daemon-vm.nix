@@ -12,6 +12,8 @@ let
   port = 8415;
   # 32 bytes or more, as atc needs; fixed values, never a real token
   gatewayToken = "gateway-fixture-bearer-0123456789abcdef-0123456789abcdef";
+  # a fixed fake clone token, never a real one
+  cloneToken = "clone-fixture-token-0123456789abcdef";
   rotatedToken = "gateway-fixture-rotated-0123456789abcdef-0123456789abcdef";
 in
 pkgs.testers.runNixOSTest {
@@ -24,6 +26,7 @@ pkgs.testers.runNixOSTest {
       listen = "127.0.0.1:${toString port}";
       tokenFile = "${secrets}/gateway-token";
       impTokenFile = "${secrets}/imp-token";
+      environmentCredentials.ATC_GIT_CLONE_TOKEN = "${secrets}/git-clone-token";
       targets.fixture = {
         provider = "imp";
         url = "http://127.0.0.1:7070";
@@ -37,7 +40,10 @@ pkgs.testers.runNixOSTest {
     # of mode 0700, written before the daemon's first start
     systemd.services.fixture-atc-tokens = {
       requiredBy = [ "atc-daemon.service" ];
-      before = [ "atc-daemon.service" ];
+      before = [
+        "atc-daemon.service"
+        "atc-daemon-env-credentials.service"
+      ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
@@ -47,7 +53,8 @@ pkgs.testers.runNixOSTest {
         mkdir -p ${secrets}
         printf '%s\n' ${gatewayToken} > ${secrets}/gateway-token
         printf '%s\n' imp-fixture-bearer > ${secrets}/imp-token
-        chmod 0400 ${secrets}/gateway-token ${secrets}/imp-token
+        printf '%s\n' ${cloneToken} > ${secrets}/git-clone-token
+        chmod 0400 ${secrets}/gateway-token ${secrets}/imp-token ${secrets}/git-clone-token
       '';
     };
   };
@@ -92,6 +99,32 @@ pkgs.testers.runNixOSTest {
 
         assert_serving()
         assert machine.succeed(f"cat {staged}") == "${rotatedToken}\n"
+
+
+    with subtest("it runs atc with the clone token in its environment, newline stripped"):
+        assert_serving()
+
+        pid = machine.succeed("systemctl show -P MainPID atc-daemon.service").strip()
+        found = machine.succeed(f"tr '\\0' '\\n' < /proc/{pid}/environ | grep '^ATC_GIT_CLONE_TOKEN='")
+        assert found == "ATC_GIT_CLONE_TOKEN=${cloneToken}\n", "the daemon's variable differs from the file"
+
+
+    with subtest("it keeps the clone token out of the journal"):
+        machine.fail("journalctl --no-pager -b | grep -F ${cloneToken}")
+
+
+    with subtest("it fails the start, naming the credential and not its value, when the file is missing"):
+        machine.succeed("systemctl stop atc-daemon.service")
+        machine.succeed(f"mv {secrets}/git-clone-token {secrets}/git-clone-token.away")
+        machine.fail("systemctl start atc-daemon.service")
+
+        unit_log = machine.succeed("journalctl --no-pager -u atc-daemon-env-credentials.service -b")
+        assert "credential env-ATC_GIT_CLONE_TOKEN (for ATC_GIT_CLONE_TOKEN) is missing or empty" in unit_log, unit_log
+        assert "${cloneToken}" not in unit_log, "the journal holds the token"
+
+        machine.succeed(f"mv {secrets}/git-clone-token.away {secrets}/git-clone-token")
+        machine.succeed("systemctl reset-failed atc-daemon.service; systemctl start atc-daemon.service")
+        assert_serving()
 
 
     with subtest("it removes the copy of the gateway token when the daemon stops"):
