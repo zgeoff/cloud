@@ -20,8 +20,9 @@ config `boxxy.publicDoor` is set:
 The owner listener takes no token, so it gets no route: no Ingress, tunnel or tailnet name points at
 it, and the owner reaches it with a port-forward over SSH
 ([the runbook](../../runbooks/boxxy.md#reach-the-owner-listener)). Its ingress NetworkPolicy admits
-no pod to either port. A port-forward still reaches the owner port, since it connects on the pod's
-own loopback, which no NetworkPolicy filters.
+no pod to either port, and admits only Prometheus to the rules sidecar's metrics port. A
+port-forward still reaches the owner port, since it connects on the pod's own loopback, which no
+NetworkPolicy filters.
 
 A worker session runs in an imp, which reaches neither the tailnet nor the cluster. It calls a
 made-up host, the broker host in the shared constants, and impd's credential broker sends the
@@ -60,28 +61,30 @@ client with `boxxy auth` commands on the owner listener
 ## Configuration and secrets
 
 Pulumi writes the server's configuration file into a ConfigMap, mounted at `/etc/boxxy/config.json`.
-The cluster sets the listeners, the store at `/data/boxxy.db`, the rules folder at `/rules`, and the
-atc address: the `/mcp` route of the atc gateway's Service, with the gateway's public host, so stack
-config `boxxy` needs stack config `atcGateway`. The gateway answers only a request whose `Host` is
-its public host, and the Service's DNS name is not that host, so the server sends the public host,
-which the cluster takes from stack config `atcGateway.publicURL`. Stack config `boxxy` sets the
-rest: the runner ID, the trusted folders of each worker target, and the spawn target. The spawn
-target's repos, each a folder or a git source, come from the secret stack config `boxxySpawnRepos`,
-because a repo's name can be private and this repo is public. Pulumi then marks the whole file a
-secret, so a preview shows no line of it, and an error about the repos names none of them. The file
-holds no token: a private repo's git source carries `credentialRef: { name }`, the name of the atc
-daemon's environment variable that holds the clone token, which the server passes to atc's spawn.
-The namespace's egress deny refuses only the tailnet and Podman's subnet, so the calls to the
-gateway's Service, to pepys's Services and to GitHub on 443 need no egress allow. The NixOS check
-`network-policy` shows the server's pod reach pepys ingest and the pepys API.
+The cluster sets the listeners, the store at `/data/boxxy.db`, the rules checkout at
+`/rules/root/current` with ref `git-sync`, and the atc address: the `/mcp` route of the atc
+gateway's Service, with the gateway's public host, so stack config `boxxy` needs stack config
+`atcGateway`. The gateway answers only a request whose `Host` is its public host, and the Service's
+DNS name is not that host, so the server sends the public host, which the cluster takes from stack
+config `atcGateway.publicURL`. Stack config `boxxy` sets the rest: the runner ID, the trusted
+folders of each worker target, and the spawn target. The spawn target's repos, each a folder or a
+git source, come from the secret stack config `boxxySpawnRepos`, because a repo's name can be
+private and this repo is public. Pulumi then marks the whole file a secret, so a preview shows no
+line of it, and an error about the repos names none of them. The file holds no token: a private
+repo's git source carries `credentialRef: { name }`, the name of the atc daemon's environment
+variable that holds the clone token, which the server passes to atc's spawn. The namespace's egress
+deny refuses only the tailnet and Podman's subnet, so the calls to the gateway's Service, to pepys's
+Services and to GitHub on 443 need no egress allow. The NixOS check `network-policy` shows the
+server's pod reach pepys ingest and the pepys API.
 
 Three sections of stack config `boxxy` are optional. With `pepys: { environment }`, the file gets a
 `pepys` section: the boxxy route of pepys ingest and the oRPC route of the pepys API, at their
 Services, which needs stack config `pepys`. The server then sends its facts there and reads its two
 reports there. pepys ingest and the pepys API must admit the server's pod, which their own policies
 decide. With `github: { baseUrl }`, the server links and watches the pull requests of its repos. It
-only reads them, and it never merges one. The pod has no broker to add a GitHub credential, so the
-token comes from `.env`. With `publicDoor: { publicURL, trustForwardedFrom }`, the server serves
+merges one only through a merge step in the rules, and the live rules have none. The pod has no
+broker to add a GitHub credential, so the server calls GitHub as the boxxy App, with keys from
+`.env`. With `publicDoor: { publicURL, trustForwardedFrom }`, the server serves
 [the public door](#the-public-door); its tunnel's token needs no item in `.env`, because Pulumi
 reads it from Cloudflare.
 
@@ -99,8 +102,12 @@ pod, and the others come from the same Secret when their section is set:
   `service:boxxy` at the atc daemon.
 - `BOXXY_PEPYS_SIGNING_SECRET`, with `pepys`: the key that signs each batch of facts. pepys ingest
   reads the same item.
-- `BOXXY_GITHUB_TOKEN`, with `github`: the server's fine-grained token, with `Pull requests: read`
-  on the owner's repos, which must cover every repo in `boxxySpawnRepos`.
+- `BOXXY_GITHUB_APP_CLIENT_ID`, `BOXXY_GITHUB_APP_PRIVATE_KEY` and
+  `BOXXY_GITHUB_APP_INSTALLATION_ID`, with `github`: the boxxy App's keys, from which the server
+  mints the installation token of every GitHub call. The App's installation must cover every repo in
+  `boxxySpawnRepos`. The deploy refuses `github` without all three, and refuses a key of a shape the
+  server would refuse at start: a client ID with whitespace, an installation ID that is not a
+  number, or a private key that is not RSA.
 - `NOSLOP_GITHUB_APP_ID`, `NOSLOP_GITHUB_APP_PRIVATE_KEY` and `NOSLOP_GITHUB_APP_INSTALLATION_ID`,
   with `spawn.reviewAgents`: the noslop App's keys, which the review gate checks and posts each
   review with. Only this pod holds them, never a session. The deploy refuses review agents without
@@ -114,13 +121,27 @@ pod, and the others come from the same Secret when their section is set:
 
 ## The rules
 
-The live rules are in `deploy/boxxy/rules/`, and the image holds them at `/rules`. The folder has no
-`.git`, so the server loads it as a plain folder, and a rules change is a new image and a deploy.
+The live rules are in the public rules repository,
+[zgeoff/boxxy-rules](https://github.com/zgeoff/boxxy-rules). A native sidecar in the server's pod,
+`rules-sync`, runs the git-sync release that `images/boxxy/versions.env` pins as `GIT_SYNC_IMAGE`.
+It clones the repository's `main` over HTTPS with no credential, on the period its arguments set,
+into `rules/` on the `data` volume. The server loads each new commit on its next tick, with no
+deploy. boxxy's
+[rules repository design](https://github.com/zgeoff/boxxy/blob/main/docs/design/boxxy/rules-repository.md)
+gives the failure behaviour.
+
+The server mounts that folder read-only at `/rules`, over the image's own copy of
+`deploy/boxxy/rules/`, and trusts the sidecar's files, which another uid owns, through the
+`safe.directory` variables. The server starts only once the sidecar's startup probe finds the first
+checkout. Prometheus scrapes the sidecar's sync counters, and BoxxyRulesStale fires while no fetch
+succeeds.
 
 The review phase runs the `review-run` recipe on the atc agent `boxxy-review`, the one agent whose
 broker profile holds the read-only clone token. Stack config `boxxy.spawn.reviewAgents` lists it,
 and the server then loads the rules only when review recipes alone name it. The image test starts
-the server with the same list, so a rules change that breaks the pairing fails CI.
+the server with the same list on the image's copy of the rules, so it never checks a commit of the
+rules repository: when a commit breaks the pairing, the server refuses it and keeps the rules in
+force.
 
 ## The caller proof
 

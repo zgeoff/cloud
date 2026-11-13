@@ -1,6 +1,7 @@
 import { topology } from '@zgeoff/cloud-topology';
 import { cloudflaredNames } from '../ingress/index.ts';
 import type { ATCDaemonEndpoint } from '../inputs/index.ts';
+import { boxxyRulesSyncNames } from '../shared/boxxy-rules-sync-names.ts';
 import { nixieGitSyncNames } from '../shared/nixie-git-sync-names.ts';
 import { buildATCSignInRules } from './build-atc-sign-in-rules.ts';
 import { impHealthProbeTarget } from './imp-health-probe-target.ts';
@@ -27,6 +28,9 @@ export interface AlertRuleInputs {
   readonly atcDaemons?: readonly ATCDaemonEndpoint[] | undefined;
 
   readonly nixieReadinessURL?: string | undefined;
+
+  // true when the boxxy server deploys, with its rules sidecar
+  readonly boxxyRulesSync?: boolean | undefined;
 }
 
 // written every minute by a host timer to node-exporter's textfile collector
@@ -137,6 +141,8 @@ export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRul
           buildNixieDefinitionsStaleRule(),
         ];
 
+  const boxxyRules = inputs.boxxyRulesSync === true ? [buildBoxxyRulesStaleRule()] : [];
+
   return [
     {
       name: 'geoff-cloud',
@@ -148,6 +154,7 @@ export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRul
         ...atcRules,
         impHealthRule,
         ...nixieRules,
+        ...boxxyRules,
         oomKilledRule,
       ],
     },
@@ -222,6 +229,26 @@ function buildNixieDefinitionsStaleRule(): AlertRule {
     labels: { severity: 'warning' },
     annotations: {
       summary: `nixie's git-sync reports no good fetch of the definitions in the last 10 minutes, so nixie serves the checkout of its last good fetch: {{ with query \`${lastFetch}\` }}{{ . | first | value | humanizeTimestamp }}{{ else }}none in the last day{{ end }}.`,
+    },
+  };
+}
+
+function buildBoxxyRulesStaleRule(): AlertRule {
+  const fetches = `git_sync_count_total{namespace="${boxxyRulesSyncNames.namespace}", container="${boxxyRulesSyncNames.container}", status=~"success|noop"}`;
+
+  // the last minute in a day that ended within 2 minutes of a good fetch; a series holds no
+  // timestamp of its last increase
+  const lastFetch = `max(max_over_time(timestamp(increase(${fetches}[2m]) > 0)[1d:1m]))`;
+
+  return {
+    // git-sync retries a failed fetch and keeps its last checkout, and the server cannot see the
+    // fetch, so neither pod readiness nor runner.status shows a stale checkout
+    alert: 'BoxxyRulesStale',
+    expr: `sum(increase(${fetches}[10m])) == 0 or absent(${fetches})`,
+    for: '5m',
+    labels: { severity: 'warning' },
+    annotations: {
+      summary: `The boxxy server's rules sidecar reports no good fetch of the rules repository in the last 10 minutes, so the server loads the checkout of its last good fetch: {{ with query \`${lastFetch}\` }}{{ . | first | value | humanizeTimestamp }}{{ else }}none in the last day{{ end }}.`,
     },
   };
 }

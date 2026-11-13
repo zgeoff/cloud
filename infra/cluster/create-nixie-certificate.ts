@@ -2,10 +2,13 @@ import type { Provider } from '@pulumi/kubernetes';
 import { Secret } from '@pulumi/kubernetes/core/v1';
 import type { Output } from '@pulumi/pulumi';
 import { all, secret } from '@pulumi/pulumi';
-import { PrivateKey } from '@pulumi/tls';
-import { Provider as ACMEProvider, Certificate, Registration } from '@pulumiverse/acme';
+import { Certificate } from '@pulumiverse/acme';
+import type { NixieACMEAccount } from './create-nixie-acme-account.ts';
 
 export interface NixieCertificateInputs {
+  // the certificate's resource name, and with "-tls" its Secret's
+  readonly name: string;
+  readonly account: NixieACMEAccount;
   readonly namespace: Output<string>;
   readonly hostname: string;
   readonly dnsToken: Output<string>;
@@ -15,25 +18,10 @@ export function createNixieCertificate(
   cluster: Provider,
   inputs: NixieCertificateInputs,
 ): Output<string> {
-  const acme = new ACMEProvider('letsencrypt', {
-    serverUrl: 'https://acme-v02.api.letsencrypt.org/directory',
-  });
-
-  const accountKey = new PrivateKey('nixie-acme-account', {
-    algorithm: 'ECDSA',
-    ecdsaCurve: 'P256',
-  });
-
-  const registration = new Registration(
-    'nixie-acme',
-    { accountKeyPem: accountKey.privateKeyPem },
-    { provider: acme },
-  );
-
   const certificate = new Certificate(
-    'nixie',
+    inputs.name,
     {
-      accountKeyPem: registration.accountKeyPem,
+      accountKeyPem: inputs.account.accountKeyPem,
       commonName: inputs.hostname,
       keyType: 'EC256',
 
@@ -45,22 +33,22 @@ export function createNixieCertificate(
         { provider: 'cloudflare', config: { CF_DNS_API_TOKEN: secret(inputs.dnsToken) } },
       ],
     },
-    { provider: acme },
+    { provider: inputs.account.provider },
   );
 
-  return createTLSSecret(cluster, inputs.namespace, certificate);
+  return createTLSSecret(cluster, inputs, certificate);
 }
 
 function createTLSSecret(
   cluster: Provider,
-  namespace: Output<string>,
+  inputs: NixieCertificateInputs,
   certificate: Certificate,
 ): Output<string> {
   const tls = new Secret(
-    'nixie-tls',
+    `${inputs.name}-tls`,
     {
       // no fixed name: a renewal replaces the Secret, and the Ingress follows the new name
-      metadata: { namespace },
+      metadata: { namespace: inputs.namespace },
       type: 'kubernetes.io/tls',
       stringData: {
         'tls.crt': all([certificate.certificatePem, certificate.issuerPem]).apply(

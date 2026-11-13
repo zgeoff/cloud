@@ -315,3 +315,63 @@ test('it refuses an API hostname outside geoff.cloud', () => {
     'stack config "pepys.apiHostname" must name a host under geoff.cloud',
   );
 });
+
+test('it carries the tailnet hostname that the exposure registry lists', () => {
+  const fixture = setupTest();
+
+  const config = buildStubConfig({
+    pepys: JSON.stringify({
+      image: fixture.image,
+      webhookHostname: 'pepys-webhook.geoff.cloud',
+      tailnetHostname: 'pepys-api.geoff.cloud',
+    }),
+  });
+
+  expect(
+    loadPepysInputs(config, fixture.coreEnv, ['PEPYS_WIDGET_SECRET']).pepys?.config,
+  ).toStrictEqual({
+    image: fixture.image,
+    webhookHostname: 'pepys-webhook.geoff.cloud',
+    tailnetHostname: 'pepys-api.geoff.cloud',
+  });
+});
+
+test.each([
+  [
+    'outside geoff.cloud',
+    'pepys-api.example.test',
+    'stack config "pepys.tailnetHostname" must name a host under geoff.cloud',
+  ],
+  [
+    "equal to the API's public hostname",
+    'pepys.geoff.cloud',
+    'stack config "pepys.tailnetHostname" must differ from "pepys.webhookHostname" and "pepys.apiHostname"',
+  ],
+  [
+    "equal to ingest's webhook hostname",
+    'pepys-webhook.geoff.cloud',
+    'stack config "pepys.tailnetHostname" must differ from "pepys.webhookHostname" and "pepys.apiHostname"',
+  ],
+  [
+    'that the exposure registry does not list',
+    'pepys-rpc.geoff.cloud',
+    'stack config "pepys.tailnetHostname" needs a tailnet-hostname entry for pepys-rpc.geoff.cloud in packages/topology/exposure.json',
+  ],
+])('it refuses a tailnet hostname %s', (_label: string, hostname: string, message: string) => {
+  const fixture = setupTest();
+
+  expect(() =>
+    loadPepysInputs(
+      buildStubConfig({
+        pepys: JSON.stringify({
+          image: fixture.image,
+          webhookHostname: 'pepys-webhook.geoff.cloud',
+          apiHostname: 'pepys.geoff.cloud',
+          tailnetHostname: hostname,
+        }),
+      }),
+      fixture.coreEnv,
+      [],
+    ),
+  ).toThrowWithMessage(Error, message);
+});

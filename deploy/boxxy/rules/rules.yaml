@@ -15,6 +15,8 @@ pipelines:
         accepted: next
         duplicate: { hold: duplicate } # the owner confirms with `boxxy item close`,
         declined: { hold: declined } # or sends the item on with `boxxy item retry`
+        needs-owner: { hold: needs-owner } # the owner answers with `boxxy item edit` or `boxxy item note`, then `boxxy item retry`
+        split: { end: split } # the parts are filed as new items, and the item closes
     - phase: design
       maxAttempts: 2
       timeoutMinutes: 90 # the clock of an agent-mode attempt; an attended one sleeps instead

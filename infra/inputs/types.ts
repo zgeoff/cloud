@@ -218,8 +218,13 @@ export interface BoxxyInputs {
     // with config pepys: the key the server signs its fact batches with
     readonly pepysSigningSecret?: Output<string>;
 
-    // with config github: the token of its pull request reads
-    readonly githubToken?: Output<string>;
+    // with config github: the boxxy App's keys, which the server mints its installation token
+    // from for every GitHub call
+    readonly githubApp?: {
+      readonly clientID: Output<string>;
+      readonly privateKey: Output<string>;
+      readonly installationID: Output<string>;
+    };
 
     // with review agents: the noslop App's keys, which the review gate checks and posts with
     readonly reviewApp?: {
@@ -257,6 +262,10 @@ interface PepysConfig {
   // the public DNS name of the API's /mcp and OAuth paths, which the shared tunnel serves; while it
   // is unset, the API serves /rpc alone and nothing of it is public
   readonly apiHostname?: string;
+
+  // the DNS name of every API path, /rpc included, which nixie's Traefik serves on the host's
+  // tailnet address; while it is unset, the API has no tailnet route
+  readonly tailnetHostname?: string;
 
   // the audience that a telemetry sender's identity token must name; while it is unset, ingest
   // refuses every telemetry export

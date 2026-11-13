@@ -1,5 +1,6 @@
 import { secret } from '@pulumi/pulumi';
 import type { Output } from '@pulumi/pulumi';
+import { exposure } from '@zgeoff/cloud-topology';
 import { z } from 'zod';
 import { findVariable } from './find-variable.ts';
 import { parseStackObject } from './parse-stack-object.ts';
@@ -14,6 +15,7 @@ const pepysConfigSchema = z.object({
   image: z.string().optional(),
   webhookHostname: z.string().optional(),
   apiHostname: z.string().optional(),
+  tailnetHostname: z.string().optional(),
   impIdentityAudience: z.string().min(1).optional(),
 });
 
@@ -39,6 +41,10 @@ export function loadPepysInputs(
     requireAPIHostname(config.apiHostname, config.webhookHostname, config.image);
   }
 
+  if (config.tailnetHostname !== undefined) {
+    requireTailnetHostname(config.tailnetHostname, [config.webhookHostname, config.apiHostname]);
+  }
+
   const pull = requireGHCRPullCredential(env);
   const backup = findBackup(env);
 
@@ -50,6 +56,9 @@ export function loadPepysInputs(
         image: config.image,
         webhookHostname: config.webhookHostname,
         ...(config.apiHostname === undefined ? {} : { apiHostname: config.apiHostname }),
+        ...(config.tailnetHostname === undefined
+          ? {}
+          : { tailnetHostname: config.tailnetHostname }),
         ...(config.impIdentityAudience === undefined
           ? {}
           : { impIdentityAudience: config.impIdentityAudience }),
@@ -103,6 +112,30 @@ function isReleaseAtLeast(release: string, minimum: string): boolean {
   }
 
   return true;
+}
+
+// /rpc checks no credential, so the name must be one the registry keeps on the tailnet
+function requireTailnetHostname(
+  tailnetHostname: string,
+  publicHostnames: readonly (string | undefined)[],
+): void {
+  requireGeoffCloudHostname('pepys.tailnetHostname', tailnetHostname);
+
+  if (publicHostnames.includes(tailnetHostname)) {
+    throw new Error(
+      'stack config "pepys.tailnetHostname" must differ from "pepys.webhookHostname" and "pepys.apiHostname"',
+    );
+  }
+
+  const isListed = exposure.entries.some(
+    (entry) => entry.kind === 'tailnet-hostname' && entry.hostname === tailnetHostname,
+  );
+
+  if (!isListed) {
+    throw new Error(
+      `stack config "pepys.tailnetHostname" needs a tailnet-hostname entry for ${tailnetHostname} in packages/topology/exposure.json`,
+    );
+  }
 }
 
 const backupVariables = {

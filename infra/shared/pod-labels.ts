@@ -2,6 +2,7 @@
 export const podLabels = {
   atcGateway: { app: 'atc-gateway' },
   atcDaemonProbe: { app: 'atc-daemon-probe' },
+  boxxyServer: { app: 'boxxy-server' },
   impHealthProbe: { app: 'imp-health-probe' },
   cloudflared: { app: 'cloudflared' },
   nixie: { app: 'nixie' },

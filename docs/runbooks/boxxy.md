@@ -8,15 +8,16 @@ listeners, the configuration and the caller proof.
 
 ## What holds what
 
-| Item in the `cloud` vault | Holds                                                    | Read by               |
-| ------------------------- | -------------------------------------------------------- | --------------------- |
-| `boxxy-worker-token`      | the worker token, which the broker adds to worker calls  | Pulumi, impd's broker |
-| `boxxy-atc-token`         | the bearer token the server sends to the atc gateway     | Pulumi                |
-| `boxxy-atc-notice-token`  | the token the server sends each owner notice with        | Pulumi                |
-| `boxxy-restic`            | the restic repository's password                         | Pulumi, the backup    |
-| `r2-boxxy-backup`         | the R2 key, endpoint and bucket of the restic repository | Pulumi, the backup    |
-| `boxxy-pepys-signing`     | the key the server signs its facts with                  | Pulumi, pepys ingest  |
-| `boxxy-github-token`      | the token of the server's pull request reads             | Pulumi                |
+| Item in the `cloud` vault | Holds                                                     | Read by               |
+| ------------------------- | --------------------------------------------------------- | --------------------- |
+| `boxxy-worker-token`      | the worker token, which the broker adds to worker calls   | Pulumi, impd's broker |
+| `boxxy-atc-token`         | the bearer token the server sends to the atc gateway      | Pulumi                |
+| `boxxy-atc-notice-token`  | the token the server sends each owner notice with         | Pulumi                |
+| `boxxy-restic`            | the restic repository's password                          | Pulumi, the backup    |
+| `r2-boxxy-backup`         | the R2 key, endpoint and bucket of the restic repository  | Pulumi, the backup    |
+| `boxxy-pepys-signing`     | the key the server signs its facts with                   | Pulumi, pepys ingest  |
+| `boxxy-github-token`      | the read-only clone token                                 | the atc daemon, impd  |
+| `boxxy-github-app`        | the boxxy App's keys, for every GitHub call of the server | Pulumi                |
 
 The prod apply job reads the same items from the `cloud-deploy` vault, so each item has a copy there
 under the same name. A `.env` line whose item is missing fails every preview and apply, so create
@@ -286,15 +287,17 @@ needs its token in `.env`, and the program stops with the name of the variable w
    BOXXY_PEPYS_SIGNING_SECRET=op://cloud/boxxy-pepys-signing/credential
    ```
 
-2. For GitHub, create a fine-grained token on the owner's repos, with the permissions
-   `Contents: read` and `Pull requests: read` and nothing else, and store it as `boxxy-github-token`
-   in `cloud` and `cloud-deploy`. Its repository access must cover every repo in `boxxySpawnRepos`.
-   The server only reads pull requests; it never merges one. The daemon's clone and the review
-   sessions read with the same token. Add the line:
+2. For GitHub, install the boxxy App on every repo in `boxxySpawnRepos`: the server makes every
+   GitHub call as the App. Store the App's keys as `boxxy-github-app` in `cloud` and `cloud-deploy`,
+   with the fields `client-id`, `private-key` and `installation-id`. Add the lines:
 
    ```bash
-   BOXXY_GITHUB_TOKEN=op://cloud/boxxy-github-token/credential
+   BOXXY_GITHUB_APP_CLIENT_ID=op://cloud/boxxy-github-app/client-id
+   BOXXY_GITHUB_APP_PRIVATE_KEY=op://cloud/boxxy-github-app/private-key
+   BOXXY_GITHUB_APP_INSTALLATION_ID=op://cloud/boxxy-github-app/installation-id
    ```
+
+   The preview fails while `github` is set and any of the three is unset.
 
 3. Add the sections to the `boxxy` object in `infra/Pulumi.prod.yaml`:
 
@@ -460,3 +463,27 @@ server recorded after the snapshot is lost. Back up first if that state still ma
    ssh root@geoffcloud k3s kubectl -n boxxy scale statefulset/boxxy --replicas=1
    ssh root@geoffcloud k3s kubectl -n boxxy rollout status statefulset/boxxy --timeout=300s
    ```
+
+## The rules go stale
+
+BoxxyRulesStale fires when the server's rules sidecar has fetched no commit of the rules repository
+for 15 minutes. The server goes on loading the last checkout it has.
+
+1. Read the sidecar's log:
+
+   ```bash
+   k3s kubectl -n boxxy logs boxxy-0 -c rules-sync --tail=50
+   ```
+
+   Expect `error syncing repo, will retry` lines that name the cause, such as a refused connection
+   to GitHub.
+
+2. When GitHub answers again, the next fetch clears the alert. When the log shows no fetch at all,
+   restart the pod:
+
+   ```bash
+   k3s kubectl -n boxxy delete pod boxxy-0
+   ```
+
+   Expect the pod back with the `rules-sync` sidecar started, and `boxxy runner status` showing a
+   `rules.commit` equal to the rules repository's `main`.

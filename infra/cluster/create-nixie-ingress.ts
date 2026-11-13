@@ -8,6 +8,8 @@ import { createNamespace } from '../shared/create-namespace.ts';
 import { geoffcloudNode } from '../shared/geoffcloud-node.ts';
 import { buildNixieIngressChartArgs } from './build-nixie-ingress-chart-args.ts';
 import { buildNixieIngressSpec } from './build-nixie-ingress-spec.ts';
+import type { NixieACMEAccount } from './create-nixie-acme-account.ts';
+import { createNixieACMEAccount } from './create-nixie-acme-account.ts';
 import { createNixieCertificate } from './create-nixie-certificate.ts';
 import { makeHostIPTransform } from './make-host-ip-transform.ts';
 
@@ -23,10 +25,23 @@ export interface NixieIngressInputs {
   readonly zoneID: Output<string>;
   readonly api: Backend;
   readonly web: Backend;
+
+  // the namespaces whose Ingress objects the Traefik serves, nixie's among them
+  readonly routesNamespaces: readonly string[];
+}
+
+// what another namespace's Ingress on the host's tailnet address needs from nixie's Traefik
+export interface NixieTailnetRoutes {
+  readonly controller: Chart;
+  readonly ingressClass: string;
+  readonly account: NixieACMEAccount;
+  readonly dnsToken: Output<string>;
+  readonly zoneID: Output<string>;
 }
 
 export interface NixieIngressOutputs {
   readonly url: Output<string>;
+  readonly tailnetRoutes: NixieTailnetRoutes;
 }
 
 const ingressClass = 'nixie';
@@ -41,7 +56,7 @@ export function createNixieIngress(
     'nixie-ingress',
     buildNixieIngressChartArgs({
       controllerNamespace: 'nixie-ingress',
-      routesNamespace: 'nixie',
+      routesNamespaces: inputs.routesNamespaces,
       ingressClass,
     }),
     {
@@ -54,12 +69,28 @@ export function createNixieIngress(
     },
   );
 
-  createIngress(cluster, inputs, controller);
+  const account = createNixieACMEAccount();
 
-  return { url: interpolate`https://${createRecord(inputs).name}` };
+  createIngress(cluster, inputs, controller, account);
+
+  return {
+    url: interpolate`https://${createRecord(inputs).name}`,
+    tailnetRoutes: {
+      controller,
+      ingressClass,
+      account,
+      dnsToken: inputs.dnsToken,
+      zoneID: inputs.zoneID,
+    },
+  };
 }
 
-function createIngress(cluster: Provider, inputs: NixieIngressInputs, controller: Chart): Ingress {
+function createIngress(
+  cluster: Provider,
+  inputs: NixieIngressInputs,
+  controller: Chart,
+  account: NixieACMEAccount,
+): Ingress {
   return new Ingress(
     'nixie',
     {
@@ -67,7 +98,13 @@ function createIngress(cluster: Provider, inputs: NixieIngressInputs, controller
       spec: buildNixieIngressSpec({
         hostname: inputs.hostname,
         ingressClass,
-        tlsSecret: createNixieCertificate(cluster, inputs),
+        tlsSecret: createNixieCertificate(cluster, {
+          name: 'nixie',
+          account,
+          namespace: inputs.namespace,
+          hostname: inputs.hostname,
+          dnsToken: inputs.dnsToken,
+        }),
         api: inputs.api,
         web: inputs.web,
       }),

@@ -9,8 +9,12 @@ const boxxyDoorPort = topology.boxxy.doorPort;
 // gateway's backup image copies and restores every *.db in it.
 const boxxyStoreFile = '/data/boxxy.db';
 
-// the image's own rules folder, which has no .git, so the server loads it as a plain folder
-const boxxyRulesFolder = '/rules';
+// where the pod mounts the rules sidecar's checkout, over the image's own copy of the rules
+export const boxxyRulesMount = '/rules';
+
+// git-sync's link to the current worktree, below the sync root it makes under the mount; git-sync
+// keeps no remote-tracking branch, so the server reads the branch git-sync moves after each fetch
+const boxxyRules = { folder: `${boxxyRulesMount}/root/current`, ref: 'git-sync' };
 
 // where the pod mounts the ConfigMap of the trust documents, one file per issuer
 export const boxxyTrustedIssuersFolder = '/etc/boxxy-issuers';
@@ -45,7 +49,7 @@ export function renderBoxxyConfig(inputs: BoxxyConfigFileInputs): string {
   const file = {
     runner: inputs.config.runner,
     store: { file: boxxyStoreFile },
-    rules: { folder: boxxyRulesFolder },
+    rules: boxxyRules,
     api: {
       listen: { hostname: '0.0.0.0', port: boxxyOwnerPort },
       workerListen: { hostname: '0.0.0.0', port: boxxyWorkerPort },
