@@ -32,7 +32,7 @@ config:
     webhookHostname: pepys-webhook.geoff.cloud
     impIdentityAudience: pepys.imp.internal
   geoff-cloud:boxxy:
-    image: ghcr.io/zgeoff/cloud-boxxy:4cb873f873be0945afb4a4141b930dca836dc91e@sha256:d29c2a09792de24d9f7269fa557bc1b37d64de601399b02faf58577d3d1e5ca2
+    image: ghcr.io/zgeoff/cloud-boxxy:38c62e3bf02ab76c647d2e3968bf090fe1c98eb9@sha256:478ea05c575113675b79cdc830f65f4d153ca33faf3cc20b5c47956f44af79c2
     runner: geoffcloud
     atc:
       trustedFolders: {}
