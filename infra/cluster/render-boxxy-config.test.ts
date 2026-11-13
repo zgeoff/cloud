@@ -6,7 +6,6 @@ function setupTest() {
     runner: 'runner-for-tests',
     atc: {
       trustedFolders: { 'target-for-tests': ['/workspace'] },
-      noticeSession: 'owner-session',
     },
     spawn: { target: 'target-for-tests' },
   };
@@ -47,7 +46,6 @@ test('it sets the listeners, the store on the volume, the image rules and the ga
       url: 'http://atc-gateway.atc.svc.cluster.local:8414/mcp',
       host: 'atc.fixture.invalid',
       trustedFolders: { 'target-for-tests': ['/workspace'] },
-      noticeSession: 'owner-session',
     },
   });
 });
@@ -71,6 +69,33 @@ test("it names the mounted issuers folder and the broker's host as the audience 
     trustedIssuers: {
       folders: ['/etc/boxxy-issuers'],
       audience: 'boxxy.imp.internal',
+    },
+  });
+});
+
+test("it puts the public door on its port, with the stack config's URL and trusted peers, and leaves the address and the auth file to the server's defaults", () => {
+  const fixture = setupTest();
+
+  expect(
+    JSON.parse(
+      renderBoxxyConfig({
+        config: {
+          ...fixture.config,
+          publicDoor: { publicURL: 'https://boxxy.example.com', trustForwardedFrom: ['127.0.0.1'] },
+        },
+        repos: fixture.repos,
+        atc: {
+          url: 'http://atc-gateway.atc.svc.cluster.local:8414/mcp',
+          host: 'atc.fixture.invalid',
+        },
+        trusted: false,
+      }),
+    ),
+  ).toMatchObject({
+    publicDoor: {
+      port: 8092,
+      publicURL: 'https://boxxy.example.com',
+      trustForwardedFrom: ['127.0.0.1'],
     },
   });
 });
@@ -114,4 +139,33 @@ test('it writes the pepys section it is given and the GitHub root of the config'
       }),
     ),
   ).toMatchObject({ pepys, github: { baseUrl: 'https://api.github.com' } });
+});
+
+test('it lists the review agents in the spawn section beside the repos', () => {
+  const fixture = setupTest();
+
+  const config = {
+    ...fixture.config,
+    spawn: { target: 'target-for-tests', reviewAgents: ['review-agent-for-tests'] },
+  };
+
+  expect(
+    JSON.parse(
+      renderBoxxyConfig({
+        config,
+        repos: fixture.repos,
+        atc: {
+          url: 'http://atc-gateway.atc.svc.cluster.local:8414/mcp',
+          host: 'atc.fixture.invalid',
+        },
+        trusted: false,
+      }),
+    ),
+  ).toMatchObject({
+    spawn: {
+      target: 'target-for-tests',
+      repos: fixture.repos,
+      reviewAgents: ['review-agent-for-tests'],
+    },
+  });
 });

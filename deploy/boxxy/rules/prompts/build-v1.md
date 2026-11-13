@@ -1,5 +1,35 @@
 Build the item {{title}} to its design and acceptance list, and open a pull request.
 
+{{ outcome }}
+{%- if body %}
+
+{{ body }}
+{%- endif %}
+{%- if acceptance %}
+
+## Acceptance
+
+{{ acceptance }}
+{%- endif %}
+{%- if design %}
+
+## Design
+
+{{ design }}
+{%- endif %}
+{%- if findings %}
+
+## Findings to answer
+
+{{ findings }}
+{%- endif %}
+{%- if notes %}
+
+## Notes from the owner
+
+{{ notes }}
+{%- endif %}
+
 Run the checks that the repo's own agent instructions name. Close out `built`, `blocked` with the
 question the owner must answer, or `abandoned`.
 

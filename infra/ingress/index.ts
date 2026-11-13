@@ -7,18 +7,20 @@ import type { Provider } from '@pulumi/kubernetes';
 import type { Output } from '@pulumi/pulumi';
 import { secret } from '@pulumi/pulumi';
 import { atcGatewayPaths } from './atc-gateway-paths.ts';
+import { boxxyDoorPaths } from './boxxy-door-paths.ts';
 import type { TunnelRoute } from './build-tunnel-ingresses.ts';
 import type { GatewayIngress, SignInIngress } from './build-tunnel-route-specs.ts';
-import type { ATCTunnel } from './create-atc-tunnel.ts';
 import { createCloudflared } from './create-cloudflared.ts';
 import { createOwnerAccess } from './create-owner-access.ts';
+import type { SidecarTunnel } from './create-sidecar-tunnel.ts';
 import { createTunnelRoutes } from './create-tunnel-routes.ts';
 import { pepysAPIPaths } from './pepys-api-paths.ts';
 
 export { cloudflaredNames } from './cloudflared-names.ts';
 
-// made before the cluster, so the gateway pod's sidecar gets the tunnel's token
-export { createATCTunnel } from './create-atc-tunnel.ts';
+// made before the cluster, so the sidecar in the gateway's pod, or in the boxxy server's, gets the
+// tunnel's token
+export { createSidecarTunnel } from './create-sidecar-tunnel.ts';
 
 interface IngressInputs {
   readonly accountID: string;
@@ -33,7 +35,11 @@ interface IngressInputs {
   readonly ownerEmail: Output<string> | undefined;
 
   // set only with the gateway
-  readonly atcTunnel: ATCTunnel | undefined;
+  readonly atcTunnel: SidecarTunnel | undefined;
+
+  // set only with the boxxy server's public door, with the door's own tunnel
+  readonly boxxyDoorHostname?: string | undefined;
+  readonly boxxyTunnel?: SidecarTunnel | undefined;
 
   // set only with the files service
   readonly filesRoute: TunnelRoute | undefined;
@@ -50,6 +56,8 @@ interface IngressOutputs {
   readonly tunnelConfigVersion: Output<number>;
   readonly atcTunnelConfigVersion?: Output<number>;
   readonly atcURL?: Output<string>;
+  readonly boxxyDoorConfigVersion?: Output<number>;
+  readonly boxxyDoorURL?: Output<string>;
   readonly filesURL?: Output<string>;
   readonly pepysWebhookURL?: Output<string>;
   readonly pepysAPIURL?: Output<string>;
@@ -74,7 +82,9 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
   }
 
   const identityProviderID =
-    inputs.atcRoute === undefined && inputs.pepysAPIRoute === undefined
+    inputs.atcRoute === undefined &&
+    inputs.pepysAPIRoute === undefined &&
+    inputs.boxxyDoorHostname === undefined
       ? undefined
       : createOneTimePin(inputs.accountID);
 
@@ -83,6 +93,7 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
     zoneID: inputs.zoneID,
     tunnelID: tunnel.id,
     gateway: createGatewayIngress(inputs, identityProviderID),
+    boxxyDoor: createBoxxyDoorIngress(inputs, identityProviderID),
     files: inputs.filesRoute,
     pepys: inputs.pepysRoute,
     pepysAPI: createPepysAPIIngress(inputs, identityProviderID),
@@ -95,6 +106,10 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
       ? {}
       : { atcTunnelConfigVersion: routes.atcConfigVersion }),
     ...(routes.atcURL === undefined ? {} : { atcURL: routes.atcURL }),
+    ...(routes.boxxyDoorConfigVersion === undefined
+      ? {}
+      : { boxxyDoorConfigVersion: routes.boxxyDoorConfigVersion }),
+    ...(routes.boxxyDoorURL === undefined ? {} : { boxxyDoorURL: routes.boxxyDoorURL }),
     ...(routes.filesURL === undefined ? {} : { filesURL: routes.filesURL }),
     ...(routes.pepysURL === undefined ? {} : { pepysWebhookURL: routes.pepysURL }),
     ...(routes.pepysAPIURL === undefined ? {} : { pepysAPIURL: routes.pepysAPIURL }),
@@ -144,6 +159,42 @@ function createGatewayIngress(
       displayName: 'atc gateway',
       hostname: atcRoute.hostname,
       browserPaths: atcGatewayPaths.browser,
+      identityProviderID,
+      ownerEmail,
+    }),
+  };
+}
+
+// the boxxy server deploys only beside the gateway, so its door shares the gateway's owner address
+function createBoxxyDoorIngress(
+  inputs: IngressInputs,
+  identityProviderID: Output<string> | undefined,
+): GatewayIngress | undefined {
+  const hostname = inputs.boxxyDoorHostname;
+  const ownerEmail = inputs.ownerEmail;
+  const boxxyTunnel = inputs.boxxyTunnel;
+
+  if (hostname === undefined || identityProviderID === undefined) {
+    return undefined;
+  }
+
+  if (ownerEmail === undefined) {
+    throw new Error("the boxxy door's route has no owner address for its Access policy");
+  }
+
+  if (boxxyTunnel === undefined) {
+    throw new Error("the boxxy door's route has no boxxy tunnel");
+  }
+
+  return {
+    hostname,
+    tunnelID: boxxyTunnel.tunnelID,
+    access: createOwnerAccess({
+      accountID: inputs.accountID,
+      resourceName: 'boxxy-door',
+      displayName: 'boxxy door',
+      hostname,
+      browserPaths: boxxyDoorPaths.browser,
       identityProviderID,
       ownerEmail,
     }),

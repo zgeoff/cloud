@@ -20,6 +20,7 @@ import {
   configFileName,
   githubTokenKey,
   pepysSigningSecretKey,
+  reviewAppKeys,
   workerTokenKey,
 } from './build-boxxy-spec.ts';
 import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
@@ -50,6 +51,7 @@ export function createBoxxy(
   cluster: Provider,
   inputs: BoxxyInputs,
   atcGateway: BoxxyATCGateway,
+  doorTunnelToken: Output<string> | undefined,
 ): BoxxyOutputs {
   const ns = createNamespace('boxxy', cluster);
   const namespace = ns.metadata.name;
@@ -75,11 +77,20 @@ export function createBoxxy(
         ...(inputs.secrets.githubToken === undefined
           ? {}
           : { [githubTokenKey]: inputs.secrets.githubToken }),
+        ...(inputs.secrets.reviewApp === undefined
+          ? {}
+          : {
+              [reviewAppKeys.NOSLOP_GITHUB_APP_ID]: inputs.secrets.reviewApp.appID,
+              [reviewAppKeys.NOSLOP_GITHUB_APP_PRIVATE_KEY]: inputs.secrets.reviewApp.privateKey,
+              [reviewAppKeys.NOSLOP_GITHUB_APP_INSTALLATION_ID]:
+                inputs.secrets.reviewApp.installationID,
+            }),
       },
     },
     { provider: cluster },
   );
 
+  const doorTunnel = createDoorTunnelSecret(cluster, namespace, inputs, doorTunnelToken);
   const trustDocuments = readBoxxyTrustDocuments(trustDocumentsFolder);
   const trusted = Object.keys(trustDocuments).length > 0;
 
@@ -181,7 +192,9 @@ export function createBoxxy(
         tokenSecret: tokens.metadata.name,
         pepysSigningSecret: inputs.secrets.pepysSigningSecret !== undefined,
         githubToken: inputs.secrets.githubToken !== undefined,
+        reviewApp: inputs.secrets.reviewApp !== undefined,
         pullSecret: ghcrPullSecretName,
+        ...(doorTunnel === undefined ? {} : { doorTunnelToken: doorTunnel.metadata.name }),
       }),
     },
     { provider: cluster, dependsOn: [pull, worker, ingress] },
@@ -198,4 +211,28 @@ export function createBoxxy(
   return {
     ownerServiceURL: interpolate`http://${owner.metadata.name}.${namespace}.svc.cluster.local:${boxxyOwnerPort}`,
   };
+}
+
+// No fixed name, so a new token rolls the pod: cloudflared reads it only at start. The program
+// makes the door's tunnel exactly when the stack config sets the door, so one without the other is
+// a wiring fault.
+function createDoorTunnelSecret(
+  cluster: Provider,
+  namespace: Output<string>,
+  inputs: BoxxyInputs,
+  doorTunnelToken: Output<string> | undefined,
+): Secret | undefined {
+  if (inputs.config.publicDoor === undefined) {
+    return undefined;
+  }
+
+  if (doorTunnelToken === undefined) {
+    throw new Error("the boxxy server's public door has no tunnel token");
+  }
+
+  return new Secret(
+    'boxxy-door-tunnel-token',
+    { metadata: { namespace }, stringData: { token: doorTunnelToken } },
+    { provider: cluster },
+  );
 }

@@ -86,15 +86,15 @@ the items, with their copies, before the PR that adds the lines merges.
    with no backup.
 
 4. Merge the PR. `Deploy prod` applies it, since every step is a create.
-5. Check that the pod is up and both listeners started:
+5. Check that the pod is up and its listeners started:
 
    ```bash
    ssh root@geoffcloud k3s kubectl -n boxxy rollout status statefulset/boxxy --timeout=300s
    ssh root@geoffcloud k3s kubectl -n boxxy logs boxxy-0 | grep 'boxxy server listening'
    ```
 
-   Expect `statefulset rolling update complete`, then one line with `"ownerPort":8090` and
-   `"workerPort":8091`.
+   Expect `statefulset rolling update complete`, then one line with `"ownerPort":8090`,
+   `"workerPort":8091` and `"publicPort":null`, or `"publicPort":8092` with the public door.
 
 ## Reach the owner listener
 
@@ -105,6 +105,63 @@ ssh -L 8090:localhost:8090 root@geoffcloud k3s kubectl -n boxxy port-forward svc
 ```
 
 Then set `BOXXY_URL=http://localhost:8090` for the boxxy CLI.
+
+## Turn on the public door
+
+The public door serves the owner's MCP tools at `https://boxxy.geoff.cloud/mcp`, behind the server's
+own OAuth, through a tunnel of its own
+([the workload doc](../architecture/workloads/boxxy.md#the-public-door)). It needs an image with
+`@boxxy/server` 0.2.1 or later, because an older server refuses a configuration with a `publicDoor`
+section and does not start.
+
+1. In a PR, add the section to the `boxxy` object in `infra/Pulumi.prod.yaml`:
+
+   ```yaml
+   publicDoor:
+     publicURL: https://boxxy.geoff.cloud
+     trustForwardedFrom:
+       - 127.0.0.1
+   ```
+
+   Run `bun run preview`. Expect it to create the `boxxy` tunnel, its configuration and its DNS
+   record, the `boxxy-door-owner` Access policy and the `boxxy-door-sign-in` Access application, and
+   the Secret `boxxy-door-tunnel-token`. Expect it to replace the ConfigMap `boxxy-config` and
+   update the StatefulSet, and to change nothing else.
+
+2. Merge it. The guard of `Deploy prod` holds the plan, because it creates a tunnel's routes, a DNS
+   record and an Access application. Read the held plan and dispatch it, as
+   [the prod apply runbook](./prod-apply.md#answer-a-held-run) says.
+3. Check the route from any machine:
+
+   ```bash
+   curl -sS -o /dev/null -w '%{http_code}\n' https://boxxy.geoff.cloud/.well-known/oauth-protected-resource
+   curl -sS -o /dev/null -w '%{http_code}\n' -X POST https://boxxy.geoff.cloud/mcp
+   curl -sS -o /dev/null -w '%{http_code}\n' https://boxxy.geoff.cloud/rpc
+   ```
+
+   Expect `200`, then `401`, then `404`.
+
+4. [Reach the owner listener](#reach-the-owner-listener), and enroll a passkey:
+
+   ```bash
+   BOXXY_URL=http://localhost:8090 boxxy auth enroll
+   ```
+
+   Expect `Enrollment link: https://boxxy.geoff.cloud/enroll?token=<token>`. Open the link in your
+   browser, sign in to Access with the one-time PIN, and save the passkey before the link expires.
+
+5. Add each MCP client with its redirect URI:
+
+   ```bash
+   BOXXY_URL=http://localhost:8090 boxxy auth clients add <client_name> --redirect-uri <redirect_uri>
+   ```
+
+   `<client_name>` is the name the consent page shows, and `<redirect_uri>` is the callback URL the
+   client's OAuth settings give. Expect `Added <client_name>. Its client ID is <client_id>`, and
+   give the client that ID with `https://boxxy.geoff.cloud/mcp` as its server URL.
+
+`boxxy auth clients` and `boxxy auth grants` list and remove clients and grants. The backup copies
+the door's auth database with the store, and a restore puts both back.
 
 ## Let sessions reach the server
 
@@ -140,7 +197,7 @@ relay and the daemon's new config.
 
    ```sh
    ssh root@geoffcloud podman exec imp-host impz token set atc-cloud \
-     --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy \
+     --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy,boxxy-github-token,boxxy-github-token \
      < /dev/null
    ```
 
@@ -228,10 +285,11 @@ needs its token in `.env`, and the program stops with the name of the variable w
    BOXXY_PEPYS_SIGNING_SECRET=op://cloud/boxxy-pepys-signing/credential
    ```
 
-2. For GitHub, create a fine-grained token on the owner's repos, with the permission
-   `Pull requests: read` and nothing else, and store it as `boxxy-github-token` in `cloud` and
-   `cloud-deploy`. Its repository access must cover every repo in `boxxySpawnRepos`. The server only
-   reads pull requests; it never merges one. Add the line:
+2. For GitHub, create a fine-grained token on the owner's repos, with the permissions
+   `Contents: read` and `Pull requests: read` and nothing else, and store it as `boxxy-github-token`
+   in `cloud` and `cloud-deploy`. Its repository access must cover every repo in `boxxySpawnRepos`.
+   The server only reads pull requests; it never merges one. The daemon's clone and the review
+   sessions read with the same token. Add the line:
 
    ```bash
    BOXXY_GITHUB_TOKEN=op://cloud/boxxy-github-token/credential
@@ -252,6 +310,38 @@ needs its token in `.env`, and the program stops with the name of the variable w
 
 4. Run `bun run preview` and check that it replaces the Secret `boxxy-tokens` and the ConfigMap
    `boxxy-config`, updates the StatefulSet, and changes nothing else.
+
+## Turn on the review gate
+
+The review phase runs noslop in a session on the `boxxy-review` agent, and the server checks and
+posts the result as the noslop App. Without the App's keys, the server rejects every review
+close-out, and each item holds at review after two sessions.
+
+1. Copy the item `noslop-github-app` into `cloud` and `cloud-deploy`, with the fields `app-id`,
+   `private-key` and `installation-id`. Install the noslop App on every repo in `boxxySpawnRepos`.
+2. Give impd the read-only clone token as the secret `boxxy-github-token`, of kind `github`, from
+   the item of the same name. Send it as step 1 of
+   [Let sessions reach the server](#let-sessions-reach-the-server) sends `boxxy`: `op read` on your
+   machine, piped over SSH's stdin into `impz secret add boxxy-github-token --kind github` in
+   imp-host. Then set the daemon token's grantable list from `scripts/atc-cloud-grantable.ts`, which
+   names `boxxy-github-token`, with the `impz token set atc-cloud` command of that section.
+3. Switch the host, so the atc daemon offers the `boxxy-review` agent and its `github-review`
+   profile.
+4. Add the lines to `.env`:
+
+   ```bash
+   NOSLOP_GITHUB_APP_ID=op://cloud/noslop-github-app/app-id
+   NOSLOP_GITHUB_APP_PRIVATE_KEY=op://cloud/noslop-github-app/private-key
+   NOSLOP_GITHUB_APP_INSTALLATION_ID=op://cloud/noslop-github-app/installation-id
+   ```
+
+5. In the same PR as an image pin of `@boxxy/server` 0.2.4 or later, add
+   `reviewAgents: [boxxy-review]` to `spawn` in the `boxxy` object of `infra/Pulumi.prod.yaml`. An
+   older server refuses the field.
+6. Run `bun run preview`. Expect it to replace the Secret `boxxy-tokens` and the ConfigMap
+   `boxxy-config`, and to update the StatefulSet.
+7. Merge it. After the deploy, a review round leaves noslop's check run at the pull request's head,
+   posted by the App.
 
 ## Upgrade the server
 

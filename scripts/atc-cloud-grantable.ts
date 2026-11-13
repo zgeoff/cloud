@@ -7,4 +7,5 @@ export const atcCloudGrantable: readonly string[] = [
   'op-connect',
   'pepys-telemetry',
   'boxxy',
+  'boxxy-github-token',
 ];

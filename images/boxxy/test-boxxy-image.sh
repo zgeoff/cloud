@@ -154,8 +154,9 @@ it_exits_1_on_a_trust_document_that_is_not_json() {
   assert_status 1 "$status"
 }
 
-# a configuration with the listeners, store and rules folder that infra/cluster/render-boxxy-config.ts
-# sets, its trustedIssuers section when the second argument is set, and an atc address that refuses
+# a configuration with the listeners, store, rules folder and review agent that
+# infra/cluster/render-boxxy-config.ts sets, so the image's rules load as the cluster loads them, its
+# trustedIssuers section when the second argument is set, and an atc address that refuses
 # every connection, so the runner tick fails and logs and the listeners keep serving
 write_config() {
   local tree="$1" trusted="${2:-}" issuers=''
@@ -172,7 +173,7 @@ write_config() {
     "listen": { "hostname": "0.0.0.0", "port": 8090 },
     "workerListen": { "hostname": "0.0.0.0", "port": 8091 }
   },
-  "spawn": { "target": "image-test", "repos": {} },
+  "spawn": { "target": "image-test", "repos": {}, "reviewAgents": ["boxxy-review"] },
   "atc": { "url": "http://127.0.0.1:1/mcp", "host": "atc.image-test.invalid", "trustedFolders": {} }
 }
 EOF

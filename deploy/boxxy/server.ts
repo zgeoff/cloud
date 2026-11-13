@@ -26,10 +26,13 @@ console.log(
     message: 'boxxy server listening',
     ownerPort: server.ownerPort,
     workerPort: server.workerPort,
+
+    // null without a public door
+    publicPort: server.publicPort,
   }),
 );
 
-// Kubernetes stops the pod with SIGTERM: the server stops its tick and both listeners and closes
+// Kubernetes stops the pod with SIGTERM: the server stops its tick and its listeners and closes
 // the store before the process exits
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {

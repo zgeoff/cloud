@@ -25,23 +25,42 @@ const githubNeed =
   'the boxxy server reads pull requests with it while stack config "boxxy.github" is set';
 
 const name = z.string().min(1);
+
+const publicURLMessage =
+  'must be the https:// origin clients reach, with no path, such as https://boxxy.example.com';
+
 const folders = z.array(name);
 
 // the image reaches its own check below, which names what the field must hold
 const boxxyConfigSchema = z.strictObject({
   image: z.string().optional(),
   runner: name,
-  atc: z.strictObject({
-    trustedFolders: z.record(name, folders),
-    noticeSession: name.optional(),
+  atc: z.strictObject({ trustedFolders: z.record(name, folders) }),
+  spawn: z.strictObject({
+    target: name,
+
+    // the atc agents whose broker profile holds the read-only clone token; with one, the server
+    // runs its review gate, which needs the noslop App's keys and the github section
+    reviewAgents: z.array(name).optional(),
   }),
-  spawn: z.strictObject({ target: name }),
 
   // the environment whose deploy the stage times count; the cluster sets pepys's addresses
   pepys: z.strictObject({ environment: name }).optional(),
 
   // GitHub's REST root, which the pull request watch and the hook's link read
   github: z.strictObject({ baseUrl: z.url() }).optional(),
+
+  // the owner's MCP tools behind OAuth, on a tunnel of its own; the cluster sets the port
+  publicDoor: z
+    .strictObject({
+      publicURL: z
+        .url({ protocol: /^https$/u, error: publicURLMessage })
+        .refine((url) => new URL(url).origin === url, publicURLMessage),
+
+      // the socket peers whose forwarded client address the door's security events trust
+      trustForwardedFrom: z.array(name),
+    })
+    .optional(),
 });
 
 // setting stack config "boxxy" approves the deploy; BOXXY_RESTIC_* and BOXXY_R2_* add the backup
@@ -80,6 +99,7 @@ export function loadBoxxyInputs(
       ? undefined
       : requireVariable(env, 'BOXXY_GITHUB_TOKEN', githubNeed);
 
+  const reviewApp = findReviewApp(config, env);
   const pull = requireGHCRPullCredential(env);
   const backup = findBackup(env, backupImage);
 
@@ -88,15 +108,16 @@ export function loadBoxxyInputs(
       config: {
         image: config.image,
         runner: config.runner,
-        atc: {
-          trustedFolders: config.atc.trustedFolders,
-          ...(config.atc.noticeSession === undefined
+        atc: config.atc,
+        spawn: {
+          target: config.spawn.target,
+          ...(config.spawn.reviewAgents === undefined
             ? {}
-            : { noticeSession: config.atc.noticeSession }),
+            : { reviewAgents: config.spawn.reviewAgents }),
         },
-        spawn: config.spawn,
         ...(config.pepys === undefined ? {} : { pepys: config.pepys }),
         ...(config.github === undefined ? {} : { github: config.github }),
+        ...(config.publicDoor === undefined ? {} : { publicDoor: config.publicDoor }),
       },
       repos: spawnRepos,
       pullCredential: { username: pull.username, token: secret(pull.token) },
@@ -107,6 +128,7 @@ export function loadBoxxyInputs(
           ? {}
           : { pepysSigningSecret: secret(pepysSigningSecret) }),
         ...(githubToken === undefined ? {} : { githubToken: secret(githubToken) }),
+        ...(reviewApp === undefined ? {} : { reviewApp }),
       },
       ...(backup === undefined ? {} : { backup }),
     },
@@ -123,6 +145,35 @@ function requireRepos(stackConfig: Pick<StackConfig, 'getSecret'>): Output<Boxxy
   }
 
   return raw.apply(parseBoxxyRepos);
+}
+
+const reviewAppNeed =
+  'the boxxy server posts each review as the noslop App with it while stack config "boxxy.spawn.reviewAgents" lists an agent';
+
+// The noslop App's keys, which only the server's pod holds: the review gate checks and posts each
+// review session's result with them. A server with review agents and no keys or no github section
+// rejects every review close-out, so the deploy refuses that pairing.
+function findReviewApp(
+  config: z.infer<typeof boxxyConfigSchema>,
+  env: Environment,
+): NonNullable<BoxxyInputs['secrets']['reviewApp']> | undefined {
+  if ((config.spawn.reviewAgents ?? []).length === 0) {
+    return undefined;
+  }
+
+  if (config.github === undefined) {
+    throw new Error(
+      'stack config "boxxy.spawn.reviewAgents" needs stack config "boxxy.github": the review gate reads the pull request\'s changes through it',
+    );
+  }
+
+  return {
+    appID: secret(requireVariable(env, 'NOSLOP_GITHUB_APP_ID', reviewAppNeed)),
+    privateKey: secret(requireVariable(env, 'NOSLOP_GITHUB_APP_PRIVATE_KEY', reviewAppNeed)),
+    installationID: secret(
+      requireVariable(env, 'NOSLOP_GITHUB_APP_INSTALLATION_ID', reviewAppNeed),
+    ),
+  };
 }
 
 function findBackup(

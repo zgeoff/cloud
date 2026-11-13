@@ -1,8 +1,9 @@
 import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import invariant from 'tiny-invariant';
-import { buildATCGatewayRoutes } from './build-atc-gateway-routes.ts';
+import { atcGatewayPaths } from './atc-gateway-paths.ts';
 import { buildATCTunnelIngresses } from './build-atc-tunnel-ingresses.ts';
+import { buildSignInRoutes } from './build-sign-in-routes.ts';
 import { buildTunnelIngresses } from './build-tunnel-ingresses.ts';
 
 test("it sends the gateway's browser paths through the Access check and its machine paths without one to the pod's loopback, then answers 404", () => {
@@ -29,8 +30,9 @@ test("it renders the gateway's route rules unchanged but for the origin, the pod
   const access = { teamName: output('example-team'), audience: output('0123456789abcdef') };
 
   const shared = buildTunnelIngresses(
-    buildATCGatewayRoutes(
+    buildSignInRoutes(
       { hostname: 'atc.geoff.cloud', service: 'http://atc-gateway.atc.svc.cluster.local:8414' },
+      atcGatewayPaths,
       access,
     ),
   );

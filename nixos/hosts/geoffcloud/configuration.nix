@@ -481,13 +481,20 @@ in
           profile = "linear";
         };
       };
-      claudeEnv = {
-        PR_EVIDENCE_URL = "https://${filesExposure.hostname}/api/files";
-        PR_EVIDENCE_TOKEN_PATH = "imp/files-agent-token/credential";
+      telemetryEnv = {
         CLAUDE_CODE_ENABLE_TELEMETRY = "1";
         OTEL_LOGS_EXPORTER = "otlp";
         OTEL_EXPORTER_OTLP_PROTOCOL = "http/json";
       };
+      claudeEnv = telemetryEnv // {
+        PR_EVIDENCE_URL = "https://${filesExposure.hostname}/api/files";
+        PR_EVIDENCE_TOKEN_PATH = "imp/files-agent-token/credential";
+      };
+      # the plug-in folder in the agent image that a boxxy session's hooks run from
+      boxxyPluginArgs = [
+        "--plugin-dir"
+        "/opt/boxxy/hook-plugin"
+      ];
     in
     {
       enable = true;
@@ -519,6 +526,12 @@ in
         };
         github = {
           secret = "github-imp-agents";
+          kind = "github";
+        };
+        # the read-only clone token, with Contents: read and Pull requests: read on the boxxy repos:
+        # the boxxy-review agent alone selects it
+        github-review = {
+          secret = "boxxy-github-token";
           kind = "github";
         };
         linear = {
@@ -569,14 +582,26 @@ in
         # entry's does), so the plug-in goes in the entry's args, which apply on an imp.
         boxxy = {
           kind = "claude";
-          args = [
-            "--plugin-dir"
-            "/opt/boxxy/hook-plugin"
-          ];
+          args = boxxyPluginArgs;
           auth = claudeAuth // {
             profiles = claudeProfiles ++ [ "boxxy" ];
           };
           env = claudeEnv;
+        };
+        # a review session of the boxxy server: it runs noslop's command on the pull request and
+        # sends the result as its close-out. It alone takes github-review, the read-only clone
+        # token, which noslop reads as GH_TOKEN, and no other GitHub profile; the server lists it
+        # in spawn.reviewAgents, so the rules load only when review recipes alone name it.
+        boxxy-review = {
+          kind = "claude";
+          args = boxxyPluginArgs;
+          auth.profiles = [
+            "claude"
+            "github-review"
+            "pepys-telemetry"
+            "boxxy"
+          ];
+          env = telemetryEnv;
         };
         # atc refuses a Codex auth without an oauth profile for chatgpt.com, which this daemon
         # does not have, so Codex runs with no brokered sign-in

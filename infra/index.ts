@@ -1,7 +1,7 @@
 import { Config, secret } from '@pulumi/pulumi';
 import { createCluster, createClusterProvider } from './cluster/index.ts';
 import { createEdge } from './edge/index.ts';
-import { createATCTunnel, createIngress } from './ingress/index.ts';
+import { createIngress, createSidecarTunnel } from './ingress/index.ts';
 import { buildATCDaemonEndpoints, loadInputs } from './inputs/index.ts';
 import { createObservability } from './observability/index.ts';
 import { createTailnet } from './tailnet/index.ts';
@@ -33,8 +33,19 @@ const k3s =
         provider: createClusterProvider('geoffcloud', { kubeconfig: inputs.cluster.kubeconfig }),
       };
 
-// the atc tunnel's connector runs in the gateway's pod, so the tunnel comes before the cluster
-const atcTunnel = k3s?.inputs.atcGateway === undefined ? undefined : createATCTunnel(accountID);
+// the atc tunnel's connector runs in the gateway's pod, and the boxxy door tunnel's in the boxxy
+// server's, so each tunnel comes before the cluster
+const atcTunnel =
+  k3s?.inputs.atcGateway === undefined
+    ? undefined
+    : createSidecarTunnel(accountID, { resourceName: 'atc', tunnelName: 'geoff-cloud-atc' });
+
+const boxxyDoor = k3s?.inputs.boxxy?.config.publicDoor;
+
+const boxxyTunnel =
+  boxxyDoor === undefined
+    ? undefined
+    : createSidecarTunnel(accountID, { resourceName: 'boxxy', tunnelName: 'geoff-cloud-boxxy' });
 
 const workloads =
   k3s === undefined
@@ -52,6 +63,7 @@ const workloads =
         ...(k3s.inputs.files === undefined ? {} : { files: k3s.inputs.files }),
         ...(k3s.inputs.pepys === undefined ? {} : { pepys: k3s.inputs.pepys }),
         ...(k3s.inputs.boxxy === undefined ? {} : { boxxy: k3s.inputs.boxxy }),
+        ...(boxxyTunnel === undefined ? {} : { boxxyDoorTunnelToken: boxxyTunnel.tunnelToken }),
         zoneID: edge.zoneID,
         kubeconfig: secret(k3s.inputs.kubeconfig),
       });
@@ -63,6 +75,8 @@ const ingress = createIngress({
   atcRoute: workloads?.atcGatewayRoute,
   ownerEmail: k3s?.inputs.atcGateway?.secrets.ownerEmail,
   atcTunnel,
+  boxxyDoorHostname: boxxyDoor === undefined ? undefined : new URL(boxxyDoor.publicURL).hostname,
+  boxxyTunnel,
   filesRoute: workloads?.filesRoute,
   pepysRoute: workloads?.pepysRoute,
   pepysAPIRoute: workloads?.pepysAPIRoute,
@@ -72,6 +86,8 @@ export const tunnelToken = ingress.tunnelToken;
 export const tunnelConfigVersion = ingress.tunnelConfigVersion;
 export const atcTunnelConfigVersion = ingress.atcTunnelConfigVersion;
 export const atcURL = ingress.atcURL;
+export const boxxyDoorConfigVersion = ingress.boxxyDoorConfigVersion;
+export const boxxyDoorURL = ingress.boxxyDoorURL;
 export const previewWebhookURL = ingress.previewWebhookURL;
 export const filesURL = ingress.filesURL;
 export const pepysWebhookURL = ingress.pepysWebhookURL;

@@ -20,7 +20,7 @@ const mintCall = [
   '--imps',
   'harness-*',
   '--grantable',
-  'glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy',
+  'glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy,boxxy-github-token',
 ];
 
 export async function createStubImpPodman(

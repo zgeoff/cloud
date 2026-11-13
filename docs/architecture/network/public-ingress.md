@@ -1,22 +1,25 @@
 # Public ingress
 
-The estate has two ways in from the internet: two Cloudflare tunnels that cloudflared holds open
+The estate has two ways in from the internet: three Cloudflare tunnels that cloudflared holds open
 from inside the cluster, and a TLS front on the host's public HTTPS port. The host opens no inbound
 port for the tunnels, so a tunnel route exists only as a rule in a tunnel's configuration and a DNS
 record that points at that tunnel, and Pulumi declares both. The TLS front serves `imp.geoff.cloud`,
 imp's own MCP and OAuth route, which a hosted assistant signs in to and calls directly at
-`https://imp.geoff.cloud/mcp`. Each workload behind a route brings its own authentication. The atc
-tunnel serves `atc.geoff.cloud`, the atc gateway, which runs its own OAuth server. The shared tunnel
-serves two hostnames, a third while pepys runs, and a fourth while pepys's API is public.
-`preview-webhook.geoff.cloud` reaches the preview service's webhook listener, which checks the
-signature of every GitHub delivery. `files.geoff.cloud` reaches the files service, which serves each
-file to anyone who holds its link and checks a role token on every write.
+`https://imp.geoff.cloud/mcp`. Each workload behind a route brings its own authentication.
+
+The atc tunnel serves `atc.geoff.cloud`, the atc gateway, which runs its own OAuth server. The boxxy
+tunnel serves `boxxy.geoff.cloud`, the boxxy server's public door, which runs its own OAuth server
+too. The shared tunnel serves two hostnames, a third while pepys runs, and a fourth while pepys's
+API is public. `preview-webhook.geoff.cloud` reaches the preview service's webhook listener, which
+checks the signature of every GitHub delivery. `files.geoff.cloud` reaches the files service, which
+serves each file to anyone who holds its link and checks a role token on every write.
 `pepys-webhook.geoff.cloud` reaches pepys ingest, which checks the signature of every GitHub
 delivery. `pepys.geoff.cloud` reaches pepys's API, whose own OAuth server checks every MCP call.
-Cloudflare Access adds an owner-only login in front of the sign-in pages of the gateway and of
-pepys's API, and nowhere else. [The atc gateway](../workloads/atc-gateway.md),
-[the preview service](../workloads/preview.md) [the files service](../workloads/files.md) and
-[pepys](../workloads/pepys.md) cover what answers behind each route.
+Cloudflare Access adds an owner-only login in front of the sign-in pages of the gateway, the door
+and pepys's API, and nowhere else. [The atc gateway](../workloads/atc-gateway.md),
+[the boxxy server](../workloads/boxxy.md), [the preview service](../workloads/preview.md),
+[the files service](../workloads/files.md) and [pepys](../workloads/pepys.md) cover what answers
+behind each route.
 
 ## The host's TLS front
 
@@ -45,7 +48,7 @@ and answers 429 past the limit. HTTP/3 stays off, so the front needs no UDP port
 
 ## The tunnels
 
-Both tunnels take their routes from Cloudflare rather than from a file in the cluster, so a route
+Every tunnel takes its routes from Cloudflare rather than from a file in the cluster, so a route
 change is a Pulumi change to a tunnel's configuration, and cloudflared picks it up with no redeploy.
 A tunnel's configuration is an ordered list, and cloudflared takes the first rule that matches. Each
 list ends with a catch-all that answers 404, so a hostname with no rule of its own, or any other
@@ -89,6 +92,21 @@ health check on the hostname is the atc tunnel's one monitor.
 cloudflared passes the request's own host header through to the gateway. The gateway answers only
 requests addressed to its public host or to loopback, so a request that reached its Service by any
 other name gets a 403.
+
+### The boxxy tunnel
+
+The boxxy tunnel serves the boxxy server's public door, the owner's MCP tools behind OAuth, the same
+way the atc tunnel serves the gateway: its connector is a cloudflared sidecar in the server's pod,
+and the door listens on the pod's loopback address alone. No Service, no container port and no other
+pod reach the door, so the server's ingress NetworkPolicy still admits nothing, and the door trusts
+the forwarded client address only from loopback. The sidecar reads its token from a file that only
+it mounts.
+
+The boxxy tunnel's list holds two rules for the door's hostname, then the catch-all, as
+[the door's route boundary](#the-boxxy-doors-route-boundary) sets out. The owner listener's `/rpc`
+and `/healthz` are in neither rule, so the tunnel answers them with its 404 and never reaches the
+server. The sidecar restarts with the server, so the hostname is down while the pod restarts. It
+keeps its metrics on loopback, and no external health check watches the hostname.
 
 ## HTTPS and the edge
 
@@ -141,6 +159,22 @@ A route atc adds later reaches nothing until it joins that list.
 The gateway's liveness and readiness probes are in no row, because the kubelet calls them inside the
 cluster. The external health check reads the MCP resource's metadata instead.
 
+### The boxxy door's route boundary
+
+The door's routes follow the route table of the door in `@boxxy/auth-oauth`, and the tunnel and its
+Access application both read them from one list in the Pulumi program. The split is the gateway's,
+except that the door serves no alias of `/mcp` at `/`. A route the door adds later reaches nothing
+until it joins that list.
+
+| Path                                                           | Caller            | At the edge  |
+| -------------------------------------------------------------- | ----------------- | ------------ |
+| `/oauth2/authorize`, `/login`, `/enroll`, `/consent`, `/error` | the owner browser | Access login |
+| `/mcp`                                                         | an MCP client     | straight in  |
+| `/oauth2/token`, `/oauth2/revoke`                              | an MCP client     | straight in  |
+| `/.well-known/oauth-authorization-server`                      | an MCP client     | straight in  |
+| `/.well-known/oauth-protected-resource` and its `/mcp` form    | an MCP client     | straight in  |
+| any other path, `/`, `/rpc` and `/healthz` among them          | none              | tunnel 404   |
+
 ### The pepys API's route boundary
 
 pepys's API serves the same OAuth and MCP paths as the gateway, from the route table of its own
@@ -162,11 +196,11 @@ an `/rpc` path matches a rule, or when a browser path reaches the API without Ac
 
 ### The owner-only Access applications
 
-One self-hosted Access application covers the browser paths on `atc.geoff.cloud`, and a second one
-covers those on `pepys.geoff.cloud`. Access covers each path and every path under it. Each
-application's one policy allows the owner's address, which the stack config holds as a secret in
-`atcGatewayOwnerEmail`, signed in with Access's one-time PIN, and the application offers no other
-login. The two applications share the account's one one-time PIN login. Access denies every identity
+Three self-hosted Access applications cover the browser paths: one on `atc.geoff.cloud`, one on
+`boxxy.geoff.cloud` and one on `pepys.geoff.cloud`. Access covers each path and every path under it.
+Each application's one policy allows the owner's address, which the stack config holds as a secret
+in `atcGatewayOwnerEmail`, signed in with Access's one-time PIN, and the application offers no other
+login. The applications share the account's one one-time PIN login. Access denies every identity
 that no allow policy matches, so any other address gets no PIN-backed session. The machine paths lie
 outside the application, so they get no login redirect, no challenge and no Access cookie
 requirement.
@@ -176,12 +210,13 @@ the gateway only with a token that Access signed for this application, so a requ
 Access at the edge still never reaches a sign-in page. The Pulumi program reads the team name that
 cloudflared needs from the account's Zero Trust organization.
 
-Passing Access grants nothing inside atc. The gateway still signs the owner in, binds each request,
-asks for explicit consent, and checks PKCE, the redirect, the Host and Origin headers, the scope and
-the resource before it issues a token. atc keeps its grants and tokens in its own database, so a
-change to the Access application or its policy leaves every grant and token valid. A rollback of
-this edge control reverts the Access resources and the atc tunnel's two gateway rules together, and
-leaves atc's own authentication as it is.
+Passing Access grants nothing inside atc or boxxy. The gateway still signs the owner in, binds each
+request, asks for explicit consent, and checks PKCE, the redirect, the Host and Origin headers, the
+scope and the resource before it issues a token, and the boxxy door makes the same checks
+([the public door](../workloads/boxxy.md#the-public-door)). Each keeps its grants and tokens in its
+own database, so a change to an Access application or its policy leaves every grant and token valid.
+A rollback of this edge control reverts the Access resources and the tunnel's two rules together,
+and leaves the workload's own authentication as it is.
 
 ### Other ways to the gateway
 

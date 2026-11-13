@@ -42,5 +42,14 @@ export function buildMockATCProfileSecrets(): Record<string, unknown>[] {
         rules: [{ host: 'boxxy.imp.internal', header: 'authorization', scheme: 'bearer' }],
       }),
     },
+    {
+      ...buildMockImpSecret({
+        name: 'boxxy-github-token',
+        rules: [
+          { host: 'github.com', header: 'authorization', scheme: 'basic' },
+          { host: 'api.github.com', header: 'authorization', scheme: 'bearer' },
+        ],
+      }),
+    },
   ];
 }

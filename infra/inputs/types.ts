@@ -151,11 +151,14 @@ export interface BoxxyConfig {
   readonly atc: {
     // by worker target: the folders the agent trusts
     readonly trustedFolders: Readonly<Record<string, readonly string[]>>;
-
-    // the session that gets the hold notices; with none, no notice is sent
-    readonly noticeSession?: string;
   };
-  readonly spawn: { readonly target: string };
+  readonly spawn: {
+    readonly target: string;
+
+    // the atc agents whose broker profile holds the read-only clone token: only a review recipe
+    // may name one, and with one the server runs its review gate
+    readonly reviewAgents?: readonly string[];
+  };
 
   // with it, the server sends its facts to pepys and reads its two reports there; the cluster sets
   // the addresses
@@ -163,6 +166,16 @@ export interface BoxxyConfig {
 
   // with it, the server links and watches pull requests
   readonly github?: { readonly baseUrl: string };
+
+  // with it, the server serves the owner's MCP tools on its public door, behind OAuth, through a
+  // tunnel whose connector runs in the server's pod
+  readonly publicDoor?: {
+    // the https origin clients reach the door at: the OAuth issuer
+    readonly publicURL: string;
+
+    // the socket peers whose forwarded client address the door's security events trust
+    readonly trustForwardedFrom: readonly string[];
+  };
 }
 
 // by repo: its folder on the target, or the git source that atc clones there
@@ -206,6 +219,13 @@ export interface BoxxyInputs {
 
     // with config github: the token of its pull request reads
     readonly githubToken?: Output<string>;
+
+    // with review agents: the noslop App's keys, which the review gate checks and posts with
+    readonly reviewApp?: {
+      readonly appID: Output<string>;
+      readonly privateKey: Output<string>;
+      readonly installationID: Output<string>;
+    };
   };
 
   // without it there is no backup CronJob

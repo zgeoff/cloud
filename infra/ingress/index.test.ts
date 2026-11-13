@@ -1,5 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { output, runtime } from '@pulumi/pulumi';
+import invariant from 'tiny-invariant';
 import { buildStubResourceMocks } from '../test-utils/build-stub-resource-mocks.ts';
 import { resolveOutput } from '../test-utils/resolve-output.ts';
 import { createIngress } from './index.ts';
@@ -374,4 +375,125 @@ test("it refuses the pepys API's route without an owner address for its Access p
     Error,
     "the pepys API's route has no owner address for its Access policy; it takes the atc gateway's",
   );
+});
+
+test("it fronts the gateway's and the boxxy door's sign-in pages with an owner-only application each, on the one one-time PIN login", async () => {
+  const stub = buildStubResourceMocks();
+
+  await runtime.setMocks(
+    {
+      ...stub.mocks,
+
+      // the account's Zero Trust organization, which names the team that cloudflared checks
+      // Access tokens against
+      call: (args: runtime.MockCallArgs) =>
+        args.token === 'cloudflare:index/getZeroTrustOrganization:getZeroTrustOrganization'
+          ? { authDomain: 'example-team.cloudflareaccess.com' }
+          : stub.mocks.call(args),
+    },
+    'geoff-cloud',
+    'test',
+  );
+
+  onTestFinished(() => {
+    stub.release();
+    runtime.resetOptions('', '', -1, '', '', false, '');
+  });
+
+  const ingress = createIngress({
+    accountID: 'account',
+    zoneID: output('zone'),
+    cluster: undefined,
+    atcRoute: {
+      hostname: 'atc.geoff.cloud',
+      service: output('http://atc-gateway.atc.svc.cluster.local:8414'),
+    },
+    ownerEmail: output('owner@example.test'),
+    atcTunnel: { tunnelID: output('atc-tunnel'), tunnelToken: output('atc-tunnel-token') },
+    boxxyDoorHostname: 'boxxy.geoff.cloud',
+    boxxyTunnel: { tunnelID: output('boxxy-tunnel'), tunnelToken: output('boxxy-tunnel-token') },
+    filesRoute: undefined,
+    pepysRoute: undefined,
+    pepysAPIRoute: undefined,
+  });
+
+  invariant(ingress.boxxyDoorConfigVersion);
+
+  await resolveOutput(ingress.boxxyDoorConfigVersion);
+
+  expect({
+    identityProviders: stub.registered.filter((key) =>
+      key.startsWith(
+        'cloudflare:index/zeroTrustAccessIdentityProvider:ZeroTrustAccessIdentityProvider::',
+      ),
+    ),
+    policy: stub.inputs.get(
+      'cloudflare:index/zeroTrustAccessPolicy:ZeroTrustAccessPolicy::boxxy-door-owner',
+    ),
+    application: stub.inputs.get(
+      'cloudflare:index/zeroTrustAccessApplication:ZeroTrustAccessApplication::boxxy-door-sign-in',
+    ),
+    gatewayApplication: stub.inputs.get(
+      'cloudflare:index/zeroTrustAccessApplication:ZeroTrustAccessApplication::atc-gateway-sign-in',
+    )?.['name'],
+  }).toStrictEqual({
+    identityProviders: [
+      'cloudflare:index/zeroTrustAccessIdentityProvider:ZeroTrustAccessIdentityProvider::one-time-pin',
+    ],
+    policy: {
+      accountId: 'account',
+      name: 'boxxy door owner',
+      decision: 'allow',
+      includes: [{ email: { email: 'owner@example.test' } }],
+      requires: [{ loginMethod: { id: 'one-time-pin-id' } }],
+    },
+    application: {
+      accountId: 'account',
+      name: 'boxxy door sign-in',
+      type: 'self_hosted',
+      domain: 'boxxy.geoff.cloud/oauth2/authorize',
+      destinations: [
+        { type: 'public', uri: 'boxxy.geoff.cloud/oauth2/authorize' },
+        { type: 'public', uri: 'boxxy.geoff.cloud/login' },
+        { type: 'public', uri: 'boxxy.geoff.cloud/enroll' },
+        { type: 'public', uri: 'boxxy.geoff.cloud/consent' },
+        { type: 'public', uri: 'boxxy.geoff.cloud/error' },
+      ],
+      policies: [{ id: 'boxxy-door-owner-id', precedence: 1 }],
+      allowedIdps: ['one-time-pin-id'],
+      autoRedirectToIdentity: true,
+      appLauncherVisible: false,
+      sessionDuration: '1h',
+      httpOnlyCookieAttribute: true,
+      sameSiteCookieAttribute: 'lax',
+    },
+    gatewayApplication: 'atc gateway sign-in',
+  });
+});
+
+test("it refuses the boxxy door's route without the owner address", async () => {
+  const stub = buildStubResourceMocks();
+
+  await runtime.setMocks(stub.mocks, 'geoff-cloud', 'test');
+
+  onTestFinished(() => {
+    stub.release();
+    runtime.resetOptions('', '', -1, '', '', false, '');
+  });
+
+  expect(() =>
+    createIngress({
+      accountID: 'account',
+      zoneID: output('zone'),
+      cluster: undefined,
+      atcRoute: undefined,
+      ownerEmail: undefined,
+      atcTunnel: undefined,
+      boxxyDoorHostname: 'boxxy.geoff.cloud',
+      boxxyTunnel: { tunnelID: output('boxxy-tunnel'), tunnelToken: output('boxxy-tunnel-token') },
+      filesRoute: undefined,
+      pepysRoute: undefined,
+      pepysAPIRoute: undefined,
+    }),
+  ).toThrowWithMessage(Error, "the boxxy door's route has no owner address for its Access policy");
 });

@@ -60,6 +60,7 @@
     "workerClusterIP": "10.43.0.80",
     "ownerPort": 8090,
     "workerPort": 8091,
+    "doorPort": 8092,
     "brokerHost": "boxxy.imp.internal"
   },
   "nodeExporter": {
