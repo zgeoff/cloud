@@ -21,6 +21,7 @@ test('it runs the boxxy server as one nonroot replica on a read-only root, with 
       tokenSecret,
       pepysSigningSecret: false,
       githubToken: false,
+      githubApp: false,
       reviewApp: false,
       pullSecret: 'ghcr-pull',
     }),
@@ -123,6 +124,7 @@ test('it mounts each trust document read-only as a regular file in the issuers f
     tokenSecret: output('boxxy-tokens-0a1b2c3d'),
     pepysSigningSecret: false,
     githubToken: false,
+    githubApp: false,
     reviewApp: false,
     pullSecret: 'ghcr-pull',
   });
@@ -169,6 +171,7 @@ test('it reads the pepys signing secret and the GitHub token from the Secret whe
     tokenSecret,
     pepysSigningSecret: true,
     githubToken: true,
+    githubApp: false,
     reviewApp: false,
     pullSecret: 'ghcr-pull',
   });
@@ -203,6 +206,7 @@ test("it runs the door tunnel's connector beside the server, with the tunnel's t
     tokenSecret: output('boxxy-tokens-0a1b2c3d'),
     pepysSigningSecret: false,
     githubToken: false,
+    githubApp: false,
     reviewApp: false,
     pullSecret: 'ghcr-pull',
     doorTunnelToken,
@@ -261,6 +265,7 @@ test('it runs no connector and mounts no tunnel token without a door tunnel', ()
     tokenSecret: output('boxxy-tokens-0a1b2c3d'),
     pepysSigningSecret: false,
     githubToken: false,
+    githubApp: false,
     reviewApp: false,
     pullSecret: 'ghcr-pull',
   });
@@ -280,6 +285,7 @@ test("it reads each of the noslop App's keys from the Secret when the server run
     tokenSecret,
     pepysSigningSecret: false,
     githubToken: true,
+    githubApp: false,
     reviewApp: true,
     pullSecret: 'ghcr-pull',
   });
@@ -300,6 +306,45 @@ test("it reads each of the noslop App's keys from the Secret when the server run
             {
               name: 'NOSLOP_GITHUB_APP_INSTALLATION_ID',
               valueFrom: { secretKeyRef: { name: tokenSecret, key: 'noslop-app-installation-id' } },
+            },
+          ]),
+        },
+      ],
+    },
+  });
+});
+
+test("it reads each of the boxxy App's keys from the Secret when the server calls GitHub", () => {
+  const tokenSecret = output('boxxy-tokens-0a1b2c3d');
+
+  const spec = buildBoxxySpec({
+    image: setupTest(),
+    serviceName: output('boxxy'),
+    configMap: output('boxxy-config-0a1b2c3d'),
+    tokenSecret,
+    pepysSigningSecret: false,
+    githubToken: true,
+    githubApp: true,
+    reviewApp: false,
+    pullSecret: 'ghcr-pull',
+  });
+
+  expect(spec.template).toMatchObject({
+    spec: {
+      containers: [
+        {
+          env: expect.arrayContaining([
+            {
+              name: 'BOXXY_GITHUB_APP_CLIENT_ID',
+              valueFrom: { secretKeyRef: { name: tokenSecret, key: 'boxxy-app-client-id' } },
+            },
+            {
+              name: 'BOXXY_GITHUB_APP_PRIVATE_KEY',
+              valueFrom: { secretKeyRef: { name: tokenSecret, key: 'boxxy-app-private-key' } },
+            },
+            {
+              name: 'BOXXY_GITHUB_APP_INSTALLATION_ID',
+              valueFrom: { secretKeyRef: { name: tokenSecret, key: 'boxxy-app-installation-id' } },
             },
           ]),
         },
