@@ -197,7 +197,7 @@ relay and the daemon's new config.
 
    ```sh
    ssh root@geoffcloud podman exec imp-host impz token set atc-cloud \
-     --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy \
+     --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy,boxxy-github-token,boxxy-github-token \
      < /dev/null
    ```
 
@@ -285,10 +285,11 @@ needs its token in `.env`, and the program stops with the name of the variable w
    BOXXY_PEPYS_SIGNING_SECRET=op://cloud/boxxy-pepys-signing/credential
    ```
 
-2. For GitHub, create a fine-grained token on the owner's repos, with the permission
-   `Pull requests: read` and nothing else, and store it as `boxxy-github-token` in `cloud` and
-   `cloud-deploy`. Its repository access must cover every repo in `boxxySpawnRepos`. The server only
-   reads pull requests; it never merges one. Add the line:
+2. For GitHub, create a fine-grained token on the owner's repos, with the permissions
+   `Contents: read` and `Pull requests: read` and nothing else, and store it as `boxxy-github-token`
+   in `cloud` and `cloud-deploy`. Its repository access must cover every repo in `boxxySpawnRepos`.
+   The server only reads pull requests; it never merges one. The daemon's clone and the review
+   sessions read with the same token. Add the line:
 
    ```bash
    BOXXY_GITHUB_TOKEN=op://cloud/boxxy-github-token/credential
@@ -309,6 +310,38 @@ needs its token in `.env`, and the program stops with the name of the variable w
 
 4. Run `bun run preview` and check that it replaces the Secret `boxxy-tokens` and the ConfigMap
    `boxxy-config`, updates the StatefulSet, and changes nothing else.
+
+## Turn on the review gate
+
+The review phase runs noslop in a session on the `boxxy-review` agent, and the server checks and
+posts the result as the noslop App. Without the App's keys, the server rejects every review
+close-out, and each item holds at review after two sessions.
+
+1. Copy the item `noslop-github-app` into `cloud` and `cloud-deploy`, with the fields `app-id`,
+   `private-key` and `installation-id`. Install the noslop App on every repo in `boxxySpawnRepos`.
+2. Give impd the read-only clone token as the secret `boxxy-github-token`, of kind `github`, from
+   the item of the same name. Send it as step 1 of
+   [Let sessions reach the server](#let-sessions-reach-the-server) sends `boxxy`: `op read` on your
+   machine, piped over SSH's stdin into `impz secret add boxxy-github-token --kind github` in
+   imp-host. Then set the daemon token's grantable list from `scripts/atc-cloud-grantable.ts`, which
+   names `boxxy-github-token`, with the `impz token set atc-cloud` command of that section.
+3. Switch the host, so the atc daemon offers the `boxxy-review` agent and its `github-review`
+   profile.
+4. Add the lines to `.env`:
+
+   ```bash
+   NOSLOP_GITHUB_APP_ID=op://cloud/noslop-github-app/app-id
+   NOSLOP_GITHUB_APP_PRIVATE_KEY=op://cloud/noslop-github-app/private-key
+   NOSLOP_GITHUB_APP_INSTALLATION_ID=op://cloud/noslop-github-app/installation-id
+   ```
+
+5. In the same PR as an image pin of `@boxxy/server` 0.2.4 or later, add
+   `reviewAgents: [boxxy-review]` to `spawn` in the `boxxy` object of `infra/Pulumi.prod.yaml`. An
+   older server refuses the field.
+6. Run `bun run preview`. Expect it to replace the Secret `boxxy-tokens` and the ConfigMap
+   `boxxy-config`, and to update the StatefulSet.
+7. Merge it. After the deploy, a review round leaves noslop's check run at the pull request's head,
+   posted by the App.
 
 ## Upgrade the server
 
