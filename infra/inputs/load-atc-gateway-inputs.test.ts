@@ -405,6 +405,68 @@ test('it carries the boxxy service token, as a secret, while BOXXY_ATC_TOKEN is 
   expect(value).toBe(token);
 });
 
+test('it carries the notice token as the boxxy-notices client, as a secret, beside the boxxy token', async () => {
+  const token = `atcs_${'b'.repeat(40)}`;
+  const noticeToken = `atcs_${'n'.repeat(40)}`;
+
+  const serviceTokens = loadATCGatewayInputs(
+    buildMockATCGatewayStackConfig(),
+    buildMockATCGatewayEnvironment({ BOXXY_ATC_TOKEN: token, BOXXY_ATC_NOTICE_TOKEN: noticeToken }),
+    { readRelease: () => '7.14.0', warn: () => {} },
+  ).atcGateway?.secrets.serviceTokens;
+
+  invariant(serviceTokens?.['boxxy-notices'] !== undefined, 'expected the notice token');
+
+  const marked = await isSecret(serviceTokens['boxxy-notices']);
+  const value = await resolveOutput(serviceTokens['boxxy-notices']);
+
+  expect(Object.keys(serviceTokens)).toStrictEqual(['boxxy', 'boxxy-notices']);
+  expect(marked).toBe(true);
+  expect(value).toBe(noticeToken);
+});
+
+test('it leaves both tokens out, with one warning for each, while the pinned release lacks the flag', () => {
+  const warnings: string[] = [];
+
+  const result = loadATCGatewayInputs(
+    buildMockATCGatewayStackConfig(),
+    buildMockATCGatewayEnvironment({
+      BOXXY_ATC_TOKEN: `atcs_${'b'.repeat(40)}`,
+      BOXXY_ATC_NOTICE_TOKEN: `atcs_${'n'.repeat(40)}`,
+    }),
+    {
+      readRelease: () => '7.13.9',
+      warn: (line) => {
+        warnings.push(line);
+      },
+    },
+  );
+
+  expect(result.atcGateway?.secrets).not.toHaveProperty('serviceTokens');
+
+  expect(warnings).toStrictEqual([
+    'BOXXY_ATC_TOKEN is set, but images/atc-gateway/versions.env pins atc 7.13.9, and --service-token-file needs 7.14.0: the gateway deploys without the boxxy service token',
+    'BOXXY_ATC_NOTICE_TOKEN is set, but images/atc-gateway/versions.env pins atc 7.13.9, and --service-token-file needs 7.14.0: the gateway deploys without the boxxy-notices service token',
+  ]);
+});
+
+test('it refuses a BOXXY_ATC_NOTICE_TOKEN that lacks the atcs_ prefix, without printing it', () => {
+  const env = buildMockATCGatewayEnvironment({
+    BOXXY_ATC_TOKEN: `atcs_${'b'.repeat(40)}`,
+    BOXXY_ATC_NOTICE_TOKEN: 'f'.repeat(64),
+  });
+
+  expect(() =>
+    loadATCGatewayInputs(buildMockATCGatewayStackConfig(), env, {
+      readRelease: () => '7.14.0',
+      warn: () => {},
+    }),
+  ).toThrowWithMessage(
+    Error,
+    'BOXXY_ATC_NOTICE_TOKEN must be atcs_ followed by 32 or more of A-Z, a-z, 0-9, _ and -, the shape of an atc service token',
+  );
+});
+
 test.each(['7.14.0', '7.14.1', '7.15.0', '8.0.0', '10.0.0'])(
   'it carries the service token, with no warning, for the pinned release %s',
   (release) => {

@@ -12,6 +12,7 @@ listeners, the configuration and the caller proof.
 | ------------------------- | -------------------------------------------------------- | --------------------- |
 | `boxxy-worker-token`      | the worker token, which the broker adds to worker calls  | Pulumi, impd's broker |
 | `boxxy-atc-token`         | the bearer token the server sends to the atc gateway     | Pulumi                |
+| `boxxy-atc-notice-token`  | the token the server sends each owner notice with        | Pulumi                |
 | `boxxy-restic`            | the restic repository's password                         | Pulumi, the backup    |
 | `r2-boxxy-backup`         | the R2 key, endpoint and bucket of the restic repository | Pulumi, the backup    |
 | `boxxy-pepys-signing`     | the key the server signs its facts with                  | Pulumi, pepys ingest  |
@@ -342,6 +343,62 @@ close-out, and each item holds at review after two sessions.
    `boxxy-config`, and to update the StatefulSet.
 7. Merge it. After the deploy, a review round leaves noslop's check run at the pull request's head,
    posted by the App.
+
+## Send notices to the owner
+
+The server sends each hold notice to one session on the owner's PC, the notice session, through the
+atc gateway. It sends with a notice token of its own, which holds the `message` scope alone, so no
+worker token reaches the PC
+([notice delivery](https://github.com/zgeoff/boxxy/blob/main/docs/design/boxxy/owner-notices.md)).
+The server needs `@boxxy/server` 0.2.4 or later.
+
+1. Mint the notice token into the item `boxxy-atc-notice-token`, field `credential`, in `cloud`, and
+   into its `cloud-deploy` copy. The token goes to `op` on stdin, never on the command line:
+
+   ```bash
+   token="atcs_$(openssl rand -hex 32)"
+   for vault in cloud cloud-deploy; do
+     printf '%s' "$token" \
+       | jq -R '{title: "boxxy-atc-notice-token", category: "API_CREDENTIAL",
+           fields: [{id: "credential", label: "credential", type: "CONCEALED", value: .}]}' \
+       | op item create --vault "$vault" -
+   done
+   unset token
+   ```
+
+2. Read the notice session's gateway ID: `atc_sessions_list` through the gateway prints it as
+   `<daemon>.<incarnation>.<id>`. The daemon is the PC daemon's name in `atcGateway.daemons`, and
+   the incarnation is the first 8 characters of its `daemonID`.
+3. On the PC, add the principal to the `principals` of the atc daemon's `config.json`, then restart
+   the daemon, because a reload rereads only its tokens:
+
+   ```json
+   "principals": {
+     "service:boxxy-notices": { "targets": ["local"] }
+   }
+   ```
+
+   Keep the notice session's sub-sessions on `local` too. atc lets a client reach a session only
+   when every session in its tree runs on a target the client holds.
+
+4. In a PR, set the gateway ID as the secret stack config `boxxyNoticeSession`, so the ID stays out
+   of the public file:
+
+   ```bash
+   cd infra
+   printf '%s' '<gateway_id>' \
+     | op run --env-file=../.env -- pulumi config set --stack prod --secret boxxyNoticeSession
+   ```
+
+   `<gateway_id>` is the ID from step 2. The deploy refuses `boxxyNoticeSession` without
+   `BOXXY_ATC_NOTICE_TOKEN`, and the token without the session.
+
+5. Run `bun run preview`. Expect it to replace the Secret `boxxy-tokens` and the gateway's
+   `atc-gateway-service-tokens` Secret, and to update the StatefulSet and the gateway's Deployment.
+6. Merge it. After the deploy, a forced hold reaches the notice session.
+
+To move notices to another session, set `boxxyNoticeSession` to its gateway ID in a PR. A rename
+keeps the ID, so it needs no change.
 
 ## Upgrade the server
 

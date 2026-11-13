@@ -445,3 +445,79 @@ test("it adds none of the noslop App's keys while no review agent is listed", ()
 
   expect(inputs.boxxy?.secrets.reviewApp).toBeUndefined();
 });
+
+test('it carries the notice session and the notice token, each secret, while both are set', async () => {
+  const fixture = setupTest();
+
+  const stackConfig = buildStubConfig({
+    ...fixture.stackValues,
+    boxxyNoticeSession: 'owner-pc.0a1b2c3d.11111111-2222-3333-4444-555555555555',
+  });
+
+  const tokens = { ...fixture.tokens, BOXXY_ATC_NOTICE_TOKEN: 'notice-token-for-tests' };
+  const inputs = loadBoxxyInputs(stackConfig, tokens, undefined);
+
+  invariant(inputs.boxxy?.secrets.notice);
+
+  const notice = inputs.boxxy.secrets.notice;
+
+  const marked = await Promise.all([isSecret(notice.session), isSecret(notice.token)]);
+  const values = await Promise.all([resolveOutput(notice.session), resolveOutput(notice.token)]);
+
+  expect(marked).toStrictEqual([true, true]);
+
+  expect(values).toStrictEqual([
+    'owner-pc.0a1b2c3d.11111111-2222-3333-4444-555555555555',
+    'notice-token-for-tests',
+  ]);
+});
+
+test('it adds no notice while neither the notice session nor the notice token is set', () => {
+  const fixture = setupTest();
+  const inputs = loadBoxxyInputs(fixture.stackConfig, fixture.tokens, undefined);
+
+  expect(inputs.boxxy?.secrets).not.toContainKey('notice');
+});
+
+test('it refuses the notice token without the notice session', () => {
+  const fixture = setupTest();
+  const tokens = { ...fixture.tokens, BOXXY_ATC_NOTICE_TOKEN: 'notice-token-for-tests' };
+
+  expect(() => loadBoxxyInputs(fixture.stackConfig, tokens, undefined)).toThrowWithMessage(
+    Error,
+    'BOXXY_ATC_NOTICE_TOKEN is set, but stack config "boxxyNoticeSession" is unset: the server sends notices only to the session it names, so set both or neither: run `pulumi config set --secret boxxyNoticeSession <gateway ID>` in infra/',
+  );
+});
+
+test('it refuses the notice session without the notice token', () => {
+  const fixture = setupTest();
+
+  const stackConfig = buildStubConfig({
+    ...fixture.stackValues,
+    boxxyNoticeSession: 'owner-pc.0a1b2c3d.11111111-2222-3333-4444-555555555555',
+  });
+
+  expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrowWithMessage(
+    Error,
+    'stack config "boxxyNoticeSession" is set, but BOXXY_ATC_NOTICE_TOKEN is unset: the boxxy server refuses to start with a notice session and no notice token',
+  );
+});
+
+test.each([
+  ['BOXXY_WORKER_TOKEN', 'worker-token-for-tests'],
+  ['BOXXY_ATC_TOKEN', 'atc-token-for-tests'],
+])('it refuses a notice token equal to %s', (_name, token) => {
+  const fixture = setupTest();
+
+  const stackConfig = buildStubConfig({
+    ...fixture.stackValues,
+    boxxyNoticeSession: 'owner-pc.0a1b2c3d.11111111-2222-3333-4444-555555555555',
+  });
+
+  const tokens = { ...fixture.tokens, BOXXY_ATC_NOTICE_TOKEN: token };
+
+  expect(() => loadBoxxyInputs(stackConfig, tokens, undefined)).toThrowWithMessage(
+    Error,
+    'BOXXY_ATC_NOTICE_TOKEN must differ from BOXXY_WORKER_TOKEN and BOXXY_ATC_TOKEN',
+  );
+});

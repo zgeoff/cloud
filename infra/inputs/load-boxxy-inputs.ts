@@ -2,6 +2,8 @@ import type { Output } from '@pulumi/pulumi';
 import { secret } from '@pulumi/pulumi';
 import { z } from 'zod';
 import { findResticBackup } from './find-restic-backup.ts';
+import { findVariable } from './find-variable.ts';
+import { boxxyNoticeSessionKey, parseBoxxyNoticeSession } from './parse-boxxy-notice-session.ts';
 import { boxxyReposKey, parseBoxxyRepos } from './parse-boxxy-repos.ts';
 import { parseStackObject } from './parse-stack-object.ts';
 import { requireGHCRPullCredential } from './require-ghcr-pull-credential.ts';
@@ -87,6 +89,8 @@ export function loadBoxxyInputs(
     throw new Error('BOXXY_WORKER_TOKEN and BOXXY_ATC_TOKEN must differ');
   }
 
+  const notice = findNotice(stackConfig, env, [workerToken, atcToken]);
+
   // the server signs each batch of facts with it; pepys ingest holds the same item
   const pepysSigningSecret =
     config.pepys === undefined
@@ -129,6 +133,7 @@ export function loadBoxxyInputs(
           : { pepysSigningSecret: secret(pepysSigningSecret) }),
         ...(githubToken === undefined ? {} : { githubToken: secret(githubToken) }),
         ...(reviewApp === undefined ? {} : { reviewApp }),
+        ...(notice === undefined ? {} : { notice }),
       },
       ...(backup === undefined ? {} : { backup }),
     },
@@ -145,6 +150,43 @@ function requireRepos(stackConfig: Pick<StackConfig, 'getSecret'>): Output<Boxxy
   }
 
   return raw.apply(parseBoxxyRepos);
+}
+
+const noticeTokenVariable = 'BOXXY_ATC_NOTICE_TOKEN';
+
+// The server refuses a notice session with no notice token. atc refuses a token file that holds
+// one token twice, and every worker session holds the worker token, so the notice token is its own.
+function findNotice(
+  stackConfig: Pick<StackConfig, 'getSecret'>,
+  env: Environment,
+  otherTokens: readonly string[],
+): NonNullable<BoxxyInputs['secrets']['notice']> | undefined {
+  const session = stackConfig.getSecret(boxxyNoticeSessionKey);
+  const token = findVariable(env, noticeTokenVariable);
+
+  if (session === undefined && token === undefined) {
+    return undefined;
+  }
+
+  if (session === undefined) {
+    throw new Error(
+      `${noticeTokenVariable} is set, but stack config "${boxxyNoticeSessionKey}" is unset: the server sends notices only to the session it names, so set both or neither: run \`pulumi config set --secret ${boxxyNoticeSessionKey} <gateway ID>\` in infra/`,
+    );
+  }
+
+  if (token === undefined) {
+    throw new Error(
+      `stack config "${boxxyNoticeSessionKey}" is set, but ${noticeTokenVariable} is unset: the boxxy server refuses to start with a notice session and no notice token`,
+    );
+  }
+
+  if (otherTokens.includes(token)) {
+    throw new Error(
+      `${noticeTokenVariable} must differ from BOXXY_WORKER_TOKEN and BOXXY_ATC_TOKEN`,
+    );
+  }
+
+  return { session: session.apply(parseBoxxyNoticeSession), token: secret(token) };
 }
 
 const reviewAppNeed =

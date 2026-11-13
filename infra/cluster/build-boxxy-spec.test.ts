@@ -22,6 +22,7 @@ test('it runs the boxxy server as one nonroot replica on a read-only root, with 
       pepysSigningSecret: false,
       githubToken: false,
       reviewApp: false,
+      notice: false,
       pullSecret: 'ghcr-pull',
     }),
   ).toStrictEqual({
@@ -124,6 +125,7 @@ test('it mounts each trust document read-only as a regular file in the issuers f
     pepysSigningSecret: false,
     githubToken: false,
     reviewApp: false,
+    notice: false,
     pullSecret: 'ghcr-pull',
   });
 
@@ -170,6 +172,7 @@ test('it reads the pepys signing secret and the GitHub token from the Secret whe
     pepysSigningSecret: true,
     githubToken: true,
     reviewApp: false,
+    notice: false,
     pullSecret: 'ghcr-pull',
   });
 
@@ -204,6 +207,7 @@ test("it runs the door tunnel's connector beside the server, with the tunnel's t
     pepysSigningSecret: false,
     githubToken: false,
     reviewApp: false,
+    notice: false,
     pullSecret: 'ghcr-pull',
     doorTunnelToken,
   });
@@ -262,6 +266,7 @@ test('it runs no connector and mounts no tunnel token without a door tunnel', ()
     pepysSigningSecret: false,
     githubToken: false,
     reviewApp: false,
+    notice: false,
     pullSecret: 'ghcr-pull',
   });
 
@@ -281,6 +286,7 @@ test("it reads each of the noslop App's keys from the Secret when the server run
     pepysSigningSecret: false,
     githubToken: true,
     reviewApp: true,
+    notice: false,
     pullSecret: 'ghcr-pull',
   });
 
@@ -300,6 +306,41 @@ test("it reads each of the noslop App's keys from the Secret when the server run
             {
               name: 'NOSLOP_GITHUB_APP_INSTALLATION_ID',
               valueFrom: { secretKeyRef: { name: tokenSecret, key: 'noslop-app-installation-id' } },
+            },
+          ]),
+        },
+      ],
+    },
+  });
+});
+
+test('it reads the notice session and the notice token from the Secret when the server sends notices', () => {
+  const tokenSecret = output('boxxy-tokens-0a1b2c3d');
+
+  const spec = buildBoxxySpec({
+    image: setupTest(),
+    serviceName: output('boxxy'),
+    configMap: output('boxxy-config-0a1b2c3d'),
+    tokenSecret,
+    pepysSigningSecret: false,
+    githubToken: false,
+    reviewApp: false,
+    notice: true,
+    pullSecret: 'ghcr-pull',
+  });
+
+  expect(spec.template).toMatchObject({
+    spec: {
+      containers: [
+        {
+          env: expect.arrayContaining([
+            {
+              name: 'BOXXY_ATC_NOTICE_SESSION',
+              valueFrom: { secretKeyRef: { name: tokenSecret, key: 'atc-notice-session' } },
+            },
+            {
+              name: 'BOXXY_ATC_NOTICE_TOKEN',
+              valueFrom: { secretKeyRef: { name: tokenSecret, key: 'atc-notice-token' } },
             },
           ]),
         },
