@@ -2,14 +2,16 @@
 # Image test for the boxxy server (images/boxxy/Dockerfile), run locally with Docker. It touches no
 # cluster, no atc daemon and no cloud account.
 #
-# It runs the image as the cluster runs it: as its nonroot user, on a read-only root, with no
+# It runs the image as the cluster runs it: as uid 65532, on a read-only root, with no
 # capabilities and no privilege escalation, its configuration file mounted read-only at
 # /etc/boxxy/config.json, and its volume at /data owned by that user. What this proves: the compiled
-# binary starts on the distroless base, loads the image's rules from /rules, prompts included,
-# opens its SQLite store on the volume and keeps it across a restart, answers /healthz on the owner
-# port, refuses a request a browser page sent with 403, answers 401 on the worker port without the
-# worker token, and exits 1 naming each missing token. What it does not prove: k3s, the atc daemon
-# the runner tick calls, the broker, pepys.
+# binary starts on the base that images/boxxy/versions.env pins, loads the image's rules from
+# /rules, prompts included, loads its rules through git from a checkout that git-sync wrote and
+# another uid owns, opens its SQLite store on the volume and keeps it across a restart, answers
+# /healthz on the owner port, refuses a request a browser page sent with 403, answers 401 on the
+# worker port without the worker token, and exits 1 naming each missing token. What it does not
+# prove: k3s, the git-sync sidecar's fetch from GitHub, the atc daemon the runner tick calls, the
+# broker, pepys.
 #
 # images/boxxy/run-image-tests.sh builds the image under a tag that carries a random per-run id,
 # sets BOXXY_IMAGE and BOXXY_RUN, runs this suite, and removes the image. Each case starts its own
@@ -154,12 +156,73 @@ it_exits_1_on_a_trust_document_that_is_not_json() {
   assert_status 1 "$status"
 }
 
+it_loads_its_rules_from_a_git_sync_checkout_that_another_uid_owns() {
+  local image="$1" restic_image="$2" run="$3" commit port loaded
+  name="boxxy-image-$run-$BASHPID"
+  create_case_tree 'docker rm -f "$name" > /dev/null 2>&1 || true; docker volume rm -f "$name-data" "$name-rules" > /dev/null || true'
+  write_config "$tree" '' '{ "folder": "/rules/root/current", "ref": "git-sync" }'
+  commit="$(create_rules_source "$tree/source")"
+  docker volume create "$name-data" > /dev/null
+  docker volume create "$name-rules" > /dev/null
+  docker run --rm --user 0 --entrypoint /bin/sh -v "$name-data:/s" -v "$name-rules:/r" "$restic_image" \
+    -c 'chown 65532:65532 /s && chown 65533:65533 /r'
+  # one sync into the rules volume, as the pod's sidecar runs it: as git-sync's own uid, 65533
+  docker run --rm --user 65533:65533 --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges \
+    -v "$name-rules:/git" -v "$tree/source:/source:ro" \
+    "$GIT_SYNC_IMAGE" --repo=file:///source --ref=main --root=/git/root --link=current --depth=1 \
+    --one-time --git-config='safe.directory:*' > "$tree/sync.log" 2>&1 || {
+    cat "$tree/sync.log" >&2
+    return 1
+  }
+
+  docker run -d --name "$name" --read-only --cap-drop ALL --security-opt no-new-privileges \
+    -v "$name-data:/data" -v "$name-rules:/rules:ro" -v "$tree/config.json:/etc/boxxy/config.json:ro" \
+    -p 127.0.0.1::8090 \
+    -e BOXXY_WORKER_TOKEN=worker-token-image-test -e BOXXY_ATC_TOKEN=atc-token-image-test \
+    -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
+    "$image" > /dev/null
+  port="$(docker port "$name" 8090/tcp)"
+  port="${port##*:}"
+  if ! wait_for 30 "$name to answer /healthz" curl -q --noproxy '*' -sf -o /dev/null "http://127.0.0.1:$port/healthz"; then
+    docker logs "$name" 2>&1 | tail -20 >&2
+    return 1
+  fi
+  loaded="$(curl -q --noproxy '*' -sS -X POST -H 'Content-Type: application/json' -d '{"json":{}}' \
+    "http://127.0.0.1:$port/rpc/runner/status" | jq -r '.json.rules.commit')"
+
+  assert_equals "$commit" "$loaded" 'rules.commit in runner.status'
+}
+
+# create_rules_source <dir>: a git repository at <dir> whose main holds one commit of the live
+# rules, readable by every uid, so git-sync's uid can fetch it; prints the commit. It reads no git
+# config of the caller's.
+create_rules_source() {
+  local dir="$1"
+  mkdir "$dir"
+  cp -R "$repo/deploy/boxxy/rules/." "$dir/"
+  (
+    cd "$dir"
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+    git init -q -b main
+    git config maintenance.auto false
+    git add -A
+    git -c user.name='Image Test' -c user.email=image-test@example.invalid -c commit.gpgsign=false \
+      commit -q -m 'add the rules'
+    git rev-parse HEAD
+  )
+  chmod -R a+rX "$dir"
+}
+
 # a configuration with the listeners, store, rules folder and review agent that
 # infra/cluster/render-boxxy-config.ts sets, so the image's rules load as the cluster loads them, its
-# trustedIssuers section when the second argument is set, and an atc address that refuses
-# every connection, so the runner tick fails and logs and the listeners keep serving
+# trustedIssuers section when the second argument is set, the rules section in the third argument
+# in place of the image's /rules, and an atc address that refuses every connection, so the runner
+# tick fails and logs and the listeners keep serving
 write_config() {
-  local tree="$1" trusted="${2:-}" issuers=''
+  local tree="$1" trusted="${2:-}" rules="${3:-}" issuers=''
+  if [ -z "$rules" ]; then
+    rules='{ "folder": "/rules" }'
+  fi
   if [ -n "$trusted" ]; then
     issuers='"trustedIssuers": { "folders": ["/etc/boxxy-issuers"], "audience": "boxxy.imp.internal" },'
   fi
@@ -168,7 +231,7 @@ write_config() {
   $issuers
   "runner": "image-test",
   "store": { "file": "/data/boxxy.db" },
-  "rules": { "folder": "/rules" },
+  "rules": $rules,
   "api": {
     "listen": { "hostname": "0.0.0.0", "port": 8090 },
     "workerListen": { "hostname": "0.0.0.0", "port": 8091 }
@@ -211,6 +274,9 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # sets RESTIC_IMAGE, among the pins
 # shellcheck source=/dev/null
 source "$repo/images/atc-gateway/versions.env"
+# sets GIT_SYNC_IMAGE, among the pins
+# shellcheck source=/dev/null
+source "$repo/images/boxxy/versions.env"
 : "${BOXXY_IMAGE:?is unset: run this through images/boxxy/run-image-tests.sh}"
 : "${BOXXY_RUN:?is unset: run this through images/boxxy/run-image-tests.sh}"
 # shellcheck disable=SC2153 # RESTIC_IMAGE comes from versions.env

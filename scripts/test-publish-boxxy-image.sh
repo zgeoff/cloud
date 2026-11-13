@@ -141,9 +141,9 @@ it_refuses_a_call_without_the_context() {
 setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/registry" "$tree/digests" \
-    "$tree/repo/scripts" "$tree/repo/images/atc-gateway" "$tree/repo/context"
+    "$tree/repo/scripts" "$tree/repo/images/boxxy" "$tree/repo/context"
   cp "$scripts/publish-boxxy-image.sh" "$tree/repo/scripts/"
-  echo 'BASE_IMAGE=example.invalid/base:1' > "$tree/repo/images/atc-gateway/versions.env"
+  echo 'BOXXY_BASE_IMAGE=example.invalid/base:1' > "$tree/repo/images/boxxy/versions.env"
   echo 'FROM scratch' > "$tree/repo/context/Dockerfile"
   echo fixture-binary > "$tree/repo/context/boxxy-server"
   mkdir "$tree/repo/context/rules"
