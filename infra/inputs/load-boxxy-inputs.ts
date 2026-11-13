@@ -168,7 +168,10 @@ function requireGithubApp(env: Environment): NonNullable<BoxxyInputs['secrets'][
     throw new Error("BOXXY_GITHUB_APP_CLIENT_ID must be the App's client ID, with no whitespace");
   }
 
-  if (!installationIDPattern.test(installationID)) {
+  if (
+    !installationIDPattern.test(installationID) ||
+    !Number.isSafeInteger(Number(installationID))
+  ) {
     throw new Error("BOXXY_GITHUB_APP_INSTALLATION_ID must be the App installation's numeric ID");
   }
 

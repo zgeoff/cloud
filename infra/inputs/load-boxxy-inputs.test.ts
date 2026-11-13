@@ -530,6 +530,11 @@ test.each([
     "BOXXY_GITHUB_APP_INSTALLATION_ID must be the App installation's numeric ID",
   ],
   [
+    'BOXXY_GITHUB_APP_INSTALLATION_ID',
+    String(2 ** 53),
+    "BOXXY_GITHUB_APP_INSTALLATION_ID must be the App installation's numeric ID",
+  ],
+  [
     'BOXXY_GITHUB_APP_PRIVATE_KEY',
     'not a key',
     "BOXXY_GITHUB_APP_PRIVATE_KEY must be the App's RSA private key, in PEM form",
