@@ -482,7 +482,7 @@ let
         '';
     }
     {
-      title = "it links geoffcloud a config.json whose target names the agent image and its atc, whose claude and boxxy sign in through the broker profiles and send telemetry to pepys, whose boxxy loads the hook plug-in and the boxxy profile and commits as the owner's GitHub login, whose boxxy-review loads the plug-in and takes the read-only clone token as its one GitHub profile, whose boxxy service client may use the target, and which gets the pr-evidence file host address and the token path with no op:// prefix";
+      title = "it links geoffcloud a config.json whose target names the agent image and its atc, whose claude and boxxy sign in through the broker profiles and send telemetry to pepys, whose boxxy loads the hook plug-in and the boxxy profile and commits as the owner, whose boxxy-review loads the plug-in and takes the read-only clone token as its one GitHub profile, whose boxxy service client may use the target, and which gets the pr-evidence file host address and the token path with no op:// prefix";
       script = ''
         jq -S . > expected <<'EOF'
         {
