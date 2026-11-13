@@ -100,8 +100,8 @@ RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/atc \
 # The sums are the two assets' lines in the release's SHA256SUMS:
 #   gh release download "@boxxy/cli@$VERSION" -R zgeoff/boxxy
 #   sha256sum -c SHA256SUMS
-ARG BOXXY_CLI_VERSION=0.2.5
-ARG BOXXY_CLI_SHA256=55be4cfc249925dac81cc10b92293db784842e105d7871010d8b97d404d8b89e
+ARG BOXXY_CLI_VERSION=0.2.7
+ARG BOXXY_CLI_SHA256=1a76f6ba18bba323a7227e5ab756dcacdfb7c6e0e5d2c084f541726aa80928bf
 ARG BOXXY_HOOK_PLUGIN_SHA256=ab8f281102a71182e1465fb8c5a254b012adfc7766737da88acf3dd5adcd4153
 RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/boxxy \
       "https://github.com/zgeoff/boxxy/releases/download/%40boxxy/cli%40${BOXXY_CLI_VERSION}/boxxy-linux-x64" \
