@@ -15,7 +15,7 @@ listeners, the configuration and the caller proof.
 | `boxxy-restic`            | the restic repository's password                          | Pulumi, the backup    |
 | `r2-boxxy-backup`         | the R2 key, endpoint and bucket of the restic repository  | Pulumi, the backup    |
 | `boxxy-pepys-signing`     | the key the server signs its facts with                   | Pulumi, pepys ingest  |
-| `boxxy-github-token`      | the token of the server's pull request reads              | Pulumi                |
+| `boxxy-github-token`      | the read-only clone token                                 | the atc daemon, impd  |
 | `boxxy-github-app`        | the boxxy App's keys, for every GitHub call of the server | Pulumi                |
 
 The prod apply job reads the same items from the `cloud-deploy` vault, so each item has a copy there
@@ -286,18 +286,8 @@ needs its token in `.env`, and the program stops with the name of the variable w
    BOXXY_PEPYS_SIGNING_SECRET=op://cloud/boxxy-pepys-signing/credential
    ```
 
-2. For GitHub, create a fine-grained token on the owner's repos, with the permissions
-   `Contents: read` and `Pull requests: read` and nothing else, and store it as `boxxy-github-token`
-   in `cloud` and `cloud-deploy`. Its repository access must cover every repo in `boxxySpawnRepos`.
-   A server before 0.2.5 reads pull requests with it. The daemon's clone and the review sessions
-   read with the same token. Add the line:
-
-   ```bash
-   BOXXY_GITHUB_TOKEN=op://cloud/boxxy-github-token/credential
-   ```
-
-   A server of 0.2.5 or later calls GitHub as the boxxy App instead. Install the App on every repo
-   in `boxxySpawnRepos`, and store its keys as `boxxy-github-app` in `cloud` and `cloud-deploy`,
+2. For GitHub, install the boxxy App on every repo in `boxxySpawnRepos`: the server makes every
+   GitHub call as the App. Store the App's keys as `boxxy-github-app` in `cloud` and `cloud-deploy`,
    with the fields `client-id`, `private-key` and `installation-id`. Add the lines:
 
    ```bash

@@ -19,7 +19,6 @@ import {
   buildBoxxySpec,
   configFileName,
   githubAppKeys,
-  githubTokenKey,
   pepysSigningSecretKey,
   reviewAppKeys,
   workerTokenKey,
@@ -75,9 +74,6 @@ export function createBoxxy(
         ...(inputs.secrets.pepysSigningSecret === undefined
           ? {}
           : { [pepysSigningSecretKey]: inputs.secrets.pepysSigningSecret }),
-        ...(inputs.secrets.githubToken === undefined
-          ? {}
-          : { [githubTokenKey]: inputs.secrets.githubToken }),
         ...(inputs.secrets.githubApp === undefined
           ? {}
           : {
@@ -200,7 +196,6 @@ export function createBoxxy(
             }),
         tokenSecret: tokens.metadata.name,
         pepysSigningSecret: inputs.secrets.pepysSigningSecret !== undefined,
-        githubToken: inputs.secrets.githubToken !== undefined,
         githubApp: inputs.secrets.githubApp !== undefined,
         reviewApp: inputs.secrets.reviewApp !== undefined,
         pullSecret: ghcrPullSecretName,

@@ -71,20 +71,19 @@ function setupTest() {
     env: {
       ...tokens,
       ...githubApp,
-      BOXXY_GITHUB_TOKEN: 'github-token-for-tests',
       NOSLOP_GITHUB_APP_ID: '123456',
       NOSLOP_GITHUB_APP_PRIVATE_KEY: 'private-key-for-tests',
       NOSLOP_GITHUB_APP_INSTALLATION_ID: '7890',
     },
   };
 
-  // the github section with the token and the boxxy App's keys
+  // the github section with the boxxy App's keys
   const github = {
     stackConfig: buildStubConfig({
       ...stackValues,
       boxxy: JSON.stringify({ ...boxxy, github: { baseUrl: 'https://api.github.com' } }),
     }),
-    env: { ...tokens, ...githubApp, BOXXY_GITHUB_TOKEN: 'github-token-for-tests' },
+    env: { ...tokens, ...githubApp },
   };
 
   return {
@@ -330,61 +329,45 @@ test('it refuses the backup variables without the backup image', () => {
   );
 });
 
-test.each([
-  ['pepys', { environment: 'production' }, 'BOXXY_PEPYS_SIGNING_SECRET', 'pepysSigningSecret'],
-  ['github', { baseUrl: 'https://api.github.com' }, 'BOXXY_GITHUB_TOKEN', 'githubToken'],
-] as const)(
-  'it keeps the %s section and marks its token secret',
-  async (section, value, variable, key) => {
-    const fixture = setupTest();
-    const withSection = { ...fixture.boxxy, [section]: value };
-
-    const stackConfig = buildStubConfig({
-      ...fixture.stackValues,
-      boxxy: JSON.stringify(withSection),
-    });
-
-    const env = { ...fixture.tokens, ...fixture.githubApp, [variable]: `${key}-for-tests` };
-    const inputs = loadBoxxyInputs(stackConfig, env, undefined);
-
-    invariant(inputs.boxxy);
-
-    const token = inputs.boxxy.secrets[key];
-
-    invariant(token);
-
-    const secretToken = await isSecret(token);
-    const resolved = await resolveOutput(token);
-
-    expect(inputs.boxxy.config[section]).toStrictEqual(value);
-    expect(secretToken).toBeTrue();
-    expect(resolved).toBe(`${key}-for-tests`);
-  },
-);
-
-test.each([
-  [
-    'pepys',
-    { environment: 'production' },
-    'BOXXY_PEPYS_SIGNING_SECRET is unset; the boxxy server signs its facts with it while stack config "boxxy.pepys" is set',
-  ],
-  [
-    'github',
-    { baseUrl: 'https://api.github.com' },
-    'BOXXY_GITHUB_TOKEN is unset; the boxxy server reads pull requests with it while stack config "boxxy.github" is set',
-  ],
-] as const)('it refuses the %s section without its token', (section, value, message) => {
+test('it keeps the pepys section and marks its signing secret secret', async () => {
   const fixture = setupTest();
-  const withSection = { ...fixture.boxxy, [section]: value };
+  const withSection = { ...fixture.boxxy, pepys: { environment: 'production' } };
 
   const stackConfig = buildStubConfig({
     ...fixture.stackValues,
     boxxy: JSON.stringify(withSection),
   });
 
-  const env = { ...fixture.tokens, ...fixture.githubApp };
+  const env = { ...fixture.tokens, BOXXY_PEPYS_SIGNING_SECRET: 'signing-secret-for-tests' };
+  const inputs = loadBoxxyInputs(stackConfig, env, undefined);
 
-  expect(() => loadBoxxyInputs(stackConfig, env, undefined)).toThrowWithMessage(Error, message);
+  invariant(inputs.boxxy);
+
+  const token = inputs.boxxy.secrets.pepysSigningSecret;
+
+  invariant(token);
+
+  const secretToken = await isSecret(token);
+  const resolved = await resolveOutput(token);
+
+  expect(inputs.boxxy.config.pepys).toStrictEqual({ environment: 'production' });
+  expect(secretToken).toBeTrue();
+  expect(resolved).toBe('signing-secret-for-tests');
+});
+
+test('it refuses the pepys section without its signing secret', () => {
+  const fixture = setupTest();
+  const withSection = { ...fixture.boxxy, pepys: { environment: 'production' } };
+
+  const stackConfig = buildStubConfig({
+    ...fixture.stackValues,
+    boxxy: JSON.stringify(withSection),
+  });
+
+  expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrowWithMessage(
+    Error,
+    'BOXXY_PEPYS_SIGNING_SECRET is unset; the boxxy server signs its facts with it while stack config "boxxy.pepys" is set',
+  );
 });
 
 test('it adds no optional token while neither section is set', () => {
@@ -393,7 +376,6 @@ test('it adds no optional token while neither section is set', () => {
   const env = {
     ...fixture.tokens,
     BOXXY_PEPYS_SIGNING_SECRET: 'unused-secret',
-    BOXXY_GITHUB_TOKEN: 'unused-token',
     ...fixture.githubApp,
   };
 
@@ -495,6 +477,7 @@ test("it marks each of the boxxy App's keys secret with the github section", asy
   const secretKeys = await Promise.all(keys.map((key) => isSecret(key)));
   const resolved = await Promise.all(keys.map((key) => resolveOutput(key)));
 
+  expect(inputs.boxxy.config.github).toStrictEqual({ baseUrl: 'https://api.github.com' });
   expect(secretKeys).toStrictEqual([true, true, true]);
 
   expect(resolved).toStrictEqual([

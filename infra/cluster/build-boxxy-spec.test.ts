@@ -20,7 +20,6 @@ test('it runs the boxxy server as one nonroot replica on a read-only root, with 
       configMap,
       tokenSecret,
       pepysSigningSecret: false,
-      githubToken: false,
       githubApp: false,
       reviewApp: false,
       pullSecret: 'ghcr-pull',
@@ -123,7 +122,6 @@ test('it mounts each trust document read-only as a regular file in the issuers f
     trustDocuments: { configMap, files: ['geoffcloud.json', 'other-host.json'] },
     tokenSecret: output('boxxy-tokens-0a1b2c3d'),
     pepysSigningSecret: false,
-    githubToken: false,
     githubApp: false,
     reviewApp: false,
     pullSecret: 'ghcr-pull',
@@ -161,7 +159,7 @@ test('it mounts each trust document read-only as a regular file in the issuers f
   });
 });
 
-test('it reads the pepys signing secret and the GitHub token from the Secret when the config needs them', () => {
+test('it reads the pepys signing secret from the Secret when the config has a pepys section', () => {
   const tokenSecret = output('boxxy-tokens-0a1b2c3d');
 
   const spec = buildBoxxySpec({
@@ -170,7 +168,6 @@ test('it reads the pepys signing secret and the GitHub token from the Secret whe
     configMap: output('boxxy-config-0a1b2c3d'),
     tokenSecret,
     pepysSigningSecret: true,
-    githubToken: true,
     githubApp: false,
     reviewApp: false,
     pullSecret: 'ghcr-pull',
@@ -184,10 +181,6 @@ test('it reads the pepys signing secret and the GitHub token from the Secret whe
             {
               name: 'BOXXY_PEPYS_SIGNING_SECRET',
               valueFrom: { secretKeyRef: { name: tokenSecret, key: 'pepys-signing-secret' } },
-            },
-            {
-              name: 'BOXXY_GITHUB_TOKEN',
-              valueFrom: { secretKeyRef: { name: tokenSecret, key: 'github-token' } },
             },
           ]),
         },
@@ -205,7 +198,6 @@ test("it runs the door tunnel's connector beside the server, with the tunnel's t
     configMap: output('boxxy-config-0a1b2c3d'),
     tokenSecret: output('boxxy-tokens-0a1b2c3d'),
     pepysSigningSecret: false,
-    githubToken: false,
     githubApp: false,
     reviewApp: false,
     pullSecret: 'ghcr-pull',
@@ -264,7 +256,6 @@ test('it runs no connector and mounts no tunnel token without a door tunnel', ()
     configMap: output('boxxy-config-0a1b2c3d'),
     tokenSecret: output('boxxy-tokens-0a1b2c3d'),
     pepysSigningSecret: false,
-    githubToken: false,
     githubApp: false,
     reviewApp: false,
     pullSecret: 'ghcr-pull',
@@ -284,7 +275,6 @@ test("it reads each of the noslop App's keys from the Secret when the server run
     configMap: output('boxxy-config-0a1b2c3d'),
     tokenSecret,
     pepysSigningSecret: false,
-    githubToken: true,
     githubApp: false,
     reviewApp: true,
     pullSecret: 'ghcr-pull',
@@ -323,7 +313,6 @@ test("it reads each of the boxxy App's keys from the Secret when the server call
     configMap: output('boxxy-config-0a1b2c3d'),
     tokenSecret,
     pepysSigningSecret: false,
-    githubToken: true,
     githubApp: true,
     reviewApp: false,
     pullSecret: 'ghcr-pull',
