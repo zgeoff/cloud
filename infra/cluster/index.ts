@@ -15,7 +15,7 @@ import { buildATCGatewayRouteOutputs } from './build-atc-gateway-route-outputs.t
 import { createBoxxy } from './create-boxxy.ts';
 import type { FilesRoute } from './create-files.ts';
 import { createFiles } from './create-files.ts';
-import type { PepysRoute } from './create-pepys.ts';
+import type { PepysAPIRoute, PepysRoute } from './create-pepys.ts';
 import { createPepys } from './create-pepys.ts';
 import { nixieReadinessURL } from './nixie-readiness-url.ts';
 import { createNixie } from './nixie.ts';
@@ -58,6 +58,7 @@ interface ClusterOutputs {
   readonly nixieReadinessURL?: string;
   readonly filesRoute?: FilesRoute;
   readonly pepysRoute?: PepysRoute;
+  readonly pepysAPIRoute?: PepysAPIRoute;
 
   // the boxxy server's owner listener in the cluster
   readonly boxxyServiceURL?: Output<string>;
@@ -94,6 +95,7 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
     onePasswordConnectServiceURL: connect.serviceURL,
     ...(files === undefined ? {} : { filesRoute: files.route }),
     ...(pepys?.route === undefined ? {} : { pepysRoute: pepys.route }),
+    ...(pepys?.apiRoute === undefined ? {} : { pepysAPIRoute: pepys.apiRoute }),
     ...(boxxy === undefined ? {} : { boxxyServiceURL: boxxy.ownerServiceURL }),
     ...(nixie === undefined ? {} : { nixieURL: nixie.url, nixieReadinessURL }),
     ...(gateway === undefined ? {} : buildATCGatewayRouteOutputs(gateway)),

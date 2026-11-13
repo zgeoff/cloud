@@ -1,4 +1,5 @@
 import { atcGatewayPaths } from './atc-gateway-paths.ts';
+import { buildExactPathPattern } from './build-exact-path-pattern.ts';
 import type { OriginAccess, TunnelRoute } from './build-tunnel-ingresses.ts';
 
 export function buildATCGatewayRoutes(route: TunnelRoute, access: OriginAccess): TunnelRoute[] {
@@ -15,8 +16,4 @@ export function buildATCGatewayRoutes(route: TunnelRoute, access: OriginAccess):
       path: buildExactPathPattern(atcGatewayPaths.machine),
     },
   ];
-}
-
-function buildExactPathPattern(paths: readonly string[]): string {
-  return `^(?:${paths.map((path) => path.replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`)).join('|')})$`;
 }

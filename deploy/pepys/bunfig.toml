@@ -7,7 +7,7 @@ minimumReleaseAge = 604800
 
 # The @pepys packages release with the host binary that images/pepys/versions.env pins, so they skip
 # the gate on the day they publish; the list holds each one the deployment installs, directly or
-# through another. The @boxxy packages, @zgeoff/std and @impz/client are first-party. The third-party entries below them
+# through another. The @boxxy packages, @zgeoff/std, @zgeoff/kysely-bun-sqlite and @impz/client are first-party. The third-party entries below them
 # are the ones pepys's own bunfig.toml excludes at the release, each until it ages past the gate.
 # @orpc/client 2.0.0-beta.50 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
 # @orpc/contract 2.0.0-beta.50 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
@@ -43,6 +43,7 @@ minimumReleaseAgeExcludes = [
   "@pepys/source-github",
   "@pepys/source-telemetry",
   "@zgeoff/std",
+  "@zgeoff/kysely-bun-sqlite",
   "@impz/client",
   "@orpc/client",
   "@orpc/contract",

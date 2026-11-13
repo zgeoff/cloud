@@ -2,7 +2,11 @@ import { DnsRecord, ZeroTrustTunnelCloudflaredConfig } from '@pulumi/cloudflare'
 import type { Output } from '@pulumi/pulumi';
 import type { TunnelRoute } from './build-tunnel-ingresses.ts';
 import { buildTunnelRouteSpecs } from './build-tunnel-route-specs.ts';
-import type { GatewayIngress, TunnelRecordSpec } from './build-tunnel-route-specs.ts';
+import type {
+  GatewayIngress,
+  SignInIngress,
+  TunnelRecordSpec,
+} from './build-tunnel-route-specs.ts';
 
 interface TunnelRoutesInputs {
   readonly accountID: string;
@@ -16,6 +20,9 @@ interface TunnelRoutesInputs {
 
   // set only with pepys, while a route of its deployment is public
   readonly pepys?: TunnelRoute | undefined;
+
+  // set only while pepys's API serves /mcp on its public hostname
+  readonly pepysAPI?: SignInIngress | undefined;
 }
 
 interface TunnelRoutesOutputs {
@@ -24,13 +31,19 @@ interface TunnelRoutesOutputs {
   readonly atcURL?: Output<string>;
   readonly filesURL?: Output<string>;
   readonly pepysURL?: Output<string>;
+  readonly pepysAPIURL?: Output<string>;
 
   // the payload URL each opted-in repository's webhook posts to
   readonly previewWebhookURL: Output<string>;
 }
 
 export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutputs {
-  const specs = buildTunnelRouteSpecs(inputs.tunnelID, inputs.gateway, inputs.files, inputs.pepys);
+  const specs = buildTunnelRouteSpecs(inputs.tunnelID, {
+    gateway: inputs.gateway,
+    files: inputs.files,
+    pepys: inputs.pepys,
+    pepysAPI: inputs.pepysAPI,
+  });
 
   const atc =
     specs.atc === undefined
@@ -68,6 +81,11 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
       ? undefined
       : createRecord('pepys-webhook', inputs.zoneID, specs.pepysRecord);
 
+  const pepysAPI =
+    specs.pepysAPIRecord === undefined
+      ? undefined
+      : createRecord('pepys-api', inputs.zoneID, specs.pepysAPIRecord);
+
   return {
     configVersion: config.version,
     ...(atc === undefined
@@ -75,6 +93,7 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
       : { atcConfigVersion: atc.config.version, atcURL: toURL(atc.record) }),
     ...(files === undefined ? {} : { filesURL: toURL(files) }),
     ...(pepys === undefined ? {} : { pepysURL: toURL(pepys) }),
+    ...(pepysAPI === undefined ? {} : { pepysAPIURL: toURL(pepysAPI) }),
     previewWebhookURL: toURL(previewWebhook).apply((url) => `${url}/webhook`),
   };
 }

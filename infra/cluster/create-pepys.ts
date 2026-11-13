@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { Provider } from '@pulumi/kubernetes';
 import { Deployment, StatefulSet } from '@pulumi/kubernetes/apps/v1';
-import { ConfigMap, Secret, Service } from '@pulumi/kubernetes/core/v1';
+import { ConfigMap, PersistentVolumeClaim, Secret, Service } from '@pulumi/kubernetes/core/v1';
 import { NetworkPolicy } from '@pulumi/kubernetes/networking/v1';
 import type { Output } from '@pulumi/pulumi';
 import type { PepysInputs } from '../inputs/index.ts';
@@ -28,9 +28,20 @@ export interface PepysRoute {
   readonly path: string;
 }
 
+// the API's /mcp and OAuth paths, which the shared tunnel carries with Access on the browser paths
+export interface PepysAPIRoute {
+  readonly hostname: string;
+
+  // resolves once the host's StatefulSet has rolled out, so the tunnel's rules wait for it
+  readonly service: Output<string>;
+}
+
 interface PepysOutputs {
   // unset while no route of the deployment is public
   readonly route?: PepysRoute;
+
+  // unset while stack config "pepys.apiHostname" is unset
+  readonly apiRoute?: PepysAPIRoute;
 }
 
 export function createPepys(cluster: Provider, inputs: PepysInputs): PepysOutputs {
@@ -43,11 +54,14 @@ export function createPepys(cluster: Provider, inputs: PepysInputs): PepysOutput
     credential: inputs.pullCredential,
   });
 
-  createNetworkPolicies(cluster, namespace);
+  const apiHostname = inputs.config.apiHostname;
+
+  createNetworkPolicies(cluster, namespace, apiHostname !== undefined);
   createGarage(cluster, namespace, inputs);
   createS2(cluster, namespace, inputs);
   createIngest(cluster, namespace, inputs, pull);
-  createHost(cluster, namespace, inputs, pull);
+
+  const host = createHost(cluster, namespace, inputs, pull);
 
   if (inputs.backup !== undefined) {
     createPepysBackupJob(cluster, namespace, inputs.backup);
@@ -55,20 +69,37 @@ export function createPepys(cluster: Provider, inputs: PepysInputs): PepysOutput
 
   const path = buildPepysPublicPath(readPepysRouteTable());
 
-  return path === undefined
-    ? {}
-    : {
-        route: {
-          hostname: inputs.config.webhookHostname,
-          service: pepysWorkloads.ingest.url,
-          path,
-        },
-      };
+  return {
+    ...(path === undefined
+      ? {}
+      : {
+          route: {
+            hostname: inputs.config.webhookHostname,
+            service: pepysWorkloads.ingest.url,
+            path,
+          },
+        }),
+    ...(apiHostname === undefined
+      ? {}
+      : {
+          apiRoute: {
+            hostname: apiHostname,
+
+            // an older API serves /mcp to any caller, so the route waits until the pod that runs
+            // the pinned image is ready
+            service: host.metadata.name.apply(() => pepysWorkloads.host.url),
+          },
+        }),
+  };
 }
 
 // each pod's ingress policy and its egress policy, beside the namespace's deny of all egress
-function createNetworkPolicies(cluster: Provider, namespace: Output<string>): NetworkPolicy[] {
-  const specs = { ...buildPepysNetworkPolicySpecs(), ...buildPepysEgressPolicySpecs() };
+function createNetworkPolicies(
+  cluster: Provider,
+  namespace: Output<string>,
+  isAPIPublic: boolean,
+): NetworkPolicy[] {
+  const specs = { ...buildPepysNetworkPolicySpecs(isAPIPublic), ...buildPepysEgressPolicySpecs() };
 
   return Object.entries(specs).map(
     ([name, spec]) =>
@@ -236,6 +267,16 @@ function createHost(
     PEPYS_S2_ACCESS_TOKEN: inputs.secrets.s2AccessToken,
   });
 
+  const apiHostname = inputs.config.apiHostname;
+
+  const mcp =
+    apiHostname === undefined
+      ? undefined
+      : {
+          publicURL: `https://${apiHostname}`,
+          authClaim: createAuthClaim(cluster, namespace),
+        };
+
   return new StatefulSet(
     host.name,
     {
@@ -245,8 +286,29 @@ function createHost(
         serviceName: service.metadata.name,
         envSecret: env.metadata.name,
         pullSecret: ghcrPullSecretName,
+        ...(mcp === undefined ? {} : { mcp }),
       }),
     },
     { provider: cluster, dependsOn: [pull] },
   );
+}
+
+// A claim of its own beside the StatefulSet: a live StatefulSet refuses a new claim template, so
+// one would replace the host. The retaining class keeps the OAuth server's database when the claim
+// goes, since losing it signs every client out.
+function createAuthClaim(cluster: Provider, namespace: Output<string>): Output<string> {
+  const claim = new PersistentVolumeClaim(
+    'pepys-auth',
+    {
+      metadata: { name: 'pepys-auth', namespace },
+      spec: {
+        storageClassName: 'local-path-retain',
+        accessModes: ['ReadWriteOnce'],
+        resources: { requests: { storage: '1Gi' } },
+      },
+    },
+    { provider: cluster },
+  );
+
+  return claim.metadata.name;
 }

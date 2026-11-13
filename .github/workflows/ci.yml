@@ -214,6 +214,11 @@ jobs:
         if: needs.decide.outputs.reused != 'true' && needs.decide.outputs.pepys-image != 'false'
         run: bun run check:pepys-deployment
 
+      # needs the deployment that the step above installs
+      - name: Check pepys API Binary
+        if: needs.decide.outputs.reused != 'true' && needs.decide.outputs.pepys-image != 'false'
+        run: bun run check:pepys-api-binary
+
       - name: Test pepys Image
         if:
           needs.decide.outputs.reused != 'true' && (github.event_name == 'pull_request' &&
@@ -647,6 +652,12 @@ jobs:
           ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' &&
           steps.decide.outputs.pepys-image != 'false' }}
         run: bun run check:pepys-deployment
+
+      - name: Check pepys API Binary
+        if: >-
+          ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' &&
+          steps.decide.outputs.pepys-image != 'false' }}
+        run: bun run check:pepys-api-binary
 
       - name: Test pepys Image
         if: >-

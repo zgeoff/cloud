@@ -42,6 +42,7 @@
     "test:files-image": "bash images/files/run-image-tests.sh",
     "test:pepys-image": "bash images/pepys/run-image-tests.sh",
     "check:pepys-deployment": "cd deploy/pepys && bun install --frozen-lockfile && bun run typecheck",
+    "check:pepys-api-binary": "bun deploy/pepys/check-api-binary.ts",
     "test:boxxy-image": "bash images/boxxy/run-image-tests.sh",
     "test:agent-image": "docker build -t cloud/agent-image images/agent && bun scripts/check-agent-image.ts --docker cloud/agent-image && bash scripts/run-shell-suites.sh agent-image",
     "typecheck": "bun run sdk:build && tsrs -p tsconfig.json --noEmit && tsrs -p workers/health-check/tsconfig.json --noEmit",

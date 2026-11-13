@@ -61,10 +61,11 @@ const ingress = createIngress({
   zoneID: edge.zoneID,
   cluster: k3s?.provider,
   atcRoute: workloads?.atcGatewayRoute,
-  atcOwnerEmail: k3s?.inputs.atcGateway?.secrets.ownerEmail,
+  ownerEmail: k3s?.inputs.atcGateway?.secrets.ownerEmail,
   atcTunnel,
   filesRoute: workloads?.filesRoute,
   pepysRoute: workloads?.pepysRoute,
+  pepysAPIRoute: workloads?.pepysAPIRoute,
 });
 
 export const tunnelToken = ingress.tunnelToken;
@@ -74,6 +75,7 @@ export const atcURL = ingress.atcURL;
 export const previewWebhookURL = ingress.previewWebhookURL;
 export const filesURL = ingress.filesURL;
 export const pepysWebhookURL = ingress.pepysWebhookURL;
+export const pepysAPIURL = ingress.pepysAPIURL;
 export const onePasswordConnectServiceURL = workloads?.onePasswordConnectServiceURL;
 export const atcGatewayServiceURL = workloads?.atcGatewayServiceURL;
 export const nixieURL = workloads?.nixieURL;

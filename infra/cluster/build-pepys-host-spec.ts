@@ -4,6 +4,14 @@ import { pepysWorkloads } from '../shared/pepys-workloads.ts';
 import { buildPepysContainerSecurity } from './build-pepys-container-security.ts';
 import { buildPepysPodSecurity } from './build-pepys-pod-security.ts';
 
+interface PepysMCPInputs {
+  // the https origin that MCP clients reach the API at, and the OAuth issuer
+  readonly publicURL: string;
+
+  // the claim of the volume that holds the OAuth server's database
+  readonly authClaim: Output<string>;
+}
+
 interface PepysHostSpecInputs {
   // the cloud-pepys image
   readonly image: string;
@@ -12,6 +20,9 @@ interface PepysHostSpecInputs {
   // the Secret with PEPYS_S2_ACCESS_TOKEN
   readonly envSecret: Output<string>;
   readonly pullSecret: string;
+
+  // set while the API serves /mcp on its public hostname
+  readonly mcp?: PepysMCPInputs;
 }
 
 const host = pepysWorkloads.host;
@@ -30,7 +41,12 @@ export function buildPepysHostSpec(inputs: PepysHostSpecInputs) {
       spec: {
         ...buildPepysPodSecurity(),
         imagePullSecrets: [{ name: inputs.pullSecret }],
-        volumes: [{ name: 'tmp', emptyDir: {} }],
+        volumes: [
+          { name: 'tmp', emptyDir: {} },
+          ...(inputs.mcp === undefined
+            ? []
+            : [{ name: 'auth', persistentVolumeClaim: { claimName: inputs.mcp.authClaim } }]),
+        ],
         containers: [buildHostContainer(inputs), buildAPIContainer(inputs)],
       },
     },
@@ -74,6 +90,8 @@ function buildHostContainer(inputs: PepysHostSpecInputs): input.core.v1.Containe
   };
 }
 
+const authDirectory = '/auth';
+
 function buildAPIContainer(inputs: PepysHostSpecInputs): input.core.v1.Container {
   return {
     name: 'api',
@@ -86,6 +104,14 @@ function buildAPIContainer(inputs: PepysHostSpecInputs): input.core.v1.Container
       // the API listens on 127.0.0.1 unless told, which no Service reaches
       { name: 'PEPYS_API_HOST', value: '0.0.0.0' },
       { name: 'PEPYS_API_PORT', value: String(host.apiPort) },
+
+      // the API exits at start with a public URL and no auth folder, so the two come together
+      ...(inputs.mcp === undefined
+        ? []
+        : [
+            { name: 'PEPYS_API_PUBLIC_URL', value: inputs.mcp.publicURL },
+            { name: 'PEPYS_AUTH_DIR', value: authDirectory },
+          ]),
     ],
     readinessProbe: { tcpSocket: { port: host.apiPort }, periodSeconds: 10, failureThreshold: 3 },
 
@@ -95,6 +121,7 @@ function buildAPIContainer(inputs: PepysHostSpecInputs): input.core.v1.Container
     volumeMounts: [
       { name: 'store', mountPath: storeDirectory },
       { name: 'tmp', mountPath: '/tmp' },
+      ...(inputs.mcp === undefined ? [] : [{ name: 'auth', mountPath: authDirectory }]),
     ],
     securityContext: buildPepysContainerSecurity(),
     resources: { requests: { cpu: '50m', memory: '64Mi' }, limits: { memory: '256Mi' } },
