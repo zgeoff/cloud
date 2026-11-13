@@ -146,8 +146,6 @@ setup_test() {
   echo 'BOXXY_BASE_IMAGE=example.invalid/base:1' > "$tree/repo/images/boxxy/versions.env"
   echo 'FROM scratch' > "$tree/repo/context/Dockerfile"
   echo fixture-binary > "$tree/repo/context/boxxy-server"
-  mkdir "$tree/repo/context/rules"
-  echo "version: 1" > "$tree/repo/context/rules/rules.yaml"
   create_stub_publish_docker "$tree/bin"
 }
 

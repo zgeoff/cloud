@@ -4,10 +4,11 @@
 #
 # It runs the image as the cluster runs it: as uid 65532, on a read-only root, with no
 # capabilities and no privilege escalation, its configuration file mounted read-only at
-# /etc/boxxy/config.json, and its volume at /data owned by that user. What this proves: the compiled
-# binary starts on the base that images/boxxy/versions.env pins, loads the image's rules from
-# /rules, prompts included, loads its rules through git from a checkout that git-sync wrote and
-# another uid owns, opens its SQLite store on the volume and keeps it across a restart, answers
+# /etc/boxxy/config.json, its volume at /data owned by that user, and a rules folder read-only at
+# /rules, since the image holds none. What this proves: the compiled binary starts on the base that
+# images/boxxy/versions.env pins, loads the test's rules folder (images/boxxy/test-rules), prompts
+# included, loads its rules through git from a checkout that git-sync wrote and another uid owns,
+# opens its SQLite store on the volume and keeps it across a restart, answers
 # /healthz on the owner port, refuses a request a browser page sent with 403, answers 401 on the
 # worker port without the worker token, and exits 1 naming each missing token. What it does not
 # prove: k3s, the git-sync sidecar's fetch from GitHub, the atc daemon the runner tick calls, the
@@ -104,6 +105,7 @@ it_exits_1_and_names_each_missing_token() {
 
   docker run --name "$name" --read-only --cap-drop ALL --security-opt no-new-privileges \
     -v "$name-data:/data" -v "$tree/config.json:/etc/boxxy/config.json:ro" \
+    -v "$repo/images/boxxy/test-rules:/rules:ro" \
     "$image" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -125,6 +127,7 @@ it_starts_with_each_trust_document_of_the_repo_mounted_as_a_file() {
 
   docker run -d --name "$name" --read-only --cap-drop ALL --security-opt no-new-privileges \
     -v "$name-data:/data" -v "$tree/config.json:/etc/boxxy/config.json:ro" "${mounts[@]}" \
+    -v "$repo/images/boxxy/test-rules:/rules:ro" \
     -p 127.0.0.1::8090 \
     -e BOXXY_WORKER_TOKEN=worker-token-image-test -e BOXXY_ATC_TOKEN=atc-token-image-test \
     "$image" > /dev/null
@@ -148,7 +151,7 @@ it_exits_1_on_a_trust_document_that_is_not_json() {
 
   docker run --name "$name" --read-only --cap-drop ALL --security-opt no-new-privileges \
     -v "$name-data:/data" -v "$tree/config.json:/etc/boxxy/config.json:ro" \
-    -v "$tree/broken.json:/etc/boxxy-issuers/broken.json:ro" \
+    -v "$repo/images/boxxy/test-rules:/rules:ro" -v "$tree/broken.json:/etc/boxxy-issuers/broken.json:ro" \
     -e BOXXY_WORKER_TOKEN=worker-token-image-test -e BOXXY_ATC_TOKEN=atc-token-image-test \
     "$image" > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -193,13 +196,13 @@ it_loads_its_rules_from_a_git_sync_checkout_that_another_uid_owns() {
   assert_equals "$commit" "$loaded" 'rules.commit in runner.status'
 }
 
-# create_rules_source <dir>: a git repository at <dir> whose main holds one commit of the live
+# create_rules_source <dir>: a git repository at <dir> whose main holds one commit of the test's
 # rules, readable by every uid, so git-sync's uid can fetch it; prints the commit. It reads no git
 # config of the caller's.
 create_rules_source() {
   local dir="$1"
   mkdir "$dir"
-  cp -R "$repo/deploy/boxxy/rules/." "$dir/"
+  cp -R "$repo/images/boxxy/test-rules/." "$dir/"
   (
     cd "$dir"
     export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
@@ -214,9 +217,9 @@ create_rules_source() {
 }
 
 # a configuration with the listeners, store, rules folder and review agent that
-# infra/cluster/render-boxxy-config.ts sets, so the image's rules load as the cluster loads them, its
+# infra/cluster/render-boxxy-config.ts sets, so the rules load as the cluster loads them, its
 # trustedIssuers section when the second argument is set, the rules section in the third argument
-# in place of the image's /rules, and an atc address that refuses every connection, so the runner
+# in place of the plain folder at /rules, and an atc address that refuses every connection, so the runner
 # tick fails and logs and the listeners keep serving
 write_config() {
   local tree="$1" trusted="${2:-}" rules="${3:-}" issuers=''
@@ -254,7 +257,7 @@ setup_test() {
   docker run --rm --user 0 --entrypoint /bin/sh -v "$name-data:/s" "$restic_image" -c 'chown 65532:65532 /s'
   docker run -d --name "$name" --read-only --cap-drop ALL --security-opt no-new-privileges \
     -v "$name-data:/data" -v "$tree/config.json:/etc/boxxy/config.json:ro" \
-    -p 127.0.0.1::8090 -p 127.0.0.1::8091 \
+    -v "$repo/images/boxxy/test-rules:/rules:ro" -p 127.0.0.1::8090 -p 127.0.0.1::8091 \
     -e BOXXY_WORKER_TOKEN=worker-token-image-test -e BOXXY_ATC_TOKEN=atc-token-image-test \
     "$image" > /dev/null
   port="$(docker port "$name" 8090/tcp)"

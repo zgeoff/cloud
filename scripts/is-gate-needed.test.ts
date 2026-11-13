@@ -53,7 +53,7 @@ test.each([
   ['pepys-image', ['images/pepys/Dockerfile'], true],
   ['pepys-image', ['deploy/pepys/bun.lock'], true],
   ['pepys-image', ['deploy/pepys/ingest-routes.json', 'infra/index.ts'], false],
-  ['boxxy-image', ['deploy/boxxy/rules/rules.yaml'], true],
+  ['boxxy-image', ['images/boxxy/test-rules/rules.yaml'], true],
   ['boxxy-image', ['bun.lock'], true],
   ['boxxy-image', ['infra/cluster/create-boxxy.ts', 'packages/files/main.ts'], false],
   ['files-backup', ['deploy/files/backup/backup.sh'], true],
