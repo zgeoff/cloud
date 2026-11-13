@@ -17,6 +17,7 @@ async function setupTest() {
     [
       'infra',
       'images/atc-gateway',
+      'images/boxxy',
       'images/agent',
       'deploy/nixie',
       'nixos/hosts/geoffcloud',
@@ -31,6 +32,7 @@ async function setupTest() {
       'infra/Pulumi.prod.yaml',
       'images/atc-gateway/versions.env',
       'images/atc-gateway/restore-job.yaml',
+      'images/boxxy/versions.env',
       'images/agent/Dockerfile',
       'deploy/nixie/restore-job.yaml',
       'nixos/hosts/geoffcloud/configuration.nix',

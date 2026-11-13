@@ -2,7 +2,7 @@
 # Build the boxxy image from the context that write-boxxy-image-context.sh wrote, and push it to
 # GHCR as ghcr.io/zgeoff/cloud-boxxy:<commit> unless that tag is already published: the boxxy image
 # workflow's publish job runs it on main. It logs docker in to ghcr.io as GITHUB_ACTOR with GH_TOKEN
-# on stdin, and builds on the distroless base that images/atc-gateway/versions.env pins. A
+# on stdin, and builds on the base that images/boxxy/versions.env pins. A
 # published tag is immutable: it skips a tag the registry already holds, and pushes only when the
 # registry confirms the tag is missing; any other lookup error stops the run. The outcome is a line
 # in GITHUB_STEP_SUMMARY, with the digest that the stack config's boxxy.image pins.
@@ -26,11 +26,11 @@ if [[ ! "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]; then
 fi
 
 # shellcheck source=/dev/null
-source images/atc-gateway/versions.env
+source images/boxxy/versions.env
 ref="ghcr.io/zgeoff/cloud-boxxy:$GITHUB_SHA"
 printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-# shellcheck disable=SC2153 # BASE_IMAGE comes from versions.env
-docker build --build-arg "BASE_IMAGE=$BASE_IMAGE" -t "$ref" "$context"
+# shellcheck disable=SC2153 # BOXXY_BASE_IMAGE comes from versions.env
+docker build --build-arg "BASE_IMAGE=$BOXXY_BASE_IMAGE" -t "$ref" "$context"
 if lookup=$(docker manifest inspect "$ref" 2>&1); then
   echo "$ref: already published, not replaced" >> "$GITHUB_STEP_SUMMARY"
   exit 0

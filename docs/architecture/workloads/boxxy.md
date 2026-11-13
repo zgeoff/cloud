@@ -141,8 +141,9 @@ The backup and the restore run as the server's user, so they can read and write 
 
 The `boxxy image` workflow compiles `deploy/boxxy/server.ts` and the `@boxxy/server` version that
 `package.json` pins into one binary, adds the rules, and publishes the image from `main` to GHCR as
-`ghcr.io/zgeoff/cloud-boxxy:<commit>`. The Pulumi program deploys the server only when stack config
-`boxxy` is set, so the deploy needs the owner's change to stack config. The pod runs as a nonroot
-user on a read-only root filesystem with every capability dropped. A small memory-backed `/tmp`
-takes the temp file SQLite writes for a statement journal; its pages count against the container's
-memory limit.
+`ghcr.io/zgeoff/cloud-boxxy:<commit>`. The image builds on the base that `images/boxxy/versions.env`
+pins, which carries git, since the server reads a rules checkout through git. The Pulumi program
+deploys the server only when stack config `boxxy` is set, so the deploy needs the owner's change to
+stack config. The pod runs as uid 65532 on a read-only root filesystem with every capability
+dropped. A small memory-backed `/tmp` takes the temp file SQLite writes for a statement journal; its
+pages count against the container's memory limit.
