@@ -406,3 +406,27 @@ server recorded after the snapshot is lost. Back up first if that state still ma
    ssh root@geoffcloud k3s kubectl -n boxxy scale statefulset/boxxy --replicas=1
    ssh root@geoffcloud k3s kubectl -n boxxy rollout status statefulset/boxxy --timeout=300s
    ```
+
+## The rules go stale
+
+BoxxyRulesStale fires when the server's rules sidecar has fetched no commit of the rules repository
+for 15 minutes. The server goes on loading the last checkout it has.
+
+1. Read the sidecar's log:
+
+   ```bash
+   k3s kubectl -n boxxy logs boxxy-0 -c rules-sync --tail=50
+   ```
+
+   Expect `error syncing repo, will retry` lines that name the cause, such as a refused connection
+   to GitHub.
+
+2. When GitHub answers again, the next fetch clears the alert. When the log shows no fetch at all,
+   restart the pod:
+
+   ```bash
+   k3s kubectl -n boxxy delete pod boxxy-0
+   ```
+
+   Expect the pod back with the `rules-sync` sidecar started, and `boxxy runner status` showing a
+   `rules.commit` equal to the rules repository's `main`.

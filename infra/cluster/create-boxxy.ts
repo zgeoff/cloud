@@ -7,6 +7,7 @@ import type { Output } from '@pulumi/pulumi';
 import { all, interpolate } from '@pulumi/pulumi';
 import type { BoxxyInputs } from '../inputs/index.ts';
 import { createNamespace } from '../shared/create-namespace.ts';
+import { readGitSyncImage } from '../shared/read-git-sync-image.ts';
 import { readPepysRouteTable } from '../shared/read-pepys-route-table.ts';
 import { buildBoxxyNetworkPolicySpec } from './build-boxxy-network-policy-spec.ts';
 import { buildBoxxyPepysAddresses } from './build-boxxy-pepys-addresses.ts';
@@ -184,6 +185,7 @@ export function createBoxxy(
       metadata: { name: 'boxxy', namespace },
       spec: buildBoxxySpec({
         image: inputs.config.image,
+        rulesSyncImage: readGitSyncImage(),
         serviceName: owner.metadata.name,
         configMap: config.metadata.name,
         ...(issuers === undefined

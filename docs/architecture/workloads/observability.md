@@ -112,6 +112,9 @@ only on a bad value, because a target that vanishes is no longer a target. They 
 - nixie's definitions, which go stale while git-sync cannot fetch them and leave the pod ready.
   Prometheus scrapes git-sync's sync counters, and the alert names the time of git-sync's last good
   fetch, or none in the last day;
+- the boxxy server's rules, which go stale while its rules sidecar cannot fetch the rules
+  repository, and the server goes on loading its last checkout. The alert reads the sidecar's sync
+  counters as the nixie one does;
 - how long the host has run an older system or imp than the latest green build of `main`, which a
   host timer compares with GitHub every hour, and the age of its last check, because a merged change
   to the host waits for a person to switch it;
