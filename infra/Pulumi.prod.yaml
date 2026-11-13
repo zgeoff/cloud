@@ -32,16 +32,21 @@ config:
     webhookHostname: pepys-webhook.geoff.cloud
     impIdentityAudience: pepys.imp.internal
   geoff-cloud:boxxy:
-    image: ghcr.io/zgeoff/cloud-boxxy:890c19d9cc7cc456d7595dd8d388707278429ee9@sha256:2a9d711aeb9941cd3b5b602314c22e3b80c8f1c77fa0d32a6fb2d7e42236f575
+    image: ghcr.io/zgeoff/cloud-boxxy:4cb873f873be0945afb4a4141b930dca836dc91e@sha256:d29c2a09792de24d9f7269fa557bc1b37d64de601399b02faf58577d3d1e5ca2
     runner: geoffcloud
     atc:
       trustedFolders: {}
     spawn:
       target: geoffcloud
+      reviewAgents: [boxxy-review]
     pepys:
       environment: production
     github:
       baseUrl: https://api.github.com
+    publicDoor:
+      publicURL: https://boxxy.geoff.cloud
+      trustForwardedFrom:
+        - 127.0.0.1
   geoff-cloud:atcGatewayOwnerEmail:
     secure: v1:qtn2w/XR0+liFzQ/:W1+yrhJlqaefFrlRSnptVnSirINfeT8elzOilqkmF0VmHbE=
   geoff-cloud:boxxySpawnRepos:
