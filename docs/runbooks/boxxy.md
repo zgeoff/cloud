@@ -8,14 +8,15 @@ listeners, the configuration and the caller proof.
 
 ## What holds what
 
-| Item in the `cloud` vault | Holds                                                    | Read by               |
-| ------------------------- | -------------------------------------------------------- | --------------------- |
-| `boxxy-worker-token`      | the worker token, which the broker adds to worker calls  | Pulumi, impd's broker |
-| `boxxy-atc-token`         | the bearer token the server sends to the atc gateway     | Pulumi                |
-| `boxxy-restic`            | the restic repository's password                         | Pulumi, the backup    |
-| `r2-boxxy-backup`         | the R2 key, endpoint and bucket of the restic repository | Pulumi, the backup    |
-| `boxxy-pepys-signing`     | the key the server signs its facts with                  | Pulumi, pepys ingest  |
-| `boxxy-github-token`      | the token of the server's pull request reads             | Pulumi                |
+| Item in the `cloud` vault | Holds                                                     | Read by               |
+| ------------------------- | --------------------------------------------------------- | --------------------- |
+| `boxxy-worker-token`      | the worker token, which the broker adds to worker calls   | Pulumi, impd's broker |
+| `boxxy-atc-token`         | the bearer token the server sends to the atc gateway      | Pulumi                |
+| `boxxy-restic`            | the restic repository's password                          | Pulumi, the backup    |
+| `r2-boxxy-backup`         | the R2 key, endpoint and bucket of the restic repository  | Pulumi, the backup    |
+| `boxxy-pepys-signing`     | the key the server signs its facts with                   | Pulumi, pepys ingest  |
+| `boxxy-github-token`      | the token of the server's pull request reads              | Pulumi                |
+| `boxxy-github-app`        | the boxxy App's keys, for every GitHub call of the server | Pulumi                |
 
 The prod apply job reads the same items from the `cloud-deploy` vault, so each item has a copy there
 under the same name. A `.env` line whose item is missing fails every preview and apply, so create
@@ -288,12 +289,24 @@ needs its token in `.env`, and the program stops with the name of the variable w
 2. For GitHub, create a fine-grained token on the owner's repos, with the permissions
    `Contents: read` and `Pull requests: read` and nothing else, and store it as `boxxy-github-token`
    in `cloud` and `cloud-deploy`. Its repository access must cover every repo in `boxxySpawnRepos`.
-   The server only reads pull requests; it never merges one. The daemon's clone and the review
-   sessions read with the same token. Add the line:
+   A server before 0.2.5 reads pull requests with it. The daemon's clone and the review sessions
+   read with the same token. Add the line:
 
    ```bash
    BOXXY_GITHUB_TOKEN=op://cloud/boxxy-github-token/credential
    ```
+
+   A server of 0.2.5 or later calls GitHub as the boxxy App instead. Install the App on every repo
+   in `boxxySpawnRepos`, and store its keys as `boxxy-github-app` in `cloud` and `cloud-deploy`,
+   with the fields `client-id`, `private-key` and `installation-id`. Add the lines:
+
+   ```bash
+   BOXXY_GITHUB_APP_CLIENT_ID=op://cloud/boxxy-github-app/client-id
+   BOXXY_GITHUB_APP_PRIVATE_KEY=op://cloud/boxxy-github-app/private-key
+   BOXXY_GITHUB_APP_INSTALLATION_ID=op://cloud/boxxy-github-app/installation-id
+   ```
+
+   The preview fails while `github` is set and any of the three is unset.
 
 3. Add the sections to the `boxxy` object in `infra/Pulumi.prod.yaml`:
 
