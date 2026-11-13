@@ -575,7 +575,7 @@ let
           "targets": {
             "geoffcloud": {
               "guestATC": "/usr/local/bin/atc",
-              "image": "agent-4cb873f",
+              "image": "agent-a1e1fe0",
               "impPrefix": "harness-",
               "provider": "imp",
               "tokenFile": "/run/credentials/atc-daemon.service/imp-token",
