@@ -27,7 +27,7 @@ config:
     image: ghcr.io/zgeoff/cloud-files:33830cac231f4295a03516fe081d1a0cbd790452@sha256:0c3ecdf88e7a02ce1b80d17e3017757b79f49b9abc1986af7c3674e7574334f9
     hostname: files.geoff.cloud
   geoff-cloud:pepys:
-    image: ghcr.io/zgeoff/cloud-pepys:0.4.0-52c65bbe5ced@sha256:a17377d38e71ffa567a60115e711e2215e06f5b0492032c9fbe61f988d22a906
+    image: ghcr.io/zgeoff/cloud-pepys:0.4.1-daa08c9b1532@sha256:bdbdc68d916d79e69260ede8693788b06499ad388d1a412ee9799f56706c40cf
     apiHostname: pepys.geoff.cloud
     tailnetHostname: pepys-api.geoff.cloud
     webhookHostname: pepys-webhook.geoff.cloud
