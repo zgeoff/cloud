@@ -4,7 +4,8 @@ pepys is the owner's personal data hub. Its ingest takes signed deliveries and s
 in a log, its host runs the deployment's consumers over that log into a store, and its API serves
 the store. The cluster runs it in the namespace `pepys` once stack config `pepys` is set. Two routes
 are public: the GitHub webhook route of ingest, and the API's MCP and OAuth paths while stack config
-`pepys.apiHostname` is set. Everything else stays inside the cluster, `/rpc` included.
+`pepys.apiHostname` is set. While stack config `pepys.tailnetHostname` is set, the API's `/rpc` also
+answers on the tailnet. Everything else stays inside the cluster.
 
 ## Processes
 
@@ -14,7 +15,7 @@ are public: the GitHub webhook route of ingest, and the API's MCP and OAuth path
 | `pepys-s2`     | Deployment, `Recreate` | s2, by its publisher          | the `facts` bucket in Garage            |
 | `pepys-ingest` | Deployment             | `cloud-pepys`                 | s2-lite, the route secrets              |
 | `pepys-host`   | StatefulSet, 1 replica | `cloud-pepys`, two containers | s2-lite; the API reads the host's store |
-| `pepys-backup` | CronJob, 05:00 nightly | rclone, by its publisher      | every bucket in Garage                  |
+| `pepys-backup` | CronJob, 04:00 UTC     | rclone, by its publisher      | every bucket in Garage                  |
 
 [`pepys-workloads.ts`](../../../infra/shared/pepys-workloads.ts) holds each name, port and
 in-cluster URL. [`pepys-images.ts`](../../../infra/shared/pepys-images.ts) pins the three images
@@ -59,17 +60,12 @@ context, after `bun install --frozen-lockfile` in `deploy/pepys`:
 4. It compiles the two entry files with
    [`compile-entries.ts`](../../../deploy/pepys/compile-entries.ts).
 
-The `@pepys/*` packages must carry the version that `PEPYS_RELEASE` names, so that the binaries and
-the modules come from one release. A release bump changes `PEPYS_RELEASE` and each `@pepys/*`
-version in `deploy/pepys/package.json` in one pull request, with the lock of `deploy/pepys` written
-again. The shared release tooling changes only `images/pepys/versions.env`, so change the package
-versions and the lock by hand in its pull request.
+The `@pepys/*` packages in `deploy/pepys/package.json` carry the release that `PEPYS_RELEASE` in
+`images/pepys/versions.env` names, so the binaries and the modules come from one release.
 [`collect-pepys-version-mismatches.test.ts`](../../../scripts/collect-pepys-version-mismatches.test.ts)
-fails when the release and a package version differ.
-
-`@boxxy/pepys` carries boxxy's own version, so that test never reads it. It takes `@pepys/kit` as a
-peer, so that the plug-in and the deployment share one copy of the kit. A release bump therefore
-needs an `@boxxy/pepys` whose peer range admits the release.
+fails when a package version differs from the release. `@boxxy/pepys` carries boxxy's own version
+and takes `@pepys/kit` as a peer, so the plug-in and the deployment share one copy of the kit.
+[The pepys runbook](../../runbooks/pepys.md#bump-the-pepys-release) gives the bump.
 
 The compile embeds Turso's native addon in the API. Turso's loader reaches the addon through
 `createRequire`, which `bun build --compile` does not follow, so the compile script drops that call,
@@ -121,10 +117,10 @@ The API serves typed queries under `/rpc`, which check no credential, and serves
 behind its own OAuth 2.1 server. While stack config `pepys.apiHostname` names a host, such as
 `pepys.geoff.cloud`, the shared tunnel carries that host's MCP and OAuth paths to the API's Service.
 [The pepys API's route boundary](../network/public-ingress.md#the-pepys-apis-route-boundary) lists
-the paths. Every other path gets the tunnel's 404, so `/rpc` never leaves the cluster. Cloudflare
+the paths. Every other path gets the tunnel's 404, so the tunnel never carries `/rpc`. Cloudflare
 Access fronts the sign-in pages for the owner, and the owner's passkey signs the owner in behind it.
 
-The field turns on these together, and nothing else of the route exists without it:
+`pepys.apiHostname` turns on these together, and the route has no other part:
 
 - the API's settings `PEPYS_API_PUBLIC_URL`, the host's `https://` origin, and `PEPYS_AUTH_DIR`,
   `/auth`. The API exits at start with a public URL and no auth folder, so the program sets both or
@@ -137,15 +133,41 @@ The field turns on these together, and nothing else of the route exists without 
   port;
 - the tunnel's two rules, the Access application and the proxied record of the host.
 
-The Pulumi program refuses the field with a `pepys.image` older than pepys 0.3.0. An older API
-serves `/mcp` to any caller, so a public route to it would open every query to the internet. Set the
-field in the pull request that pins a 0.3.0 or later image.
+The Pulumi program refuses `pepys.apiHostname` with a `pepys.image` older than pepys 0.3.0. An older
+API serves `/mcp` to any caller, so a public route to it would open every query to the internet. Set
+the field in the pull request that pins a 0.3.0 or later image.
 
 The backup leaves `mcp-auth.db` out, as pepys decides in its design: a lost database costs one
-passkey enrollment and one sign-in per client. The backup copies Garage's buckets only, and the
-retaining class keeps the volume when its claim goes.
-[The pepys runbook](../../runbooks/pepys.md#turn-on-the-apis-public-route) turns the route on,
-enrolls the passkey and adds a client.
+passkey enrollment and one sign-in per client, and the retaining class keeps the volume when its
+claim goes. [The pepys runbook](../../runbooks/pepys.md#turn-on-the-apis-public-route) turns the
+route on, enrolls the passkey and adds a client.
+
+### The API's tailnet route
+
+While stack config `pepys.tailnetHostname` names a host, such as `pepys-api.geoff.cloud`, a tailnet
+device reads every query at `/rpc` on that name. The Pulumi program refuses the setting when it
+equals ingest's webhook name or the API's public name, or when the
+[exposure registry](../network/firewalls.md#the-exposure-registry) has no `tailnet-hostname` entry
+for the name.
+
+nixie's Traefik serves the name, because it holds the node's port 443 on the tailnet address and a
+second controller could not bind that port. The Pulumi program adds the `pepys` namespace to the
+namespaces that Traefik watches, and so refuses `pepys.tailnetHostname` without stack config
+`nixie`. Traefik's ClusterRole already reads Services, EndpointSlices and Secrets in every
+namespace, so Traefik gains no permission. `pepys.tailnetHostname` turns on these together:
+
+- the Ingress `pepys-api-tailnet` in the namespace `pepys`, which sends every path of the name to
+  the API's port, 8081;
+- a Let's Encrypt certificate for the name from nixie's account. A Pulumi apply issues it, and an
+  apply near its expiry renews it, as [nixie's](./nixie.md#the-route-in) is renewed;
+- a DNS-only A record at the node's tailnet address, so the name answers on the tailnet only;
+- the rule in the host pod's network policy that admits Traefik to the API's port.
+
+`/rpc` checks no credential, and the tailnet policy gives port 443 on the node to each member's
+device, so each of those devices reads every query. While the public route is on, the API answers
+`/mcp` and the OAuth paths only for the public name in `Host`, so they answer 403 on the tailnet
+name. While it is off, the API serves `/rpc` alone. Traefik serves no route for the public name, so
+a tailnet request that names it gets Traefik's 404 and never reaches a sign-in page.
 
 ### The telemetry path from a session
 
@@ -177,8 +199,11 @@ Each pod admits only its callers:
   cloudflared too while the API's public route is on. `/rpc` checks no caller, so the boxxy server
   reads every query under `/rpc`. `/mcp` needs an OAuth token and the public host's name in `Host`,
   so the boxxy server never calls it. The tunnel forwards only the public paths, so cloudflared
-  never reaches `/rpc`. The policy never admits another pod to the API, and never admits a pod to
-  another port of the host's pod. A person reaches the API with `kubectl port-forward`.
+  never reaches `/rpc`. While [the tailnet route](#the-apis-tailnet-route) is on, a rule of its own
+  admits nixie's Traefik on 8081: the pod labelled `app.kubernetes.io/name: traefik` in the
+  namespace `nixie-ingress`. The policy never admits another pod to the API, and never admits a pod
+  to another port of the host's pod. Without the tailnet route, a person reaches the API with
+  `kubectl port-forward`.
 - The backup admits no pod.
 
 Unlike every other namespace, pepys denies all egress, because ingest takes traffic from the
@@ -208,8 +233,10 @@ value changes, Pulumi replaces the Secret on the next apply, and Kubernetes roll
 from the repo's root [`.env`](../../../.env). The backup variables are all or none: without them,
 the cluster runs no backup.
 
-The backup copies each bucket to its own folder of an R2 bucket with `rclone copy`, which never
-deletes a copied object. The host's store needs no backup: the host rebuilds it from the fact log.
+The backup runs at 04:00 UTC each day, and copies each bucket to its own folder of an R2 bucket with
+`rclone copy`, which never deletes a copied object. It copies Garage's buckets only. The consumer
+modules need no backup, because they ship inside the `cloud-pepys` image that `pepys.image` pins by
+digest, and the host's store needs none, because the host rebuilds it from the fact log.
 
 The backup reads Garage with its own key, which can read each bucket the backup copies and write
 none. `pepysWorkloads.backup.buckets` in
@@ -219,51 +246,4 @@ but it has no way to create a second key, so an operator imports the backup's ke
 again after any rebuild of Garage's data. The
 [pepys runbook](../../runbooks/pepys.md#give-the-backup-its-garage-key) gives the steps.
 
-## Deploy the first time
-
-**CAUTION:** The first apply adds a public route. Its `Deploy prod` run holds on the tunnel route
-change until the owner approves it, as [the prod apply job](../../runbooks/prod-apply.md) describes.
-
-The Pulumi program deploys pepys only when stack config `pepys` exists, so the service merges first
-and changes nothing in prod.
-
-1. Merge the service. The `pepys image` workflow publishes
-   `ghcr.io/zgeoff/cloud-pepys:<release>-<commit>` from `main`, and its run summary gives the
-   digest. When the package does not exist yet, the first push creates it and then fails with
-   `denied`: rerun the failed job, which publishes the tag.
-2. In a PR, add the `pepys` object to `infra/Pulumi.prod.yaml`:
-
-   ```yaml
-   geoff-cloud:pepys:
-     image: ghcr.io/zgeoff/cloud-pepys:<release>-<commit>@sha256:<digest>
-     webhookHostname: pepys-webhook.geoff.cloud
-     impIdentityAudience: pepys.imp.internal
-   ```
-
-   Run `bun run preview` and check that it adds the `pepys` namespace, its network policies,
-   Secrets, Services and workloads, and the shared tunnel's rule and the proxied record for
-   `pepys-webhook.geoff.cloud`, and changes nothing else. The backup CronJob comes only with the
-   backup variables in `.env`.
-
-3. Merge the PR, and approve the held `Deploy prod` run once its plan matches the preview.
-4. Check that the workloads are up:
-
-   ```bash
-   ssh root@geoffcloud k3s kubectl -n pepys rollout status statefulset/pepys-host --timeout=300s
-   ```
-
-   Expect `statefulset rolling update complete`. Check `statefulset/pepys-garage`,
-   `deployment/pepys-s2` and `deployment/pepys-ingest` the same way.
-
-5. Check that the public route refuses an unsigned delivery:
-
-   ```bash
-   curl -s -o /dev/null -w '%{http_code}\n' -X POST https://pepys-webhook.geoff.cloud/webhook/github
-   ```
-
-   Expect `401`.
-
-## Later work
-
-- A tailnet route to the API, through the cluster's Traefik, so a tailnet client reaches it without
-  a port-forward.
+[The pepys runbook](../../runbooks/pepys.md#deploy-the-first-time) deploys pepys the first time.

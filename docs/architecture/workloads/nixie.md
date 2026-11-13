@@ -187,8 +187,10 @@ the route as nixie's ingress controller. It holds the host's HTTPS port through 
 the tailnet address alone, so no other interface answers. It runs in its own namespace,
 nixie-ingress, because Pod Security's `baseline` level refuses a host port, and that namespace alone
 goes without the level while nixie's own pods keep it
-([cross-cutting rules](../overview.md#cross-cutting)). It watches nixie's namespace only and serves
-no dashboard. The NixOS firewall trusts the tailnet interface, and the tailnet policy lets every
+([cross-cutting rules](../overview.md#cross-cutting)). It serves the Ingress objects of nixie's
+namespace and of pepys's, because two pods cannot both hold the host's port 443: pepys's namespace
+joins while [pepys's tailnet route](./pepys.md#the-apis-tailnet-route) is on. It serves no
+dashboard. The NixOS firewall trusts the tailnet interface, and the tailnet policy lets every
 member's device reach the host on HTTPS ([firewalls](../network/firewalls.md)).
 
 The Ingress sends `/rpc` to nixie and every other path to the web client. Its certificate comes from

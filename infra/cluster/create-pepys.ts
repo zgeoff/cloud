@@ -14,6 +14,7 @@ import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
 import { buildPepysGarageSpec } from './build-pepys-garage-spec.ts';
 import { buildPepysHostSpec } from './build-pepys-host-spec.ts';
 import { buildPepysIngestSpec } from './build-pepys-ingest-spec.ts';
+import type { PepysAPIRoutes } from './build-pepys-network-policy-specs.ts';
 import { buildPepysNetworkPolicySpecs } from './build-pepys-network-policy-specs.ts';
 import { buildPepysPublicPath } from './build-pepys-public-path.ts';
 import { buildPepysS2Spec } from './build-pepys-s2-spec.ts';
@@ -37,6 +38,11 @@ export interface PepysAPIRoute {
 }
 
 interface PepysOutputs {
+  readonly namespace: Output<string>;
+
+  // the host's Service, once the host's StatefulSet has rolled out
+  readonly apiService: Output<string>;
+
   // unset while no route of the deployment is public
   readonly route?: PepysRoute;
 
@@ -56,7 +62,11 @@ export function createPepys(cluster: Provider, inputs: PepysInputs): PepysOutput
 
   const apiHostname = inputs.config.apiHostname;
 
-  createNetworkPolicies(cluster, namespace, apiHostname !== undefined);
+  createNetworkPolicies(cluster, namespace, {
+    isPublic: apiHostname !== undefined,
+    isTailnetRouted: inputs.config.tailnetHostname !== undefined,
+  });
+
   createGarage(cluster, namespace, inputs);
   createS2(cluster, namespace, inputs);
   createIngest(cluster, namespace, inputs, pull);
@@ -70,6 +80,8 @@ export function createPepys(cluster: Provider, inputs: PepysInputs): PepysOutput
   const path = buildPepysPublicPath(readPepysRouteTable());
 
   return {
+    namespace,
+    apiService: host.metadata.name.apply(() => pepysWorkloads.host.name),
     ...(path === undefined
       ? {}
       : {
@@ -97,9 +109,9 @@ export function createPepys(cluster: Provider, inputs: PepysInputs): PepysOutput
 function createNetworkPolicies(
   cluster: Provider,
   namespace: Output<string>,
-  isAPIPublic: boolean,
+  apiRoutes: PepysAPIRoutes,
 ): NetworkPolicy[] {
-  const specs = { ...buildPepysNetworkPolicySpecs(isAPIPublic), ...buildPepysEgressPolicySpecs() };
+  const specs = { ...buildPepysNetworkPolicySpecs(apiRoutes), ...buildPepysEgressPolicySpecs() };
 
   return Object.entries(specs).map(
     ([name, spec]) =>

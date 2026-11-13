@@ -258,6 +258,10 @@ interface PepysConfig {
   // is unset, the API serves /rpc alone and nothing of it is public
   readonly apiHostname?: string;
 
+  // the DNS name of every API path, /rpc included, which nixie's Traefik serves on the host's
+  // tailnet address; while it is unset, the API has no tailnet route
+  readonly tailnetHostname?: string;
+
   // the audience that a telemetry sender's identity token must name; while it is unset, ingest
   // refuses every telemetry export
   readonly impIdentityAudience?: string;

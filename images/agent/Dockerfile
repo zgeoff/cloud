@@ -100,8 +100,8 @@ RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/atc \
 # The sums are the two assets' lines in the release's SHA256SUMS:
 #   gh release download "@boxxy/cli@$VERSION" -R zgeoff/boxxy
 #   sha256sum -c SHA256SUMS
-ARG BOXXY_CLI_VERSION=0.2.4
-ARG BOXXY_CLI_SHA256=7bb1019b23af74e499abdde972af05ada6190b7b52dcc93db04396c2ab9627f3
+ARG BOXXY_CLI_VERSION=0.2.5
+ARG BOXXY_CLI_SHA256=55be4cfc249925dac81cc10b92293db784842e105d7871010d8b97d404d8b89e
 ARG BOXXY_HOOK_PLUGIN_SHA256=ab8f281102a71182e1465fb8c5a254b012adfc7766737da88acf3dd5adcd4153
 RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/boxxy \
       "https://github.com/zgeoff/boxxy/releases/download/%40boxxy/cli%40${BOXXY_CLI_VERSION}/boxxy-linux-x64" \
@@ -269,8 +269,8 @@ RUN curl -fsSL ${CURL_RETRY} -o /tmp/op.zip \
 # for --plugin-dir. The sum is the tarball's. The release bump (scripts/release/) checks the
 # tarball against npm's dist.integrity, its sha512, and writes this pin:
 #   npm view auto-mode@$VERSION dist.tarball dist.integrity
-ARG AUTO_MODE_VERSION=4.0.0
-ARG AUTO_MODE_SHA256=b4f876ed5c586abd72ef3bf47b1a4ace3eefe81fb589397fd5be0c3307cfa58b
+ARG AUTO_MODE_VERSION=4.0.1
+ARG AUTO_MODE_SHA256=338aaa9a6de3f1fe6576a48b788f45f6eacee96315078035fb5021ad9dd57b10
 RUN curl -fsSL ${CURL_RETRY} -o /tmp/auto-mode.tgz \
       "https://registry.npmjs.org/auto-mode/-/auto-mode-${AUTO_MODE_VERSION}.tgz" \
  && echo "${AUTO_MODE_SHA256}  /tmp/auto-mode.tgz" | sha256sum -c - \

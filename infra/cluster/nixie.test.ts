@@ -55,7 +55,11 @@ test('it registers none of the config, the definitions key and the Secret that n
         dnsToken: output('fake-dns-token'),
       },
     },
-    { zoneID: output('zone'), kubeconfig: output('kubeconfig-for-tests') },
+    {
+      zoneID: output('zone'),
+      kubeconfig: output('kubeconfig-for-tests'),
+      routesNamespaces: ['nixie'],
+    },
   );
 
   await ctx.stub.whenRegistered('command:local:Command::nixie-sandbox-images');
@@ -87,7 +91,11 @@ test("it mounts the sandbox image Job's own copy of nixie's Secret in the Job", 
         dnsToken: output('fake-dns-token'),
       },
     },
-    { zoneID: output('zone'), kubeconfig: output('kubeconfig-for-tests') },
+    {
+      zoneID: output('zone'),
+      kubeconfig: output('kubeconfig-for-tests'),
+      routesNamespaces: ['nixie'],
+    },
   );
 
   await ctx.stub.whenRegistered('command:local:Command::nixie-sandbox-images');
@@ -150,7 +158,11 @@ test("it registers no copy of the config for the backup's restore while nixie's 
         },
       },
     },
-    { zoneID: output('zone'), kubeconfig: output('kubeconfig-for-tests') },
+    {
+      zoneID: output('zone'),
+      kubeconfig: output('kubeconfig-for-tests'),
+      routesNamespaces: ['nixie'],
+    },
   );
 
   ctx.stub.releaseKey('command:local:Command::nixie-sandbox-images');

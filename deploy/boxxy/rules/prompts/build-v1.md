@@ -30,6 +30,9 @@ Build the item {{title}} to its design and acceptance list, and open a pull requ
 {{ notes }}
 {%- endif %}
 
+Add no attribution to a commit message, a pull request title or a pull request body: no
+`Co-Authored-By` trailer, and no line that names the tool or the model that wrote the change.
+
 Run the checks that the repo's own agent instructions name. Close out `built`, `blocked` with the
 question the owner must answer, or `abandoned`.
 

@@ -60,6 +60,13 @@ test('it accepts one entry of each kind as given', () => {
         auth: 'a bearer token',
       },
       {
+        name: 'notes-tailnet',
+        kind: 'tailnet-hostname',
+        hostname: 'notes-tailnet.example.org',
+        scope: 'tailnet',
+        reason: 'the notes API on the tailnet',
+      },
+      {
         name: 'funnel',
         kind: 'tailnet-capability',
         attr: 'funnel',
@@ -305,6 +312,18 @@ test.each([
       reason: 'the notes API',
     },
     'auth',
+  ],
+  [
+    'a public tailnet hostname',
+    {
+      name: 'notes-tailnet',
+      kind: 'tailnet-hostname',
+      hostname: 'notes-tailnet.example.org',
+      scope: 'public',
+      reason: 'the notes API',
+      auth: 'a bearer token',
+    },
+    'scope',
   ],
   [
     'a reserved host port',

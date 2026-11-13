@@ -119,7 +119,7 @@
       "protocol": "tcp",
       "port": 443,
       "scope": "tailnet",
-      "reason": "nixie's Traefik ingress, which holds the host port on the host's tailnet address only: nixie.geoff.cloud points at that address"
+      "reason": "nixie's Traefik ingress, which holds the host port on the host's tailnet address only and serves the Ingress objects of the nixie and pepys namespaces: nixie.geoff.cloud and pepys-api.geoff.cloud point at that address"
     },
     {
       "name": "public-front",
@@ -194,6 +194,13 @@
       "scope": "public",
       "reason": "The pepys API's MCP and OAuth endpoints for the owner's remote MCP clients. The tunnel carries only /mcp and the OAuth server's paths, and answers 404 on every other path, /rpc included, because /rpc checks no credential",
       "auth": "The API's own OAuth 2.1 server authenticates every MCP call, and an owner-only Cloudflare Access login and the owner's passkey front its sign-in pages"
+    },
+    {
+      "name": "pepys-api-tailnet",
+      "kind": "tailnet-hostname",
+      "hostname": "pepys-api.geoff.cloud",
+      "scope": "tailnet",
+      "reason": "The pepys API's every path, /rpc included, for the owner's tailnet devices. nixie's Traefik serves it on the host's tailnet address, and /rpc checks no credential, so the name stays off the tunnels"
     },
     {
       "name": "impd-mcp",
