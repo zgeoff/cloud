@@ -1,8 +1,8 @@
 # pepys
 
 Runbook for the parts of [pepys](../architecture/workloads/pepys.md) that an operator runs by hand:
-the path that carries a session's telemetry to ingest and its token, and the backup's Garage key and
-a backup on demand.
+the path that carries a session's telemetry to ingest and its token, the API's passkey and OAuth
+clients and their public route, and the backup's Garage key and a backup on demand.
 
 ## Let sessions send telemetry
 
@@ -67,6 +67,84 @@ set to `pepys.imp.internal`.
 2. Run the `impz secret add` command above with `--replace`.
 3. [Apply by hand](./workflows.md#apply-by-hand), so Pulumi replaces the ingest Secret. A new secret
    under the same name needs the grantable list set again.
+
+## Turn on the API's public route
+
+**CAUTION:** This adds a public route. Its `Deploy prod` run holds on the tunnel route change until
+the owner approves it.
+
+1. In the pull request that pins a `cloud-pepys` image of pepys 0.3.1 or later, add
+   `apiHostname: pepys.geoff.cloud` to the `geoff-cloud:pepys` object in `infra/Pulumi.prod.yaml`.
+   The program takes 0.3.0, but its compiled API stops at start.
+2. Run `bun run preview`. Expect it to add the claim `pepys-auth`, the Access policy and application
+   `pepys-api-owner` and `pepys-api-sign-in`, and the record `pepys-api`, and to update the host's
+   StatefulSet, the host's network policy and the shared tunnel's configuration. Expect no replace.
+3. Merge, and approve the held `Deploy prod` run once its plan matches the preview.
+4. Check that the API serves `/mcp` behind its token:
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST https://pepys.geoff.cloud/mcp
+   ```
+
+   Expect `401`.
+
+5. Check that the tunnel keeps `/rpc` in:
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' https://pepys.geoff.cloud/rpc/
+   ```
+
+   Expect `404`.
+
+6. Check that the MCP alias at `/` takes only a POST. cloudflared routes on the path alone, so the
+   API refuses the other methods:
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' https://pepys.geoff.cloud/
+   ```
+
+   Expect `405`.
+
+7. Sign a client in, as [Sign a client in to the API](#sign-a-client-in-to-the-api) says.
+
+## Sign a client in to the API
+
+The API's admin commands run in the API's container, on `mcp-auth.db`, beside the running server.
+The commands need the API's public route, as
+[Turn on the API's public route](#turn-on-the-apis-public-route) says. Each command below runs
+through `pepys-api` in the container `api` of the pod `pepys-host-0`.
+
+1. List the passkeys:
+
+   ```sh
+   ssh root@geoffcloud k3s kubectl -n pepys exec pepys-host-0 -c api -- /usr/local/bin/pepys-api passkeys
+   ```
+
+   When it prints `No passkeys`, go on to step 2. Otherwise go to step 3.
+
+2. Print an enrollment token, and type it on `https://pepys.geoff.cloud/enroll` within 15 minutes:
+
+   ```sh
+   ssh root@geoffcloud k3s kubectl -n pepys exec pepys-host-0 -c api -- /usr/local/bin/pepys-api passkeys enroll
+   ```
+
+   Cloudflare Access asks for the owner's one-time PIN before the page loads. Expect `passkeys` to
+   list the new passkey.
+
+3. Add the client, with a fixed callback port, `<port>`, of your choice:
+
+   ```sh
+   ssh root@geoffcloud k3s kubectl -n pepys exec pepys-host-0 -c api -- /usr/local/bin/pepys-api clients add 'Claude Code' --redirect-uri http://localhost:<port>/callback
+   ```
+
+   Expect a client ID, `<client_id>`.
+
+4. In Claude Code, add the MCP server `https://pepys.geoff.cloud/mcp` over HTTP, with `<client_id>`
+   in `--client-id` and `<port>` in `--callback-port`. Leave out `--client-secret`, because every
+   client is public. Expect the first connection to open the owner's browser on `/oauth2/authorize`.
+
+`grants` lists the live grants, and `grants --revoke=<grant_id>` ends one.
+`clients remove <client_id>` removes a client with each grant and token it holds.
 
 ## Give the backup its Garage key
 

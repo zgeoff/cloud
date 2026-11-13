@@ -188,6 +188,14 @@
       "auth": "GitHub's webhook signature: ingest checks the HMAC-SHA256 of every delivery against the webhook secret and stores nothing from a delivery that fails"
     },
     {
+      "name": "pepys-api",
+      "kind": "tunnel-hostname",
+      "hostname": "pepys.geoff.cloud",
+      "scope": "public",
+      "reason": "The pepys API's MCP and OAuth endpoints for the owner's remote MCP clients. The tunnel carries only /mcp and the OAuth server's paths, and answers 404 on every other path, /rpc included, because /rpc checks no credential",
+      "auth": "The API's own OAuth 2.1 server authenticates every MCP call, and an owner-only Cloudflare Access login and the owner's passkey front its sign-in pages"
+    },
+    {
       "name": "impd-mcp",
       "kind": "front-route",
       "hostname": "imp.geoff.cloud",

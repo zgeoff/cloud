@@ -73,12 +73,13 @@ const ingress = createIngress({
   zoneID: edge.zoneID,
   cluster: k3s?.provider,
   atcRoute: workloads?.atcGatewayRoute,
-  atcOwnerEmail: k3s?.inputs.atcGateway?.secrets.ownerEmail,
+  ownerEmail: k3s?.inputs.atcGateway?.secrets.ownerEmail,
   atcTunnel,
   boxxyDoorHostname: boxxyDoor === undefined ? undefined : new URL(boxxyDoor.publicURL).hostname,
   boxxyTunnel,
   filesRoute: workloads?.filesRoute,
   pepysRoute: workloads?.pepysRoute,
+  pepysAPIRoute: workloads?.pepysAPIRoute,
 });
 
 export const tunnelToken = ingress.tunnelToken;
@@ -90,6 +91,7 @@ export const boxxyDoorURL = ingress.boxxyDoorURL;
 export const previewWebhookURL = ingress.previewWebhookURL;
 export const filesURL = ingress.filesURL;
 export const pepysWebhookURL = ingress.pepysWebhookURL;
+export const pepysAPIURL = ingress.pepysAPIURL;
 export const onePasswordConnectServiceURL = workloads?.onePasswordConnectServiceURL;
 export const atcGatewayServiceURL = workloads?.atcGatewayServiceURL;
 export const nixieURL = workloads?.nixieURL;

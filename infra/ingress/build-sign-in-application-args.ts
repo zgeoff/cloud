@@ -4,12 +4,12 @@ import type { Output } from '@pulumi/pulumi';
 interface SignInApplicationInputs {
   readonly accountID: string;
 
-  // the application's name in Cloudflare
+  // the application's display name
   readonly name: string;
 
   readonly hostname: string;
 
-  // the pages the owner's browser loads to sign in; the first is the application's domain
+  // the origin's browser paths; the first is the application's domain
   readonly browserPaths: readonly [string, ...string[]];
 
   readonly identityProviderID: Output<string>;

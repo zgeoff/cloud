@@ -246,6 +246,10 @@ interface PepysConfig {
   // the public DNS name of ingest's public routes, which the shared tunnel serves
   readonly webhookHostname: string;
 
+  // the public DNS name of the API's /mcp and OAuth paths, which the shared tunnel serves; while it
+  // is unset, the API serves /rpc alone and nothing of it is public
+  readonly apiHostname?: string;
+
   // the audience that a telemetry sender's identity token must name; while it is unset, ingest
   // refuses every telemetry export
   readonly impIdentityAudience?: string;

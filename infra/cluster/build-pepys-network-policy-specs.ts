@@ -13,9 +13,18 @@ const boxxyServerPeer: NetworkPolicyPeer = {
   podSelector: { matchLabels: boxxyLabels },
 };
 
+// the shared tunnel's connector, which carries every public route of pepys
+const cloudflaredPeer: NetworkPolicyPeer = {
+  namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'ingress' } },
+  podSelector: { matchLabels: podLabels.cloudflared },
+};
+
 // Each pepys pod admits only its callers. kube-router admits the node's own addresses before any
-// policy, so a relay on the host still reaches a Service.
-export function buildPepysNetworkPolicySpecs(): Readonly<Record<string, NetworkPolicySpec>> {
+// policy, so a relay on the host still reaches a Service. cloudflared reaches the API only while
+// the API serves /mcp on its public hostname.
+export function buildPepysNetworkPolicySpecs(
+  isAPIPublic: boolean,
+): Readonly<Record<string, NetworkPolicySpec>> {
   const workloads = pepysWorkloads;
 
   return {
@@ -32,19 +41,17 @@ export function buildPepysNetworkPolicySpecs(): Readonly<Record<string, NetworkP
     [workloads.ingest.name]: buildIngressPolicy(workloads.ingest.labels, [
       {
         port: workloads.ingest.port,
-        from: [
-          {
-            namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'ingress' } },
-            podSelector: { matchLabels: podLabels.cloudflared },
-          },
-          boxxyServerPeer,
-        ],
+        from: [cloudflaredPeer, boxxyServerPeer],
       },
     ]),
 
-    // the boxxy server queries the API, which checks no caller
+    // the boxxy server queries /rpc, which checks no caller; the tunnel carries only /mcp and the
+    // OAuth paths
     [workloads.host.name]: buildIngressPolicy(workloads.host.labels, [
-      { port: workloads.host.apiPort, from: [boxxyServerPeer] },
+      {
+        port: workloads.host.apiPort,
+        from: isAPIPublic ? [cloudflaredPeer, boxxyServerPeer] : [boxxyServerPeer],
+      },
     ]),
 
     // no pod calls the backup

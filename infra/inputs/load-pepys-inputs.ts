@@ -13,6 +13,7 @@ import type { Environment, PepysBackupInputs, PepysInputs, StackConfig } from '.
 const pepysConfigSchema = z.object({
   image: z.string().optional(),
   webhookHostname: z.string().optional(),
+  apiHostname: z.string().optional(),
   impIdentityAudience: z.string().min(1).optional(),
 });
 
@@ -34,6 +35,10 @@ export function loadPepysInputs(
   requirePinnedImage('pepys.image', config.image);
   requireGeoffCloudHostname('pepys.webhookHostname', config.webhookHostname);
 
+  if (config.apiHostname !== undefined) {
+    requireAPIHostname(config.apiHostname, config.webhookHostname, config.image);
+  }
+
   const pull = requireGHCRPullCredential(env);
   const backup = findBackup(env);
 
@@ -44,6 +49,7 @@ export function loadPepysInputs(
       config: {
         image: config.image,
         webhookHostname: config.webhookHostname,
+        ...(config.apiHostname === undefined ? {} : { apiHostname: config.apiHostname }),
         ...(config.impIdentityAudience === undefined
           ? {}
           : { impIdentityAudience: config.impIdentityAudience }),
@@ -62,6 +68,41 @@ export function loadPepysInputs(
       ...(backup === undefined ? {} : { backup }),
     },
   };
+}
+
+// the first pepys release whose API checks an OAuth token on /mcp; an older API serves /mcp to
+// any caller, so a public route to it would open every query to the internet
+const mcpAuthRelease = '0.3.0';
+
+function requireAPIHostname(apiHostname: string, webhookHostname: string, image: string): void {
+  requireGeoffCloudHostname('pepys.apiHostname', apiHostname);
+
+  if (apiHostname === webhookHostname) {
+    throw new Error('stack config "pepys.apiHostname" must differ from "pepys.webhookHostname"');
+  }
+
+  const release = /:(?<release>\d+\.\d+\.\d+)-[\da-f]+@/u.exec(image)?.groups?.['release'];
+
+  if (release === undefined || !isReleaseAtLeast(release, mcpAuthRelease)) {
+    throw new Error(
+      `stack config "pepys.apiHostname" needs a "pepys.image" of pepys ${mcpAuthRelease} or later, whose API checks a token on /mcp; the image is ${release === undefined ? 'not a release tag' : `pepys ${release}`}`,
+    );
+  }
+}
+
+function isReleaseAtLeast(release: string, minimum: string): boolean {
+  const parts = release.split('.').map(Number);
+  const floor = minimum.split('.').map(Number);
+
+  for (const [index, part] of parts.entries()) {
+    const needed = floor[index] ?? 0;
+
+    if (part !== needed) {
+      return part > needed;
+    }
+  }
+
+  return true;
 }
 
 const backupVariables = {

@@ -4,7 +4,7 @@ import type { Output } from '@pulumi/pulumi';
 interface OwnerPolicyInputs {
   readonly accountID: string;
 
-  // the policy's name in Cloudflare
+  // the policy's display name
   readonly name: string;
 
   readonly identityProviderID: Output<string>;

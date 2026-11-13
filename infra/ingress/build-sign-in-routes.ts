@@ -1,3 +1,4 @@
+import { buildExactPathPattern } from './build-exact-path-pattern.ts';
 import type { OriginAccess, TunnelRoute } from './build-tunnel-ingresses.ts';
 
 // a workload's routes split by caller: the pages the owner's browser loads, and the paths that an
@@ -25,8 +26,4 @@ export function buildSignInRoutes(
       path: buildExactPathPattern(paths.machine),
     },
   ];
-}
-
-function buildExactPathPattern(paths: readonly string[]): string {
-  return `^(?:${paths.map((path) => path.replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`)).join('|')})$`;
 }
