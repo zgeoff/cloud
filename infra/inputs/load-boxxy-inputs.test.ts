@@ -48,7 +48,23 @@ function setupTest() {
   const stackValues = { boxxy: JSON.stringify(boxxy), boxxySpawnRepos: JSON.stringify(repos) };
   const stackConfig = buildStubConfig(stackValues);
 
-  return { boxxy, repos, stackValues, stackConfig, tokens, backupVariables, backupImage };
+  // the review gate's part: review agents with the github section, and the noslop App's keys
+  const review = {
+    boxxy: {
+      ...boxxy,
+      spawn: { ...boxxy.spawn, reviewAgents: ['review-agent-for-tests'] },
+      github: { baseUrl: 'https://api.github.com' },
+    },
+    env: {
+      ...tokens,
+      BOXXY_GITHUB_TOKEN: 'github-token-for-tests',
+      NOSLOP_GITHUB_APP_ID: '123456',
+      NOSLOP_GITHUB_APP_PRIVATE_KEY: 'private-key-for-tests',
+      NOSLOP_GITHUB_APP_INSTALLATION_ID: '7890',
+    },
+  };
+
+  return { boxxy, repos, stackValues, stackConfig, tokens, backupVariables, backupImage, review };
 }
 
 test('it returns nothing while the stack config leaves boxxy out', () => {
@@ -350,4 +366,82 @@ test('it adds no optional token while neither section is set', () => {
   const inputs = loadBoxxyInputs(fixture.stackConfig, env, undefined);
 
   expect(Object.keys(inputs.boxxy?.secrets ?? {})).toStrictEqual(['workerToken', 'atcToken']);
+});
+
+test("it keeps the review agents and marks each of the noslop App's keys secret", async () => {
+  const fixture = setupTest();
+  const review = fixture.review;
+  const stackValues = fixture.stackValues;
+
+  const stackConfig = buildStubConfig({
+    ...stackValues,
+    boxxy: JSON.stringify(review.boxxy),
+  });
+
+  const inputs = loadBoxxyInputs(stackConfig, review.env, undefined);
+
+  invariant(inputs.boxxy);
+
+  const reviewApp = inputs.boxxy.secrets.reviewApp;
+
+  invariant(reviewApp);
+
+  const keys = [reviewApp.appID, reviewApp.privateKey, reviewApp.installationID];
+
+  const secretKeys = await Promise.all(keys.map((key) => isSecret(key)));
+  const resolved = await Promise.all(keys.map((key) => resolveOutput(key)));
+
+  expect(inputs.boxxy.config.spawn).toStrictEqual({
+    target: 'target-for-tests',
+    reviewAgents: ['review-agent-for-tests'],
+  });
+
+  expect(secretKeys).toStrictEqual([true, true, true]);
+  expect(resolved).toStrictEqual(['123456', 'private-key-for-tests', '7890']);
+});
+
+test.each([
+  'NOSLOP_GITHUB_APP_ID',
+  'NOSLOP_GITHUB_APP_PRIVATE_KEY',
+  'NOSLOP_GITHUB_APP_INSTALLATION_ID',
+] as const)('it refuses the review agents without %s', (variable) => {
+  const fixture = setupTest();
+  const review = fixture.review;
+  const stackValues = fixture.stackValues;
+
+  const stackConfig = buildStubConfig({
+    ...stackValues,
+    boxxy: JSON.stringify(review.boxxy),
+  });
+
+  const { [variable]: _left, ...env } = review.env;
+
+  expect(() => loadBoxxyInputs(stackConfig, env, undefined)).toThrowWithMessage(
+    Error,
+    `${variable} is unset; the boxxy server posts each review as the noslop App with it while stack config "boxxy.spawn.reviewAgents" lists an agent`,
+  );
+});
+
+test('it refuses the review agents without the github section', () => {
+  const fixture = setupTest();
+  const review = fixture.review;
+  const stackValues = fixture.stackValues;
+  const { github: _github, ...boxxy } = review.boxxy;
+  const stackConfig = buildStubConfig({ ...stackValues, boxxy: JSON.stringify(boxxy) });
+
+  expect(() => loadBoxxyInputs(stackConfig, review.env, undefined)).toThrowWithMessage(
+    Error,
+    'stack config "boxxy.spawn.reviewAgents" needs stack config "boxxy.github": the review gate reads the pull request\'s changes through it',
+  );
+});
+
+test("it adds none of the noslop App's keys while no review agent is listed", () => {
+  const fixture = setupTest();
+  const review = fixture.review;
+  const stackValues = fixture.stackValues;
+  const boxxy = { ...review.boxxy, spawn: { ...review.boxxy.spawn, reviewAgents: [] } };
+  const stackConfig = buildStubConfig({ ...stackValues, boxxy: JSON.stringify(boxxy) });
+  const inputs = loadBoxxyInputs(stackConfig, review.env, undefined);
+
+  expect(inputs.boxxy?.secrets.reviewApp).toBeUndefined();
 });

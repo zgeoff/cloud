@@ -152,7 +152,13 @@ export interface BoxxyConfig {
     // by worker target: the folders the agent trusts
     readonly trustedFolders: Readonly<Record<string, readonly string[]>>;
   };
-  readonly spawn: { readonly target: string };
+  readonly spawn: {
+    readonly target: string;
+
+    // the atc agents whose broker profile holds the read-only clone token: only a review recipe
+    // may name one, and with one the server runs its review gate
+    readonly reviewAgents?: readonly string[];
+  };
 
   // with it, the server sends its facts to pepys and reads its two reports there; the cluster sets
   // the addresses
@@ -213,6 +219,13 @@ export interface BoxxyInputs {
 
     // with config github: the token of its pull request reads
     readonly githubToken?: Output<string>;
+
+    // with review agents: the noslop App's keys, which the review gate checks and posts with
+    readonly reviewApp?: {
+      readonly appID: Output<string>;
+      readonly privateKey: Output<string>;
+      readonly installationID: Output<string>;
+    };
   };
 
   // without it there is no backup CronJob

@@ -89,7 +89,7 @@ A server before the release that moves its atc calls to MCP calls `/rpc` and sen
 override, and the gateway refuses both. Run an image built from that release or a later one.
 
 Two tokens reach the pod as variables from a Secret with no fixed name, so a new token rolls the
-pod, and two more come from the same Secret when their section is set:
+pod, and the others come from the same Secret when their section is set:
 
 - `BOXXY_WORKER_TOKEN`: the bearer token the broker adds to every worker call. The broker holds the
   second copy.
@@ -101,11 +101,20 @@ pod, and two more come from the same Secret when their section is set:
   reads the same item.
 - `BOXXY_GITHUB_TOKEN`, with `github`: the server's fine-grained token, with `Pull requests: read`
   on the owner's repos, which must cover every repo in `boxxySpawnRepos`.
+- `NOSLOP_GITHUB_APP_ID`, `NOSLOP_GITHUB_APP_PRIVATE_KEY` and `NOSLOP_GITHUB_APP_INSTALLATION_ID`,
+  with `spawn.reviewAgents`: the noslop App's keys, which the review gate checks and posts each
+  review with. Only this pod holds them, never a session. The deploy refuses review agents without
+  all three or without `github`, because the server then rejects every review close-out.
 
 ## The rules
 
 The live rules are in `deploy/boxxy/rules/`, and the image holds them at `/rules`. The folder has no
 `.git`, so the server loads it as a plain folder, and a rules change is a new image and a deploy.
+
+The review phase runs the `review-run` recipe on the atc agent `boxxy-review`, the one agent whose
+broker profile holds the read-only clone token. Stack config `boxxy.spawn.reviewAgents` lists it,
+and the server then loads the rules only when review recipes alone name it. The image test starts
+the server with the same list, so a rules change that breaks the pairing fails CI.
 
 ## The caller proof
 

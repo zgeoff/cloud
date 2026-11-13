@@ -140,3 +140,32 @@ test('it writes the pepys section it is given and the GitHub root of the config'
     ),
   ).toMatchObject({ pepys, github: { baseUrl: 'https://api.github.com' } });
 });
+
+test('it lists the review agents in the spawn section beside the repos', () => {
+  const fixture = setupTest();
+
+  const config = {
+    ...fixture.config,
+    spawn: { target: 'target-for-tests', reviewAgents: ['review-agent-for-tests'] },
+  };
+
+  expect(
+    JSON.parse(
+      renderBoxxyConfig({
+        config,
+        repos: fixture.repos,
+        atc: {
+          url: 'http://atc-gateway.atc.svc.cluster.local:8414/mcp',
+          host: 'atc.fixture.invalid',
+        },
+        trusted: false,
+      }),
+    ),
+  ).toMatchObject({
+    spawn: {
+      target: 'target-for-tests',
+      repos: fixture.repos,
+      reviewAgents: ['review-agent-for-tests'],
+    },
+  });
+});

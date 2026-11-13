@@ -32,6 +32,7 @@ export interface BoxxySpecInputs {
   readonly tokenSecret: Output<string>;
   readonly pepysSigningSecret: boolean;
   readonly githubToken: boolean;
+  readonly reviewApp: boolean;
   readonly pullSecret: string;
 
   // the Secret with the token of the public door's tunnel; with it, the pod runs the tunnel's
@@ -107,6 +108,13 @@ export const atcTokenKey = 'atc-token';
 export const pepysSigningSecretKey = 'pepys-signing-secret';
 export const githubTokenKey = 'github-token';
 
+// the noslop App's keys, by the variable the server reads each one from
+export const reviewAppKeys = {
+  NOSLOP_GITHUB_APP_ID: 'noslop-app-id',
+  NOSLOP_GITHUB_APP_PRIVATE_KEY: 'noslop-app-private-key',
+  NOSLOP_GITHUB_APP_INSTALLATION_ID: 'noslop-app-installation-id',
+} as const;
+
 // the image reads its configuration file here (images/boxxy/Dockerfile)
 const configFolder = '/etc/boxxy';
 
@@ -151,6 +159,12 @@ function buildBoxxyContainer(inputs: BoxxySpecInputs): input.core.v1.Container {
               valueFrom: { secretKeyRef: { name: inputs.tokenSecret, key: githubTokenKey } },
             },
           ]
+        : []),
+      ...(inputs.reviewApp
+        ? Object.entries(reviewAppKeys).map(([name, key]) => ({
+            name,
+            valueFrom: { secretKeyRef: { name: inputs.tokenSecret, key } },
+          }))
         : []),
     ],
 

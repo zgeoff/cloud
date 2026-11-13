@@ -21,6 +21,7 @@ test('it runs the boxxy server as one nonroot replica on a read-only root, with 
       tokenSecret,
       pepysSigningSecret: false,
       githubToken: false,
+      reviewApp: false,
       pullSecret: 'ghcr-pull',
     }),
   ).toStrictEqual({
@@ -122,6 +123,7 @@ test('it mounts each trust document read-only as a regular file in the issuers f
     tokenSecret: output('boxxy-tokens-0a1b2c3d'),
     pepysSigningSecret: false,
     githubToken: false,
+    reviewApp: false,
     pullSecret: 'ghcr-pull',
   });
 
@@ -167,6 +169,7 @@ test('it reads the pepys signing secret and the GitHub token from the Secret whe
     tokenSecret,
     pepysSigningSecret: true,
     githubToken: true,
+    reviewApp: false,
     pullSecret: 'ghcr-pull',
   });
 
@@ -200,6 +203,7 @@ test("it runs the door tunnel's connector beside the server, with the tunnel's t
     tokenSecret: output('boxxy-tokens-0a1b2c3d'),
     pepysSigningSecret: false,
     githubToken: false,
+    reviewApp: false,
     pullSecret: 'ghcr-pull',
     doorTunnelToken,
   });
@@ -257,10 +261,49 @@ test('it runs no connector and mounts no tunnel token without a door tunnel', ()
     tokenSecret: output('boxxy-tokens-0a1b2c3d'),
     pepysSigningSecret: false,
     githubToken: false,
+    reviewApp: false,
     pullSecret: 'ghcr-pull',
   });
 
   expect(spec.template).toMatchObject({
     spec: { containers: [{ name: 'boxxy' }], volumes: [{ name: 'config' }, { name: 'tmp' }] },
+  });
+});
+
+test("it reads each of the noslop App's keys from the Secret when the server runs its review gate", () => {
+  const tokenSecret = output('boxxy-tokens-0a1b2c3d');
+
+  const spec = buildBoxxySpec({
+    image: setupTest(),
+    serviceName: output('boxxy'),
+    configMap: output('boxxy-config-0a1b2c3d'),
+    tokenSecret,
+    pepysSigningSecret: false,
+    githubToken: true,
+    reviewApp: true,
+    pullSecret: 'ghcr-pull',
+  });
+
+  expect(spec.template).toMatchObject({
+    spec: {
+      containers: [
+        {
+          env: expect.arrayContaining([
+            {
+              name: 'NOSLOP_GITHUB_APP_ID',
+              valueFrom: { secretKeyRef: { name: tokenSecret, key: 'noslop-app-id' } },
+            },
+            {
+              name: 'NOSLOP_GITHUB_APP_PRIVATE_KEY',
+              valueFrom: { secretKeyRef: { name: tokenSecret, key: 'noslop-app-private-key' } },
+            },
+            {
+              name: 'NOSLOP_GITHUB_APP_INSTALLATION_ID',
+              valueFrom: { secretKeyRef: { name: tokenSecret, key: 'noslop-app-installation-id' } },
+            },
+          ]),
+        },
+      ],
+    },
   });
 });

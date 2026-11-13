@@ -20,6 +20,7 @@ import {
   configFileName,
   githubTokenKey,
   pepysSigningSecretKey,
+  reviewAppKeys,
   workerTokenKey,
 } from './build-boxxy-spec.ts';
 import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
@@ -76,6 +77,14 @@ export function createBoxxy(
         ...(inputs.secrets.githubToken === undefined
           ? {}
           : { [githubTokenKey]: inputs.secrets.githubToken }),
+        ...(inputs.secrets.reviewApp === undefined
+          ? {}
+          : {
+              [reviewAppKeys.NOSLOP_GITHUB_APP_ID]: inputs.secrets.reviewApp.appID,
+              [reviewAppKeys.NOSLOP_GITHUB_APP_PRIVATE_KEY]: inputs.secrets.reviewApp.privateKey,
+              [reviewAppKeys.NOSLOP_GITHUB_APP_INSTALLATION_ID]:
+                inputs.secrets.reviewApp.installationID,
+            }),
       },
     },
     { provider: cluster },
@@ -183,6 +192,7 @@ export function createBoxxy(
         tokenSecret: tokens.metadata.name,
         pepysSigningSecret: inputs.secrets.pepysSigningSecret !== undefined,
         githubToken: inputs.secrets.githubToken !== undefined,
+        reviewApp: inputs.secrets.reviewApp !== undefined,
         pullSecret: ghcrPullSecretName,
         ...(doorTunnel === undefined ? {} : { doorTunnelToken: doorTunnel.metadata.name }),
       }),
