@@ -37,7 +37,7 @@ export interface BoxxySpecInputs {
   // the Secret with the worker token and the atc token, and each optional token the config needs
   readonly tokenSecret: Output<string>;
   readonly pepysSigningSecret: boolean;
-  readonly githubToken: boolean;
+  readonly githubApp: boolean;
   readonly reviewApp: boolean;
   readonly pullSecret: string;
 
@@ -181,7 +181,13 @@ function buildRulesSyncContainer(image: string): input.core.v1.Container {
 export const workerTokenKey = 'worker-token';
 export const atcTokenKey = 'atc-token';
 export const pepysSigningSecretKey = 'pepys-signing-secret';
-export const githubTokenKey = 'github-token';
+
+// the boxxy App's keys, by the variable the server reads each one from
+export const githubAppKeys = {
+  BOXXY_GITHUB_APP_CLIENT_ID: 'boxxy-app-client-id',
+  BOXXY_GITHUB_APP_PRIVATE_KEY: 'boxxy-app-private-key',
+  BOXXY_GITHUB_APP_INSTALLATION_ID: 'boxxy-app-installation-id',
+} as const;
 
 // the noslop App's keys, by the variable the server reads each one from
 export const reviewAppKeys = {
@@ -232,13 +238,11 @@ function buildBoxxyContainer(inputs: BoxxySpecInputs): input.core.v1.Container {
             },
           ]
         : []),
-      ...(inputs.githubToken
-        ? [
-            {
-              name: 'BOXXY_GITHUB_TOKEN',
-              valueFrom: { secretKeyRef: { name: inputs.tokenSecret, key: githubTokenKey } },
-            },
-          ]
+      ...(inputs.githubApp
+        ? Object.entries(githubAppKeys).map(([name, key]) => ({
+            name,
+            valueFrom: { secretKeyRef: { name: inputs.tokenSecret, key } },
+          }))
         : []),
       ...(inputs.reviewApp
         ? Object.entries(reviewAppKeys).map(([name, key]) => ({

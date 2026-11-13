@@ -45,17 +45,17 @@
     "version": "0.70.1"
   },
   "pepys-host": {
-    "version": "0.3.1",
-    "sum": "b8ef9325be84e38e92fb275fd160b4751119811f03accc468c2d6b155c87d384"
+    "version": "0.4.0",
+    "sum": "c305ecb2c72f7422e81ce1f49a211dab5e730dfea3c015dac5acc39f6e694f29"
   },
   "boxxy-cli": {
-    "version": "0.2.4",
-    "sum": "7bb1019b23af74e499abdde972af05ada6190b7b52dcc93db04396c2ab9627f3",
+    "version": "0.2.5",
+    "sum": "55be4cfc249925dac81cc10b92293db784842e105d7871010d8b97d404d8b89e",
     "pluginSum": "ab8f281102a71182e1465fb8c5a254b012adfc7766737da88acf3dd5adcd4153"
   },
   "auto-mode": {
-    "version": "4.0.0",
-    "sum": "b4f876ed5c586abd72ef3bf47b1a4ace3eefe81fb589397fd5be0c3307cfa58b"
+    "version": "4.0.1",
+    "sum": "338aaa9a6de3f1fe6576a48b788f45f6eacee96315078035fb5021ad9dd57b10"
   },
   "noslop": {
     "version": "0.4.29"

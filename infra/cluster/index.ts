@@ -12,9 +12,11 @@ import { createK3sNamespacePatches } from '../shared/create-k3s-namespace-patche
 import { createATCGateway } from './atc-gateway.ts';
 import type { ATCGatewayRoute } from './build-atc-gateway-route-outputs.ts';
 import { buildATCGatewayRouteOutputs } from './build-atc-gateway-route-outputs.ts';
+import { buildNixieRoutesNamespaces } from './build-nixie-routes-namespaces.ts';
 import { createBoxxy } from './create-boxxy.ts';
 import type { FilesRoute } from './create-files.ts';
 import { createFiles } from './create-files.ts';
+import { createPepysTailnetRoute } from './create-pepys-tailnet-route.ts';
 import type { PepysAPIRoute, PepysRoute } from './create-pepys.ts';
 import { createPepys } from './create-pepys.ts';
 import { nixieReadinessURL } from './nixie-readiness-url.ts';
@@ -64,6 +66,9 @@ interface ClusterOutputs {
   readonly pepysRoute?: PepysRoute;
   readonly pepysAPIRoute?: PepysAPIRoute;
 
+  // the API's every path on the host's tailnet address, through nixie's Traefik
+  readonly pepysTailnetURL?: Output<string>;
+
   // the boxxy server's owner listener in the cluster
   readonly boxxyServiceURL?: Output<string>;
 }
@@ -78,6 +83,7 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
       : createATCGateway(cluster, inputs.atcGateway.inputs, inputs.atcGateway.tunnelToken);
 
   const connect = createOnePasswordConnect(cluster, inputs.onePasswordConnect);
+  const pepysTailnetHostname = requireNixieRoutes(inputs);
 
   const nixie =
     inputs.nixie === undefined
@@ -85,10 +91,21 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
       : createNixie(cluster, inputs.nixie, {
           zoneID: inputs.zoneID,
           kubeconfig: inputs.kubeconfig,
+          routesNamespaces: buildNixieRoutesNamespaces(pepysTailnetHostname),
         });
 
   const files = inputs.files === undefined ? undefined : createFiles(cluster, inputs.files);
   const pepys = inputs.pepys === undefined ? undefined : createPepys(cluster, inputs.pepys);
+
+  const pepysTailnetURL =
+    pepys === undefined || nixie === undefined || pepysTailnetHostname === undefined
+      ? undefined
+      : createPepysTailnetRoute(cluster, {
+          hostname: pepysTailnetHostname,
+          namespace: pepys.namespace,
+          service: pepys.apiService,
+          routes: nixie.tailnetRoutes,
+        });
 
   const boxxy =
     inputs.boxxy === undefined
@@ -105,10 +122,24 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
     ...(files === undefined ? {} : { filesRoute: files.route }),
     ...(pepys?.route === undefined ? {} : { pepysRoute: pepys.route }),
     ...(pepys?.apiRoute === undefined ? {} : { pepysAPIRoute: pepys.apiRoute }),
+    ...(pepysTailnetURL === undefined ? {} : { pepysTailnetURL }),
     ...(boxxy === undefined ? {} : { boxxyServiceURL: boxxy.ownerServiceURL }),
     ...(nixie === undefined ? {} : { nixieURL: nixie.url, nixieReadinessURL }),
     ...(gateway === undefined ? {} : buildATCGatewayRouteOutputs(gateway)),
   };
+}
+
+// the API's tailnet route goes through nixie's Traefik, which alone holds the host's tailnet 443
+function requireNixieRoutes(inputs: ClusterInputs): string | undefined {
+  const hostname = inputs.pepys?.config.tailnetHostname;
+
+  if (hostname !== undefined && inputs.nixie === undefined) {
+    throw new Error(
+      'stack config "pepys.tailnetHostname" needs stack config "nixie": the route goes through nixie\'s Traefik',
+    );
+  }
+
+  return hostname;
 }
 
 // the server's facts and reports go to the pepys in this cluster, so its section needs pepys here

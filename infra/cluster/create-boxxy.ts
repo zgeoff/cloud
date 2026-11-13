@@ -19,7 +19,7 @@ import {
   atcTokenKey,
   buildBoxxySpec,
   configFileName,
-  githubTokenKey,
+  githubAppKeys,
   pepysSigningSecretKey,
   reviewAppKeys,
   workerTokenKey,
@@ -75,9 +75,14 @@ export function createBoxxy(
         ...(inputs.secrets.pepysSigningSecret === undefined
           ? {}
           : { [pepysSigningSecretKey]: inputs.secrets.pepysSigningSecret }),
-        ...(inputs.secrets.githubToken === undefined
+        ...(inputs.secrets.githubApp === undefined
           ? {}
-          : { [githubTokenKey]: inputs.secrets.githubToken }),
+          : {
+              [githubAppKeys.BOXXY_GITHUB_APP_CLIENT_ID]: inputs.secrets.githubApp.clientID,
+              [githubAppKeys.BOXXY_GITHUB_APP_PRIVATE_KEY]: inputs.secrets.githubApp.privateKey,
+              [githubAppKeys.BOXXY_GITHUB_APP_INSTALLATION_ID]:
+                inputs.secrets.githubApp.installationID,
+            }),
         ...(inputs.secrets.reviewApp === undefined
           ? {}
           : {
@@ -193,7 +198,7 @@ export function createBoxxy(
             }),
         tokenSecret: tokens.metadata.name,
         pepysSigningSecret: inputs.secrets.pepysSigningSecret !== undefined,
-        githubToken: inputs.secrets.githubToken !== undefined,
+        githubApp: inputs.secrets.githubApp !== undefined,
         reviewApp: inputs.secrets.reviewApp !== undefined,
         pullSecret: ghcrPullSecretName,
         ...(doorTunnel === undefined ? {} : { doorTunnelToken: doorTunnel.metadata.name }),

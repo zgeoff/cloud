@@ -41,6 +41,7 @@ const deployDir = new URL('../../deploy/nixie/', import.meta.url);
 interface NixieClusterShape {
   readonly zoneID: Output<string>;
   readonly kubeconfig: Output<string>;
+  readonly routesNamespaces: readonly string[];
 }
 
 export function createNixie(
@@ -115,6 +116,7 @@ export function createNixie(
     zoneID: shape.zoneID,
     api: { service: api.metadata.name, port: nixieAPIPort },
     web: { service: webService.metadata.name, port: nixieWebPort },
+    routesNamespaces: shape.routesNamespaces,
   });
 
   if (inputs.backup !== undefined) {

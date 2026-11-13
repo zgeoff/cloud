@@ -82,8 +82,9 @@ Three sections of stack config `boxxy` are optional. With `pepys: { environment 
 Services, which needs stack config `pepys`. The server then sends its facts there and reads its two
 reports there. pepys ingest and the pepys API must admit the server's pod, which their own policies
 decide. With `github: { baseUrl }`, the server links and watches the pull requests of its repos. It
-only reads them, and it never merges one. The pod has no broker to add a GitHub credential, so the
-token comes from `.env`. With `publicDoor: { publicURL, trustForwardedFrom }`, the server serves
+merges one only through a merge step in the rules, and the live rules have none. The pod has no
+broker to add a GitHub credential, so the server calls GitHub as the boxxy App, with keys from
+`.env`. With `publicDoor: { publicURL, trustForwardedFrom }`, the server serves
 [the public door](#the-public-door); its tunnel's token needs no item in `.env`, because Pulumi
 reads it from Cloudflare.
 
@@ -101,8 +102,12 @@ pod, and the others come from the same Secret when their section is set:
   `service:boxxy` at the atc daemon.
 - `BOXXY_PEPYS_SIGNING_SECRET`, with `pepys`: the key that signs each batch of facts. pepys ingest
   reads the same item.
-- `BOXXY_GITHUB_TOKEN`, with `github`: the server's fine-grained token, with `Pull requests: read`
-  on the owner's repos, which must cover every repo in `boxxySpawnRepos`.
+- `BOXXY_GITHUB_APP_CLIENT_ID`, `BOXXY_GITHUB_APP_PRIVATE_KEY` and
+  `BOXXY_GITHUB_APP_INSTALLATION_ID`, with `github`: the boxxy App's keys, from which the server
+  mints the installation token of every GitHub call. The App's installation must cover every repo in
+  `boxxySpawnRepos`. The deploy refuses `github` without all three, and refuses a key of a shape the
+  server would refuse at start: a client ID with whitespace, an installation ID that is not a
+  number, or a private key that is not RSA.
 - `NOSLOP_GITHUB_APP_ID`, `NOSLOP_GITHUB_APP_PRIVATE_KEY` and `NOSLOP_GITHUB_APP_INSTALLATION_ID`,
   with `spawn.reviewAgents`: the noslop App's keys, which the review gate checks and posts each
   review with. Only this pod holds them, never a session. The deploy refuses review agents without

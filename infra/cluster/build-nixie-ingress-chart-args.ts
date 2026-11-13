@@ -5,7 +5,7 @@ import { buildNixieIngressValues } from './build-nixie-ingress-values.ts';
 export interface NixieIngressChartInputs {
   // a hostPort keeps the controller out of Pod Security's baseline
   readonly controllerNamespace: string;
-  readonly routesNamespace: string;
+  readonly routesNamespaces: readonly string[];
   readonly ingressClass: string;
 }
 
@@ -22,7 +22,7 @@ export function buildNixieIngressChartArgs(inputs: NixieIngressChartInputs): Cha
       httpsPort: geoffcloudNode.httpsPort,
       endpointIP: geoffcloudNode.ip,
       ingressClass: inputs.ingressClass,
-      namespace: inputs.routesNamespace,
+      namespaces: inputs.routesNamespaces,
     }),
   };
 }

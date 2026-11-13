@@ -95,6 +95,7 @@ export const pepysAPIURL = ingress.pepysAPIURL;
 export const onePasswordConnectServiceURL = workloads?.onePasswordConnectServiceURL;
 export const atcGatewayServiceURL = workloads?.atcGatewayServiceURL;
 export const nixieURL = workloads?.nixieURL;
+export const pepysTailnetURL = workloads?.pepysTailnetURL;
 
 const observability = await createObservability({
   accountID,
