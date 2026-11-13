@@ -84,7 +84,7 @@ fails when the release and a package version differ.
 3. Check that `@boxxy/pepys`, the boxxy plug-in in `deploy/pepys/package.json`, admits the release.
    The plug-in's own `package.json` gives its range on `@pepys/kit` under `peerDependencies`. When
    the range leaves the release out, set `@boxxy/pepys` to a version whose range admits it.
-   `@boxxy/pepys` carries boxxy's own version, so its number never matches the pepys release.
+   `@boxxy/pepys` carries boxxy's own version.
 4. Run `bun install` in `deploy/pepys` to write its lock again. Then run
    `bun run check:pepys-deployment` from the repo root. Expect exit 0.
 5. Merge the pull request. Its `pepys image` run on `main` publishes the image of the release, and
