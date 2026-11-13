@@ -7,7 +7,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@boxxy/pepys": "0.2.2",
+    "@boxxy/pepys": "0.2.4",
     "@pepys/api": "0.3.1",
     "@pepys/cli": "0.3.1",
     "@pepys/ingest": "0.3.1",
