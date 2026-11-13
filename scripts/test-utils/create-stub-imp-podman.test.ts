@@ -35,7 +35,7 @@ test('it answers the atc-cloud mint as the scenario says, and logs the call', as
     '--imps',
     'harness-*',
     '--grantable',
-    'glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy',
+    'glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy,boxxy-github-token',
   ]);
 
   expect(result).toStrictEqual({
@@ -48,7 +48,7 @@ test('it answers the atc-cloud mint as the scenario says, and logs the call', as
   const calls = await readFile(join(ctx.directory, 'podman-calls'), 'utf8');
 
   expect(calls).toBe(
-    '["podman","exec","imp-host","impz","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy"]\n',
+    '["podman","exec","imp-host","impz","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy,boxxy-github-token"]\n',
   );
 });
 

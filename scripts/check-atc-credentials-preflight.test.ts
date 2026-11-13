@@ -185,7 +185,7 @@ test('it stops before any change when impd lacks a secret that atc-cloud may gra
   expect(checkATCCredentialsPreflight(ctx.context)).rejects.toMatchObject({
     exitCode: 1,
     message:
-      "impd lacks github-imp-agents, linear-imp-agents, pepys-telemetry, boxxy, which atc-cloud may grant; add each with\n'impz secret add' in imp-host, then rerun. Nothing changed",
+      "impd lacks github-imp-agents, linear-imp-agents, pepys-telemetry, boxxy, boxxy-github-token, which atc-cloud may grant; add each with\n'impz secret add' in imp-host, then rerun. Nothing changed",
   });
 
   expect(tools.calls.at(-1)?.argv.slice(4)).toStrictEqual([

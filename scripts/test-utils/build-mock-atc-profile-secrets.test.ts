@@ -54,6 +54,17 @@ test('it builds the six secrets that the daemon’s auth profiles name', () => {
       imps: [],
       createdAt: '2026-10-07T12:00:00.000Z',
     },
+    {
+      name: 'boxxy-github-token',
+      kind: 'static',
+      rules: [
+        { host: 'github.com', header: 'authorization', scheme: 'basic' },
+        { host: 'api.github.com', header: 'authorization', scheme: 'bearer' },
+      ],
+      env: [],
+      imps: [],
+      createdAt: '2026-10-07T12:00:00.000Z',
+    },
   ]);
 });
 
@@ -62,5 +73,5 @@ test('it builds fresh secrets on each call, so one test’s changes never reach 
 
   first.pop();
 
-  expect(buildMockATCProfileSecrets()).toHaveLength(6);
+  expect(buildMockATCProfileSecrets()).toHaveLength(7);
 });

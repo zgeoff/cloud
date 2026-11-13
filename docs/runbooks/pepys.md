@@ -48,7 +48,7 @@ set to `pepys.imp.internal`.
 
    ```sh
    ssh root@geoffcloud podman exec imp-host impz token set atc-cloud \
-     --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy \
+     --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy,boxxy-github-token \
      < /dev/null
    ```
 

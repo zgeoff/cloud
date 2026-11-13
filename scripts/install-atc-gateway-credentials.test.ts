@@ -55,12 +55,12 @@ skip: glm exists with the expected rules
 == 2/3 daemon bearer: 1Password cloud/atc-daemon-token and root@geoffcloud:/var/lib/atc-daemon-secrets/gateway-token
 skip: both exist and match
 
-== 3/3 impd token atc-cloud (manage, harness-*, grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy) to root@geoffcloud:/var/lib/atc-daemon-secrets/imp-token
+== 3/3 impd token atc-cloud (manage, harness-*, grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy,boxxy-github-token) to root@geoffcloud:/var/lib/atc-daemon-secrets/imp-token
 skip: both exist, atc-cloud has the expected limits, and the file authenticates as it
 
 == check
 {"name":"glm","kind":"static","rules":[{"host":"api.z.ai","header":"authorization","scheme":"bearer"}],"imps":[]}
-{"name":"atc-cloud","scope":"manage","imps":["harness-*"],"grantable":["claude-setup-token","github-imp-agents","glm","linear-imp-agents","op-connect","pepys-telemetry","boxxy"]}
+{"name":"atc-cloud","scope":"manage","imps":["harness-*"],"grantable":["claude-setup-token","github-imp-agents","glm","linear-imp-agents","op-connect","pepys-telemetry","boxxy","boxxy-github-token"]}
 /var/lib/atc-daemon-secrets root 700 4096 bytes
 /var/lib/atc-daemon-secrets/gateway-token root 400 15 bytes
 /var/lib/atc-daemon-secrets/imp-token root 400 18 bytes

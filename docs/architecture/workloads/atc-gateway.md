@@ -157,6 +157,12 @@ entry's `auth` takes no `args`, and the plug-in's folder exists only in the gues
 sits in the entry's `args`. atc adds `atc.session.id` to `OTEL_RESOURCE_ATTRIBUTES` in every session
 it starts, which joins a session's telemetry to the session.
 
+The `boxxy-review` agent runs the boxxy server's review sessions. It loads the same plug-in, and
+selects the `claude`, `pepys-telemetry` and `boxxy` profiles and `github-review`, whose secret
+`boxxy-github-token` is the read-only clone token. noslop reads that token as `GH_TOKEN`. No other
+agent selects `github-review`, and `boxxy-review` selects no other GitHub profile, so build and
+design sessions never get the read-only token, and a review session cannot push.
+
 Two lists name every secret the daemon may grant. The profiles in the host's config name them, and
 the grantable list of the daemon's impd token (`scripts/atc-cloud-grantable.ts`) bounds them: `glm`,
 `claude-setup-token`, `github-imp-agents`, `linear-imp-agents`, `op-connect`, `pepys-telemetry` and
