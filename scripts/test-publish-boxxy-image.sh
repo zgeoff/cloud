@@ -45,7 +45,6 @@ EOF
   diff - "$tree/contexts/ghcr.io_zgeoff_cloud-boxxy_0123456789abcdef0123456789abcdef01234567" << 'EOF'
 Dockerfile
 boxxy-server
-rules
 EOF
   diff - "$tree/summary" << 'EOF'
 ghcr.io/zgeoff/cloud-boxxy:0123456789abcdef0123456789abcdef01234567: ghcr.io/zgeoff/cloud-boxxy@sha256:1111111111111111111111111111111111111111111111111111111111111111
@@ -135,7 +134,7 @@ it_refuses_a_call_without_the_context() {
 }
 
 # setup_test <tree>: a repo copy at <tree>/repo holding the publish script, a versions.env that
-# pins an example base, and a build context with a Dockerfile, a binary and a rules folder; the docker stand-in in
+# pins an example base, and a build context with a Dockerfile and a binary; the docker stand-in in
 # <tree>/bin; the HOME and TMPDIR the script runs with, and empty registry and digest directories
 # for the cases to fill
 setup_test() {
