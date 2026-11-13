@@ -15,7 +15,7 @@ function setupTest() {
   return { config, repos };
 }
 
-test('it sets the listeners, the store on the volume, the image rules and the gateway address with its public host, with no trustedIssuers section while no trust document is mounted', () => {
+test('it sets the listeners, the store on the volume, the checkout of the rules sidecar and the gateway address with its public host, with no trustedIssuers section while no trust document is mounted', () => {
   const fixture = setupTest();
 
   expect(
@@ -33,7 +33,7 @@ test('it sets the listeners, the store on the volume, the image rules and the ga
   ).toStrictEqual({
     runner: 'runner-for-tests',
     store: { file: '/data/boxxy.db' },
-    rules: { folder: '/rules' },
+    rules: { folder: '/rules/root/current', ref: 'git-sync' },
     api: {
       listen: { hostname: '0.0.0.0', port: 8090 },
       workerListen: { hostname: '0.0.0.0', port: 8091 },

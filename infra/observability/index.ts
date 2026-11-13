@@ -14,6 +14,9 @@ interface ClusterObservabilityInputs {
   readonly atcDaemons: readonly ATCDaemonEndpoint[] | undefined;
 
   readonly nixieReadinessURL: string | undefined;
+
+  // true when the boxxy server deploys, with its rules sidecar
+  readonly boxxyRulesSync: boolean;
 }
 
 interface ObservabilityInputs {
@@ -42,6 +45,7 @@ export async function createObservability(
       : createClusterObservability(inputs.cluster.provider, inputs.cluster.alertWebhook, {
           atcDaemons: inputs.cluster.atcDaemons,
           nixieReadinessURL: inputs.cluster.nixieReadinessURL,
+          boxxyRulesSync: inputs.cluster.boxxyRulesSync,
         });
 
   const healthCheck = await createHealthCheck({

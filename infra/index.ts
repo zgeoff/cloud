@@ -108,6 +108,7 @@ const observability = await createObservability({
           alertWebhook: k3s.inputs.alertWebhook,
           atcDaemons: buildATCDaemonEndpoints(k3s.inputs.atcGateway?.config),
           nixieReadinessURL: workloads?.nixieReadinessURL,
+          boxxyRulesSync: workloads?.boxxyServiceURL !== undefined,
         },
 });
 
