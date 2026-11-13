@@ -45,8 +45,8 @@
     "version": "0.70.2"
   },
   "pepys-host": {
-    "version": "0.4.1",
-    "sum": "c65eb696205f67573025aa5eac6d8acef84563bbbdb7eabe7b468961edd4f31b"
+    "version": "0.4.2",
+    "sum": "bb7f9f9dab6f59ca051929cc76f13ea162652e89d5867a3f87745750ed680f6a"
   },
   "boxxy-cli": {
     "version": "0.2.8",
