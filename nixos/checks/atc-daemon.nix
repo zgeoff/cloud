@@ -482,7 +482,7 @@ let
         '';
     }
     {
-      title = "it links geoffcloud a config.json whose target names the agent image and its atc, whose claude and boxxy sign in through the broker profiles and send telemetry to pepys, whose boxxy loads the hook plug-in and the boxxy profile, whose boxxy service client may use the target, and which gets the pr-evidence file host address and the token path with no op:// prefix";
+      title = "it links geoffcloud a config.json whose target names the agent image and its atc, whose claude and boxxy sign in through the broker profiles and send telemetry to pepys, whose boxxy loads the hook plug-in and the boxxy profile, whose boxxy-review loads the plug-in and takes the read-only clone token as its one GitHub profile, whose boxxy service client may use the target, and which gets the pr-evidence file host address and the token path with no op:// prefix";
       script = ''
         jq -S . > expected <<'EOF'
         {
@@ -499,6 +499,16 @@ let
                 "OTEL_LOGS_EXPORTER": "otlp",
                 "PR_EVIDENCE_TOKEN_PATH": "imp/files-agent-token/credential",
                 "PR_EVIDENCE_URL": "https://files.geoff.cloud/api/files"
+              },
+              "kind": "claude"
+            },
+            "boxxy-review": {
+              "args": ["--plugin-dir", "/opt/boxxy/hook-plugin"],
+              "auth": { "profiles": ["claude", "github-review", "pepys-telemetry", "boxxy"] },
+              "env": {
+                "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+                "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+                "OTEL_LOGS_EXPORTER": "otlp"
               },
               "kind": "claude"
             },
@@ -532,6 +542,7 @@ let
               "secret": "claude-setup-token"
             },
             "github": { "kind": "github", "secret": "github-imp-agents" },
+            "github-review": { "kind": "github", "secret": "boxxy-github-token" },
             "linear": {
               "header": "authorization",
               "host": "mcp.linear.app",
