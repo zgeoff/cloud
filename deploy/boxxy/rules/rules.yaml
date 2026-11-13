@@ -1,7 +1,8 @@
 # The boxxy server's live rules, which the cloud-boxxy image holds at /rules: a change here is a
 # new image and a deploy. They start as the v1 example rules of @boxxy/rules: four phases, two
-# limits, five pools and the sleep times. Each recipe runs atc's `boxxy` agent, which loads the
-# boxxy hook plug-in.
+# limits, five pools and the sleep times. Each recipe but the review runs atc's `boxxy` agent, which
+# loads the boxxy hook plug-in. The review runs `boxxy-review`, which loads the plug-in too and
+# alone holds the read-only clone token; the server's spawn.reviewAgents lists it.
 version: 1
 concepts: [pool@2, defer@1, expedite@1] # pool@2 adds the filter field `designMode`
 
@@ -28,12 +29,13 @@ pipelines:
         built: next
         blocked: { hold: blocked }
         abandoned: again
-    - phase: review
+    - phase: review # a session runs the review tool's command; the server checks and posts its result
       maxAttempts: 2
       timeoutMinutes: 45
       on:
         passed: { end: reviewed }
         changes-requested: { to: build, max: 3, resume: true } # wakes the build's kept session
+        failed: again # a failed call or a result that covers no head runs once more
 
 kinds:
   core.idea:
@@ -43,7 +45,7 @@ kinds:
       design: design-v1
       design/attended: design-attended-v1
       build: build-v1
-      review: review-v1
+      review: review-run
   core.issue:
     pipeline: standard
     recipes:
@@ -51,7 +53,7 @@ kinds:
       design: design-v1
       design/attended: design-attended-v1
       build: build-v1
-      review: review-v1
+      review: review-run
 
 skills: # one commit of the skills repo, for every recipe
   source: zgeoff/skills
@@ -88,11 +90,11 @@ recipes: # the pin and each recipe's skills are part of the recipe hash
     prompt: prompts/build-v1.md
     source: subscription
     skills: []
-  review-v1:
-    agent: boxxy
-    model: claude-opus-5-5
-    effort: medium
-    prompt: prompts/review-v1.md
+  review-run: # the agent runs one command and sends its output; it judges nothing
+    agent: boxxy-review # the atc agent whose broker profile holds the read-only clone token
+    model: claude-haiku-5-5
+    effort: low
+    prompt: prompts/review-run.md
     source: subscription
     skills: []
 
