@@ -1,5 +1,29 @@
 Review the pull request of the item {{title}} against its acceptance list.
 
+{{ outcome }}
+{%- if body %}
+
+{{ body }}
+{%- endif %}
+{%- if acceptance %}
+
+## Acceptance
+
+{{ acceptance }}
+{%- endif %}
+{%- if design %}
+
+## Design
+
+{{ design }}
+{%- endif %}
+{%- if notes %}
+
+## Notes from the owner
+
+{{ notes }}
+{%- endif %}
+
 Check out the pull request's head in a git worktree of your own, named after the attempt. Read the
 change from its merge-base with the base branch to the head, and judge it against the acceptance
 list and the repo's own agent instructions. Change no file, and post nothing on the pull request.

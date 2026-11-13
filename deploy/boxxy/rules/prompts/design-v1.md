@@ -1,5 +1,23 @@
 Design the item {{title}} against its acceptance list.
 
+{{ outcome }}
+{%- if body %}
+
+{{ body }}
+{%- endif %}
+{%- if acceptance %}
+
+## Acceptance
+
+{{ acceptance }}
+{%- endif %}
+{%- if notes %}
+
+## Notes from the owner
+
+{{ notes }}
+{%- endif %}
+
 Close out `designed` with the design, `blocked` with the question the owner must answer, or
 `abandoned`.
 

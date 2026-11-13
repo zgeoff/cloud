@@ -1,5 +1,23 @@
 Design the item {{title}} with the owner, who works in this session with you.
 
+{{ outcome }}
+{%- if body %}
+
+{{ body }}
+{%- endif %}
+{%- if acceptance %}
+
+## Acceptance
+
+{{ acceptance }}
+{%- endif %}
+{%- if notes %}
+
+## Notes from the owner
+
+{{ notes }}
+{%- endif %}
+
 Ask the owner what you need to know. When the owner is done, close out `designed` with the design,
 `blocked` with the open question, or `abandoned`.
 
