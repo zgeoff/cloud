@@ -52,6 +52,7 @@ it_answers_the_protected_resource_metadata_on_its_public_Host() {
     "header"
   ],
   "resource": "https://atc.fixture.invalid/mcp",
+  "resource_name": "atc",
   "scopes_supported": [
     "read",
     "message",
