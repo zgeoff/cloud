@@ -216,12 +216,13 @@
         "/oauth2/token",
         "/oauth2/revoke",
         "/login",
+        "/enroll",
         "/consent",
         "/error"
       ],
       "scope": "public",
       "reason": "A hosted assistant signs in to imp over OAuth and calls imp's MCP tools. The front passes impd's MCP, OAuth and discovery paths only, and impd's public listener answers no other route",
-      "auth": "impd's own OAuth 2.1 server: each MCP call needs an access token from a grant that a named imp token approved, for a client that the operator added"
+      "auth": "impd's own OAuth 2.1 server: each MCP call needs an access token from a grant that the owner approved with a passkey, for a client that the operator added"
     },
     {
       "name": "health-check-workers-dev",

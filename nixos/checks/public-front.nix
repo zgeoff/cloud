@@ -41,7 +41,7 @@ let
         		}
         	}
 
-        	@route `{path} in ["/mcp","/.well-known/oauth-authorization-server","/.well-known/oauth-protected-resource","/.well-known/oauth-protected-resource/mcp","/oauth2/authorize","/oauth2/token","/oauth2/revoke","/login","/consent","/error"]`
+        	@route `{path} in ["/mcp","/.well-known/oauth-authorization-server","/.well-known/oauth-protected-resource","/.well-known/oauth-protected-resource/mcp","/oauth2/authorize","/oauth2/token","/oauth2/revoke","/login","/enroll","/consent","/error"]`
         	handle @route {
         		rate_limit {
         			zone by_address {
