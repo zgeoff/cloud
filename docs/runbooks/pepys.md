@@ -78,9 +78,10 @@ in one pull request.
    ```
 
    The host logs `swapped` for a consumer whose module changed in the release: it built that
-   consumer's rows again from the fact log. The host's first start can fail with
-   `up <consumer> failed: s2: connection refused`. The pod then starts the host again: expect one
-   restart of the `host` container and the lines above from the second start.
+   consumer's rows again from the fact log. When a start fails with
+   `up <consumer> failed: s2: connection refused`, the pod starts the host again, and the lines
+   above come from the first start that succeeds. When the starts keep failing, check
+   `deployment/pepys-s2`.
 
 [`collect-pepys-version-mismatches.test.ts`](../../scripts/collect-pepys-version-mismatches.test.ts)
 fails when the release and a package version differ.
