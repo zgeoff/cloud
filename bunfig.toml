@@ -18,7 +18,8 @@ minimumReleaseAge = 604800
 # the release they deploy.
 # @boxxy/server and the @boxxy packages it depends on release together, and the
 # boxxy image compiles the server from them; @atcx/contract and @pepys/kit are
-# the atc and pepys contracts those packages are built against.
+# the atc and pepys contracts those packages are built against, and @wringer/core
+# the verify library that @boxxy/verifier-wringer wraps.
 # @orpc/client 2.0.0-beta.50 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
 # @orpc/contract 2.0.0-beta.50 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
 # @orpc/json-schema 2.0.0-beta.50 (published 2026-11-09) ages past the gate ~2026-11-16 — remove then (audit-fix)
@@ -56,6 +57,8 @@ minimumReleaseAgeExcludes = [
   "@boxxy/rules",
   "@boxxy/server",
   "@boxxy/store-sqlite",
+  "@boxxy/train",
+  "@boxxy/verifier-wringer",
   "@boxxy/worker-atc",
   "@heynixie/contract",
   "@impz/client",
@@ -78,12 +81,14 @@ minimumReleaseAgeExcludes = [
   "@standard-server/node",
   "@standard-server/peer",
   "@standard-server/shared",
+  "@wringer/core",
   "@zgeoff/agent-hooks",
   "@zgeoff/bun-test-extended",
   "@zgeoff/chex",
   "@zgeoff/diet",
   "@zgeoff/format-codemod",
   "@zgeoff/kysely-bun-sqlite",
+  "@zgeoff/mcp-auth",
   "@zgeoff/oxlint-config",
   "@zgeoff/rig",
   "@zgeoff/std",

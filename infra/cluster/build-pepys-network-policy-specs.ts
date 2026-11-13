@@ -19,11 +19,24 @@ const cloudflaredPeer: NetworkPolicyPeer = {
   podSelector: { matchLabels: podLabels.cloudflared },
 };
 
+// nixie's Traefik, which carries the API's tailnet route; its chart sets the label
+const nixieTraefikPeer: NetworkPolicyPeer = {
+  namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'nixie-ingress' } },
+  podSelector: { matchLabels: { 'app.kubernetes.io/name': 'traefik' } },
+};
+
+export interface PepysAPIRoutes {
+  // the shared tunnel carries the API's /mcp and OAuth paths
+  readonly isPublic: boolean;
+
+  // nixie's Traefik carries every path of the API on the host's tailnet address
+  readonly isTailnetRouted: boolean;
+}
+
 // Each pepys pod admits only its callers. kube-router admits the node's own addresses before any
-// policy, so a relay on the host still reaches a Service. cloudflared reaches the API only while
-// the API serves /mcp on its public hostname.
+// policy, so a relay on the host still reaches a Service.
 export function buildPepysNetworkPolicySpecs(
-  isAPIPublic: boolean,
+  apiRoutes: PepysAPIRoutes,
 ): Readonly<Record<string, NetworkPolicySpec>> {
   const workloads = pepysWorkloads;
 
@@ -50,8 +63,11 @@ export function buildPepysNetworkPolicySpecs(
     [workloads.host.name]: buildIngressPolicy(workloads.host.labels, [
       {
         port: workloads.host.apiPort,
-        from: isAPIPublic ? [cloudflaredPeer, boxxyServerPeer] : [boxxyServerPeer],
+        from: apiRoutes.isPublic ? [cloudflaredPeer, boxxyServerPeer] : [boxxyServerPeer],
       },
+      ...(apiRoutes.isTailnetRouted
+        ? [{ port: workloads.host.apiPort, from: [nixieTraefikPeer] }]
+        : []),
     ]),
 
     // no pod calls the backup

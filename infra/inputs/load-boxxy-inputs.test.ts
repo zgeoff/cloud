@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { generateKeyPairSync } from 'node:crypto';
 import { Output, isSecret, secret } from '@pulumi/pulumi';
 import invariant from 'tiny-invariant';
 import { buildStubConfig } from '../test-utils/build-stub-config.ts';
@@ -45,6 +46,18 @@ function setupTest() {
     },
   };
 
+  // the boxxy App's keys, which the github section needs; the key is made here, so the repo holds
+  // no private key
+  const githubApp = {
+    BOXXY_GITHUB_APP_CLIENT_ID: 'Iv23client0for0tests',
+    BOXXY_GITHUB_APP_PRIVATE_KEY: generateKeyPairSync('rsa', {
+      modulusLength: 1024,
+      privateKeyEncoding: { type: 'pkcs1', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    }).privateKey,
+    BOXXY_GITHUB_APP_INSTALLATION_ID: '4242',
+  };
+
   const stackValues = { boxxy: JSON.stringify(boxxy), boxxySpawnRepos: JSON.stringify(repos) };
   const stackConfig = buildStubConfig(stackValues);
 
@@ -57,14 +70,34 @@ function setupTest() {
     },
     env: {
       ...tokens,
-      BOXXY_GITHUB_TOKEN: 'github-token-for-tests',
+      ...githubApp,
       NOSLOP_GITHUB_APP_ID: '123456',
       NOSLOP_GITHUB_APP_PRIVATE_KEY: 'private-key-for-tests',
       NOSLOP_GITHUB_APP_INSTALLATION_ID: '7890',
     },
   };
 
-  return { boxxy, repos, stackValues, stackConfig, tokens, backupVariables, backupImage, review };
+  // the github section with the boxxy App's keys
+  const github = {
+    stackConfig: buildStubConfig({
+      ...stackValues,
+      boxxy: JSON.stringify({ ...boxxy, github: { baseUrl: 'https://api.github.com' } }),
+    }),
+    env: { ...tokens, ...githubApp },
+  };
+
+  return {
+    boxxy,
+    github,
+    repos,
+    stackValues,
+    stackConfig,
+    tokens,
+    githubApp,
+    backupVariables,
+    backupImage,
+    review,
+  };
 }
 
 test('it returns nothing while the stack config leaves boxxy out', () => {
@@ -296,52 +329,35 @@ test('it refuses the backup variables without the backup image', () => {
   );
 });
 
-test.each([
-  ['pepys', { environment: 'production' }, 'BOXXY_PEPYS_SIGNING_SECRET', 'pepysSigningSecret'],
-  ['github', { baseUrl: 'https://api.github.com' }, 'BOXXY_GITHUB_TOKEN', 'githubToken'],
-] as const)(
-  'it keeps the %s section and marks its token secret',
-  async (section, value, variable, key) => {
-    const fixture = setupTest();
-    const withSection = { ...fixture.boxxy, [section]: value };
-
-    const stackConfig = buildStubConfig({
-      ...fixture.stackValues,
-      boxxy: JSON.stringify(withSection),
-    });
-
-    const env = { ...fixture.tokens, [variable]: `${key}-for-tests` };
-    const inputs = loadBoxxyInputs(stackConfig, env, undefined);
-
-    invariant(inputs.boxxy);
-
-    const token = inputs.boxxy.secrets[key];
-
-    invariant(token);
-
-    const secretToken = await isSecret(token);
-    const resolved = await resolveOutput(token);
-
-    expect(inputs.boxxy.config[section]).toStrictEqual(value);
-    expect(secretToken).toBeTrue();
-    expect(resolved).toBe(`${key}-for-tests`);
-  },
-);
-
-test.each([
-  [
-    'pepys',
-    { environment: 'production' },
-    'BOXXY_PEPYS_SIGNING_SECRET is unset; the boxxy server signs its facts with it while stack config "boxxy.pepys" is set',
-  ],
-  [
-    'github',
-    { baseUrl: 'https://api.github.com' },
-    'BOXXY_GITHUB_TOKEN is unset; the boxxy server reads pull requests with it while stack config "boxxy.github" is set',
-  ],
-] as const)('it refuses the %s section without its token', (section, value, message) => {
+test('it keeps the pepys section and marks its signing secret secret', async () => {
   const fixture = setupTest();
-  const withSection = { ...fixture.boxxy, [section]: value };
+  const withSection = { ...fixture.boxxy, pepys: { environment: 'production' } };
+
+  const stackConfig = buildStubConfig({
+    ...fixture.stackValues,
+    boxxy: JSON.stringify(withSection),
+  });
+
+  const env = { ...fixture.tokens, BOXXY_PEPYS_SIGNING_SECRET: 'signing-secret-for-tests' };
+  const inputs = loadBoxxyInputs(stackConfig, env, undefined);
+
+  invariant(inputs.boxxy);
+
+  const token = inputs.boxxy.secrets.pepysSigningSecret;
+
+  invariant(token);
+
+  const secretToken = await isSecret(token);
+  const resolved = await resolveOutput(token);
+
+  expect(inputs.boxxy.config.pepys).toStrictEqual({ environment: 'production' });
+  expect(secretToken).toBeTrue();
+  expect(resolved).toBe('signing-secret-for-tests');
+});
+
+test('it refuses the pepys section without its signing secret', () => {
+  const fixture = setupTest();
+  const withSection = { ...fixture.boxxy, pepys: { environment: 'production' } };
 
   const stackConfig = buildStubConfig({
     ...fixture.stackValues,
@@ -350,7 +366,7 @@ test.each([
 
   expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrowWithMessage(
     Error,
-    message,
+    'BOXXY_PEPYS_SIGNING_SECRET is unset; the boxxy server signs its facts with it while stack config "boxxy.pepys" is set',
   );
 });
 
@@ -360,7 +376,7 @@ test('it adds no optional token while neither section is set', () => {
   const env = {
     ...fixture.tokens,
     BOXXY_PEPYS_SIGNING_SECRET: 'unused-secret',
-    BOXXY_GITHUB_TOKEN: 'unused-token',
+    ...fixture.githubApp,
   };
 
   const inputs = loadBoxxyInputs(fixture.stackConfig, env, undefined);
@@ -444,4 +460,83 @@ test("it adds none of the noslop App's keys while no review agent is listed", ()
   const inputs = loadBoxxyInputs(stackConfig, review.env, undefined);
 
   expect(inputs.boxxy?.secrets.reviewApp).toBeUndefined();
+});
+
+test("it marks each of the boxxy App's keys secret with the github section", async () => {
+  const fixture = setupTest();
+  const inputs = loadBoxxyInputs(fixture.github.stackConfig, fixture.github.env, undefined);
+
+  invariant(inputs.boxxy);
+
+  const githubApp = inputs.boxxy.secrets.githubApp;
+
+  invariant(githubApp);
+
+  const keys = [githubApp.clientID, githubApp.privateKey, githubApp.installationID];
+
+  const secretKeys = await Promise.all(keys.map((key) => isSecret(key)));
+  const resolved = await Promise.all(keys.map((key) => resolveOutput(key)));
+
+  expect(inputs.boxxy.config.github).toStrictEqual({ baseUrl: 'https://api.github.com' });
+  expect(secretKeys).toStrictEqual([true, true, true]);
+
+  expect(resolved).toStrictEqual([
+    fixture.githubApp.BOXXY_GITHUB_APP_CLIENT_ID,
+    fixture.githubApp.BOXXY_GITHUB_APP_PRIVATE_KEY,
+    fixture.githubApp.BOXXY_GITHUB_APP_INSTALLATION_ID,
+  ]);
+});
+
+test.each([
+  'BOXXY_GITHUB_APP_CLIENT_ID',
+  'BOXXY_GITHUB_APP_PRIVATE_KEY',
+  'BOXXY_GITHUB_APP_INSTALLATION_ID',
+] as const)('it refuses the github section without %s', (variable) => {
+  const fixture = setupTest();
+  const { [variable]: _left, ...env } = fixture.github.env;
+
+  expect(() => loadBoxxyInputs(fixture.github.stackConfig, env, undefined)).toThrowWithMessage(
+    Error,
+    `${variable} is unset; the boxxy server calls GitHub as the boxxy App with it while stack config "boxxy.github" is set`,
+  );
+});
+
+test.each([
+  [
+    'BOXXY_GITHUB_APP_CLIENT_ID',
+    'Iv23 client',
+    "BOXXY_GITHUB_APP_CLIENT_ID must be the App's client ID, with no whitespace",
+  ],
+  [
+    'BOXXY_GITHUB_APP_INSTALLATION_ID',
+    'installation-4242',
+    "BOXXY_GITHUB_APP_INSTALLATION_ID must be the App installation's numeric ID",
+  ],
+  [
+    'BOXXY_GITHUB_APP_INSTALLATION_ID',
+    String(2 ** 53),
+    "BOXXY_GITHUB_APP_INSTALLATION_ID must be the App installation's numeric ID",
+  ],
+  [
+    'BOXXY_GITHUB_APP_PRIVATE_KEY',
+    'not a key',
+    "BOXXY_GITHUB_APP_PRIVATE_KEY must be the App's RSA private key, in PEM form",
+  ],
+  [
+    'BOXXY_GITHUB_APP_PRIVATE_KEY',
+    generateKeyPairSync('ec', {
+      namedCurve: 'P-256',
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    }).privateKey,
+    "BOXXY_GITHUB_APP_PRIVATE_KEY must be the App's RSA private key, in PEM form",
+  ],
+] as const)('it refuses a %s of the wrong shape', (variable, value, message) => {
+  const fixture = setupTest();
+  const env = { ...fixture.github.env, [variable]: value };
+
+  expect(() => loadBoxxyInputs(fixture.github.stackConfig, env, undefined)).toThrowWithMessage(
+    Error,
+    message,
+  );
 });

@@ -8,7 +8,9 @@ export interface NixieIngressValuesInputs {
   // Pulumi waits on each Ingress's status address, and the ClusterIP Service has none to publish
   readonly endpointIP: string;
   readonly ingressClass: string;
-  readonly namespace: string;
+
+  // the namespaces whose Ingress objects Traefik serves: two pods cannot both hold the host's 443
+  readonly namespaces: readonly string[];
 }
 
 export function buildNixieIngressValues(inputs: NixieIngressValuesInputs): Record<string, unknown> {
@@ -28,7 +30,7 @@ export function buildNixieIngressValues(inputs: NixieIngressValuesInputs): Recor
       kubernetesGateway: { enabled: false },
       kubernetesIngress: {
         enabled: true,
-        namespaces: [inputs.namespace],
+        namespaces: [...inputs.namespaces],
         publishedService: { enabled: false },
         ingressEndpoint: { ip: inputs.endpointIP },
       },

@@ -51,6 +51,13 @@ const frontRouteSchema = z.strictObject({
     .readonly(),
 });
 
+// a DNS-only name at the host's tailnet address, which answers on the tailnet alone
+const tailnetHostnameSchema = z.strictObject({
+  ...routeFields,
+  kind: z.literal('tailnet-hostname'),
+  hostname: z.hostname(),
+});
+
 const tailnetCapabilitySchema = z.strictObject({
   ...routeFields,
   kind: z.literal('tailnet-capability'),
@@ -67,6 +74,7 @@ const entrySchema = z.discriminatedUnion('kind', [
   hostPortSchema,
   tunnelHostnameSchema,
   frontRouteSchema,
+  tailnetHostnameSchema,
   tailnetCapabilitySchema,
   workerURLSchema,
 ]);
@@ -145,7 +153,7 @@ export type ExposureEntry = Exposure['entries'][number];
 type Route = Exclude<ExposureEntry, HostPort>;
 
 interface RouteIssue {
-  readonly field: 'auth' | 'paths';
+  readonly field: 'auth' | 'paths' | 'scope';
   readonly message: string;
 }
 
@@ -156,6 +164,9 @@ function collectRouteIssues(entry: Route): readonly RouteIssue[] {
     ...(new Set(paths).size === paths.length
       ? []
       : [{ field: 'paths' as const, message: 'a front route lists each path once' }]),
+    ...(entry.kind === 'tailnet-hostname' && entry.scope !== 'tailnet'
+      ? [{ field: 'scope' as const, message: 'a tailnet hostname is tailnet scope' }]
+      : []),
     ...(entry.scope === 'public' && entry.auth === undefined
       ? [{ field: 'auth' as const, message: 'a public route needs its auth layer' }]
       : []),

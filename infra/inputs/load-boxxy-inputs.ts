@@ -1,3 +1,4 @@
+import { createPrivateKey } from 'node:crypto';
 import type { Output } from '@pulumi/pulumi';
 import { secret } from '@pulumi/pulumi';
 import { z } from 'zod';
@@ -20,9 +21,6 @@ const tokenNeed = 'the boxxy server needs it while stack config "boxxy" is set';
 
 const pepysNeed =
   'the boxxy server signs its facts with it while stack config "boxxy.pepys" is set';
-
-const githubNeed =
-  'the boxxy server reads pull requests with it while stack config "boxxy.github" is set';
 
 const name = z.string().min(1);
 
@@ -93,12 +91,7 @@ export function loadBoxxyInputs(
       ? undefined
       : requireVariable(env, 'BOXXY_PEPYS_SIGNING_SECRET', pepysNeed);
 
-  // the pod has no broker to add a GitHub credential, so a private repo needs the token
-  const githubToken =
-    config.github === undefined
-      ? undefined
-      : requireVariable(env, 'BOXXY_GITHUB_TOKEN', githubNeed);
-
+  const githubApp = config.github === undefined ? undefined : requireGithubApp(env);
   const reviewApp = findReviewApp(config, env);
   const pull = requireGHCRPullCredential(env);
   const backup = findBackup(env, backupImage);
@@ -127,7 +120,7 @@ export function loadBoxxyInputs(
         ...(pepysSigningSecret === undefined
           ? {}
           : { pepysSigningSecret: secret(pepysSigningSecret) }),
-        ...(githubToken === undefined ? {} : { githubToken: secret(githubToken) }),
+        ...(githubApp === undefined ? {} : { githubApp }),
         ...(reviewApp === undefined ? {} : { reviewApp }),
       },
       ...(backup === undefined ? {} : { backup }),
@@ -145,6 +138,51 @@ function requireRepos(stackConfig: Pick<StackConfig, 'getSecret'>): Output<Boxxy
   }
 
   return raw.apply(parseBoxxyRepos);
+}
+
+const githubAppNeed =
+  'the boxxy server calls GitHub as the boxxy App with it while stack config "boxxy.github" is set';
+
+const installationIDPattern = /^[1-9]\d*$/u;
+const clientIDPattern = /^\S+$/u;
+
+// The pod has no broker to add a GitHub credential, so the github section needs the App's keys. A
+// server refuses to start on a key of the wrong shape, which leaves the StatefulSet with no pod, so
+// the deploy checks the shapes the server checks first, naming the variable and never its value.
+function requireGithubApp(env: Environment): NonNullable<BoxxyInputs['secrets']['githubApp']> {
+  const clientID = requireVariable(env, 'BOXXY_GITHUB_APP_CLIENT_ID', githubAppNeed);
+  const privateKey = requireVariable(env, 'BOXXY_GITHUB_APP_PRIVATE_KEY', githubAppNeed);
+  const installationID = requireVariable(env, 'BOXXY_GITHUB_APP_INSTALLATION_ID', githubAppNeed);
+
+  if (!clientIDPattern.test(clientID)) {
+    throw new Error("BOXXY_GITHUB_APP_CLIENT_ID must be the App's client ID, with no whitespace");
+  }
+
+  if (
+    !installationIDPattern.test(installationID) ||
+    !Number.isSafeInteger(Number(installationID))
+  ) {
+    throw new Error("BOXXY_GITHUB_APP_INSTALLATION_ID must be the App installation's numeric ID");
+  }
+
+  if (!isRSAPrivateKey(privateKey)) {
+    throw new Error("BOXXY_GITHUB_APP_PRIVATE_KEY must be the App's RSA private key, in PEM form");
+  }
+
+  return {
+    clientID: secret(clientID),
+    privateKey: secret(privateKey),
+    installationID: secret(installationID),
+  };
+}
+
+// GitHub takes only an RS256 JWT, so a key of any other type can't sign it
+function isRSAPrivateKey(pem: string): boolean {
+  try {
+    return createPrivateKey(pem).asymmetricKeyType === 'rsa';
+  } catch {
+    return false;
+  }
 }
 
 const reviewAppNeed =

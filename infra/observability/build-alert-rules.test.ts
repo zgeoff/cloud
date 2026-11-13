@@ -404,3 +404,33 @@ test("it alerts on nixie's failing turns and on a status other than ready from t
     buildATCSignInRules(),
   ]);
 });
+
+test("it alerts on the boxxy rules sidecar's stale checkout, after the imp health rule, when the boxxy server deploys", () => {
+  const fetches =
+    'git_sync_count_total{namespace="boxxy", container="rules-sync", status=~"success|noop"}';
+
+  expect(
+    buildAlertRules({ boxxyRulesSync: true })[0]?.rules.filter(
+      (rule) => rule.alert === 'BoxxyRulesStale' || rule.alert === 'ImpHealthUnreachable',
+    ),
+  ).toStrictEqual([
+    expect.objectContaining({ alert: 'ImpHealthUnreachable' }),
+    {
+      alert: 'BoxxyRulesStale',
+      expr: `sum(increase(${fetches}[10m])) == 0 or absent(${fetches})`,
+      for: '5m',
+      labels: { severity: 'warning' },
+      annotations: {
+        summary: `The boxxy server's rules sidecar reports no good fetch of the rules repository in the last 10 minutes, so the server loads the checkout of its last good fetch: {{ with query \`max(max_over_time(timestamp(increase(${fetches}[2m]) > 0)[1d:1m]))\` }}{{ . | first | value | humanizeTimestamp }}{{ else }}none in the last day{{ end }}.`,
+      },
+    },
+  ]);
+});
+
+test('it adds no boxxy rules alert when the boxxy server does not deploy', () => {
+  expect(
+    buildAlertRules({ boxxyRulesSync: false })
+      .flatMap((group) => group.rules)
+      .some((rule) => rule.alert === 'BoxxyRulesStale'),
+  ).toBeFalse();
+});

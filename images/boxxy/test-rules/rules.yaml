@@ -1,8 +1,7 @@
-# The boxxy server's live rules, which the cloud-boxxy image holds at /rules: a change here is a
-# new image and a deploy. They start as the v1 example rules of @boxxy/rules: four phases, two
-# limits, five pools and the sleep times. Each recipe but the review runs atc's `boxxy` agent, which
-# loads the boxxy hook plug-in. The review runs `boxxy-review`, which loads the plug-in too and
-# alone holds the read-only clone token; the server's spawn.reviewAgents lists it.
+# Rules for the boxxy image test alone: the server refuses to start without a rules folder, so the
+# test mounts this one at /rules. The live rules are in the rules repository, and nothing deploys
+# this file. Keep it loadable by the @boxxy/server release that package.json pins: the review runs
+# on `boxxy-review`, which the test's spawn.reviewAgents lists.
 version: 1
 concepts: [pool@2, defer@1, expedite@1] # pool@2 adds the filter field `designMode`
 
@@ -15,6 +14,8 @@ pipelines:
         accepted: next
         duplicate: { hold: duplicate } # the owner confirms with `boxxy item close`,
         declined: { hold: declined } # or sends the item on with `boxxy item retry`
+        needs-owner: { hold: needs-owner } # the owner answers with `boxxy item edit` or `boxxy item note`, then `boxxy item retry`
+        split: { end: split } # the parts are filed as new items, and the item closes
     - phase: design
       maxAttempts: 2
       timeoutMinutes: 90 # the clock of an agent-mode attempt; an attended one sleeps instead

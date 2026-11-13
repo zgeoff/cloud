@@ -27,12 +27,13 @@ config:
     image: ghcr.io/zgeoff/cloud-files:33830cac231f4295a03516fe081d1a0cbd790452@sha256:0c3ecdf88e7a02ce1b80d17e3017757b79f49b9abc1986af7c3674e7574334f9
     hostname: files.geoff.cloud
   geoff-cloud:pepys:
-    image: ghcr.io/zgeoff/cloud-pepys:0.3.1-f63d5b511da4@sha256:7ef678987fd4695ab9988a42a156c721282e87e0b7c2ddc23a942f32b257bc71
+    image: ghcr.io/zgeoff/cloud-pepys:0.4.0-52c65bbe5ced@sha256:a17377d38e71ffa567a60115e711e2215e06f5b0492032c9fbe61f988d22a906
     apiHostname: pepys.geoff.cloud
+    tailnetHostname: pepys-api.geoff.cloud
     webhookHostname: pepys-webhook.geoff.cloud
     impIdentityAudience: pepys.imp.internal
   geoff-cloud:boxxy:
-    image: ghcr.io/zgeoff/cloud-boxxy:38c62e3bf02ab76c647d2e3968bf090fe1c98eb9@sha256:478ea05c575113675b79cdc830f65f4d153ca33faf3cc20b5c47956f44af79c2
+    image: ghcr.io/zgeoff/cloud-boxxy:71c760b225d18f34994bf80f4b71a138314c8c4d@sha256:339ca32f53368d0fdc80bd3179b93a54dd3e5e9c7a483edc6e63c3ecb4edbc81
     runner: geoffcloud
     atc:
       trustedFolders: {}

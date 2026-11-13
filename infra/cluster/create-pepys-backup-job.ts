@@ -6,7 +6,7 @@ import type { Output } from '@pulumi/pulumi';
 import type { PepysBackupInputs } from '../inputs/index.ts';
 import { pepysImages } from '../shared/pepys-images.ts';
 import { pepysWorkloads } from '../shared/pepys-workloads.ts';
-import { buildPepysBackupPodSpec } from './build-pepys-backup-pod-spec.ts';
+import { buildPepysBackupCronJobSpec } from './build-pepys-backup-cron-job-spec.ts';
 
 export function createPepysBackupJob(
   cluster: Provider,
@@ -48,26 +48,11 @@ export function createPepysBackupJob(
     pepysWorkloads.backup.name,
     {
       metadata: { name: pepysWorkloads.backup.name, namespace },
-      spec: {
-        // after the files backup at 04:30, so the two never share the node's disk
-        schedule: '0 5 * * *',
-        timeZone: 'Australia/Melbourne',
-        suspend: false,
-        concurrencyPolicy: 'Forbid',
-        jobTemplate: {
-          spec: {
-            backoffLimit: 2,
-            template: {
-              metadata: { labels: pepysWorkloads.backup.labels },
-              spec: buildPepysBackupPodSpec({
-                image: pepysImages.rcloneImage,
-                scriptConfigMap: script.metadata.name,
-                envSecret: env.metadata.name,
-              }),
-            },
-          },
-        },
-      },
+      spec: buildPepysBackupCronJobSpec({
+        image: pepysImages.rcloneImage,
+        scriptConfigMap: script.metadata.name,
+        envSecret: env.metadata.name,
+      }),
     },
     { provider: cluster },
   );

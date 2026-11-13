@@ -2,6 +2,7 @@ import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import type { Namespace } from '@pulumi/kubernetes/core/v1';
 import type { CustomResourceOptions } from '@pulumi/pulumi';
 import { cloudflaredNames } from '../ingress/index.ts';
+import { boxxyRulesSyncNames } from '../shared/boxxy-rules-sync-names.ts';
 import { nixieGitSyncNames } from '../shared/nixie-git-sync-names.ts';
 import type { AlertRuleInputs } from './build-alert-rules.ts';
 import { createAlertRules } from './create-alert-rules.ts';
@@ -25,6 +26,10 @@ export function createMonitors(
   if (inputs.nixieReadinessURL !== undefined) {
     createNixieProbe(ns, inputs.nixieReadinessURL, opts);
     createNixieGitSyncMonitor(ns, opts);
+  }
+
+  if (inputs.boxxyRulesSync === true) {
+    createBoxxyRulesSyncMonitor(ns, opts);
   }
 }
 
@@ -56,6 +61,23 @@ function createNixieGitSyncMonitor(ns: Namespace, opts: CustomResourceOptions): 
         namespaceSelector: { matchNames: [nixieGitSyncNames.namespace] },
         selector: { matchLabels: nixieGitSyncNames.labels },
         podMetricsEndpoints: [{ port: nixieGitSyncNames.httpPort }],
+      },
+    },
+    opts,
+  );
+}
+
+function createBoxxyRulesSyncMonitor(ns: Namespace, opts: CustomResourceOptions): CustomResource {
+  return new CustomResource(
+    'boxxy-rules-sync',
+    {
+      apiVersion: 'monitoring.coreos.com/v1',
+      kind: 'PodMonitor',
+      metadata: { name: 'boxxy-rules-sync', namespace: ns.metadata.name },
+      spec: {
+        namespaceSelector: { matchNames: [boxxyRulesSyncNames.namespace] },
+        selector: { matchLabels: boxxyRulesSyncNames.labels },
+        podMetricsEndpoints: [{ port: boxxyRulesSyncNames.httpPort }],
       },
     },
     opts,

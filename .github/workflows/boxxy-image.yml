@@ -11,7 +11,6 @@ on:
     branches: [main]
     paths:
       - deploy/boxxy/server.ts
-      - deploy/boxxy/rules/**
       - images/boxxy/**
       - images/atc-gateway/versions.env
       - scripts/write-boxxy-image-context.sh

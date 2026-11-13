@@ -95,6 +95,7 @@ export const pepysAPIURL = ingress.pepysAPIURL;
 export const onePasswordConnectServiceURL = workloads?.onePasswordConnectServiceURL;
 export const atcGatewayServiceURL = workloads?.atcGatewayServiceURL;
 export const nixieURL = workloads?.nixieURL;
+export const pepysTailnetURL = workloads?.pepysTailnetURL;
 
 const observability = await createObservability({
   accountID,
@@ -108,6 +109,7 @@ const observability = await createObservability({
           alertWebhook: k3s.inputs.alertWebhook,
           atcDaemons: buildATCDaemonEndpoints(k3s.inputs.atcGateway?.config),
           nixieReadinessURL: workloads?.nixieReadinessURL,
+          boxxyRulesSync: workloads?.boxxyServiceURL !== undefined,
         },
 });
 
