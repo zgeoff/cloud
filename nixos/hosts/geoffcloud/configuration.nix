@@ -442,7 +442,8 @@ in
   # files are root-only and staged by scripts/install-atc-gateway-credentials.ts; systemd passes them in as
   # credentials. principals lists each gateway client ID (`atc-gateway clients list`) with
   # the targets it may reach; a client not listed here is refused every request. The target,
-  # the agents and the auth profiles match the home-pc daemon's `cloud` target. The profiles name
+  # the claude and codex agents and the auth profiles match the home-pc daemon's `cloud` target;
+  # the boxxy agents run on this daemon alone. The profiles name
   # the same impd secrets as home-pc's, so a renamed or added profile changes both daemons'
   # configs, and the daemon's impd token must list each secret as grantable.
   services.atc-daemon =
@@ -586,7 +587,14 @@ in
           auth = claudeAuth // {
             profiles = claudeProfiles ++ [ "boxxy" ];
           };
-          env = claudeEnv;
+          # a worker image has no git config, so a build session's commit fails without these:
+          # the session commits as the owner's GitHub login
+          env = claudeEnv // {
+            GIT_AUTHOR_NAME = "zgeoff";
+            GIT_AUTHOR_EMAIL = "3013783+zgeoff@users.noreply.github.com";
+            GIT_COMMITTER_NAME = "zgeoff";
+            GIT_COMMITTER_EMAIL = "3013783+zgeoff@users.noreply.github.com";
+          };
         };
         # a review session of the boxxy server: it runs noslop's command on the pull request and
         # sends the result as its close-out. It alone takes github-review, the read-only clone
