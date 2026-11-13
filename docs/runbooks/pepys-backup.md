@@ -32,8 +32,7 @@ last.
    ```
 
    When both commands print the same key ID, go to step 3. When neither vault holds the item, go on
-   to step 2. When one vault alone holds the item, create the item in the other vault with the same
-   two values, then go to step 3.
+   to step 2.
 
 2. Mint a key. Store it in both vaults. The key ID is `GK` and 24 hex digits, and the secret is 64
    hex digits. The commands send the item to `op` on stdin:
@@ -62,8 +61,8 @@ last.
      | ssh root@geoffcloud bash -s
    ```
 
-   Expect Garage's `INFO` connection lines on stderr, and no error. When Garage already holds the
-   key, the import fails with `KeyAlreadyExists` and changes nothing, so go on to the next step.
+   Expect Garage's `INFO` connection lines and no error. When Garage already holds the key, the
+   import fails with `KeyAlreadyExists` and changes nothing, so go on to the next step.
 
 4. Give the key read access to each bucket that the backup copies. `pepysWorkloads.backup.buckets`
    in [`pepys-workloads.ts`](../../infra/shared/pepys-workloads.ts) lists the buckets. Run the

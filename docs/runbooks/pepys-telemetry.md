@@ -83,7 +83,7 @@ and its auth profiles.
      < /dev/null
    ```
 
-   `scripts/install-atc-gateway-credentials.ts` checks the same list: it stops and prints this
+   `bun scripts/install-atc-gateway-credentials.ts` checks the same list: it stops and prints this
    command when `atc-cloud` holds another list.
 
 7. Spawn a Claude session through the atc gateway, as

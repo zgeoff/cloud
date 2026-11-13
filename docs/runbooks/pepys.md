@@ -3,7 +3,7 @@
 Deploy [pepys](../architecture/workloads/pepys.md), the owner's data hub, to the cluster the first
 time, and move the cluster to a later pepys release. [Deploy the first time](#deploy-the-first-time)
 is for a cluster whose [stack config](./workflows.md#change-stack-config) holds no `pepys` object.
-[Bump the pepys release](#bump-the-pepys-release) is for each pepys release after that. Three other
+[Bump the pepys release](#bump-the-pepys-release) is for each pepys release after that. Other
 runbooks cover the rest of what an operator does by hand:
 [telemetry from sessions](./pepys-telemetry.md),
 [the API's public route and its clients](./pepys-api.md), and [the backup](./pepys-backup.md).
@@ -77,9 +77,8 @@ fails when the release and a package version differ.
 1. Set `PEPYS_RELEASE` and `PEPYS_HOST_ASSET_SHA256` in
    [`images/pepys/versions.env`](../../images/pepys/versions.env). The checksum is the line of
    `pepys-host-linux-x64` in the release's `SHA256SUMS`, and the image build stops on a checksum of
-   another release. When [the release check](./release-check.md) has opened a pull request on the
-   branch `release-check/pepys`, that pull request sets both lines and changes no other file: do
-   steps 2 to 4 on its branch.
+   another release. The bump pull request that [the release check](./release-check.md) opens on the
+   branch `release-check/pepys` sets both lines, and changes only this file.
 2. Set each `@pepys/*` version in `deploy/pepys/package.json` to that release, by hand.
 3. Check that `@boxxy/pepys`, the boxxy plug-in in `deploy/pepys/package.json`, admits the release.
    The plug-in's own `package.json` gives its range on `@pepys/kit` under `peerDependencies`. When
