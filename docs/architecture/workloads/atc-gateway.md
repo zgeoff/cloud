@@ -96,10 +96,20 @@ with its claim and Secret and in its image.
 
 A service in the cluster that cannot sign in with a browser calls `/mcp` with a fixed bearer token,
 which the gateway reads from a file at start (`--service-token-file`, atc 7.14.0 and later). The
-boxxy server is the one such client. Pulumi builds the file from the stack's `BOXXY_ATC_TOKEN` and
-the public URL: the resource is the public URL's origin and `/mcp`, and the gateway refuses to start
-when the file names another. The client `boxxy` holds the scopes `read`, `spawn`, `message` and
-`kill`, and its principal is `service:boxxy`, which the daemon's `principals` lists.
+boxxy server holds the two such clients. Pulumi builds the file from the stack's `BOXXY_ATC_TOKEN`,
+its `BOXXY_ATC_NOTICE_TOKEN` and the public URL: the resource is the public URL's origin and `/mcp`,
+and the gateway refuses to start when the file names another.
+
+| Client          | Variable                 | Scopes                             | Granted by                       |
+| --------------- | ------------------------ | ---------------------------------- | -------------------------------- |
+| `boxxy`         | `BOXXY_ATC_TOKEN`        | `read`, `spawn`, `message`, `kill` | the cloud daemon, its one target |
+| `boxxy-notices` | `BOXXY_ATC_NOTICE_TOKEN` | `message`                          | the PC daemon, target `local`    |
+
+The gateway acts as `service:<client>` at each daemon, and a daemon refuses a principal its
+`principals` does not list. The notice client can message any session on the PC's `local` target, so
+its token holds no `read`, `spawn` or `kill`, and the cloud daemon never lists it. The PC daemon's
+config lives on the PC, outside this repo
+([send notices to the owner](../../runbooks/boxxy.md#send-notices-to-the-owner)).
 
 atc refuses a token file that another user owns or that its group or others can open. Kubernetes
 makes the files of a Secret volume root's, so no mode on that volume passes for the gateway's user.
@@ -107,11 +117,13 @@ An init container in the backup image, running as the gateway's user, copies the
 volume with mode 0600, and the gateway mounts that volume read-only. The Secret has no fixed name,
 so a new token rolls the Deployment.
 
-The input is optional. While `BOXXY_ATC_TOKEN` is unset, the pod has no Secret, no init container,
-no mount and no flag. While `images/atc-gateway/versions.env` pins an atc release older than 7.14.0,
-or the stack's `atcGateway.image` is older than 7.14.0, the image has no such flag. Pulumi then
-leaves them out and prints one warning, so a deploy never starts a gateway that cannot read its
-arguments ([the boxxy runbook](../../runbooks/boxxy.md#the-service-token-at-the-atc-gateway)).
+Each input is optional. While both variables are unset, the pod has no Secret, no init container, no
+mount and no flag, and the file leaves out each client whose variable is unset. While
+`images/atc-gateway/versions.env` pins an atc release older than 7.14.0, or the stack's
+`atcGateway.image` is older than 7.14.0, the image has no such flag. Pulumi then leaves them out and
+prints one warning for each variable that is set, so a deploy never starts a gateway that cannot
+read its arguments
+([the boxxy runbook](../../runbooks/boxxy.md#the-service-token-at-the-atc-gateway)).
 
 ## The cloud daemon
 

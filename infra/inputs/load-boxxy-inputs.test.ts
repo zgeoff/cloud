@@ -126,7 +126,7 @@ test('it returns the config, the pull credential and both tokens when boxxy is s
   });
 });
 
-test('it refuses a notice session in the boxxy block, which the server reads from its environment', () => {
+test('it refuses a notice session in the boxxy block, which the server refuses in its configuration', () => {
   const fixture = setupTest();
 
   const withSession = {
@@ -460,6 +460,42 @@ test("it adds none of the noslop App's keys while no review agent is listed", ()
   const inputs = loadBoxxyInputs(stackConfig, review.env, undefined);
 
   expect(inputs.boxxy?.secrets.reviewApp).toBeUndefined();
+});
+
+test('it carries the notice token as a secret while it is set, with no notice session', async () => {
+  const fixture = setupTest();
+  const tokens = { ...fixture.tokens, BOXXY_ATC_NOTICE_TOKEN: 'notice-token-for-tests' };
+  const inputs = loadBoxxyInputs(fixture.stackConfig, tokens, undefined);
+
+  invariant(inputs.boxxy?.secrets.noticeToken);
+
+  const noticeToken = inputs.boxxy.secrets.noticeToken;
+
+  const marked = await isSecret(noticeToken);
+  const value = await resolveOutput(noticeToken);
+
+  expect(marked).toBeTrue();
+  expect(value).toBe('notice-token-for-tests');
+});
+
+test('it adds no notice token while the variable is unset', () => {
+  const fixture = setupTest();
+  const inputs = loadBoxxyInputs(fixture.stackConfig, fixture.tokens, undefined);
+
+  expect(inputs.boxxy?.secrets).not.toContainKey('noticeToken');
+});
+
+test.each([
+  ['BOXXY_WORKER_TOKEN', 'worker-token-for-tests'],
+  ['BOXXY_ATC_TOKEN', 'atc-token-for-tests'],
+])('it refuses a notice token equal to %s', (_name, token) => {
+  const fixture = setupTest();
+  const tokens = { ...fixture.tokens, BOXXY_ATC_NOTICE_TOKEN: token };
+
+  expect(() => loadBoxxyInputs(fixture.stackConfig, tokens, undefined)).toThrowWithMessage(
+    Error,
+    'BOXXY_ATC_NOTICE_TOKEN must differ from BOXXY_WORKER_TOKEN and BOXXY_ATC_TOKEN',
+  );
 });
 
 test("it marks each of the boxxy App's keys secret with the github section", async () => {

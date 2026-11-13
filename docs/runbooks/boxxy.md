@@ -12,6 +12,7 @@ listeners, the configuration and the caller proof.
 | ------------------------- | --------------------------------------------------------- | --------------------- |
 | `boxxy-worker-token`      | the worker token, which the broker adds to worker calls   | Pulumi, impd's broker |
 | `boxxy-atc-token`         | the bearer token the server sends to the atc gateway      | Pulumi                |
+| `boxxy-atc-notice-token`  | the token the server sends each owner notice with         | Pulumi                |
 | `boxxy-restic`            | the restic repository's password                          | Pulumi, the backup    |
 | `r2-boxxy-backup`         | the R2 key, endpoint and bucket of the restic repository  | Pulumi, the backup    |
 | `boxxy-pepys-signing`     | the key the server signs its facts with                   | Pulumi, pepys ingest  |
@@ -345,6 +346,85 @@ close-out, and each item holds at review after two sessions.
    `boxxy-config`, and to update the StatefulSet.
 7. Merge it. After the deploy, a review round leaves noslop's check run at the pull request's head,
    posted by the App.
+
+## Send notices to the owner
+
+A notice tells the owner that an item is on hold. The server sends each notice through the atc
+gateway to the notice session, one session on the owner's PC. The server's atc token can start and
+stop sessions, so the PC's atc daemon accepts no call made with that token. The server sends notices
+with a second token, the notice token, which can only send messages. The notice session registers
+its own gateway ID with the server, and the server stores that ID, so the deployment passes the
+server the notice token and never a session ID
+([notice delivery](https://github.com/zgeoff/boxxy/blob/main/docs/design/boxxy/owner-notices.md)).
+
+The server needs `@boxxy/server` 0.2.6 or later. Deploy the notice token with that server image or
+after it, never before: an older server that holds a notice token and no session ID marks each
+notice sent without sending it.
+
+1. Read the `@boxxy/server` version of the image that `boxxy.image` in `infra/Pulumi.prod.yaml`
+   pins. The image's tag is the commit that built it:
+
+   ```bash
+   git show <commit>:package.json | grep '@boxxy/server'
+   ```
+
+   `<commit>` is the tag of `boxxy.image`. Expect 0.2.6 or later. For an older version,
+   [upgrade the server](#upgrade-the-server) first.
+
+2. Mint the notice token into the item `boxxy-atc-notice-token`, field `credential`, in `cloud`, and
+   into its `cloud-deploy` copy. The token goes to `op` on stdin, never on the command line:
+
+   ```bash
+   token="atcs_$(openssl rand -hex 32)"
+   for vault in cloud cloud-deploy; do
+     printf '%s' "$token" \
+       | jq -R '{title: "boxxy-atc-notice-token", category: "API_CREDENTIAL",
+           fields: [{id: "credential", label: "credential", type: "CONCEALED", value: .}]}' \
+       | op item create --vault "$vault" -
+   done
+   unset token
+   ```
+
+3. On the PC, add the principal `service:boxxy-notices` to the `principals` of the atc daemon's
+   `config.json`. The gateway acts as that principal on each call that carries the notice token.
+   Then restart the daemon, because a reload rereads only the daemon's tokens. The PC's atc setup
+   lives on the PC, outside this repo:
+
+   ```json
+   "principals": {
+     "service:boxxy-notices": { "targets": ["local"] }
+   }
+   ```
+
+   Keep the notice session's sub-sessions on `local` too. atc lets a client reach a session only
+   when every session in its tree runs on a target the client holds.
+
+4. In a PR, add the line to `.env`:
+
+   ```bash
+   BOXXY_ATC_NOTICE_TOKEN=op://cloud/boxxy-atc-notice-token/credential
+   ```
+
+5. Run `bun run preview`. Expect it to replace the Secret `boxxy-tokens` and the gateway's
+   `atc-gateway-service-tokens` Secret, and to update the StatefulSet and the gateway's Deployment.
+6. Merge it. `Deploy prod` rolls `boxxy-0` and the gateway. Until a session registers, each notice
+   waits, and `boxxy runner status` shows `no-notice-session` as the last notice error.
+7. In the notice session, register the session's own gateway ID, once. The owner listener has no
+   route, so [reach the owner listener](#reach-the-owner-listener) first:
+
+   ```bash
+   BOXXY_URL=http://localhost:8090 boxxy notices register <gateway_id>
+   ```
+
+   `<gateway_id>` is the session's ID as `atc_sessions_list` prints it through the gateway,
+   `<daemon>.<incarnation>.<id>`. A session that holds the owner's MCP tools of
+   [the public door](#turn-on-the-public-door) can call `notices_register` in place of the command.
+
+8. Run `BOXXY_URL=http://localhost:8090 boxxy notices show`. Expect the same ID. Each notice that
+   waits reaches the session within 15 minutes.
+
+To move notices to another session, run steps 7 and 8 in that session. The move needs no deploy and
+no restart of the server. A rename keeps the session's ID, so it needs no new registration.
 
 ## Upgrade the server
 

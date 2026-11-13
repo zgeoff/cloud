@@ -3,6 +3,7 @@ import type { Output } from '@pulumi/pulumi';
 import { secret } from '@pulumi/pulumi';
 import { z } from 'zod';
 import { findResticBackup } from './find-restic-backup.ts';
+import { findVariable } from './find-variable.ts';
 import { boxxyReposKey, parseBoxxyRepos } from './parse-boxxy-repos.ts';
 import { parseStackObject } from './parse-stack-object.ts';
 import { requireGHCRPullCredential } from './require-ghcr-pull-credential.ts';
@@ -85,6 +86,8 @@ export function loadBoxxyInputs(
     throw new Error('BOXXY_WORKER_TOKEN and BOXXY_ATC_TOKEN must differ');
   }
 
+  const noticeToken = findNoticeToken(env, [workerToken, atcToken]);
+
   // the server signs each batch of facts with it; pepys ingest holds the same item
   const pepysSigningSecret =
     config.pepys === undefined
@@ -122,6 +125,7 @@ export function loadBoxxyInputs(
           : { pepysSigningSecret: secret(pepysSigningSecret) }),
         ...(githubApp === undefined ? {} : { githubApp }),
         ...(reviewApp === undefined ? {} : { reviewApp }),
+        ...(noticeToken === undefined ? {} : { noticeToken: secret(noticeToken) }),
       },
       ...(backup === undefined ? {} : { backup }),
     },
@@ -138,6 +142,22 @@ function requireRepos(stackConfig: Pick<StackConfig, 'getSecret'>): Output<Boxxy
   }
 
   return raw.apply(parseBoxxyRepos);
+}
+
+const noticeTokenVariable = 'BOXXY_ATC_NOTICE_TOKEN';
+
+// atc refuses a token file that holds one token twice, and every worker session holds the worker
+// token, so the notice token is its own
+function findNoticeToken(env: Environment, otherTokens: readonly string[]): string | undefined {
+  const token = findVariable(env, noticeTokenVariable);
+
+  if (token !== undefined && otherTokens.includes(token)) {
+    throw new Error(
+      `${noticeTokenVariable} must differ from BOXXY_WORKER_TOKEN and BOXXY_ATC_TOKEN`,
+    );
+  }
+
+  return token;
 }
 
 const githubAppNeed =

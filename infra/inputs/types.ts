@@ -1,5 +1,6 @@
 import type { Output } from '@pulumi/pulumi';
 import type { z } from 'zod';
+import type { ATCGatewayServiceClient } from '../shared/atc-gateway-service-clients.ts';
 import type { atcGatewayConfigSchema } from './atc-gateway-config-schema.ts';
 
 // .env's values, resolved by `op run`
@@ -58,7 +59,7 @@ export interface ATCGatewayInputs {
 
     // the fixed bearer token of each service client of /mcp, by client name. Present only while
     // the gateway image knows --service-token-file (atc 7.14.0 and later)
-    readonly serviceTokens?: Readonly<Record<string, Output<string>>>;
+    readonly serviceTokens?: Readonly<Partial<Record<ATCGatewayServiceClient, Output<string>>>>;
   };
 }
 
@@ -231,6 +232,9 @@ export interface BoxxyInputs {
       readonly privateKey: Output<string>;
       readonly installationID: Output<string>;
     };
+
+    // the token the server sends each owner notice with; without it the server sends no notice
+    readonly noticeToken?: Output<string>;
   };
 
   // without it there is no backup CronJob

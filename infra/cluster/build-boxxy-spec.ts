@@ -39,6 +39,7 @@ export interface BoxxySpecInputs {
   readonly pepysSigningSecret: boolean;
   readonly githubApp: boolean;
   readonly reviewApp: boolean;
+  readonly noticeToken: boolean;
   readonly pullSecret: string;
 
   // the Secret with the token of the public door's tunnel; with it, the pod runs the tunnel's
@@ -181,6 +182,7 @@ function buildRulesSyncContainer(image: string): input.core.v1.Container {
 export const workerTokenKey = 'worker-token';
 export const atcTokenKey = 'atc-token';
 export const pepysSigningSecretKey = 'pepys-signing-secret';
+export const noticeTokenKey = 'atc-notice-token';
 
 // the boxxy App's keys, by the variable the server reads each one from
 export const githubAppKeys = {
@@ -243,6 +245,14 @@ function buildBoxxyContainer(inputs: BoxxySpecInputs): input.core.v1.Container {
             name,
             valueFrom: { secretKeyRef: { name: inputs.tokenSecret, key } },
           }))
+        : []),
+      ...(inputs.noticeToken
+        ? [
+            {
+              name: 'BOXXY_ATC_NOTICE_TOKEN',
+              valueFrom: { secretKeyRef: { name: inputs.tokenSecret, key: noticeTokenKey } },
+            },
+          ]
         : []),
       ...(inputs.reviewApp
         ? Object.entries(reviewAppKeys).map(([name, key]) => ({

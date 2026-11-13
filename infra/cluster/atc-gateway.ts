@@ -187,13 +187,8 @@ function createServiceTokenSecret(
     return undefined;
   }
 
-  const names = Object.keys(serviceTokens);
-
-  const file = all(Object.values(serviceTokens)).apply((tokens) =>
-    buildATCGatewayServiceTokenFile({
-      publicURL: inputs.config.publicURL,
-      tokens: Object.fromEntries(names.map((name, index) => [name, tokens[index] ?? ''])),
-    }),
+  const file = all(serviceTokens).apply((tokens) =>
+    buildATCGatewayServiceTokenFile({ publicURL: inputs.config.publicURL, tokens }),
   );
 
   return new Secret(

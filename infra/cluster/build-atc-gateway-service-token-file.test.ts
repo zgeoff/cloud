@@ -29,3 +29,23 @@ test('#buildATCGatewayServiceTokenFile takes the origin of a public URL with a t
     ),
   ).toMatchObject({ resource: 'https://atc.geoff.cloud/mcp' });
 });
+
+test('#buildATCGatewayServiceTokenFile gives the boxxy-notices client the message scope alone, beside the boxxy client', () => {
+  const token = `atcs_${'a'.repeat(40)}`;
+  const noticeToken = `atcs_${'n'.repeat(40)}`;
+
+  expect(
+    JSON.parse(
+      buildATCGatewayServiceTokenFile({
+        publicURL: 'https://atc.geoff.cloud',
+        tokens: { boxxy: token, 'boxxy-notices': noticeToken },
+      }),
+    ),
+  ).toStrictEqual({
+    resource: 'https://atc.geoff.cloud/mcp',
+    clients: {
+      boxxy: { scopes: ['read', 'spawn', 'message', 'kill'], tokens: [token] },
+      'boxxy-notices': { scopes: ['message'], tokens: [noticeToken] },
+    },
+  });
+});
