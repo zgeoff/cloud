@@ -29,6 +29,7 @@ config:
   geoff-cloud:pepys:
     image: ghcr.io/zgeoff/cloud-pepys:0.3.1-f63d5b511da4@sha256:7ef678987fd4695ab9988a42a156c721282e87e0b7c2ddc23a942f32b257bc71
     apiHostname: pepys.geoff.cloud
+    tailnetHostname: pepys-api.geoff.cloud
     webhookHostname: pepys-webhook.geoff.cloud
     impIdentityAudience: pepys.imp.internal
   geoff-cloud:boxxy:

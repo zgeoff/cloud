@@ -4,7 +4,8 @@ pepys is the owner's personal data hub. Its ingest takes signed deliveries and s
 in a log, its host runs the deployment's consumers over that log into a store, and its API serves
 the store. The cluster runs it in the namespace `pepys` once stack config `pepys` is set. Two routes
 are public: the GitHub webhook route of ingest, and the API's MCP and OAuth paths while stack config
-`pepys.apiHostname` is set. Everything else stays inside the cluster, `/rpc` included.
+`pepys.apiHostname` is set. While stack config `pepys.tailnetHostname` is set, every path of the
+API, `/rpc` included, answers on the tailnet too. Everything else stays inside the cluster.
 
 ## Processes
 
@@ -14,7 +15,7 @@ are public: the GitHub webhook route of ingest, and the API's MCP and OAuth path
 | `pepys-s2`     | Deployment, `Recreate` | s2, by its publisher          | the `facts` bucket in Garage            |
 | `pepys-ingest` | Deployment             | `cloud-pepys`                 | s2-lite, the route secrets              |
 | `pepys-host`   | StatefulSet, 1 replica | `cloud-pepys`, two containers | s2-lite; the API reads the host's store |
-| `pepys-backup` | CronJob, 05:00 nightly | rclone, by its publisher      | every bucket in Garage                  |
+| `pepys-backup` | CronJob, 04:00 UTC     | rclone, by its publisher      | every bucket in Garage                  |
 
 [`pepys-workloads.ts`](../../../infra/shared/pepys-workloads.ts) holds each name, port and
 in-cluster URL. [`pepys-images.ts`](../../../infra/shared/pepys-images.ts) pins the three images
@@ -121,7 +122,7 @@ The API serves typed queries under `/rpc`, which check no credential, and serves
 behind its own OAuth 2.1 server. While stack config `pepys.apiHostname` names a host, such as
 `pepys.geoff.cloud`, the shared tunnel carries that host's MCP and OAuth paths to the API's Service.
 [The pepys API's route boundary](../network/public-ingress.md#the-pepys-apis-route-boundary) lists
-the paths. Every other path gets the tunnel's 404, so `/rpc` never leaves the cluster. Cloudflare
+the paths. Every other path gets the tunnel's 404, so the tunnel never carries `/rpc`. Cloudflare
 Access fronts the sign-in pages for the owner, and the owner's passkey signs the owner in behind it.
 
 The field turns on these together, and nothing else of the route exists without it:
@@ -146,6 +147,35 @@ passkey enrollment and one sign-in per client. The backup copies Garage's bucket
 retaining class keeps the volume when its claim goes.
 [The pepys runbook](../../runbooks/pepys.md#turn-on-the-apis-public-route) turns the route on,
 enrolls the passkey and adds a client.
+
+### The API's tailnet route
+
+While stack config `pepys.tailnetHostname` names a host, such as `pepys-api.geoff.cloud`, nixie's
+Traefik serves every path of the API on that host, `/rpc` included. The host's record is DNS-only,
+at the host's tailnet address, so the name resolves anywhere and answers on the tailnet only, as
+[nixie's route](./nixie.md#the-route-in) does. The Pulumi program refuses a tailnet hostname that
+equals either public hostname, or that the exposure registry lists in no `tailnet-hostname` entry.
+
+pepys shares nixie's Traefik because that Traefik holds the host's port 443 on the tailnet address,
+and a second controller could not bind it. The field adds the `pepys` namespace to the namespaces
+that Traefik watches, so the program refuses the field without stack config `nixie`. Traefik's
+ClusterRole already reads Services, EndpointSlices and Secrets in every namespace, so the field
+grants Traefik no new permission.
+
+The field turns on these together:
+
+- the Ingress `pepys-api-tailnet` in the namespace `pepys`, which sends every path of the host to
+  the API's port, 8081;
+- its certificate, from nixie's Let's Encrypt account by the same DNS-01 challenge, which an apply
+  renews as it renews [nixie's](./nixie.md#the-route-in);
+- the host's DNS-only A record;
+- the rule in the host pod's network policy that admits nixie's Traefik to the API's port.
+
+`/rpc` checks no credential, so every device that reaches the host's port 443 on the tailnet reads
+every query, and the tailnet policy gives that port to each member's device. The API answers its
+other paths only for the public host's name in `Host`, so `/mcp` and the OAuth paths answer 403 on
+the tailnet host. Traefik serves no route for the public host, so a tailnet request that names it
+gets Traefik's 404 and never reaches a sign-in page without Access.
 
 ### The telemetry path from a session
 
@@ -177,8 +207,11 @@ Each pod admits only its callers:
   cloudflared too while the API's public route is on. `/rpc` checks no caller, so the boxxy server
   reads every query under `/rpc`. `/mcp` needs an OAuth token and the public host's name in `Host`,
   so the boxxy server never calls it. The tunnel forwards only the public paths, so cloudflared
-  never reaches `/rpc`. The policy never admits another pod to the API, and never admits a pod to
-  another port of the host's pod. A person reaches the API with `kubectl port-forward`.
+  never reaches `/rpc`. While [the tailnet route](#the-apis-tailnet-route) is on, a rule of its own
+  admits nixie's Traefik on 8081: the pod labelled `app.kubernetes.io/name: traefik` in the
+  namespace `nixie-ingress`. The policy never admits another pod to the API, and never admits a pod
+  to another port of the host's pod. Without the tailnet route, a person reaches the API with
+  `kubectl port-forward`.
 - The backup admits no pod.
 
 Unlike every other namespace, pepys denies all egress, because ingest takes traffic from the
@@ -208,8 +241,10 @@ value changes, Pulumi replaces the Secret on the next apply, and Kubernetes roll
 from the repo's root [`.env`](../../../.env). The backup variables are all or none: without them,
 the cluster runs no backup.
 
-The backup copies each bucket to its own folder of an R2 bucket with `rclone copy`, which never
-deletes a copied object. The host's store needs no backup: the host rebuilds it from the fact log.
+The backup runs at 04:00 UTC each day, and copies each bucket to its own folder of an R2 bucket with
+`rclone copy`, which never deletes a copied object. The consumer modules ship inside the
+digest-pinned `cloud-pepys` image, so no modules bucket exists and the backup copies Garage's
+buckets only. The host's store needs no backup: the host rebuilds it from the fact log.
 
 The backup reads Garage with its own key, which can read each bucket the backup copies and write
 none. `pepysWorkloads.backup.buckets` in
@@ -262,8 +297,3 @@ and changes nothing in prod.
    ```
 
    Expect `401`.
-
-## Later work
-
-- A tailnet route to the API, through the cluster's Traefik, so a tailnet client reaches it without
-  a port-forward.
