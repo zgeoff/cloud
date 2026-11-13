@@ -208,8 +208,8 @@ relay and the daemon's new config.
 3. Restart the atc daemon if the switch did not, so it reads the new `boxxy` agent and profiles. A
    switch that changes the daemon's config restarts it.
 
-[The pepys runbook](./pepys.md#let-sessions-send-telemetry) covers the telemetry secret, which every
-Claude session uses.
+[The pepys telemetry runbook](./pepys-telemetry.md#let-sessions-send-telemetry) covers the telemetry
+secret, which every Claude session uses.
 
 ## The service token at the atc gateway
 
