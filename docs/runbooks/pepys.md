@@ -61,6 +61,26 @@ in one pull request.
    pin an `@boxxy/pepys` whose range does. `@boxxy/pepys` carries boxxy's own version.
 4. Run `bun install` in `deploy/pepys` to write its lock again, then
    `bun run check:pepys-deployment`. Expect exit 0.
+5. Merge the pull request. Its `pepys image` run on `main` publishes the image of the release.
+6. Pin that image in `infra/Pulumi.prod.yaml`, in a second pull request, and merge it.
+7. After the `Deploy prod` run of the pin, read the pepys host's start log. The host starts with
+   `run --up`, so it deploys each consumer's module of the release before it applies new facts:
+
+   ```bash
+   ssh root@geoffcloud k3s kubectl -n pepys logs pepys-host-0 -c host
+   ```
+
+   Expect one line for each consumer, with the hash of its module:
+
+   ```text
+   github_pull_request b8843619…: swapped
+   github_release 37fd0758…: no swap, the version is current
+   ```
+
+   The host logs `swapped` for a consumer whose module changed in the release: it built that
+   consumer's rows again from the fact log. The host's first start can fail with
+   `up <consumer> failed: s2: connection refused`. The pod then starts the host again: expect one
+   restart of the `host` container and the lines above from the second start.
 
 [`collect-pepys-version-mismatches.test.ts`](../../scripts/collect-pepys-version-mismatches.test.ts)
 fails when the release and a package version differ.
