@@ -351,15 +351,15 @@ close-out, and each item holds at review after two sessions.
 
 A notice tells the owner that an item is on hold. The server sends each notice through the atc
 gateway to the notice session, one session on the owner's PC. The server's atc token can start and
-stop sessions, so the PC's atc daemon never grants it. The server sends notices with a second token,
-the notice token, which can only send messages. The notice session registers its own gateway ID with
-the server, and the server stores it, so the deployment passes the server the notice token and never
-a session
+stop sessions, so the PC's atc daemon accepts no call made with that token. The server sends notices
+with a second token, the notice token, which can only send messages. The notice session registers
+its own gateway ID with the server, and the server stores that ID, so the deployment passes the
+server the notice token and never a session ID
 ([notice delivery](https://github.com/zgeoff/boxxy/blob/main/docs/design/boxxy/owner-notices.md)).
 
 The server needs `@boxxy/server` 0.2.6 or later. Deploy the notice token with that server image or
-after it, never before: an older server that holds a notice token and no session marks each notice
-sent without sending it.
+after it, never before: an older server that holds a notice token and no session ID marks each
+notice sent without sending it.
 
 1. Read the `@boxxy/server` version of the image that `boxxy.image` in `infra/Pulumi.prod.yaml`
    pins. The image's tag is the commit that built it:
@@ -385,9 +385,10 @@ sent without sending it.
    unset token
    ```
 
-3. On the PC, add the principal to the `principals` of the atc daemon's `config.json`, then restart
-   that daemon, because a reload rereads only its tokens. The PC's atc setup lives on the PC,
-   outside this repo:
+3. On the PC, add the principal `service:boxxy-notices` to the `principals` of the atc daemon's
+   `config.json`. The gateway acts as that principal on each call that carries the notice token.
+   Then restart the daemon, because a reload rereads only the daemon's tokens. The PC's atc setup
+   lives on the PC, outside this repo:
 
    ```json
    "principals": {
