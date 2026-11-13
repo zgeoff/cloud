@@ -1,30 +1,42 @@
 # pepys: the backup
 
-Give the backup of [pepys](../architecture/workloads/pepys.md) the Garage key it reads with, and run
-a backup on demand. Use [Give the backup its Garage key](#give-the-backup-its-garage-key) before the
-first backup, and again whenever Garage's `meta` volume is new. Use [Back up now](#back-up-now) to
-copy the buckets outside the daily schedule.
+Give the backup of [pepys](../architecture/workloads/pepys.md) its key to Garage, and run a backup
+on demand. Garage is the bucket store in the `pepys` namespace, and the backup copies Garage's
+buckets to R2 each day. Use [Give the backup its Garage key](#give-the-backup-its-garage-key) before
+the first backup, and again after Garage loses its keys. Use [Back up now](#back-up-now) to copy the
+buckets outside the daily schedule.
 [Secrets and the backup](../architecture/workloads/pepys.md#secrets-and-the-backup) explains what
 the backup copies and where.
 
 ## Give the backup its Garage key
 
-The cluster runs the backup only while `.env` holds every `PEPYS_BACKUP_*` and `PEPYS_R2_*`
-variable. Without them, the Pulumi program adds no backup CronJob.
-
-Import the backup's key into Garage before the first backup, and again whenever Garage's `meta`
-volume is new, such as after a rebuild of Garage's data. Garage creates the key of s2-lite, the fact
-log's server, at each start, but Garage never creates the backup's key. Without the key, the backup
+Garage keeps its keys on its `meta` volume, and it creates only the key of s2-lite, the server of
+the fact log, at each start. An operator imports the backup's key by hand. A `meta` volume that
+starts empty, such as after a rebuild of Garage's data, holds no backup key, and the backup then
 fails with `AccessDenied`.
 
 The 1Password item `pepys-garage-backup` holds the key in two fields, `access-key-id` and
-`secret-access-key`. [The prod apply job](./prod-apply.md) reads its copy in the `cloud-deploy`
-vault, so the item lives in the vaults `cloud` and `cloud-deploy` under the same name. The key can
-read each bucket that `pepysWorkloads.backup.buckets` in
-[`pepys-workloads.ts`](../../infra/shared/pepys-workloads.ts) lists, and write none.
+`secret-access-key`. The item lives under the same name in two vaults: `cloud`, which these steps
+read, and `cloud-deploy`, which [the prod apply job](./prod-apply.md) reads to give the backup's pod
+the key.
 
-1. If the item does not exist, mint a key and store it in both vaults. The key ID is `GK` and 24 hex
-   digits, and the secret is 64 hex digits. The item goes to `op` on stdin:
+The Pulumi program adds the backup CronJob only while the repo's root `.env` names every
+`PEPYS_BACKUP_*` and `PEPYS_R2_*` variable. The steps below do not need the CronJob, except the
+last.
+
+1. Check whether the item exists in each vault:
+
+   ```sh
+   op item get pepys-garage-backup --vault cloud --fields label=access-key-id
+   op item get pepys-garage-backup --vault cloud-deploy --fields label=access-key-id
+   ```
+
+   When both commands print the same key ID, go to step 3. When neither vault holds the item, go on
+   to step 2. When one vault alone holds the item, create the item in the other vault with the same
+   two values, then go to step 3.
+
+2. Mint a key. Store it in both vaults. The key ID is `GK` and 24 hex digits, and the secret is 64
+   hex digits. The commands send the item to `op` on stdin:
 
    ```sh
    item="$(jq -n --arg id "GK$(openssl rand -hex 12)" --arg secret "$(openssl rand -hex 32)" \
@@ -38,8 +50,10 @@ read each bucket that `pepysWorkloads.backup.buckets` in
 
    Expect `op item get pepys-garage-backup --vault cloud-deploy` to list both fields.
 
-2. Import the key into Garage. `garage key import` takes the secret as an argument, and the host's
-   journal records the SSH command line, so send the command as a script on SSH's stdin:
+3. Import the key into Garage.
+
+   **CAUTION:** `garage key import` takes the secret as an argument, and the host's journal records
+   the SSH command line. Send the command as a script on SSH's stdin, as the command below does.
 
    ```sh
    printf 'k3s kubectl -n pepys exec pepys-garage-0 -c garage -- /garage key import --yes -n pepys-backup %s %s > /dev/null\n' \
@@ -48,10 +62,12 @@ read each bucket that `pepysWorkloads.backup.buckets` in
      | ssh root@geoffcloud bash -s
    ```
 
-   Expect Garage's `INFO` connection lines and no error. When Garage already holds the key, the
-   import fails with `KeyAlreadyExists` and changes nothing, so go on to the next step.
+   Expect Garage's `INFO` connection lines on stderr, and no error. When Garage already holds the
+   key, the import fails with `KeyAlreadyExists` and changes nothing, so go on to the next step.
 
-3. Give the key read access to each bucket that the backup copies. For `facts`:
+4. Give the key read access to each bucket that the backup copies. `pepysWorkloads.backup.buckets`
+   in [`pepys-workloads.ts`](../../infra/shared/pepys-workloads.ts) lists the buckets. Run the
+   command once for each bucket, with the bucket's name in place of `facts`:
 
    ```sh
    ssh root@geoffcloud k3s kubectl -n pepys exec pepys-garage-0 -c garage -- \
@@ -59,9 +75,10 @@ read each bucket that `pepysWorkloads.backup.buckets` in
    ```
 
    Expect the command to print the bucket's key table, with `R` for `pepys-backup` and `RWO` for
-   s2-lite's `default access key`. Running it again changes nothing.
+   s2-lite's `default access key`. Running it again changes nothing. The key then reads each bucket
+   that the backup copies, and writes none.
 
-4. Run the backup once, as [Back up now](#back-up-now) describes.
+5. Run the backup once, as [Back up now](#back-up-now) describes.
 
 ## Back up now
 
