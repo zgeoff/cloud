@@ -126,7 +126,7 @@ test('it returns the config, the pull credential and both tokens when boxxy is s
   });
 });
 
-test('it refuses a notice session in the boxxy block, which the server reads from its environment', () => {
+test('it refuses a notice session in the boxxy block, which the server refuses in its configuration', () => {
   const fixture = setupTest();
 
   const withSession = {
@@ -462,61 +462,27 @@ test("it adds none of the noslop App's keys while no review agent is listed", ()
   expect(inputs.boxxy?.secrets.reviewApp).toBeUndefined();
 });
 
-test('it carries the notice session and the notice token, each secret, while both are set', async () => {
+test('it carries the notice token as a secret while it is set, with no notice session', async () => {
   const fixture = setupTest();
-
-  const stackConfig = buildStubConfig({
-    ...fixture.stackValues,
-    boxxyNoticeSession: 'owner-pc.0a1b2c3d.11111111-2222-3333-4444-555555555555',
-  });
-
   const tokens = { ...fixture.tokens, BOXXY_ATC_NOTICE_TOKEN: 'notice-token-for-tests' };
-  const inputs = loadBoxxyInputs(stackConfig, tokens, undefined);
+  const inputs = loadBoxxyInputs(fixture.stackConfig, tokens, undefined);
 
-  invariant(inputs.boxxy?.secrets.notice);
+  invariant(inputs.boxxy?.secrets.noticeToken);
 
-  const notice = inputs.boxxy.secrets.notice;
+  const noticeToken = inputs.boxxy.secrets.noticeToken;
 
-  const marked = await Promise.all([isSecret(notice.session), isSecret(notice.token)]);
-  const values = await Promise.all([resolveOutput(notice.session), resolveOutput(notice.token)]);
+  const marked = await isSecret(noticeToken);
+  const value = await resolveOutput(noticeToken);
 
-  expect(marked).toStrictEqual([true, true]);
-
-  expect(values).toStrictEqual([
-    'owner-pc.0a1b2c3d.11111111-2222-3333-4444-555555555555',
-    'notice-token-for-tests',
-  ]);
+  expect(marked).toBeTrue();
+  expect(value).toBe('notice-token-for-tests');
 });
 
-test('it adds no notice while neither the notice session nor the notice token is set', () => {
+test('it adds no notice token while the variable is unset', () => {
   const fixture = setupTest();
   const inputs = loadBoxxyInputs(fixture.stackConfig, fixture.tokens, undefined);
 
-  expect(inputs.boxxy?.secrets).not.toContainKey('notice');
-});
-
-test('it refuses the notice token without the notice session', () => {
-  const fixture = setupTest();
-  const tokens = { ...fixture.tokens, BOXXY_ATC_NOTICE_TOKEN: 'notice-token-for-tests' };
-
-  expect(() => loadBoxxyInputs(fixture.stackConfig, tokens, undefined)).toThrowWithMessage(
-    Error,
-    'BOXXY_ATC_NOTICE_TOKEN is set, but stack config "boxxyNoticeSession" is unset: the server sends notices only to the session it names, so set both or neither: run `pulumi config set --secret boxxyNoticeSession <gateway ID>` in infra/',
-  );
-});
-
-test('it refuses the notice session without the notice token', () => {
-  const fixture = setupTest();
-
-  const stackConfig = buildStubConfig({
-    ...fixture.stackValues,
-    boxxyNoticeSession: 'owner-pc.0a1b2c3d.11111111-2222-3333-4444-555555555555',
-  });
-
-  expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrowWithMessage(
-    Error,
-    'stack config "boxxyNoticeSession" is set, but BOXXY_ATC_NOTICE_TOKEN is unset: the boxxy server refuses to start with a notice session and no notice token',
-  );
+  expect(inputs.boxxy?.secrets).not.toContainKey('noticeToken');
 });
 
 test.each([
@@ -524,15 +490,9 @@ test.each([
   ['BOXXY_ATC_TOKEN', 'atc-token-for-tests'],
 ])('it refuses a notice token equal to %s', (_name, token) => {
   const fixture = setupTest();
-
-  const stackConfig = buildStubConfig({
-    ...fixture.stackValues,
-    boxxyNoticeSession: 'owner-pc.0a1b2c3d.11111111-2222-3333-4444-555555555555',
-  });
-
   const tokens = { ...fixture.tokens, BOXXY_ATC_NOTICE_TOKEN: token };
 
-  expect(() => loadBoxxyInputs(stackConfig, tokens, undefined)).toThrowWithMessage(
+  expect(() => loadBoxxyInputs(fixture.stackConfig, tokens, undefined)).toThrowWithMessage(
     Error,
     'BOXXY_ATC_NOTICE_TOKEN must differ from BOXXY_WORKER_TOKEN and BOXXY_ATC_TOKEN',
   );

@@ -233,12 +233,8 @@ export interface BoxxyInputs {
       readonly installationID: Output<string>;
     };
 
-    // the notice session's gateway ID and the token the notifier sends to it with; without them
-    // the server sends no notice
-    readonly notice?: {
-      readonly session: Output<string>;
-      readonly token: Output<string>;
-    };
+    // the token the server sends each owner notice with; without it the server sends no notice
+    readonly noticeToken?: Output<string>;
   };
 
   // without it there is no backup CronJob

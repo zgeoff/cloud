@@ -27,7 +27,7 @@ test("it runs the boxxy server as one nonroot replica on a read-only root, with 
       pepysSigningSecret: false,
       githubApp: false,
       reviewApp: false,
-      notice: false,
+      noticeToken: false,
       pullSecret: 'ghcr-pull',
     }),
   ).toStrictEqual({
@@ -175,7 +175,7 @@ test('it mounts each trust document read-only as a regular file in the issuers f
     pepysSigningSecret: false,
     githubApp: false,
     reviewApp: false,
-    notice: false,
+    noticeToken: false,
     pullSecret: 'ghcr-pull',
   });
 
@@ -224,7 +224,7 @@ test('it reads the pepys signing secret from the Secret when the config has a pe
     pepysSigningSecret: true,
     githubApp: false,
     reviewApp: false,
-    notice: false,
+    noticeToken: false,
     pullSecret: 'ghcr-pull',
   });
 
@@ -255,7 +255,7 @@ test("it runs the door tunnel's connector beside the server, with the tunnel's t
     pepysSigningSecret: false,
     githubApp: false,
     reviewApp: false,
-    notice: false,
+    noticeToken: false,
     pullSecret: 'ghcr-pull',
     doorTunnelToken,
   });
@@ -316,7 +316,7 @@ test('it runs no connector and mounts no tunnel token without a door tunnel', ()
     pepysSigningSecret: false,
     githubApp: false,
     reviewApp: false,
-    notice: false,
+    noticeToken: false,
     pullSecret: 'ghcr-pull',
   });
 
@@ -339,7 +339,7 @@ test("it reads each of the noslop App's keys from the Secret when the server run
     pepysSigningSecret: false,
     githubApp: false,
     reviewApp: true,
-    notice: false,
+    noticeToken: false,
     pullSecret: 'ghcr-pull',
   });
 
@@ -367,7 +367,7 @@ test("it reads each of the noslop App's keys from the Secret when the server run
   });
 });
 
-test('it reads the notice session and the notice token from the Secret when the server sends notices', () => {
+test('it reads the notice token alone from the Secret when the server sends notices', () => {
   const tokenSecret = output('boxxy-tokens-0a1b2c3d');
 
   const spec = buildBoxxySpec({
@@ -378,7 +378,7 @@ test('it reads the notice session and the notice token from the Secret when the 
     pepysSigningSecret: false,
     githubApp: false,
     reviewApp: false,
-    notice: true,
+    noticeToken: true,
     pullSecret: 'ghcr-pull',
   });
 
@@ -387,10 +387,6 @@ test('it reads the notice session and the notice token from the Secret when the 
       containers: [
         {
           env: expect.arrayContaining([
-            {
-              name: 'BOXXY_ATC_NOTICE_SESSION',
-              valueFrom: { secretKeyRef: { name: tokenSecret, key: 'atc-notice-session' } },
-            },
             {
               name: 'BOXXY_ATC_NOTICE_TOKEN',
               valueFrom: { secretKeyRef: { name: tokenSecret, key: 'atc-notice-token' } },
@@ -411,7 +407,7 @@ test('it mounts no Secret for the rules repository, the checkout read-write in t
     pepysSigningSecret: false,
     githubApp: false,
     reviewApp: false,
-    notice: false,
+    noticeToken: false,
     pullSecret: 'ghcr-pull',
   });
 
@@ -450,7 +446,7 @@ test("it reads each of the boxxy App's keys from the Secret when the server call
     pepysSigningSecret: false,
     githubApp: true,
     reviewApp: false,
-    notice: false,
+    noticeToken: false,
     pullSecret: 'ghcr-pull',
   });
 

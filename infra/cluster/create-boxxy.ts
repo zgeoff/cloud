@@ -20,7 +20,6 @@ import {
   buildBoxxySpec,
   configFileName,
   githubAppKeys,
-  noticeSessionKey,
   noticeTokenKey,
   pepysSigningSecretKey,
   reviewAppKeys,
@@ -93,12 +92,9 @@ export function createBoxxy(
               [reviewAppKeys.NOSLOP_GITHUB_APP_INSTALLATION_ID]:
                 inputs.secrets.reviewApp.installationID,
             }),
-        ...(inputs.secrets.notice === undefined
+        ...(inputs.secrets.noticeToken === undefined
           ? {}
-          : {
-              [noticeSessionKey]: inputs.secrets.notice.session,
-              [noticeTokenKey]: inputs.secrets.notice.token,
-            }),
+          : { [noticeTokenKey]: inputs.secrets.noticeToken }),
       },
     },
     { provider: cluster },
@@ -208,7 +204,7 @@ export function createBoxxy(
         pepysSigningSecret: inputs.secrets.pepysSigningSecret !== undefined,
         githubApp: inputs.secrets.githubApp !== undefined,
         reviewApp: inputs.secrets.reviewApp !== undefined,
-        notice: inputs.secrets.notice !== undefined,
+        noticeToken: inputs.secrets.noticeToken !== undefined,
         pullSecret: ghcrPullSecretName,
         ...(doorTunnel === undefined ? {} : { doorTunnelToken: doorTunnel.metadata.name }),
       }),

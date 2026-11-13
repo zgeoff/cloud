@@ -351,11 +351,25 @@ close-out, and each item holds at review after two sessions.
 
 The server sends each hold notice to one session on the owner's PC, the notice session, through the
 atc gateway. It sends with a notice token of its own, which holds the `message` scope alone, so no
-worker token reaches the PC
+worker token reaches the PC. The notice session registers its own gateway ID with the server, which
+stores it, so the deployment holds the token and no session
 ([notice delivery](https://github.com/zgeoff/boxxy/blob/main/docs/design/boxxy/owner-notices.md)).
-The server needs `@boxxy/server` 0.2.4 or later.
 
-1. Mint the notice token into the item `boxxy-atc-notice-token`, field `credential`, in `cloud`, and
+The server needs `@boxxy/server` 0.2.6 or later. Deploy the token with that server image or after
+it, never before: an older server that holds a token and no session marks each notice sent without
+sending it.
+
+1. Read the `@boxxy/server` version of the image that `boxxy.image` in `infra/Pulumi.prod.yaml`
+   pins. The image's tag is the commit that built it:
+
+   ```bash
+   git show <commit>:package.json | grep '@boxxy/server'
+   ```
+
+   `<commit>` is the tag of `boxxy.image`. Expect 0.2.6 or later. For an older version,
+   [upgrade the server](#upgrade-the-server) first.
+
+2. Mint the notice token into the item `boxxy-atc-notice-token`, field `credential`, in `cloud`, and
    into its `cloud-deploy` copy. The token goes to `op` on stdin, never on the command line:
 
    ```bash
@@ -369,9 +383,6 @@ The server needs `@boxxy/server` 0.2.4 or later.
    unset token
    ```
 
-2. Read the notice session's gateway ID: `atc_sessions_list` through the gateway prints it as
-   `<daemon>.<incarnation>.<id>`. The daemon is the PC daemon's name in `atcGateway.daemons`, and
-   the incarnation is the first 8 characters of its `daemonID`.
 3. On the PC, add the principal to the `principals` of the atc daemon's `config.json`, then restart
    the daemon, because a reload rereads only its tokens:
 
@@ -384,24 +395,23 @@ The server needs `@boxxy/server` 0.2.4 or later.
    Keep the notice session's sub-sessions on `local` too. atc lets a client reach a session only
    when every session in its tree runs on a target the client holds.
 
-4. In a PR, set the gateway ID as the secret stack config `boxxyNoticeSession`, so the ID stays out
-   of the public file:
+4. Run `bun run preview`. Expect it to replace the Secret `boxxy-tokens` and the gateway's
+   `atc-gateway-service-tokens` Secret, and to update the StatefulSet and the gateway's Deployment.
+5. Apply it: merge the PR that adds the `.env` line, or, with the line on `main`,
+   [apply by hand](./workflows.md#apply-by-hand). Until a session registers, each notice waits, and
+   `runner.status` shows `no-notice-session`.
+6. In the notice session, register the session's own gateway ID, once:
 
    ```bash
-   cd infra
-   printf '%s' '<gateway_id>' \
-     | op run --env-file=../.env -- pulumi config set --stack prod --secret boxxyNoticeSession
+   boxxy notices register <gateway_id>
    ```
 
-   `<gateway_id>` is the ID from step 2. The deploy refuses `boxxyNoticeSession` without
-   `BOXXY_ATC_NOTICE_TOKEN`, and the token without the session.
+   `<gateway_id>` is the session's ID as `atc_sessions_list` prints it through the gateway,
+   `<daemon>.<incarnation>.<id>`. Expect `boxxy notices show` to print the same ID. The notices that
+   wait reach the session within 15 minutes, and a forced hold after that reaches it within 2 ticks.
 
-5. Run `bun run preview`. Expect it to replace the Secret `boxxy-tokens` and the gateway's
-   `atc-gateway-service-tokens` Secret, and to update the StatefulSet and the gateway's Deployment.
-6. Merge it. After the deploy, a forced hold reaches the notice session.
-
-To move notices to another session, set `boxxyNoticeSession` to its gateway ID in a PR. A rename
-keeps the ID, so it needs no change.
+To move notices to another session, run step 6 in that session. It needs no deploy and no restart of
+the server. A rename keeps the ID, so it needs no new registration.
 
 ## Upgrade the server
 
