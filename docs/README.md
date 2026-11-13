@@ -84,8 +84,13 @@ call, the path of a change, the topology and the data.
   forgotten item, test a restore.
 - [The files service](./runbooks/files.md): deploy files.geoff.cloud, upload a file, upgrade, revoke
   a token, back up, restore and check a restore.
-- [pepys](./runbooks/pepys.md): let Claude sessions send their telemetry to pepys ingest, and rotate
-  its token.
+- [pepys: deploy and release](./runbooks/pepys.md): deploy pepys the first time, and bump its
+  release.
+- [pepys: telemetry from sessions](./runbooks/pepys-telemetry.md): let Claude sessions send their
+  telemetry to pepys ingest, and rotate its token.
+- [pepys: the API's public route and its clients](./runbooks/pepys-api.md): turn on the API's public
+  route, enroll the owner's passkey, and add or remove an MCP client.
+- [pepys: the backup](./runbooks/pepys-backup.md): give the backup its Garage key, and back up now.
 - [The boxxy server](./runbooks/boxxy.md): deploy the server, add a trust document, upgrade, rotate
   a token, back up and restore.
 - [Release check](./runbooks/release-check.md): the bump pull requests for new atc, imp, nixie,

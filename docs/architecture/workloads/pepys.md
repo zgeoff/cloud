@@ -139,7 +139,7 @@ the field in the pull request that pins a 0.3.0 or later image.
 
 The backup leaves `mcp-auth.db` out, as pepys decides in its design: a lost database costs one
 passkey enrollment and one sign-in per client, and the retaining class keeps the volume when its
-claim goes. [The pepys runbook](../../runbooks/pepys.md#turn-on-the-apis-public-route) turns the
+claim goes. [The API runbook](../../runbooks/pepys-api.md#turn-on-the-apis-public-route) turns the
 route on, enrolls the passkey and adds a client.
 
 ### The API's tailnet route
@@ -179,7 +179,7 @@ address on Podman's bridge. The relay dials the ingest Service at its pinned Clu
 policy has no rule for the relay, and the relay still passes: kube-router accepts a packet whose
 source is one of the node's own addresses before it applies any policy, so the policy needs no
 `ipBlock`. Ingest then checks the bearer token and the identity token as above. The secret's setup
-is in [the pepys runbook](../../runbooks/pepys.md#let-sessions-send-telemetry).
+is in [the telemetry runbook](../../runbooks/pepys-telemetry.md#let-sessions-send-telemetry).
 
 ## Network policies
 
@@ -244,6 +244,6 @@ none. `pepysWorkloads.backup.buckets` in
 added there needs a read grant for the backup's key too. Garage creates s2-lite's key at each start,
 but it has no way to create a second key, so an operator imports the backup's key by hand, once and
 again after any rebuild of Garage's data. The
-[pepys runbook](../../runbooks/pepys.md#give-the-backup-its-garage-key) gives the steps.
+[backup runbook](../../runbooks/pepys-backup.md#give-the-backup-its-garage-key) gives the steps.
 
 [The pepys runbook](../../runbooks/pepys.md#deploy-the-first-time) deploys pepys the first time.

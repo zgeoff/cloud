@@ -1,23 +1,31 @@
-# pepys
+# pepys: first deploy and release bump
 
-Runbook for the parts of [pepys](../architecture/workloads/pepys.md) that an operator runs by hand:
-the first deploy and a release bump, the path that carries a session's telemetry to ingest and its
-token, the API's passkey and OAuth clients and their public route, and the backup's Garage key and a
-backup on demand.
+Deploy [pepys](../architecture/workloads/pepys.md), the owner's data hub, to the cluster the first
+time, and move the cluster to a later pepys release. [Deploy the first time](#deploy-the-first-time)
+is for a cluster whose [stack config](./workflows.md#change-stack-config) holds no `pepys` object.
+[Bump the pepys release](#bump-the-pepys-release) is for each pepys release after that. Other
+runbooks cover the rest of what an operator does by hand:
+[telemetry from sessions](./pepys-telemetry.md),
+[the API's public route and its clients](./pepys-api.md), and [the backup](./pepys-backup.md).
 
 ## Deploy the first time
 
-**CAUTION:** The first apply adds a public route. Its `Deploy prod` run holds on the tunnel route
-change until the owner approves it, as [the prod apply job](./prod-apply.md) describes.
+The Pulumi program deploys pepys only when the stack config holds a `pepys` object: the key
+`geoff-cloud:pepys` in `infra/Pulumi.prod.yaml`. Without the object, the pepys code on `main`
+changes nothing in prod.
 
-The Pulumi program deploys pepys only when stack config `pepys` exists, so the service merges first
-and changes nothing in prod.
+**CAUTION:** These steps add a public route. The `Deploy prod` run of the merge in step 4 holds at
+the tunnel route change, and step 5 answers the held run. Get the owner's approval before you answer
+it, as [the prod apply job](./prod-apply.md) describes.
 
-1. Merge the service. The `pepys image` workflow publishes
-   `ghcr.io/zgeoff/cloud-pepys:<release>-<commit>` from `main`, and its run summary gives the
-   digest. When the package does not exist yet, the first push creates it and then fails with
-   `denied`: rerun the failed job, which publishes the tag.
-2. In a PR, add the `pepys` object to `infra/Pulumi.prod.yaml`:
+1. Read the image's tag and digest in the summary of the newest
+   [`pepys image`](../../.github/workflows/pepys-image.yml) run on `main`. The workflow publishes
+   `ghcr.io/zgeoff/cloud-pepys:<release>-<commit>`, where `<release>` is the pepys release without
+   its `v`, and `<commit>` is the first 12 digits of the commit. A push to a container package that
+   ghcr.io does not hold yet creates the package and then fails with `denied`. Rerun the failed job,
+   which publishes the tag.
+2. In a pull request, add the `pepys` object to `infra/Pulumi.prod.yaml`, with the tag and the
+   digest, `<digest>`, from step 1:
 
    ```yaml
    geoff-cloud:pepys:
@@ -26,22 +34,28 @@ and changes nothing in prod.
      impIdentityAudience: pepys.imp.internal
    ```
 
-   Run `bun run preview` and check that it adds the `pepys` namespace, its network policies,
-   Secrets, Services and workloads, and the shared tunnel's rule and the proxied record for
-   `pepys-webhook.geoff.cloud`, and changes nothing else. The backup CronJob comes only with the
-   backup variables in `.env`.
-
-3. Merge the PR, and approve the held `Deploy prod` run once its plan matches the preview.
-4. Check that the workloads are up:
+3. Run `bun run preview` from the repo root, as [First preview](./development.md#first-preview) sets
+   up. Expect the preview to add the `pepys` namespace, its network policies, Secrets, Services and
+   workloads. Expect it to add the rule of
+   [the shared tunnel](../architecture/network/public-ingress.md#the-shared-tunnel) and the proxied
+   record for `pepys-webhook.geoff.cloud`. Expect no other change. The preview adds the backup
+   CronJob only when `.env` names
+   [the backup variables](./pepys-backup.md#give-the-backup-its-garage-key).
+4. Merge the pull request.
+5. Once the plan of the held `Deploy prod` run matches the preview, answer the run, as
+   [Answer a held run](./prod-apply.md#answer-a-held-run) says.
+6. Check that the workloads are up:
 
    ```bash
    ssh root@geoffcloud k3s kubectl -n pepys rollout status statefulset/pepys-host --timeout=300s
    ```
 
-   Expect `statefulset rolling update complete`. Check `statefulset/pepys-garage`,
-   `deployment/pepys-s2` and `deployment/pepys-ingest` the same way.
+   Expect `statefulset rolling update complete`. Run the command again for
+   `statefulset/pepys-garage`, and expect the same line. Run it for `deployment/pepys-s2` and
+   `deployment/pepys-ingest`, and expect `deployment "<name>" successfully rolled out`, where
+   `<name>` is the Deployment's name.
 
-5. Check that the public route refuses an unsigned delivery:
+7. Check that the public route refuses an unsigned delivery:
 
    ```bash
    curl -s -o /dev/null -w '%{http_code}\n' -X POST https://pepys-webhook.geoff.cloud/webhook/github
@@ -51,18 +65,32 @@ and changes nothing in prod.
 
 ## Bump the pepys release
 
-The binaries and the modules must come from one release, so a bump changes the pin and the packages
-in one pull request.
+The `cloud-pepys` image holds the pepys host, a binary that the pepys release publishes, beside
+ingest, the API and the consumer modules, which the image build compiles from the `@pepys/*`
+packages in `deploy/pepys`. [Processes](../architecture/workloads/pepys.md#processes) and
+[The image](../architecture/workloads/pepys.md#the-image) explain the host, its consumers and the
+fact log. The binary and the packages must come from one release, so a bump changes `PEPYS_RELEASE`
+and the package versions in one pull request.
+[`collect-pepys-version-mismatches.test.ts`](../../scripts/collect-pepys-version-mismatches.test.ts)
+fails when the release and a package version differ.
 
-1. Set `PEPYS_RELEASE` in [`images/pepys/versions.env`](../../images/pepys/versions.env). The shared
-   release tooling changes only this file.
+1. Set `PEPYS_RELEASE` and `PEPYS_HOST_ASSET_SHA256` in
+   [`images/pepys/versions.env`](../../images/pepys/versions.env). The checksum is the line of
+   `pepys-host-linux-x64` in the release's `SHA256SUMS`, and the image build stops on a checksum of
+   another release. The bump pull request that [the release check](./release-check.md) opens on the
+   branch `release-check/pepys` sets both lines, and changes only this file.
 2. Set each `@pepys/*` version in `deploy/pepys/package.json` to that release, by hand.
-3. Check that the peer range of `@boxxy/pepys` on `@pepys/kit` admits the release. When it does not,
-   pin an `@boxxy/pepys` whose range does. `@boxxy/pepys` carries boxxy's own version.
-4. Run `bun install` in `deploy/pepys` to write its lock again, then
-   `bun run check:pepys-deployment`. Expect exit 0.
-5. Merge the pull request. Its `pepys image` run on `main` publishes the image of the release.
-6. Pin that image in `infra/Pulumi.prod.yaml`, in a second pull request, and merge it.
+3. Check that `@boxxy/pepys`, the boxxy plug-in in `deploy/pepys/package.json`, admits the release.
+   The plug-in's own `package.json` gives its range on `@pepys/kit` under `peerDependencies`. When
+   the range leaves the release out, set `@boxxy/pepys` to a version whose range admits it.
+   `@boxxy/pepys` carries boxxy's own version.
+4. Run `bun install` in `deploy/pepys` to write its lock again. Then run
+   `bun run check:pepys-deployment` from the repo root. Expect exit 0.
+5. Merge the pull request. Its `pepys image` run on `main` publishes the image of the release, and
+   the run summary gives the image's tag and digest.
+6. Open a second pull request that sets `image` in the `geoff-cloud:pepys` object of
+   `infra/Pulumi.prod.yaml` to that tag and digest. Merge it. The `Deploy prod` workflow applies it
+   once CI passes on `main`.
 7. After the `Deploy prod` run of the pin, read the pepys host's start log. The host starts with
    `run --up`, so it deploys each consumer's module of the release before it applies new facts:
 
@@ -82,219 +110,3 @@ in one pull request.
    `up <consumer> failed: s2: connection refused`, the pod starts the host again, and the lines
    above come from the first start that succeeds. When the starts keep failing, check
    `deployment/pepys-s2`.
-
-[`collect-pepys-version-mismatches.test.ts`](../../scripts/collect-pepys-version-mismatches.test.ts)
-fails when the release and a package version differ.
-
-## Let sessions send telemetry
-
-A Claude session in an imp sends its OpenTelemetry logs to `https://pepys.imp.internal`, a name that
-exists only inside imp's broker. The broker adds the bearer token and an imp identity token, and
-forwards the request to the pepys relay on the host's address on Podman's bridge. The relay dials
-the ingest Service. The guest holds neither token.
-
-| Where                                           | Holds                                                                    |
-| ----------------------------------------------- | ------------------------------------------------------------------------ |
-| vault `cloud`, item `pepys-telemetry`           | the bearer token that ingest accepts on its telemetry route              |
-| impd, static secret `pepys-telemetry`           | the same token, with `pepys.imp.internal` as its only host, and identity |
-| the atc daemon's `pepys-telemetry` auth profile | the secret's name, the host and the session's OpenTelemetry endpoint     |
-
-The path needs the host switch that adds the relay, and the stack config `pepys.impIdentityAudience`
-set to `pepys.imp.internal`.
-
-1. Check that impd signs identity tokens. `impz info --json` in imp-host shows `secretIdentity` as
-   true under `features`, and `impz identity jwks` prints the document that
-   `deploy/pepys/imp-issuers/geoffcloud.json` holds.
-2. Add the token to impd. Send it on stdin, and never put it on a command line. The upstream is the
-   host's address on Podman's bridge (`podman.bridgeAddress` in the shared constants) and the port
-   of the `pepys-ingest-relay` entry in the exposure registry:
-
-   ```sh
-   op read op://cloud/pepys-telemetry/credential \
-     | ssh root@geoffcloud podman exec -i imp-host impz secret add pepys-telemetry \
-         --kind static --hosts pepys.imp.internal --header authorization --scheme bearer \
-         --upstream http://10.88.0.1:18083 --identity
-   ```
-
-   Read the token on your machine with `op`: imp-host has neither `op` nor a vault credential, so
-   the secret travels over SSH's stdin into `impz` in the container. Never put it on the SSH command
-   line, because the host's journal records that line.
-
-   Expect `impz secret ls` to show `pepys.imp.internal -> http://10.88.0.1:18083 (identity)`.
-   Replacing the token of a secret that exists takes `--replace`, and a change of host, upstream or
-   `--identity` takes `--replace --rebind`, which drops the secret's grants.
-
-3. List the secret in the grantable list of the atc daemon's impd token, so the daemon may grant it
-   to a session. The command replaces the whole list, and the list is in
-   `scripts/atc-cloud-grantable.ts`:
-
-   ```sh
-   ssh root@geoffcloud podman exec imp-host impz token set atc-cloud \
-     --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy,boxxy-github-token \
-     < /dev/null
-   ```
-
-   `bun scripts/install-atc-gateway-credentials.ts` stops with this command when the token exists
-   with another list.
-
-4. Spawn a Claude session through the atc gateway, and check that ingest received its export:
-
-   ```sh
-   ssh root@geoffcloud k3s kubectl -n pepys logs -l app=pepys-ingest --tail=50
-   ```
-
-## Rotate the token
-
-1. Put the new token in the item `pepys-telemetry` in `cloud` and in its `cloud-deploy` copy.
-2. Run the `impz secret add` command above with `--replace`.
-3. [Apply by hand](./workflows.md#apply-by-hand), so Pulumi replaces the ingest Secret. A new secret
-   under the same name needs the grantable list set again.
-
-## Turn on the API's public route
-
-**CAUTION:** This adds a public route. Its `Deploy prod` run holds on the tunnel route change until
-the owner approves it.
-
-1. In the pull request that pins a `cloud-pepys` image of pepys 0.3.1 or later, add
-   `apiHostname: pepys.geoff.cloud` to the `geoff-cloud:pepys` object in `infra/Pulumi.prod.yaml`.
-   The program takes 0.3.0, but its compiled API stops at start.
-2. Run `bun run preview`. Expect it to add the claim `pepys-auth`, the Access policy and application
-   `pepys-api-owner` and `pepys-api-sign-in`, and the record `pepys-api`, and to update the host's
-   StatefulSet, the host's network policy and the shared tunnel's configuration. Expect no replace.
-3. Merge, and approve the held `Deploy prod` run once its plan matches the preview.
-4. Check that the API serves `/mcp` behind its token:
-
-   ```bash
-   curl -s -o /dev/null -w '%{http_code}\n' -X POST https://pepys.geoff.cloud/mcp
-   ```
-
-   Expect `401`.
-
-5. Check that the tunnel keeps `/rpc` in:
-
-   ```bash
-   curl -s -o /dev/null -w '%{http_code}\n' https://pepys.geoff.cloud/rpc/
-   ```
-
-   Expect `404`.
-
-6. Check that the MCP alias at `/` takes only a POST. cloudflared routes on the path alone, so the
-   API refuses the other methods:
-
-   ```bash
-   curl -s -o /dev/null -w '%{http_code}\n' https://pepys.geoff.cloud/
-   ```
-
-   Expect `405`.
-
-7. Sign a client in, as [Sign a client in to the API](#sign-a-client-in-to-the-api) says.
-
-## Sign a client in to the API
-
-The API's admin commands run in the API's container, on `mcp-auth.db`, beside the running server.
-The commands need the API's public route, as
-[Turn on the API's public route](#turn-on-the-apis-public-route) says. Each command below runs
-through `pepys-api` in the container `api` of the pod `pepys-host-0`.
-
-1. List the passkeys:
-
-   ```sh
-   ssh root@geoffcloud k3s kubectl -n pepys exec pepys-host-0 -c api -- /usr/local/bin/pepys-api passkeys
-   ```
-
-   When it prints `No passkeys`, go on to step 2. Otherwise go to step 3.
-
-2. Print an enrollment token, and type it on `https://pepys.geoff.cloud/enroll` within 15 minutes:
-
-   ```sh
-   ssh root@geoffcloud k3s kubectl -n pepys exec pepys-host-0 -c api -- /usr/local/bin/pepys-api passkeys enroll
-   ```
-
-   Cloudflare Access asks for the owner's one-time PIN before the page loads. Expect `passkeys` to
-   list the new passkey.
-
-3. Add the client, with a fixed callback port, `<port>`, of your choice:
-
-   ```sh
-   ssh root@geoffcloud k3s kubectl -n pepys exec pepys-host-0 -c api -- /usr/local/bin/pepys-api clients add 'Claude Code' --redirect-uri http://localhost:<port>/callback
-   ```
-
-   Expect a client ID, `<client_id>`.
-
-4. In Claude Code, add the MCP server `https://pepys.geoff.cloud/mcp` over HTTP, with `<client_id>`
-   in `--client-id` and `<port>` in `--callback-port`. Leave out `--client-secret`, because every
-   client is public. Expect the first connection to open the owner's browser on `/oauth2/authorize`.
-
-`grants` lists the live grants, and `grants --revoke=<grant_id>` ends one.
-`clients remove <client_id>` removes a client with each grant and token it holds.
-
-## Give the backup its Garage key
-
-Import the backup's key into Garage before the first backup, and again whenever Garage's `meta`
-volume is new, such as after a rebuild of Garage's data. Garage creates s2-lite's key itself at each
-start, but it never creates the backup's. Without the key, the backup fails with `AccessDenied`.
-
-The vault item `pepys-garage-backup` holds the key in two fields, `access-key-id` and
-`secret-access-key`. The prod apply job reads its copy in the `cloud-deploy` vault, so the item
-lives in `cloud` and in `cloud-deploy` under the same name. The key can read each bucket that
-`pepysWorkloads.backup.buckets` in [`pepys-workloads.ts`](../../infra/shared/pepys-workloads.ts)
-lists, and write none.
-
-1. If the item does not exist, mint a key and store it in both vaults. The key ID is `GK` and 24 hex
-   digits, and the secret is 64 hex digits. The item goes to `op` on stdin:
-
-   ```sh
-   item="$(jq -n --arg id "GK$(openssl rand -hex 12)" --arg secret "$(openssl rand -hex 32)" \
-     '{title: "pepys-garage-backup", category: "API_CREDENTIAL", fields: [
-       {id: "access-key-id", label: "access-key-id", type: "STRING", value: $id},
-       {id: "secret-access-key", label: "secret-access-key", type: "CONCEALED", value: $secret}]}')"
-   printf '%s' "$item" | op item create --vault cloud > /dev/null
-   printf '%s' "$item" | op item create --vault cloud-deploy > /dev/null
-   unset item
-   ```
-
-   Expect `op item get pepys-garage-backup --vault cloud-deploy` to list both fields.
-
-2. Import the key into Garage. `garage key import` takes the secret as an argument, and the host's
-   journal records the SSH command line, so send the command as a script on SSH's stdin:
-
-   ```sh
-   printf 'k3s kubectl -n pepys exec pepys-garage-0 -c garage -- /garage key import --yes -n pepys-backup %s %s > /dev/null\n' \
-     "$(op read op://cloud/pepys-garage-backup/access-key-id)" \
-     "$(op read op://cloud/pepys-garage-backup/secret-access-key)" \
-     | ssh root@geoffcloud bash -s
-   ```
-
-   Expect Garage's `INFO` connection lines and no error. When Garage already holds the key, the
-   import fails with `KeyAlreadyExists` and changes nothing, so go on to the next step.
-
-3. Give the key read access to each bucket that the backup copies. For `facts`:
-
-   ```sh
-   ssh root@geoffcloud k3s kubectl -n pepys exec pepys-garage-0 -c garage -- \
-     /garage bucket allow --read facts --key pepys-backup
-   ```
-
-   Expect the command to print the bucket's key table, with `R` for `pepys-backup` and `RWO` for
-   s2-lite's `default access key`. Running it again changes nothing.
-
-4. Run the backup once, as [Back up now](#back-up-now) describes.
-
-## Back up now
-
-1. Start a job from the backup's CronJob:
-
-   ```sh
-   ssh root@geoffcloud k3s kubectl -n pepys create job --from=cronjob/pepys-backup pepys-backup-manual-$(date +%s)
-   ```
-
-   Expect `job.batch/<job-name> created`, where `<job-name>` is the new job's name.
-
-2. Follow the job's log:
-
-   ```sh
-   ssh root@geoffcloud k3s kubectl -n pepys logs -f job/<job-name>
-   ```
-
-   Expect one `copied <bucket>` line for each bucket, such as `copied facts`. When the log shows
-   `AccessDenied` from Garage, [give the backup its Garage key](#give-the-backup-its-garage-key).
