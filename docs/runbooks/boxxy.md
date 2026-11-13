@@ -349,7 +349,8 @@ close-out, and each item holds at review after two sessions.
 ## Upgrade the server
 
 1. Merge the change: a new `@boxxy/server` version in `package.json` and `bun.lock`, or a change to
-   `deploy/boxxy/`. The `boxxy image` workflow publishes the new commit's image.
+   `deploy/boxxy/server.ts`. The `boxxy image` workflow publishes the new commit's image. A rules
+   change needs no image: it is a pull request to the rules repository.
 2. In a PR, set `boxxy.image` in `infra/Pulumi.prod.yaml` to the new tag and digest.
 3. Merge it. `Deploy prod` rolls `boxxy-0`; the server is down for the restart.
 

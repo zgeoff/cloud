@@ -124,18 +124,17 @@ deploy. boxxy's
 [rules repository design](https://github.com/zgeoff/boxxy/blob/main/docs/design/boxxy/rules-repository.md)
 gives the failure behaviour.
 
-The server mounts that folder read-only at `/rules`, over the image's own copy of
-`deploy/boxxy/rules/`, and trusts the sidecar's files, which another uid owns, through the
-`safe.directory` variables. The server starts only once the sidecar's startup probe finds the first
-checkout. Prometheus scrapes the sidecar's sync counters, and BoxxyRulesStale fires while no fetch
-succeeds.
+The image holds no rules. The server mounts that folder read-only at `/rules`, and trusts the
+sidecar's files, which another uid owns, through the `safe.directory` variables. The server starts
+only once the sidecar's startup probe finds the first checkout. Prometheus scrapes the sidecar's
+sync counters, and BoxxyRulesStale fires while no fetch succeeds.
 
 The review phase runs the `review-run` recipe on the atc agent `boxxy-review`, the one agent whose
 broker profile holds the read-only clone token. Stack config `boxxy.spawn.reviewAgents` lists it,
 and the server then loads the rules only when review recipes alone name it. The image test starts
-the server with the same list on the image's copy of the rules, so it never checks a commit of the
-rules repository: when a commit breaks the pairing, the server refuses it and keeps the rules in
-force.
+the server with the same list on rules of its own, in `images/boxxy/test-rules/`, so it never checks
+a commit of the rules repository: when a commit breaks the pairing, the server refuses it and keeps
+the rules in force.
 
 ## The caller proof
 
@@ -161,7 +160,7 @@ The backup and the restore run as the server's user, so they can read and write 
 ## Deployment
 
 The `boxxy image` workflow compiles `deploy/boxxy/server.ts` and the `@boxxy/server` version that
-`package.json` pins into one binary, adds the rules, and publishes the image from `main` to GHCR as
+`package.json` pins into one binary, and publishes the image from `main` to GHCR as
 `ghcr.io/zgeoff/cloud-boxxy:<commit>`. The image builds on the base that `images/boxxy/versions.env`
 pins, which carries git, since the server reads a rules checkout through git. The Pulumi program
 deploys the server only when stack config `boxxy` is set, so the deploy needs the owner's change to
