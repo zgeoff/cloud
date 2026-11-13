@@ -101,14 +101,11 @@ pod, and the others come from the same Secret when their section is set:
 - `BOXXY_PEPYS_SIGNING_SECRET`, with `pepys`: the key that signs each batch of facts. pepys ingest
   reads the same item.
 - `BOXXY_GITHUB_APP_CLIENT_ID`, `BOXXY_GITHUB_APP_PRIVATE_KEY` and
-  `BOXXY_GITHUB_APP_INSTALLATION_ID`, with `github`: the boxxy App's keys, from which a server of
-  0.2.5 or later mints the installation token of every GitHub call. The App's installation must
-  cover every repo in `boxxySpawnRepos`. The deploy refuses `github` without all three, and refuses
-  a key of a shape the server would refuse at start: a client ID with whitespace, an installation ID
-  that is not a number, or a private key that is not RSA.
-- `BOXXY_GITHUB_TOKEN`, with `github`: the fine-grained token, with `Pull requests: read` on the
-  owner's repos, that a server before 0.2.5 reads pull requests with. A server of 0.2.5 or later
-  ignores it.
+  `BOXXY_GITHUB_APP_INSTALLATION_ID`, with `github`: the boxxy App's keys, from which the server
+  mints the installation token of every GitHub call. The App's installation must cover every repo in
+  `boxxySpawnRepos`. The deploy refuses `github` without all three, and refuses a key of a shape the
+  server would refuse at start: a client ID with whitespace, an installation ID that is not a
+  number, or a private key that is not RSA.
 - `NOSLOP_GITHUB_APP_ID`, `NOSLOP_GITHUB_APP_PRIVATE_KEY` and `NOSLOP_GITHUB_APP_INSTALLATION_ID`,
   with `spawn.reviewAgents`: the noslop App's keys, which the review gate checks and posts each
   review with. Only this pod holds them, never a session. The deploy refuses review agents without

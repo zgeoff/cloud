@@ -22,9 +22,6 @@ const tokenNeed = 'the boxxy server needs it while stack config "boxxy" is set';
 const pepysNeed =
   'the boxxy server signs its facts with it while stack config "boxxy.pepys" is set';
 
-const githubNeed =
-  'the boxxy server reads pull requests with it while stack config "boxxy.github" is set';
-
 const name = z.string().min(1);
 
 const publicURLMessage =
@@ -94,12 +91,6 @@ export function loadBoxxyInputs(
       ? undefined
       : requireVariable(env, 'BOXXY_PEPYS_SIGNING_SECRET', pepysNeed);
 
-  // the pod has no broker to add a GitHub credential, so a private repo needs the token
-  const githubToken =
-    config.github === undefined
-      ? undefined
-      : requireVariable(env, 'BOXXY_GITHUB_TOKEN', githubNeed);
-
   const githubApp = config.github === undefined ? undefined : requireGithubApp(env);
   const reviewApp = findReviewApp(config, env);
   const pull = requireGHCRPullCredential(env);
@@ -129,7 +120,6 @@ export function loadBoxxyInputs(
         ...(pepysSigningSecret === undefined
           ? {}
           : { pepysSigningSecret: secret(pepysSigningSecret) }),
-        ...(githubToken === undefined ? {} : { githubToken: secret(githubToken) }),
         ...(githubApp === undefined ? {} : { githubApp }),
         ...(reviewApp === undefined ? {} : { reviewApp }),
       },

@@ -217,11 +217,8 @@ export interface BoxxyInputs {
     // with config pepys: the key the server signs its fact batches with
     readonly pepysSigningSecret?: Output<string>;
 
-    // with config github: the token of a server before 0.2.5's pull request reads
-    readonly githubToken?: Output<string>;
-
-    // with config github: the boxxy App's keys, which a server from 0.2.5 mints its installation
-    // token from for every GitHub call
+    // with config github: the boxxy App's keys, which the server mints its installation token
+    // from for every GitHub call
     readonly githubApp?: {
       readonly clientID: Output<string>;
       readonly privateKey: Output<string>;

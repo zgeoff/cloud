@@ -31,7 +31,6 @@ export interface BoxxySpecInputs {
   // the Secret with the worker token and the atc token, and each optional token the config needs
   readonly tokenSecret: Output<string>;
   readonly pepysSigningSecret: boolean;
-  readonly githubToken: boolean;
   readonly githubApp: boolean;
   readonly reviewApp: boolean;
   readonly pullSecret: string;
@@ -107,7 +106,6 @@ export function buildBoxxySpec(inputs: BoxxySpecInputs): input.apps.v1.StatefulS
 export const workerTokenKey = 'worker-token';
 export const atcTokenKey = 'atc-token';
 export const pepysSigningSecretKey = 'pepys-signing-secret';
-export const githubTokenKey = 'github-token';
 
 // the boxxy App's keys, by the variable the server reads each one from
 export const githubAppKeys = {
@@ -157,14 +155,6 @@ function buildBoxxyContainer(inputs: BoxxySpecInputs): input.core.v1.Container {
               valueFrom: {
                 secretKeyRef: { name: inputs.tokenSecret, key: pepysSigningSecretKey },
               },
-            },
-          ]
-        : []),
-      ...(inputs.githubToken
-        ? [
-            {
-              name: 'BOXXY_GITHUB_TOKEN',
-              valueFrom: { secretKeyRef: { name: inputs.tokenSecret, key: githubTokenKey } },
             },
           ]
         : []),
