@@ -450,6 +450,22 @@ test('it leaves both tokens out, with one warning for each, while the pinned rel
   ]);
 });
 
+test('it refuses a BOXXY_ATC_NOTICE_TOKEN equal to BOXXY_ATC_TOKEN, which the gateway would refuse at start', () => {
+  const token = `atcs_${'b'.repeat(40)}`;
+
+  const env = buildMockATCGatewayEnvironment({
+    BOXXY_ATC_TOKEN: token,
+    BOXXY_ATC_NOTICE_TOKEN: token,
+  });
+
+  expect(() =>
+    loadATCGatewayInputs(buildMockATCGatewayStackConfig(), env, {
+      readRelease: () => '7.14.0',
+      warn: () => {},
+    }),
+  ).toThrowWithMessage(Error, 'BOXXY_ATC_TOKEN and BOXXY_ATC_NOTICE_TOKEN must differ');
+});
+
 test('it refuses a BOXXY_ATC_NOTICE_TOKEN that lacks the atcs_ prefix, without printing it', () => {
   const env = buildMockATCGatewayEnvironment({
     BOXXY_ATC_TOKEN: `atcs_${'b'.repeat(40)}`,

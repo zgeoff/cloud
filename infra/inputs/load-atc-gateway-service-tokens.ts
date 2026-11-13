@@ -69,6 +69,11 @@ export function loadATCGatewayServiceTokens(
     }
   }
 
+  // atc refuses a file that holds one token twice, which stops every client of the gateway
+  if (new Set(found.map((entry) => entry.token)).size < found.length) {
+    throw new Error(`${found.map((entry) => entry.variable).join(' and ')} must differ`);
+  }
+
   return Object.fromEntries(found.map((entry) => [entry.name, secret(entry.token)]));
 }
 
