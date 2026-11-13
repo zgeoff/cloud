@@ -112,13 +112,14 @@ pod, and the others come from the same Secret when their section is set:
   with `spawn.reviewAgents`: the noslop App's keys, which the review gate checks and posts each
   review with. Only this pod holds them, never a session. The deploy refuses review agents without
   all three or without `github`, because the server then rejects every review close-out.
-- `BOXXY_ATC_NOTICE_TOKEN`: the atc service token the server sends each hold notice with, on
-  `@boxxy/server` 0.2.6 and later. The token holds the `message` scope alone, and the server is the
-  principal `service:boxxy-notices` at the owner's PC daemon, which grants it the `local` target
-  where the notice session runs. The deploy refuses a notice token that equals another boxxy token.
-  The Secret holds no notice session: the notice session registers its own gateway ID with the
-  server, which stores it and refuses to start while its environment holds
-  `BOXXY_ATC_NOTICE_SESSION`
+- `BOXXY_ATC_NOTICE_TOKEN`, while the variable is set: the atc service token the server sends each
+  notice with. A notice tells the owner that an item is on hold, and goes to the notice session, one
+  session on the owner's PC. The token holds the `message` scope alone. The server is the principal
+  `service:boxxy-notices` at the atc daemon on the owner's PC, and that daemon grants the principal
+  the target `local`, where the notice session runs. The deploy refuses a notice token that equals
+  another boxxy token. The deployment passes the server no notice session. The notice session
+  registers its own gateway ID with the server, and the server refuses to start while the server's
+  environment holds `BOXXY_ATC_NOTICE_SESSION`
   ([send notices to the owner](../../runbooks/boxxy.md#send-notices-to-the-owner)).
 
 ## The rules

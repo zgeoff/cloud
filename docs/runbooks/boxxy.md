@@ -349,15 +349,17 @@ close-out, and each item holds at review after two sessions.
 
 ## Send notices to the owner
 
-The server sends each hold notice to one session on the owner's PC, the notice session, through the
-atc gateway. It sends with a notice token of its own, which holds the `message` scope alone, so no
-worker token reaches the PC. The notice session registers its own gateway ID with the server, which
-stores it, so the deployment holds the token and no session
+A notice tells the owner that an item is on hold. The server sends each notice through the atc
+gateway to the notice session, one session on the owner's PC. The server's atc token can start and
+stop sessions, so the PC's atc daemon never grants it. The server sends notices with a second token,
+the notice token, which can only send messages. The notice session registers its own gateway ID with
+the server, and the server stores it, so the deployment passes the server the notice token and never
+a session
 ([notice delivery](https://github.com/zgeoff/boxxy/blob/main/docs/design/boxxy/owner-notices.md)).
 
-The server needs `@boxxy/server` 0.2.6 or later. Deploy the token with that server image or after
-it, never before: an older server that holds a token and no session marks each notice sent without
-sending it.
+The server needs `@boxxy/server` 0.2.6 or later. Deploy the notice token with that server image or
+after it, never before: an older server that holds a notice token and no session marks each notice
+sent without sending it.
 
 1. Read the `@boxxy/server` version of the image that `boxxy.image` in `infra/Pulumi.prod.yaml`
    pins. The image's tag is the commit that built it:
@@ -384,7 +386,8 @@ sending it.
    ```
 
 3. On the PC, add the principal to the `principals` of the atc daemon's `config.json`, then restart
-   the daemon, because a reload rereads only its tokens:
+   that daemon, because a reload rereads only its tokens. The PC's atc setup lives on the PC,
+   outside this repo:
 
    ```json
    "principals": {
@@ -395,23 +398,32 @@ sending it.
    Keep the notice session's sub-sessions on `local` too. atc lets a client reach a session only
    when every session in its tree runs on a target the client holds.
 
-4. Run `bun run preview`. Expect it to replace the Secret `boxxy-tokens` and the gateway's
-   `atc-gateway-service-tokens` Secret, and to update the StatefulSet and the gateway's Deployment.
-5. Apply it: merge the PR that adds the `.env` line, or, with the line on `main`,
-   [apply by hand](./workflows.md#apply-by-hand). Until a session registers, each notice waits, and
-   `runner.status` shows `no-notice-session`.
-6. In the notice session, register the session's own gateway ID, once:
+4. In a PR, add the line to `.env`:
 
    ```bash
-   boxxy notices register <gateway_id>
+   BOXXY_ATC_NOTICE_TOKEN=op://cloud/boxxy-atc-notice-token/credential
+   ```
+
+5. Run `bun run preview`. Expect it to replace the Secret `boxxy-tokens` and the gateway's
+   `atc-gateway-service-tokens` Secret, and to update the StatefulSet and the gateway's Deployment.
+6. Merge it. `Deploy prod` rolls `boxxy-0` and the gateway. Until a session registers, each notice
+   waits, and `boxxy runner status` shows `no-notice-session` as the last notice error.
+7. In the notice session, register the session's own gateway ID, once. The owner listener has no
+   route, so [reach the owner listener](#reach-the-owner-listener) first:
+
+   ```bash
+   BOXXY_URL=http://localhost:8090 boxxy notices register <gateway_id>
    ```
 
    `<gateway_id>` is the session's ID as `atc_sessions_list` prints it through the gateway,
-   `<daemon>.<incarnation>.<id>`. Expect `boxxy notices show` to print the same ID. The notices that
-   wait reach the session within 15 minutes, and a forced hold after that reaches it within 2 ticks.
+   `<daemon>.<incarnation>.<id>`. A session that holds the owner's MCP tools of
+   [the public door](#turn-on-the-public-door) can call `notices_register` in place of the command.
 
-To move notices to another session, run step 6 in that session. It needs no deploy and no restart of
-the server. A rename keeps the ID, so it needs no new registration.
+8. Run `BOXXY_URL=http://localhost:8090 boxxy notices show`. Expect the same ID. Each notice that
+   waits reaches the session within 15 minutes.
+
+To move notices to another session, run steps 7 and 8 in that session. The move needs no deploy and
+no restart of the server. A rename keeps the session's ID, so it needs no new registration.
 
 ## Upgrade the server
 

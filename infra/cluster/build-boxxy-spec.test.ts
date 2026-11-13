@@ -386,12 +386,18 @@ test('it reads the notice token alone from the Secret when the server sends noti
     spec: {
       containers: [
         {
-          env: expect.arrayContaining([
+          env: [
+            { name: 'BOXXY_CONFIG' },
+            { name: 'GIT_CONFIG_COUNT' },
+            { name: 'GIT_CONFIG_KEY_0' },
+            { name: 'GIT_CONFIG_VALUE_0' },
+            { name: 'BOXXY_WORKER_TOKEN' },
+            { name: 'BOXXY_ATC_TOKEN' },
             {
               name: 'BOXXY_ATC_NOTICE_TOKEN',
               valueFrom: { secretKeyRef: { name: tokenSecret, key: 'atc-notice-token' } },
             },
-          ]),
+          ],
         },
       ],
     },
