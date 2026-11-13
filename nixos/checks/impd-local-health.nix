@@ -325,7 +325,7 @@ let
       script = ''
         mkdir home tmp out
         start_stub_server ${./test-utils/run-stub-impd.py} \
-          /health 404 'text/plain;charset=utf-8' NOT_FOUND "$PWD/requests"
+          /health 404 application/problem+json '{"type":"not-found","code":"not-found","status":404,"title":"Not Found"}' "$PWD/requests"
 
         before=$(date +%s)
         status=0

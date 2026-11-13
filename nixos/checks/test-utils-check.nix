@@ -535,7 +535,7 @@ let
       '';
     }
     {
-      title = "it run-stub-impd holds to the pinned imp: its /health handler and its empty warnings, the default 404 of Elysia, Elysia 1.4.30 and a Bun at the hashes of this check";
+      title = "it run-stub-impd holds to the pinned imp: its /health handler and its empty warnings, the default 404 of Elysia, Elysia 2.0.0-rc.3 and a Bun at the hashes of this check";
       script = ''
         handlers=$(grep -cxF "    .get('/health', () => ({" ${imp}/packages/daemon/src/surface/create-app.ts || true)
         grep -xF -A4 "    .get('/health', () => ({" ${imp}/packages/daemon/src/surface/create-app.ts > handler || true
@@ -545,7 +545,7 @@ let
         # an Elysia onError hook would replace the default 404; create-app.ts's onError is oRPC's
         error_hooks=$(grep -cF '.onError(' ${imp}/packages/daemon/src/surface/create-app.ts || true)
         elysia=$(jq -r '.workspaces.catalog.elysia' ${imp}/package.json)
-        grep -oE '"(elysia|@sinclair/typebox|cookie|exact-mirror|fast-decode-uri-component|memoirist)": \["[^"]+".*"sha512-[^"]+"\]' \
+        grep -oE '"(elysia|deuri|exact-mirror|memoirist|typebox)": \["[^"]+".*"sha512-[^"]+"\]' \
           ${imp}/bun.lock | sed -E 's/^"([^"]+)": \["([^"]+)".*"(sha512-[^"]+)"\]$/\2 \3/' | sort > locked
 
         assert_equals 1 "$handlers" "create-app.ts's /health handlers"
@@ -567,15 +567,14 @@ let
         }
         EOF
         assert_equals 0 "$error_hooks" "create-app.ts's Elysia onError hooks"
-        assert_equals 1.4.30 "$elysia" "imp's Elysia version"
+        assert_equals 2.0.0-rc.3 "$elysia" "imp's Elysia version"
         assert_equals "" ${lib.escapeShellArg (impBunRelease.error or "")} "host/Dockerfile's Bun release"
         cat > expected <<'EOF'
-        @sinclair/typebox@0.34.52 sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==
-        cookie@1.1.1 sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==
-        elysia@1.4.30 sha512-S2qqV0CbM4faB1hQQ5IYoeYnAUinjHlzRduxaBc4OoNqh0GjOc8k6tt3hv5ozWcG6Svr6hugw6JL4zNke4jwfA==
-        exact-mirror@0.2.7 sha512-+MeEmDcLA4o/vjK2zujgk+1VTxPR4hdp23qLqkWfStbECtAq9gmsvQa3LW6z/0GXZyHJobrCnmy1cdeE7BjsYg==
-        fast-decode-uri-component@1.0.1 sha512-WKgKWg5eUxvRZGwW8FvfbaH7AXSh2cL+3j5fMGzUMCxWBJ3dV3a7Wz8y2f/uQ0e3B6WmodD3oS54jTQ9HVTIIg==
-        memoirist@0.4.0 sha512-zxTgA0mSYELa66DimuNQDvyLq36AwDlTuVRbnQtB+VuTcKWm5Qc4z3WkSpgsFWHNhexqkIooqpv4hdcqrX5Nmg==
+        deuri@3.0.1 sha512-IUgdopWhjToYbgpYDe3ZCBdzILexypCTCEakqDGQyKSlayxWL7yonY/zeJL9ICIjwVmAm3cpiAyT64rBn34gGg==
+        elysia@2.0.0-rc.3 sha512-7W4qXQ6TBWGctaVwdYDhLFRKiXwROidVwdYEwlRLR5NaWLc17Mrj8CZOsFlD7xR+GzG/LrmvYjh/FC8vqkJvWw==
+        exact-mirror@1.2.7 sha512-HhEYVm/y8qbEFnErtr0K7Jsuy0GzRlblZVyeaMoZBSKBDpNuELwzsWtzXQjezFVPka6ZqFaD6+EW3TW+x59vrw==
+        memoirist@1.2.4 sha512-4ZQz65pzZQl1fQEy0EPplIo+rzn0c1vzrqhrdnswr2IKYoPje58p2hZCCeiDD3iB0Bh6OVIaScirDIw8S5qHaQ==
+        typebox@1.4.4 sha512-ctPyL8BZibv6HYU6cE3ldDtfCTh7nXM7WPuL3KQVyRRhMnZEzU3o2yLVywxEEFmKEx+8EdeqG1/uTNzazRbxLA==
         EOF
         sort expected > expected-sorted
         assert_files_equal expected-sorted locked
@@ -611,38 +610,32 @@ let
         }
         unpack elysia ${
           pkgs.fetchurl {
-            url = "https://registry.npmjs.org/elysia/-/elysia-1.4.30.tgz";
-            hash = "sha512-S2qqV0CbM4faB1hQQ5IYoeYnAUinjHlzRduxaBc4OoNqh0GjOc8k6tt3hv5ozWcG6Svr6hugw6JL4zNke4jwfA==";
+            url = "https://registry.npmjs.org/elysia/-/elysia-2.0.0-rc.3.tgz";
+            hash = "sha512-7W4qXQ6TBWGctaVwdYDhLFRKiXwROidVwdYEwlRLR5NaWLc17Mrj8CZOsFlD7xR+GzG/LrmvYjh/FC8vqkJvWw==";
           }
         }
-        unpack @sinclair/typebox ${
+        unpack deuri ${
           pkgs.fetchurl {
-            url = "https://registry.npmjs.org/@sinclair/typebox/-/typebox-0.34.52.tgz";
-            hash = "sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==";
-          }
-        }
-        unpack cookie ${
-          pkgs.fetchurl {
-            url = "https://registry.npmjs.org/cookie/-/cookie-1.1.1.tgz";
-            hash = "sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==";
+            url = "https://registry.npmjs.org/deuri/-/deuri-3.0.1.tgz";
+            hash = "sha512-IUgdopWhjToYbgpYDe3ZCBdzILexypCTCEakqDGQyKSlayxWL7yonY/zeJL9ICIjwVmAm3cpiAyT64rBn34gGg==";
           }
         }
         unpack exact-mirror ${
           pkgs.fetchurl {
-            url = "https://registry.npmjs.org/exact-mirror/-/exact-mirror-0.2.7.tgz";
-            hash = "sha512-+MeEmDcLA4o/vjK2zujgk+1VTxPR4hdp23qLqkWfStbECtAq9gmsvQa3LW6z/0GXZyHJobrCnmy1cdeE7BjsYg==";
-          }
-        }
-        unpack fast-decode-uri-component ${
-          pkgs.fetchurl {
-            url = "https://registry.npmjs.org/fast-decode-uri-component/-/fast-decode-uri-component-1.0.1.tgz";
-            hash = "sha512-WKgKWg5eUxvRZGwW8FvfbaH7AXSh2cL+3j5fMGzUMCxWBJ3dV3a7Wz8y2f/uQ0e3B6WmodD3oS54jTQ9HVTIIg==";
+            url = "https://registry.npmjs.org/exact-mirror/-/exact-mirror-1.2.7.tgz";
+            hash = "sha512-HhEYVm/y8qbEFnErtr0K7Jsuy0GzRlblZVyeaMoZBSKBDpNuELwzsWtzXQjezFVPka6ZqFaD6+EW3TW+x59vrw==";
           }
         }
         unpack memoirist ${
           pkgs.fetchurl {
-            url = "https://registry.npmjs.org/memoirist/-/memoirist-0.4.0.tgz";
-            hash = "sha512-zxTgA0mSYELa66DimuNQDvyLq36AwDlTuVRbnQtB+VuTcKWm5Qc4z3WkSpgsFWHNhexqkIooqpv4hdcqrX5Nmg==";
+            url = "https://registry.npmjs.org/memoirist/-/memoirist-1.2.4.tgz";
+            hash = "sha512-4ZQz65pzZQl1fQEy0EPplIo+rzn0c1vzrqhrdnswr2IKYoPje58p2hZCCeiDD3iB0Bh6OVIaScirDIw8S5qHaQ==";
+          }
+        }
+        unpack typebox ${
+          pkgs.fetchurl {
+            url = "https://registry.npmjs.org/typebox/-/typebox-1.4.4.tgz";
+            hash = "sha512-ctPyL8BZibv6HYU6cE3ldDtfCTh7nXM7WPuL3KQVyRRhMnZEzU3o2yLVywxEEFmKEx+8EdeqG1/uTNzazRbxLA==";
           }
         }
         cat > $out/app.ts <<'EOF'
@@ -659,7 +652,7 @@ let
       '';
     in
     {
-      title = "it run-stub-impd answers /health and an unknown route as the Elysia 1.4.30 of imp on Bun ${impBunRelease.version} does";
+      title = "it run-stub-impd answers /health and an unknown route as the Elysia 2.0.0-rc.3 of imp on Bun ${impBunRelease.version} does";
       script = ''
         mkdir home tmp
         mkfifo real.fifo stub-health.fifo stub-missing.fifo
@@ -674,7 +667,7 @@ let
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/health.requests" >&4 &
         health_pid=$!
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-          /missing 404 'text/plain;charset=utf-8' NOT_FOUND "$PWD/missing.requests" >&5 &
+          /missing 404 application/problem+json '{"type":"not-found","code":"not-found","status":404,"title":"Not Found"}' "$PWD/missing.requests" >&5 &
         missing_pid=$!
         read -r -t 30 -u 3 real_port
         read -r -t 5 -u 4 health_port
