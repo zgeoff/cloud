@@ -1,8 +1,69 @@
 # pepys
 
 Runbook for the parts of [pepys](../architecture/workloads/pepys.md) that an operator runs by hand:
-the path that carries a session's telemetry to ingest and its token, the API's passkey and OAuth
-clients and their public route, and the backup's Garage key and a backup on demand.
+the first deploy and a release bump, the path that carries a session's telemetry to ingest and its
+token, the API's passkey and OAuth clients and their public route, and the backup's Garage key and a
+backup on demand.
+
+## Deploy the first time
+
+**CAUTION:** The first apply adds a public route. Its `Deploy prod` run holds on the tunnel route
+change until the owner approves it, as [the prod apply job](./prod-apply.md) describes.
+
+The Pulumi program deploys pepys only when stack config `pepys` exists, so the service merges first
+and changes nothing in prod.
+
+1. Merge the service. The `pepys image` workflow publishes
+   `ghcr.io/zgeoff/cloud-pepys:<release>-<commit>` from `main`, and its run summary gives the
+   digest. When the package does not exist yet, the first push creates it and then fails with
+   `denied`: rerun the failed job, which publishes the tag.
+2. In a PR, add the `pepys` object to `infra/Pulumi.prod.yaml`:
+
+   ```yaml
+   geoff-cloud:pepys:
+     image: ghcr.io/zgeoff/cloud-pepys:<release>-<commit>@sha256:<digest>
+     webhookHostname: pepys-webhook.geoff.cloud
+     impIdentityAudience: pepys.imp.internal
+   ```
+
+   Run `bun run preview` and check that it adds the `pepys` namespace, its network policies,
+   Secrets, Services and workloads, and the shared tunnel's rule and the proxied record for
+   `pepys-webhook.geoff.cloud`, and changes nothing else. The backup CronJob comes only with the
+   backup variables in `.env`.
+
+3. Merge the PR, and approve the held `Deploy prod` run once its plan matches the preview.
+4. Check that the workloads are up:
+
+   ```bash
+   ssh root@geoffcloud k3s kubectl -n pepys rollout status statefulset/pepys-host --timeout=300s
+   ```
+
+   Expect `statefulset rolling update complete`. Check `statefulset/pepys-garage`,
+   `deployment/pepys-s2` and `deployment/pepys-ingest` the same way.
+
+5. Check that the public route refuses an unsigned delivery:
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST https://pepys-webhook.geoff.cloud/webhook/github
+   ```
+
+   Expect `401`.
+
+## Bump the pepys release
+
+The binaries and the modules must come from one release, so a bump changes the pin and the packages
+in one pull request.
+
+1. Set `PEPYS_RELEASE` in [`images/pepys/versions.env`](../../images/pepys/versions.env). The shared
+   release tooling changes only this file.
+2. Set each `@pepys/*` version in `deploy/pepys/package.json` to that release, by hand.
+3. Check that the peer range of `@boxxy/pepys` on `@pepys/kit` admits the release. When it does not,
+   pin an `@boxxy/pepys` whose range does. `@boxxy/pepys` carries boxxy's own version.
+4. Run `bun install` in `deploy/pepys` to write its lock again, then
+   `bun run check:pepys-deployment`. Expect exit 0.
+
+[`collect-pepys-version-mismatches.test.ts`](../../scripts/collect-pepys-version-mismatches.test.ts)
+fails when the release and a package version differ.
 
 ## Let sessions send telemetry
 

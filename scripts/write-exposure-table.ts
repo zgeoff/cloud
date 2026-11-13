@@ -109,6 +109,7 @@ function formatExposes(entry: ExposureEntry): string {
       (route) =>
         `\`${route.hostname}\` to \`${route.upstream}\`: ${route.paths.map((path) => `\`${path}\``).join(', ')}`,
     )
+    .with({ kind: 'tailnet-hostname' }, (route) => `\`${route.hostname}\` on the tailnet`)
     .with({ kind: 'tailnet-capability' }, (capability) => `node attribute \`${capability.attr}\``)
     .with({ kind: 'worker-url' }, (worker) => `\`${worker.script}\` on workers.dev`)
     .exhaustive();
