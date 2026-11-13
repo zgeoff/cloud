@@ -5,13 +5,14 @@ from inside the cluster, and a TLS front on the host's public HTTPS port. The ho
 port for the tunnels, so a tunnel route exists only as a rule in a tunnel's configuration and a DNS
 record that points at that tunnel, and Pulumi declares both. The TLS front serves `imp.geoff.cloud`,
 imp's own MCP and OAuth route, which a hosted assistant signs in to and calls directly at
-`https://imp.geoff.cloud/mcp`. Each workload behind a route brings its own authentication. The atc
-tunnel serves `atc.geoff.cloud`, the atc gateway, which runs its own OAuth server. The boxxy tunnel
-serves `boxxy.geoff.cloud`, the boxxy server's public door, which runs its own OAuth server too. The
-shared tunnel serves two hostnames, a third while pepys runs, and a fourth while pepys's API is
-public. `preview-webhook.geoff.cloud` reaches the preview service's webhook listener, which checks
-the signature of every GitHub delivery. `files.geoff.cloud` reaches the files service, which serves
-each file to anyone who holds its link and checks a role token on every write.
+`https://imp.geoff.cloud/mcp`. Each workload behind a route brings its own authentication.
+
+The atc tunnel serves `atc.geoff.cloud`, the atc gateway, which runs its own OAuth server. The boxxy
+tunnel serves `boxxy.geoff.cloud`, the boxxy server's public door, which runs its own OAuth server
+too. The shared tunnel serves two hostnames, a third while pepys runs, and a fourth while pepys's
+API is public. `preview-webhook.geoff.cloud` reaches the preview service's webhook listener, which
+checks the signature of every GitHub delivery. `files.geoff.cloud` reaches the files service, which
+serves each file to anyone who holds its link and checks a role token on every write.
 `pepys-webhook.geoff.cloud` reaches pepys ingest, which checks the signature of every GitHub
 delivery. `pepys.geoff.cloud` reaches pepys's API, whose own OAuth server checks every MCP call.
 Cloudflare Access adds an owner-only login in front of the sign-in pages of the gateway, the door
