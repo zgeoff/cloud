@@ -17,6 +17,26 @@ test.each([
     '[{"id":"a1","tags":["nixie"]},{"id":"b2"}]',
     undefined,
   ],
+  [
+    'the set and publish of a numbered publish, beside its legacy-set and proven-from tags',
+    '[{"id":"a1","tags":["set-3","kind-scheduled","publish-7","legacy-set-40","proven-from-2"]}]',
+    'set-3,publish-7',
+  ],
+  [
+    'the highest publish over a higher set, because a set repeats after a restore',
+    '[{"id":"a1","tags":["set-40","kind-scheduled","publish-6"]},{"id":"b2","tags":["set-3","kind-scheduled","publish-7"]}]',
+    'set-3,publish-7',
+  ],
+  [
+    'the first numbered publish over the unnumbered snapshot its legacy-set names',
+    '[{"id":"a1","tags":["set-40","kind-scheduled"]},{"id":"b2","tags":["set-41","kind-scheduled","publish-1","legacy-set-40"]}]',
+    'set-41,publish-1',
+  ],
+  [
+    'the highest set while an unnumbered snapshot stays beside a numbered one',
+    '[{"id":"a1","tags":["set-50","kind-scheduled"]},{"id":"b2","tags":["set-41","kind-scheduled","publish-1","legacy-set-40"]}]',
+    'set-50',
+  ],
   ['no set for an empty list', '[]', undefined],
 ])('it picks %s', (_case: string, text: string, picked: string | undefined) => {
   expect(pickNewestSet(text)).toBe(picked);
