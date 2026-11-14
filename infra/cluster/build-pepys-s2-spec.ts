@@ -45,10 +45,10 @@ export function buildPepysS2Spec(inputs: PepysS2SpecInputs) {
             volumeMounts: [{ name: 'tmp', mountPath: '/tmp' }],
             securityContext: buildPepysContainerSecurity(),
 
-            // s2-lite idles near 80Mi, and a compaction adds to that: at a 512Mi limit the kernel
-            // OOM-killed it at 514MiB after 29 hours, and again at 507MiB two minutes after it
-            // started.
-            resources: { requests: { cpu: '50m', memory: '256Mi' }, limits: { memory: '1Gi' } },
+            // s2-lite 0.43.2 has no cache setting, and it keeps appended data in memory up to a
+            // bound it sets itself: under a local load of 16KB records its heap settled between
+            // 1.0GB and 1.15GB. The kernel OOM-killed it at a 512Mi limit after 29 hours.
+            resources: { requests: { cpu: '50m', memory: '256Mi' }, limits: { memory: '1536Mi' } },
           },
         ],
       },
