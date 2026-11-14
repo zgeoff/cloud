@@ -46,8 +46,6 @@ it_publishes_a_staged_set_to_both_repos_and_leaves_only_its_receipt_and_marker()
   diff /dev/null "$tree/err"
   sed -E 's/"time":"[^"]+",//' "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
-nixie-backup (nixie-backup)
-
 {"event":"backup.set_published","sequence":1}
 EOF
   assert_status 0 "$status"
@@ -64,9 +62,9 @@ EOF
     "$tree/receipt-1" > "$tree/receipt"
   diff - "$tree/receipt" <<< '{"status":"published","sequence":1,"prune":"passed","check":"passed","failure":null,"removed":0}'
   jq -c '[.[] | {paths, tags}]' "$tree/data.json" > "$tree/data"
-  diff - "$tree/data" <<< '[{"paths":["/nixie.db"],"tags":["set-1","kind-scheduled"]}]'
+  diff - "$tree/data" <<< '[{"paths":["/nixie.db"],"tags":["set-1","kind-scheduled","publish-1"]}]'
   jq -c '[.[] | {paths, tags}]' "$tree/keys.json" > "$tree/keys"
-  diff - "$tree/keys" <<< '[{"paths":["/keys.db"],"tags":["set-1","kind-scheduled"]}]'
+  diff - "$tree/keys" <<< '[{"paths":["/keys.db"],"tags":["set-1","kind-scheduled","publish-1"]}]'
   [ "$(jq -r .dataSnapshotID "$tree/receipt-1")" = "$(jq -r '.[0].id' "$tree/data.json")" ]
   [ "$(jq -r .keySnapshotID "$tree/receipt-1")" = "$(jq -r '.[0].id' "$tree/keys.json")" ]
 }
@@ -86,14 +84,12 @@ it_keeps_the_newest_sets_key_snapshot_alone_and_every_data_snapshot() {
   diff /dev/null "$tree/err"
   sed -E 's/"time":"[^"]+",//' "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
-nixie-backup (nixie-backup)
-
 {"event":"backup.set_published","sequence":2}
 EOF
   assert_status 0 "$status"
   read_repos "$name" "$image" "$tree"
   jq -c '[.[] | {paths, tags}]' "$tree/keys.json" > "$tree/keys"
-  diff - "$tree/keys" <<< '[{"paths":["/keys.db"],"tags":["set-2","kind-forget"]}]'
+  diff - "$tree/keys" <<< '[{"paths":["/keys.db"],"tags":["set-2","kind-forget","publish-2"]}]'
   jq -c '[.[] | .tags[0]] | sort' "$tree/data.json" > "$tree/data"
   diff - "$tree/data" <<< '["set-1","set-2"]'
   jq -c '{status, removed: (.removedKeySnapshotIDs | length)}' "$tree/receipt-2" > "$tree/receipt"
@@ -121,16 +117,11 @@ it_fails_a_run_whose_set_fails_and_passes_its_rerun_with_the_receipt_unchanged()
   sed -E 's/"time":"[^"]+",//; s#mkdir /repos/keys/[a-z]+:#mkdir /repos/keys/FOLDER:#' "$tree/out" > \
     "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
-nixie-backup (nixie-backup)
-
 {"event":"backup.set_failed","level":"error","sequence":1,"failure":"restic init in the key repo exited 1: Fatal: Fatal: create repository at /repos/keys failed: mkdir /repos/keys/FOLDER: permission denied"}
 EOF
   diff /dev/null "$tree/err"
   sed -E 's/"time":"[^"]+",//' "$tree/rerun" > "$tree/rerun.normal"
-  diff - "$tree/rerun.normal" << 'EOF'
-nixie-backup (nixie-backup)
-
-EOF
+  diff /dev/null "$tree/rerun.normal"
   diff /dev/null "$tree/rerun-err"
   run_shell "$name" "$image" > "$tree/receipt-after" <<< 'cat /state/backup/000000000001/receipt.json'
   diff "$tree/receipt-before" "$tree/receipt-after"
@@ -261,7 +252,7 @@ EOF
     -v "$tree/race.sh:/opt/race/race.sh:ro" restore > /dev/null 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << 'EOF'
-Fatal: failed to find snapshot: snapshot filter (Paths:[] Tags:[[set-2]] Hosts:[]): no snapshot found
+Fatal: failed to find snapshot: snapshot filter (Paths:[] Tags:[[set-2, publish-2]] Hosts:[]): no snapshot found
 EOF
   assert_status 0 "$status"
   run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
@@ -296,6 +287,32 @@ keys.db of set 2
 EOF
 }
 
+# a restore starts nixie's set sequence again from the restored database, so a later publish can
+# hold a lower set: the publish number, not the set, orders the two snapshots
+it_restores_a_SNAPSHOT_of_an_earlier_publish_whose_set_is_higher() {
+  local image="$1" script="$2" earlier status=0
+  name="nixie-backup-$3-$BASHPID"
+  create_case_tree "$cleanup"
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 5:scheduled
+  run_job "$name" "$image" > /dev/null
+  earlier="$(run_shell "$name" "$image" <<< 'cat /state/backup/000000000005/receipt.json' | jq -r .dataSnapshotID)"
+  run_shell "$name" "$image" <<< 'rm -r /state/backup/000000000005'
+  stage_sets "$name" "$image" 2:scheduled
+  run_job "$name" "$image" > /dev/null
+
+  run_restore "$name" "$image" "$script" -e "SNAPSHOT=$earlier" restore > /dev/null 2> "$tree/err" ||
+    status=$?
+
+  diff /dev/null "$tree/err"
+  assert_status 0 "$status"
+  run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
+  diff - "$tree/copy" << 'EOF'
+nixie.db of set 5
+keys.db of set 2
+EOF
+}
+
 # set 2's data snapshot landed and its key snapshot did not, so set 2's records have no keys
 it_refuses_a_SNAPSHOT_whose_set_is_newer_than_the_key_repos() {
   local image="$1" script="$2" newer status=0
@@ -315,7 +332,7 @@ EOF
   run_restore "$name" "$image" "$script" -e "SNAPSHOT=$newer" restore > "$tree/out" 2> "$tree/err" ||
     status=$?
 
-  diff - "$tree/err" <<< "the data snapshot $newer holds set-2, newer than the key repo's set-1"
+  diff - "$tree/err" <<< "the data snapshot $newer holds set-2, newer than the key repo's set-1,publish-1"
   diff /dev/null "$tree/out"
   assert_status 1 "$status"
   run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup'
@@ -406,17 +423,17 @@ it_lists_both_repos_in_ls_mode() {
   normalize_restic_output < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 data repo:
-ID        Time                 Host        Tags               Paths      Size
------------------------------------------------------------------------------
-ID  NOW  nixie       set-1,kind-forget  /nixie.db  SIZE
------------------------------------------------------------------------------
+ID        Time                 Host        Tags                         Paths      Size
+---------------------------------------------------------------------------------------
+ID  NOW  nixie       set-1,kind-forget,publish-1  /nixie.db  SIZE
+---------------------------------------------------------------------------------------
 Timestamps shown in local time
 1 snapshots
 key repo:
-ID        Time                 Host        Tags               Paths     Size
-----------------------------------------------------------------------------
-ID  NOW  nixie       set-1,kind-forget  /keys.db  SIZE
-----------------------------------------------------------------------------
+ID        Time                 Host        Tags                         Paths     Size
+--------------------------------------------------------------------------------------
+ID  NOW  nixie       set-1,kind-forget,publish-1  /keys.db  SIZE
+--------------------------------------------------------------------------------------
 Timestamps shown in local time
 1 snapshots
 EOF

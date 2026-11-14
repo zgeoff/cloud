@@ -31,11 +31,29 @@ key_restic() {
     restic "$@"
 }
 
-# pick_newest_set: reads `restic snapshots --json` on stdin and prints the newest set-<sequence> tag,
-# or nothing when no snapshot carries one, through bun, which the image runs the job with. It exits
-# 1 on output that is no snapshot list.
+# pick_newest_set: reads `restic snapshots --json` on stdin and prints the newest snapshot's tags as
+# a --tag filter, set-<sequence>,publish-<n> or set-<sequence> for a snapshot from before publish
+# numbers, or nothing when no snapshot carries a set tag, through bun, which the image runs the job
+# with. It exits 1 on output that is no snapshot list.
 pick_newest_set() {
   bun "$(dirname "$0")/pick-newest-set.ts"
+}
+
+# tag_number <filter> <prefix>: the number of the <prefix>-<n> tag in a pick's filter, or nothing
+tag_number() {
+  echo "$1" | tr ',' '\n' | sed -n "s/^$2-\([0-9][0-9]*\)\$/\1/p"
+}
+
+# is_newer <data filter> <key filter>: whether the data snapshot is newer than the key snapshot, by
+# publish number when both have one, since a set number can repeat after a restore, else by set
+is_newer() {
+  data_publish="$(tag_number "$1" publish)"
+  key_publish="$(tag_number "$2" publish)"
+  if [ -n "$data_publish" ] && [ -n "$key_publish" ]; then
+    [ "$data_publish" -gt "$key_publish" ]
+  else
+    [ "$(tag_number "$1" set)" -gt "$(tag_number "$2" set)" ]
+  fi
 }
 
 case "${1:-}" in
@@ -58,8 +76,8 @@ case "${1:-}" in
     # first, because restic's lock holds the removal off only while a restore runs.
     attempt=1
     while :; do
-      # the job tags both snapshots of a set with set-<sequence>, and a key snapshot whose removal
-      # failed stays beside the newest
+      # the job tags both snapshots of a publish with set-<sequence> and publish-<n>, and a key
+      # snapshot whose removal failed stays beside the newest
       key_snapshots="$(key_restic snapshots --json)"
       set_tag="$(echo "$key_snapshots" | pick_newest_set)"
       [ -n "$set_tag" ] || {
@@ -67,7 +85,7 @@ case "${1:-}" in
         exit 1
       }
       # a newer nixie.db holds records whose keys the key repo's set lacks
-      [ -z "${SNAPSHOT:-}" ] || [ "${data_set#set-}" -le "${set_tag#set-}" ] || {
+      [ -z "${SNAPSHOT:-}" ] || ! is_newer "$data_set" "$set_tag" || {
         echo "the data snapshot $SNAPSHOT holds $data_set, newer than the key repo's $set_tag" >&2
         exit 1
       }

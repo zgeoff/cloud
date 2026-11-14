@@ -1,10 +1,13 @@
 // Runs in the nixie-backup image beside restore.sh, which holds bun and none of this repo's
 // packages, so this file imports nothing.
 
-const setTag = /^set-(?<sequence>[0-9]+)$/u;
+const setTag = /^set-(?<number>[0-9]+)$/u;
+const publishTag = /^publish-(?<number>[0-9]+)$/u;
+const legacySetTag = /^legacy-set-(?<number>[0-9]+)$/u;
 
-// the newest set-<sequence> tag among the snapshots that `restic snapshots --json` prints, by
-// number: set-10 sorts after set-9 only as a number
+// the newest snapshot's tags as a --tag filter, as the job's own pick in nixie's backup-pair design:
+// by publish number once every snapshot has one, because a set repeats after a restore, by restic's
+// time beside a snapshot from before publish numbers, and by set number among those alone
 export function pickNewestSet(text: string): string | undefined | Error {
   const snapshots = parseSnapshots(text);
 
@@ -12,19 +15,55 @@ export function pickNewestSet(text: string): string | undefined | Error {
     return snapshots;
   }
 
-  const sequences = snapshots.flatMap((snapshot) =>
-    (snapshot.tags ?? []).flatMap((tag) => {
-      const sequence = setTag.exec(tag)?.groups?.['sequence'];
+  const published = snapshots.flatMap((snapshot) => {
+    const tags = snapshot.tags ?? [];
+    const set = parseTagNumber(tags, setTag);
 
-      return sequence === undefined ? [] : [Number(sequence)];
-    }),
+    return set === undefined
+      ? []
+      : [
+          {
+            set,
+            publish: parseTagNumber(tags, publishTag),
+            legacySet: parseTagNumber(tags, legacySetTag),
+            writtenAt: Date.parse(snapshot.time ?? ''),
+          },
+        ];
+  });
+
+  const replaced = new Set(published.map((snapshot) => snapshot.legacySet));
+
+  const remaining = published.filter(
+    (snapshot) => snapshot.publish !== undefined || !replaced.has(snapshot.set),
   );
 
-  return sequences.length === 0 ? undefined : `set-${Math.max(...sequences)}`;
+  if (remaining.length === 0) {
+    return undefined;
+  }
+
+  const isNumbered = remaining.every((snapshot) => snapshot.publish !== undefined);
+  const isLegacy = remaining.every((snapshot) => snapshot.publish === undefined);
+
+  const newest = remaining.reduce((best, snapshot) => {
+    if (isNumbered) {
+      return (snapshot.publish ?? 0) > (best.publish ?? 0) ? snapshot : best;
+    }
+
+    if (isLegacy) {
+      return snapshot.set > best.set ? snapshot : best;
+    }
+
+    return snapshot.writtenAt > best.writtenAt ? snapshot : best;
+  });
+
+  return newest.publish === undefined
+    ? `set-${newest.set}`
+    : `set-${newest.set},publish-${newest.publish}`;
 }
 
 interface Snapshot {
   readonly id: string;
+  readonly time?: string;
   readonly tags?: readonly string[];
 }
 
@@ -57,6 +96,14 @@ function isSnapshot(value: unknown): value is Snapshot {
     typeof value.id === 'string' &&
     (tags === undefined || (Array.isArray(tags) && tags.every((tag) => typeof tag === 'string')))
   );
+}
+
+function parseTagNumber(tags: readonly string[], pattern: RegExp): number | undefined {
+  const found = tags
+    .map((tag) => pattern.exec(tag)?.groups?.['number'])
+    .find((value) => value !== undefined);
+
+  return found === undefined ? undefined : Number(found);
 }
 
 // restore.sh pipes the list in, and reads the tag from stdout or the reason from stderr

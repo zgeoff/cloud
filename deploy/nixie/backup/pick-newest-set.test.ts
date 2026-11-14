@@ -17,6 +17,31 @@ test.each([
     '[{"id":"a1","tags":["nixie"]},{"id":"b2"}]',
     undefined,
   ],
+  [
+    'the set and publish of a numbered publish, beside its legacy-set and proven-from tags',
+    '[{"id":"a1","tags":["set-3","kind-scheduled","publish-7","legacy-set-40","proven-from-2"]}]',
+    'set-3,publish-7',
+  ],
+  [
+    'the highest publish over a higher set, because a set repeats after a restore',
+    '[{"id":"a1","tags":["set-40","kind-scheduled","publish-6"]},{"id":"b2","tags":["set-3","kind-scheduled","publish-7"]}]',
+    'set-3,publish-7',
+  ],
+  [
+    'the first numbered publish over the unnumbered snapshot its legacy-set names',
+    '[{"id":"a1","tags":["set-40","kind-scheduled"]},{"id":"b2","tags":["set-41","kind-scheduled","publish-1","legacy-set-40"]}]',
+    'set-41,publish-1',
+  ],
+  [
+    'the later numbered snapshot over an older unnumbered one with a higher set, by time',
+    '[{"id":"a1","time":"2026-11-01T00:00:00.123456789Z","tags":["set-50"]},{"id":"b2","time":"2026-11-02T00:00:00.123456789Z","tags":["set-41","publish-1","legacy-set-40"]}]',
+    'set-41,publish-1',
+  ],
+  [
+    'the later unnumbered snapshot over an older numbered one, by time',
+    '[{"id":"a1","time":"2026-11-03T00:00:00Z","tags":["set-50"]},{"id":"b2","time":"2026-11-02T00:00:00Z","tags":["set-41","publish-1","legacy-set-40"]}]',
+    'set-50',
+  ],
   ['no set for an empty list', '[]', undefined],
 ])('it picks %s', (_case: string, text: string, picked: string | undefined) => {
   expect(pickNewestSet(text)).toBe(picked);
