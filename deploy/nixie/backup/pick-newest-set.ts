@@ -5,8 +5,9 @@ const setTag = /^set-(?<number>[0-9]+)$/u;
 const publishTag = /^publish-(?<number>[0-9]+)$/u;
 const legacySetTag = /^legacy-set-(?<number>[0-9]+)$/u;
 
-// the newest snapshot's tags as a --tag filter, by publish number once every snapshot has one,
-// because a set number repeats after a restore; else by set number (nixie's backup-pair design)
+// the newest snapshot's tags as a --tag filter, as the job's own pick in nixie's backup-pair design:
+// by publish number once every snapshot has one, because a set repeats after a restore, by restic's
+// time beside a snapshot from before publish numbers, and by set number among those alone
 export function pickNewestSet(text: string): string | undefined | Error {
   const snapshots = parseSnapshots(text);
 
@@ -25,6 +26,7 @@ export function pickNewestSet(text: string): string | undefined | Error {
             set,
             publish: parseTagNumber(tags, publishTag),
             legacySet: parseTagNumber(tags, legacySetTag),
+            writtenAt: Date.parse(snapshot.time ?? ''),
           },
         ];
   });
@@ -40,12 +42,19 @@ export function pickNewestSet(text: string): string | undefined | Error {
   }
 
   const isNumbered = remaining.every((snapshot) => snapshot.publish !== undefined);
+  const isLegacy = remaining.every((snapshot) => snapshot.publish === undefined);
 
-  const newest = remaining.reduce((best, snapshot) =>
-    (isNumbered ? (snapshot.publish ?? 0) > (best.publish ?? 0) : snapshot.set > best.set)
-      ? snapshot
-      : best,
-  );
+  const newest = remaining.reduce((best, snapshot) => {
+    if (isNumbered) {
+      return (snapshot.publish ?? 0) > (best.publish ?? 0) ? snapshot : best;
+    }
+
+    if (isLegacy) {
+      return snapshot.set > best.set ? snapshot : best;
+    }
+
+    return snapshot.writtenAt > best.writtenAt ? snapshot : best;
+  });
 
   return newest.publish === undefined
     ? `set-${newest.set}`
@@ -54,6 +63,7 @@ export function pickNewestSet(text: string): string | undefined | Error {
 
 interface Snapshot {
   readonly id: string;
+  readonly time?: string;
   readonly tags?: readonly string[];
 }
 

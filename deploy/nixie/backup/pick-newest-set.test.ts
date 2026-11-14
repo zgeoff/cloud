@@ -33,8 +33,13 @@ test.each([
     'set-41,publish-1',
   ],
   [
-    'the highest set while an unnumbered snapshot stays beside a numbered one',
-    '[{"id":"a1","tags":["set-50","kind-scheduled"]},{"id":"b2","tags":["set-41","kind-scheduled","publish-1","legacy-set-40"]}]',
+    'the later numbered snapshot over an older unnumbered one with a higher set, by time',
+    '[{"id":"a1","time":"2026-11-01T00:00:00.123456789Z","tags":["set-50"]},{"id":"b2","time":"2026-11-02T00:00:00.123456789Z","tags":["set-41","publish-1","legacy-set-40"]}]',
+    'set-41,publish-1',
+  ],
+  [
+    'the later unnumbered snapshot over an older numbered one, by time',
+    '[{"id":"a1","time":"2026-11-03T00:00:00Z","tags":["set-50"]},{"id":"b2","time":"2026-11-02T00:00:00Z","tags":["set-41","publish-1","legacy-set-40"]}]',
     'set-50',
   ],
   ['no set for an empty list', '[]', undefined],
