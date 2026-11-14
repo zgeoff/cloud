@@ -9,7 +9,7 @@
     "./contract-script.ts": "./contract-script.ts"
   },
   "dependencies": {
-    "@impz/client": "7.1.0",
+    "@impz/client": "7.2.0",
     "@zgeoff/std": "0.4.3",
     "ts-pattern": "5.9.2",
     "xstate": "5.33.3",
