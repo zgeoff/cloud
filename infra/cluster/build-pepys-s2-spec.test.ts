@@ -25,7 +25,7 @@ test('it runs one s2-lite on the facts bucket in Garage, replaced before its suc
   });
 });
 
-test('it limits s2-lite to 1Gi of memory', () => {
+test('it limits s2-lite to 1536Mi of memory', () => {
   const spec = buildPepysS2Spec({
     image:
       'ghcr.io/s2-streamstore/s2:0.43.2@sha256:6666666666666666666666666666666666666666666666666666666666666666',
@@ -33,6 +33,6 @@ test('it limits s2-lite to 1Gi of memory', () => {
   });
 
   expect(spec.template.spec?.containers[0]).toMatchObject({
-    resources: { requests: { cpu: '50m', memory: '256Mi' }, limits: { memory: '1Gi' } },
+    resources: { requests: { cpu: '50m', memory: '256Mi' }, limits: { memory: '1536Mi' } },
   });
 });
