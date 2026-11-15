@@ -6,6 +6,7 @@ export interface StubNixieCheckoutAnswers {
   readonly install?: StubAnswer;
   readonly attach?: StubAnswer;
   readonly doctor?: StubAnswer;
+  readonly detach?: StubAnswer;
 }
 
 interface KubeconfigRead {
@@ -58,6 +59,10 @@ export function buildStubNixieCheckout(
       });
 
       return answers.doctor ?? {};
+    }
+
+    if (args[3] === 'detach') {
+      return answers.detach ?? {};
     }
 
     return args[3] === 'attach' ? (answers.attach ?? {}) : {};

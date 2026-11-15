@@ -258,6 +258,110 @@ test('it fails, prints the doctor, still detaches and removes the kubeconfig whe
   });
 });
 
+test('it fails when the doctor passes but detach fails', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    ctx.stackConfigPath,
+    'config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.74.0@sha256:456a48906e5ae0c444d84860057ad59e52a90ba485eceb64ea9437474372db6f\n',
+  );
+
+  const kubectl = buildStubKubectlToken({
+    adminKubeconfig: '/runner/k3s-kubeconfig',
+    server: 'https://cluster.example.test:6443',
+    certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
+    token: 'fake-token-for-tests',
+    nowMs: Date.parse('2026-11-15T06:00:00Z'),
+  });
+
+  const checkout = buildStubNixieCheckout({
+    doctor: { stdout: '{"ok":true}\n' },
+    detach: { exitCode: 1, stdout: '{"ok":false,"command":"detach"}\n' },
+  });
+
+  const runner = buildStubRunner(kubectl.handler, checkout.handler);
+
+  const exitCode = await ctx.check(runner.run);
+
+  expect({
+    exitCode,
+    out: ctx.printOut.mock.calls,
+    err: ctx.printErr.mock.calls,
+    kubeconfig: existsSync(join(ctx.workDir, 'nixie-verify-kubeconfig.yaml')),
+  }).toStrictEqual({
+    exitCode: 1,
+    out: [['::add-mask::fake-token-for-tests\n'], ['{"ok":true}\n']],
+    err: [
+      ['run-nixie-doctor-check: bun verify detach exited 1: {"ok":false,"command":"detach"}\n'],
+    ],
+    kubeconfig: false,
+  });
+});
+
+test('it fails when the doctor outlives its timeout, even when it then exits 0', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    ctx.stackConfigPath,
+    'config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.74.0@sha256:456a48906e5ae0c444d84860057ad59e52a90ba485eceb64ea9437474372db6f\n',
+  );
+
+  const kubectl = buildStubKubectlToken({
+    adminKubeconfig: '/runner/k3s-kubeconfig',
+    server: 'https://cluster.example.test:6443',
+    certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
+    token: 'fake-token-for-tests',
+    nowMs: Date.parse('2026-11-15T06:00:00Z'),
+  });
+
+  const checkout = buildStubNixieCheckout({ doctor: { timedOut: true, stdout: '{"ok":true}\n' } });
+  const runner = buildStubRunner(kubectl.handler, checkout.handler);
+
+  const exitCode = await ctx.check(runner.run);
+
+  expect({ exitCode, err: ctx.printErr.mock.calls }).toStrictEqual({
+    exitCode: 1,
+    err: [["run-nixie-doctor-check: nixie's prod doctor exited 124; its results are above\n"]],
+  });
+});
+
+test('it gives each call to git and to nixie a SIGKILL after its timeout', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    ctx.stackConfigPath,
+    'config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.74.0@sha256:456a48906e5ae0c444d84860057ad59e52a90ba485eceb64ea9437474372db6f\n',
+  );
+
+  const kubectl = buildStubKubectlToken({
+    adminKubeconfig: '/runner/k3s-kubeconfig',
+    server: 'https://cluster.example.test:6443',
+    certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
+    token: 'fake-token-for-tests',
+    nowMs: Date.parse('2026-11-15T06:00:00Z'),
+  });
+
+  const runner = buildStubRunner(kubectl.handler, buildStubNixieCheckout({}).handler);
+  const stops: string[] = [];
+
+  await ctx.check((argv, options) => {
+    stops.push(`${argv[0] ?? ''} ${options?.forceStop === undefined ? 'none' : 'SIGKILL'}`);
+
+    return runner.run(argv, options);
+  });
+
+  expect(stops).toStrictEqual([
+    'git SIGKILL',
+    'git SIGKILL',
+    'bun SIGKILL',
+    'kubectl none',
+    'kubectl none',
+    'bun SIGKILL',
+    'bun SIGKILL',
+    'bun SIGKILL',
+  ]);
+});
+
 test('it fails before it mints a token when the pinned release has no tag', async () => {
   const ctx = await setupTest();
 

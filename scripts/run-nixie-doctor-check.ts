@@ -2,7 +2,7 @@ import { readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createNixieVerifyKubeconfig } from './nixie-verify/create-nixie-verify-kubeconfig.ts';
 import { findNixieVersion } from './nixie-verify/find-nixie-version.ts';
-import type { Runner } from './run-process.ts';
+import type { RunOptions, RunResult, Runner } from './run-process.ts';
 import { runProcess } from './run-process.ts';
 
 export interface RunNixieDoctorCheckOptions {
@@ -25,6 +25,10 @@ export interface RunNixieDoctorCheckOptions {
 }
 
 const nixieRepoURL = 'https://github.com/zgeoff/nixie.git';
+
+// how long a call that its timeout's SIGTERM did not stop gets before SIGKILL; the step's
+// timeout covers every call's timeout and this
+const forceStopAfterMs = 10_000;
 
 // Runs nixie's own prod doctor, from the release the commit pins, as the nixie-verify account,
 // which may only read nixie's pod, its log, its StatefulSet and its readiness.
@@ -115,10 +119,14 @@ export async function runNixieDoctorCheck(
   return exitCode;
 }
 
+interface BoundedRunOptions extends Omit<RunOptions, 'forceStop'> {
+  readonly timeoutMs: number;
+}
+
 interface Step {
   readonly what: string;
   readonly argv: readonly string[];
-  readonly options: NonNullable<Parameters<Runner>[1]>;
+  readonly options: BoundedRunOptions;
 }
 
 async function runSteps(
@@ -126,7 +134,7 @@ async function runSteps(
   steps: readonly Step[],
 ): Promise<boolean> {
   for (const step of steps) {
-    const ran = await options.run(step.argv, step.options);
+    const ran = await runBounded(options.run, step.argv, step.options);
 
     if (ran.exitCode !== 0) {
       options.printErr(
@@ -138,6 +146,20 @@ async function runSteps(
   }
 
   return true;
+}
+
+// A call that outlives its timeout fails, even when it exits 0 after the SIGTERM, and one that
+// ignores the SIGTERM gets SIGKILL.
+async function runBounded(
+  run: Runner,
+  argv: readonly string[],
+  options: Readonly<BoundedRunOptions>,
+): Promise<RunResult> {
+  const forceStop = AbortSignal.timeout(options.timeoutMs + forceStopAfterMs);
+
+  const ran = await run(argv, { ...options, forceStop });
+
+  return ran.timedOut && ran.exitCode === 0 ? { ...ran, exitCode: 124 } : ran;
 }
 
 interface DoctorRun {
@@ -152,7 +174,7 @@ async function runDoctor(
   doctor: DoctorRun,
 ): Promise<number> {
   const verify = (args: readonly string[], timeoutMs: number) =>
-    options.run(['bun', 'run', '--silent', 'verify', ...args, '--target', 'prod'], {
+    runBounded(options.run, ['bun', 'run', '--silent', 'verify', ...args, '--target', 'prod'], {
       cwd: doctor.cwd,
       env: doctor.env,
       timeoutMs,
@@ -172,13 +194,21 @@ async function runDoctor(
 
   options.printOut(checked.stdout.toString());
 
-  await verify(['detach'], 60_000);
+  const detached = await verify(['detach'], 60_000);
 
   if (checked.exitCode !== 0) {
     options.printErr(
       `run-nixie-doctor-check: nixie's prod doctor exited ${String(checked.exitCode)}; its results are above\n${checked.stderr.toString()}`,
     );
+  }
 
+  if (detached.exitCode !== 0) {
+    options.printErr(
+      `run-nixie-doctor-check: bun verify detach exited ${String(detached.exitCode)}: ${detached.stdout.toString().trim()}\n`,
+    );
+  }
+
+  if (checked.exitCode !== 0 || detached.exitCode !== 0) {
     return 1;
   }
 
