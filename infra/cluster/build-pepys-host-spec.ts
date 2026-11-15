@@ -10,6 +10,9 @@ interface PepysMCPInputs {
 
   // the claim of the volume that holds the OAuth server's database
   readonly authClaim: Output<string>;
+
+  // the ConfigMap that holds the service-token file; set while the stack config names a client
+  readonly serviceTokensConfigMap?: Output<string>;
 }
 
 interface PepysHostSpecInputs {
@@ -46,6 +49,14 @@ export function buildPepysHostSpec(inputs: PepysHostSpecInputs) {
           ...(inputs.mcp === undefined
             ? []
             : [{ name: 'auth', persistentVolumeClaim: { claimName: inputs.mcp.authClaim } }]),
+          ...(inputs.mcp?.serviceTokensConfigMap === undefined
+            ? []
+            : [
+                {
+                  name: 'service-tokens',
+                  configMap: { name: inputs.mcp.serviceTokensConfigMap },
+                },
+              ]),
         ],
         containers: [buildHostContainer(inputs), buildAPIContainer(inputs)],
       },
@@ -92,6 +103,10 @@ function buildHostContainer(inputs: PepysHostSpecInputs): input.core.v1.Containe
 
 const authDirectory = '/auth';
 
+// mounted with no subPath: a subPath mount keeps the first copy of the file, so the API's SIGHUP
+// reload would never see an edit
+const serviceTokensDirectory = '/service-tokens';
+
 function buildAPIContainer(inputs: PepysHostSpecInputs): input.core.v1.Container {
   return {
     name: 'api',
@@ -112,6 +127,14 @@ function buildAPIContainer(inputs: PepysHostSpecInputs): input.core.v1.Container
             { name: 'PEPYS_API_PUBLIC_URL', value: inputs.mcp.publicURL },
             { name: 'PEPYS_AUTH_DIR', value: authDirectory },
           ]),
+      ...(inputs.mcp?.serviceTokensConfigMap === undefined
+        ? []
+        : [
+            {
+              name: 'PEPYS_API_SERVICE_TOKENS_FILE',
+              value: `${serviceTokensDirectory}/service-tokens.json`,
+            },
+          ]),
     ],
     readinessProbe: { tcpSocket: { port: host.apiPort }, periodSeconds: 10, failureThreshold: 3 },
 
@@ -122,6 +145,9 @@ function buildAPIContainer(inputs: PepysHostSpecInputs): input.core.v1.Container
       { name: 'store', mountPath: storeDirectory },
       { name: 'tmp', mountPath: '/tmp' },
       ...(inputs.mcp === undefined ? [] : [{ name: 'auth', mountPath: authDirectory }]),
+      ...(inputs.mcp?.serviceTokensConfigMap === undefined
+        ? []
+        : [{ name: 'service-tokens', mountPath: serviceTokensDirectory, readOnly: true }]),
     ],
     securityContext: buildPepysContainerSecurity(),
     resources: { requests: { cpu: '50m', memory: '64Mi' }, limits: { memory: '256Mi' } },

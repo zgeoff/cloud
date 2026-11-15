@@ -17,6 +17,19 @@ const pepysConfigSchema = z.object({
   apiHostname: z.string().optional(),
   tailnetHostname: z.string().optional(),
   impIdentityAudience: z.string().min(1).optional(),
+
+  // what the API's service-token file takes: the API refuses to start on a file it rejects
+  serviceClientDigests: z
+    .record(
+      z.string().regex(/^[a-z][\da-z-]{0,31}$/u, 'a client name of [a-z][a-z0-9-]{0,31}'),
+      z.string().regex(/^[\da-f]{64}$/u, 'a sha256 digest in hex'),
+    )
+    .refine((clients) => Object.keys(clients).length > 0, 'at least one client')
+    .refine(
+      (clients) => new Set(Object.values(clients)).size === Object.keys(clients).length,
+      'a digest of its own for each client',
+    )
+    .optional(),
 });
 
 // setting stack config "pepys" approves the deploy; the PEPYS_BACKUP_* and PEPYS_R2_* variables
@@ -45,6 +58,10 @@ export function loadPepysInputs(
     requireTailnetHostname(config.tailnetHostname, [config.webhookHostname, config.apiHostname]);
   }
 
+  if (config.serviceClientDigests !== undefined) {
+    requireServiceClientRelease(config.apiHostname, config.image);
+  }
+
   const pull = requireGHCRPullCredential(env);
   const backup = findBackup(env);
 
@@ -62,6 +79,9 @@ export function loadPepysInputs(
         ...(config.impIdentityAudience === undefined
           ? {}
           : { impIdentityAudience: config.impIdentityAudience }),
+        ...(config.serviceClientDigests === undefined
+          ? {}
+          : { serviceClientDigests: config.serviceClientDigests }),
       },
       pullCredential: { username: pull.username, token: secret(pull.token) },
       secrets: {
@@ -90,13 +110,17 @@ function requireAPIHostname(apiHostname: string, webhookHostname: string, image:
     throw new Error('stack config "pepys.apiHostname" must differ from "pepys.webhookHostname"');
   }
 
-  const release = /:(?<release>\d+\.\d+\.\d+)-[\da-f]+@/u.exec(image)?.groups?.['release'];
+  const release = findRelease(image);
 
   if (release === undefined || !isReleaseAtLeast(release, mcpAuthRelease)) {
     throw new Error(
       `stack config "pepys.apiHostname" needs a "pepys.image" of pepys ${mcpAuthRelease} or later, whose API checks a token on /mcp; the image is ${release === undefined ? 'not a release tag' : `pepys ${release}`}`,
     );
   }
+}
+
+function findRelease(image: string): string | undefined {
+  return /:(?<release>\d+\.\d+\.\d+)-[\da-f]+@/u.exec(image)?.groups?.['release'];
 }
 
 function isReleaseAtLeast(release: string, minimum: string): boolean {
@@ -134,6 +158,25 @@ function requireTailnetHostname(
   if (!isListed) {
     throw new Error(
       `stack config "pepys.tailnetHostname" needs a tailnet-hostname entry for ${tailnetHostname} in packages/topology/exposure.json`,
+    );
+  }
+}
+
+// the first pepys release whose API reads PEPYS_API_SERVICE_TOKENS_FILE; an older API ignores the
+// variable, so its service clients would fail to sign in with no error at the deploy
+const serviceClientRelease = '0.4.3';
+
+// the clients sign in at the API's /mcp, which only an API hostname serves
+function requireServiceClientRelease(apiHostname: string | undefined, image: string): void {
+  if (apiHostname === undefined) {
+    throw new Error('stack config "pepys.serviceClientDigests" needs "pepys.apiHostname"');
+  }
+
+  const release = findRelease(image);
+
+  if (release === undefined || !isReleaseAtLeast(release, serviceClientRelease)) {
+    throw new Error(
+      `stack config "pepys.serviceClientDigests" needs a "pepys.image" of pepys ${serviceClientRelease} or later, whose API reads the service-token file; the image is ${release === undefined ? 'not a release tag' : `pepys ${release}`}`,
     );
   }
 }

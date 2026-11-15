@@ -142,6 +142,12 @@ passkey enrollment and one sign-in per client, and the retaining class keeps the
 claim goes. [The API runbook](../../runbooks/pepys-api.md#turn-on-the-apis-public-route) turns the
 route on, enrolls the passkey and adds a client.
 
+A service client signs in at `/mcp` with a secret, with no person present, and gets the read scope.
+Stack config `pepys.serviceClientDigests` maps each client's name to the sha256 digest of its
+secret, which the API reads from a ConfigMap as its service-token file. A digest is no secret. The
+mount has no `subPath`, because a `subPath` mount keeps the first copy of the file.
+[Add a service client](../../runbooks/pepys-api.md#add-a-service-client) gives the steps.
+
 ### The API's tailnet route
 
 While stack config `pepys.tailnetHostname` names a host, such as `pepys-api.geoff.cloud`, a tailnet

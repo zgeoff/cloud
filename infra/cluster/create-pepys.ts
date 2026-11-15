@@ -18,6 +18,7 @@ import type { PepysAPIRoutes } from './build-pepys-network-policy-specs.ts';
 import { buildPepysNetworkPolicySpecs } from './build-pepys-network-policy-specs.ts';
 import { buildPepysPublicPath } from './build-pepys-public-path.ts';
 import { buildPepysS2Spec } from './build-pepys-s2-spec.ts';
+import { buildPepysServiceTokenFile } from './build-pepys-service-token-file.ts';
 import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
 import { createPepysBackupJob } from './create-pepys-backup-job.ts';
 import { readPepysIssuerDocuments } from './read-pepys-issuer-documents.ts';
@@ -280,6 +281,7 @@ function createHost(
   });
 
   const apiHostname = inputs.config.apiHostname;
+  const digests = inputs.config.serviceClientDigests;
 
   const mcp =
     apiHostname === undefined
@@ -287,6 +289,16 @@ function createHost(
       : {
           publicURL: `https://${apiHostname}`,
           authClaim: createAuthClaim(cluster, namespace),
+          ...(digests === undefined
+            ? {}
+            : {
+                serviceTokensConfigMap: createServiceTokens(
+                  cluster,
+                  namespace,
+                  `https://${apiHostname}/mcp`,
+                  digests,
+                ),
+              }),
         };
 
   return new StatefulSet(
@@ -323,4 +335,23 @@ function createAuthClaim(cluster: Provider, namespace: Output<string>): Output<s
   );
 
   return claim.metadata.name;
+}
+
+// Pulumi names the ConfigMap, so a change of digests replaces it and rolls the pod onto the new one
+function createServiceTokens(
+  cluster: Provider,
+  namespace: Output<string>,
+  resource: string,
+  digests: Readonly<Record<string, string>>,
+): Output<string> {
+  const tokens = new ConfigMap(
+    'pepys-service-tokens',
+    {
+      metadata: { namespace },
+      data: { 'service-tokens.json': buildPepysServiceTokenFile(resource, digests) },
+    },
+    { provider: cluster },
+  );
+
+  return tokens.metadata.name;
 }

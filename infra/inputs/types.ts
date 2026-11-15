@@ -266,6 +266,10 @@ interface PepysConfig {
   // the audience that a telemetry sender's identity token must name; while it is unset, ingest
   // refuses every telemetry export
   readonly impIdentityAudience?: string;
+
+  // the sha256 digest of each service client's secret, by client name; each client signs in at
+  // the API's /mcp with the read scope. A digest is no secret, so the stack config holds it.
+  readonly serviceClientDigests?: Readonly<Record<string, string>>;
 }
 
 // a nightly rclone copy of the Garage buckets to an R2 bucket
