@@ -2,17 +2,21 @@
 # person present, such as a verify run's read-only client. impd reads two files at start, named by
 # its settings IMP_MCP_SERVICE_TOKEN_FILE and IMP_MCP_SERVICE_CLIENTS_FILE: the token file holds each
 # client's scopes and the sha256 digests of its secrets, and the clients file holds the imps each
-# client may reach. The module writes both under /etc/imp, which imp-host mounts read-only.
+# client may reach. The module writes both under /etc/imp, which imp-host mounts read-only, and sets
+# both settings. impd refuses a token file whose resource is not its public MCP origin and /mcp, so
+# the module derives the resource from services.imp.settings.IMP_MCP_PUBLIC_URL.
 #
 # Each file is a copy, not a link into the store, because a link would dangle inside imp-host,
 # which mounts /etc/imp and not the store. impd refuses to start on a file its parser refuses, so
 # the assertions refuse each such client list at evaluation, with the same rules: at least one
-# client, a name of [a-z][a-z0-9-]{0,31}, at least one scope impd knows, 1 or 2 digests of 64
+# client, a public MCP origin of https and a host alone, a name of [a-z][a-z0-9-]{0,31}, at least one scope impd knows, 1 or 2 digests of 64
 # lowercase hex characters, no digest shared by two clients, and 1 to 32 imp patterns. impd reads
 # the files only at start, so a change to either restarts imp-host.
 { config, lib, ... }:
 let
   cfg = config.services.impd-service-clients;
+  publicURL = config.services.imp.settings.IMP_MCP_PUBLIC_URL or null;
+  isOrigin = builtins.isString publicURL && builtins.match "https://[^/]+" publicURL != null;
   knownScopes = [
     "read"
     "exec"
@@ -23,7 +27,7 @@ let
     lib.filter (digest: lib.count (other: other == digest) digestsOf > 1) digestsOf
   );
   tokenText = builtins.toJSON {
-    inherit (cfg) resource;
+    resource = if isOrigin then "${publicURL}/mcp" else null;
     clients = lib.mapAttrs (_: client: { inherit (client) scopes secretDigests; }) cfg.clients;
   };
   clientsText = builtins.toJSON {
@@ -62,12 +66,6 @@ in
 {
   options.services.impd-service-clients = {
     enable = lib.mkEnableOption "impd's service clients on its public MCP route";
-
-    resource = lib.mkOption {
-      type = lib.types.str;
-      example = "https://imp.example.com/mcp";
-      description = "The MCP resource impd serves: its public MCP origin and /mcp. impd refuses a token file that names another.";
-    };
 
     clients = lib.mkOption {
       default = { };
@@ -118,11 +116,18 @@ in
         message = "services.impd-service-clients.clients must name at least one client";
       }
       {
+        assertion = isOrigin;
+        message = "services.impd-service-clients needs services.imp.settings.IMP_MCP_PUBLIC_URL, an https origin with no path";
+      }
+      {
         assertion = sharedDigests == [ ];
         message = "impd service clients must not share a secret digest: ${lib.concatStringsSep ", " sharedDigests}";
       }
     ]
     ++ lib.concatLists (lib.mapAttrsToList clientAssertions cfg.clients);
+
+    services.imp.settings.IMP_MCP_SERVICE_TOKEN_FILE = cfg.tokenFile;
+    services.imp.settings.IMP_MCP_SERVICE_CLIENTS_FILE = cfg.clientsFile;
 
     environment.etc."imp/service-tokens.json" = {
       mode = "0444";

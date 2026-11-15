@@ -122,7 +122,8 @@ and the host's TLS front holds the route's name, certificate and DNS records
 A service client signs in on the same route with a secret and no person present, through OAuth's
 `client_credentials` grant. `services.impd-service-clients` in the host config lists each client
 with its scopes, the imps it may reach and the sha256 digest of its secret. The secret stays in its
-owner's vault. The module writes two files to `/etc/imp`, which imp-host mounts read-only, and impd
+owner's vault. The module writes two files to `/etc/imp`, which imp-host mounts read-only, names
+them in impd's settings, and takes the token file's resource from impd's public MCP origin. impd
 reads them only at start, so a change to a client restarts imp-host at the switch. impd refuses to
 start on a file its parser refuses, so the module's assertions refuse such a client list before the
 build. `wringer-ro` is impz's verify client: it reads every imp, with the `read` scope only.

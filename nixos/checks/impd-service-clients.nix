@@ -1,6 +1,7 @@
 # Checks services.impd-service-clients: the two files the module writes under /etc/imp for impd, the
-# restart it asks of imp-host, and each assertion that refuses a client list impd's parser would
-# refuse. Each case evaluates its own config through test-utils/build-module-system.nix, and runs in
+# settings that name them, the restart it asks of imp-host, and each assertion that refuses a client list impd's parser would
+# refuse. Each case evaluates its own config, beside imp's module, through
+# test-utils/build-module-system.nix, and runs in
 # a fresh directory under test-support/shell/run-cases.sh.
 # Run: bun run test:nixos impd-service-clients
 { nixpkgs, imp }:
@@ -13,18 +14,41 @@ let
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
   collectFailedAssertions = import ./test-utils/collect-failed-assertions.nix;
 
+  # the module beside imp's, whose settings it reads and sets
+  clientsModule = {
+    imports = [
+      ../modules/impd-service-clients.nix
+      imp.nixosModules.imp
+    ];
+  };
+
   buildClientsSystem =
-    clients:
-    buildModuleSystem ../modules/impd-service-clients.nix {
+    {
+      publicURL ? "https://imp.example.com",
+      clients,
+    }:
+    buildModuleSystem clientsModule {
+      services.imp.settings.IMP_MCP_PUBLIC_URL = publicURL;
       services.impd-service-clients = {
         enable = true;
-        resource = "https://imp.example.com/mcp";
         inherit clients;
       };
     };
 
   # each client list impd's parser refuses, with the assertion messages the module fails on it
   refusals = [
+    {
+      title = "it fails an assertion on a public MCP URL with a path";
+      publicURL = "https://imp.example.com/base";
+      clients.reader = {
+        scopes = [ "read" ];
+        secretDigests = [ (lib.fixedWidthString 64 "a" "") ];
+        imps = [ "*" ];
+      };
+      messages = [
+        "services.impd-service-clients needs services.imp.settings.IMP_MCP_PUBLIC_URL, an https origin with no path"
+      ];
+    }
     {
       title = "it fails an assertion on an empty client list";
       clients = { };
@@ -105,17 +129,17 @@ let
 
   cases = [
     {
-      title = "it writes each file as a copy that only root changes, and restarts imp-host when one changes";
+      title = "it writes each file as a copy that only root changes, names both in the settings of impd, and restarts imp-host when one changes";
       script =
         let
           config =
             (buildClientsSystem {
-              reader = {
+              clients.reader = {
                 scopes = [ "read" ];
                 secretDigests = [ (lib.fixedWidthString 64 "c" "") ];
                 imps = [ "*" ];
               };
-              runner = {
+              clients.runner = {
                 scopes = [
                   "read"
                   "exec"
@@ -170,6 +194,10 @@ let
               tokens.text
               clients.text
             ];
+            settings = {
+              IMP_MCP_SERVICE_TOKEN_FILE = "/etc/imp/service-tokens.json";
+              IMP_MCP_SERVICE_CLIENTS_FILE = "/etc/imp/service-clients.json";
+            };
           }}
           EOF
           jq -S -n \
@@ -184,14 +212,24 @@ let
               )
             } \
             --argjson restartTriggers ${lib.escapeShellArg (builtins.toJSON config.systemd.services.imp-host.restartTriggers)} \
-            '{$modes, $tokenFile, $clientsFile, $restartTriggers}' > actual
+            --argjson settings ${
+              lib.escapeShellArg (
+                builtins.toJSON {
+                  inherit (config.services.imp.settings)
+                    IMP_MCP_SERVICE_TOKEN_FILE
+                    IMP_MCP_SERVICE_CLIENTS_FILE
+                    ;
+                }
+              )
+            } \
+            '{$modes, $tokenFile, $clientsFile, $restartTriggers, $settings}' > actual
 
           assert_files_equal expected actual
           assert_equals '[]' ${
             lib.escapeShellArg (
               builtins.toJSON (
                 collectFailedAssertions (buildClientsSystem {
-                  reader = {
+                  clients.reader = {
                     scopes = [ "read" ];
                     secretDigests = [ (lib.fixedWidthString 64 "c" "") ];
                     imps = [ "*" ];
@@ -206,7 +244,20 @@ let
   ++ map (refusal: {
     inherit (refusal) title;
     script = ''
-      assert_equals ${lib.escapeShellArg (builtins.toJSON refusal.messages)} ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions (buildClientsSystem refusal.clients)))} "failed assertions"
+      assert_equals ${lib.escapeShellArg (builtins.toJSON refusal.messages)} ${
+        lib.escapeShellArg (
+          builtins.toJSON (
+            collectFailedAssertions (
+              buildClientsSystem (
+                removeAttrs refusal [
+                  "title"
+                  "messages"
+                ]
+              )
+            )
+          )
+        )
+      } "failed assertions"
     '';
   }) refusals;
 in
