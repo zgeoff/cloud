@@ -375,3 +375,103 @@ test.each([
     ),
   ).toThrowWithMessage(Error, message);
 });
+
+test('it carries the service client digests on an image of pepys 0.4.3 with an API hostname', () => {
+  const fixture = setupTest();
+
+  const image =
+    'ghcr.io/zgeoff/cloud-pepys:0.4.3-3f9c1d2a7b10@sha256:4444444444444444444444444444444444444444444444444444444444444444';
+
+  const config = buildStubConfig({
+    pepys: JSON.stringify({
+      image,
+      webhookHostname: 'pepys-webhook.geoff.cloud',
+      apiHostname: 'pepys.geoff.cloud',
+      serviceClientDigests: {
+        'lighthouse-ro': '1111111111111111111111111111111111111111111111111111111111111111',
+      },
+    }),
+  });
+
+  expect(
+    loadPepysInputs(config, fixture.coreEnv, ['PEPYS_WIDGET_SECRET']).pepys?.config,
+  ).toStrictEqual({
+    image,
+    webhookHostname: 'pepys-webhook.geoff.cloud',
+    apiHostname: 'pepys.geoff.cloud',
+    serviceClientDigests: {
+      'lighthouse-ro': '1111111111111111111111111111111111111111111111111111111111111111',
+    },
+  });
+});
+
+test.each([
+  [
+    'with no API hostname',
+    'ghcr.io/zgeoff/cloud-pepys:0.4.3-3f9c1d2a7b10@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+    undefined,
+    'stack config "pepys.serviceClientDigests" needs "pepys.apiHostname"',
+  ],
+  [
+    'on an image of pepys 0.4.2, whose API ignores the file',
+    'ghcr.io/zgeoff/cloud-pepys:0.4.2-3f9c1d2a7b10@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+    'pepys.geoff.cloud',
+    'stack config "pepys.serviceClientDigests" needs a "pepys.image" of pepys 0.4.3 or later, whose API reads the service-token file; the image is pepys 0.4.2',
+  ],
+])(
+  'it refuses service client digests %s',
+  (_label: string, image: string, apiHostname: string | undefined, message: string) => {
+    const fixture = setupTest();
+
+    expect(() =>
+      loadPepysInputs(
+        buildStubConfig({
+          pepys: JSON.stringify({
+            image,
+            webhookHostname: 'pepys-webhook.geoff.cloud',
+            apiHostname,
+            serviceClientDigests: {
+              'lighthouse-ro': '1111111111111111111111111111111111111111111111111111111111111111',
+            },
+          }),
+        }),
+        fixture.coreEnv,
+        [],
+      ),
+    ).toThrowWithMessage(Error, message);
+  },
+);
+
+test.each([
+  ['a digest that is not 64 hex digits', { 'lighthouse-ro': 'not-a-digest' }],
+  [
+    'a client name the API refuses',
+    { Lighthouse_RO: 'bd9b7496b91be8979ea3f37cb5cdf55b3a35bc22b154846f671bb4e31cea3689' },
+  ],
+  ['with no client', {}],
+  [
+    'two clients of one digest',
+    {
+      'lighthouse-ro': 'bd9b7496b91be8979ea3f37cb5cdf55b3a35bc22b154846f671bb4e31cea3689',
+      'harbour-ro': 'bd9b7496b91be8979ea3f37cb5cdf55b3a35bc22b154846f671bb4e31cea3689',
+    },
+  ],
+])('it refuses service client digests with %s', (_case, serviceClientDigests) => {
+  const fixture = setupTest();
+
+  expect(() =>
+    loadPepysInputs(
+      buildStubConfig({
+        pepys: JSON.stringify({
+          image:
+            'ghcr.io/zgeoff/cloud-pepys:0.4.3-3f9c1d2a7b10@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+          webhookHostname: 'pepys-webhook.geoff.cloud',
+          apiHostname: 'pepys.geoff.cloud',
+          serviceClientDigests,
+        }),
+      }),
+      fixture.coreEnv,
+      [],
+    ),
+  ).toThrowWithMessage(Error, /serviceClientDigests/u);
+});

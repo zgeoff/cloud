@@ -5,8 +5,9 @@ client in to it, and end a client's access.
 [Turn on the API's public route](#turn-on-the-apis-public-route) adds the route to a deployment that
 has none. [Sign a client in to the API](#sign-a-client-in-to-the-api) enrolls the owner's passkey
 and adds an MCP client, and [End a client's access](#end-a-clients-access) removes one.
-[The API's public route](../architecture/workloads/pepys.md#the-apis-public-route) explains what the
-route is made of, and
+[Add a service client](#add-a-service-client) lets a client with no person present sign in with a
+secret. [The API's public route](../architecture/workloads/pepys.md#the-apis-public-route) explains
+what the route is made of, and
 [the pepys API's route boundary](../architecture/network/public-ingress.md#the-pepys-apis-route-boundary)
 lists what each path checks.
 
@@ -108,6 +109,40 @@ OAuth server.
 
    Leave out `--client-secret`: the OAuth server gives no client a secret. Expect the first
    connection to open the owner's browser on `/oauth2/authorize`.
+
+## Add a service client
+
+A service client signs in at `/mcp` with the read scope.
+[The API's public route](../architecture/workloads/pepys.md#the-apis-public-route) explains the
+service-token file that holds its digest. The route must be on, and the image must hold pepys 0.4.3
+or later.
+
+1. Keep the client's secret in the 1Password vault of the client's owner, never in this repo. Take
+   the sha256 digest of the secret, in hex, `<digest>`.
+2. In a pull request, add the client under `geoff-cloud:pepys` in `infra/Pulumi.prod.yaml`:
+
+   ```yaml
+   serviceClientDigests:
+     <client_name>: <digest>
+   ```
+
+3. Run `bun run preview`. Expect it to create the ConfigMap `pepys-service-tokens`, or to replace it
+   when the field held a client already, and to update the StatefulSet `pepys-host`.
+4. Merge it. `Deploy prod` applies it once CI passes on `main`, and the pod `pepys-host-0` rolls.
+5. Check the API's start log:
+
+   ```sh
+   ssh root@geoffcloud k3s kubectl -n pepys logs pepys-host-0 -c api
+   ```
+
+   Expect a line that starts `api listening on` and ends
+   `serving /mcp at https://pepys.geoff.cloud/mcp`. The API reads the file before it listens, and
+   refuses to start on a file it can't read or parse, with an error line that names the reason.
+
+6. Sign the client in once with its secret, such as with pepys's own `bun verify` `prod` target, as
+   pepys's verify skill describes.
+
+To remove a client, delete its line. When it is the last one, delete the whole field.
 
 ## End a client's access
 

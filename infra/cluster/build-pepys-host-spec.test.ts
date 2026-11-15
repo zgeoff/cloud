@@ -115,6 +115,58 @@ test("it gives the API its public URL and the auth folder on the auth claim, in 
   });
 });
 
+test("it mounts the service-token ConfigMap read-only and whole, and names its file, in the API's container only", () => {
+  const authClaim = output('pepys-auth');
+  const serviceTokensConfigMap = output('pepys-service-tokens-5e6f7a8b');
+
+  const spec = buildPepysHostSpec({
+    image:
+      'ghcr.io/zgeoff/cloud-pepys:0.4.3-3f9c1d2a7b10@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+    serviceName: output('pepys-host'),
+    envSecret: output('pepys-host-0a1b2c3d'),
+    pullSecret: 'ghcr-pull',
+    mcp: { publicURL: 'https://pepys.geoff.cloud', authClaim, serviceTokensConfigMap },
+  });
+
+  expect({
+    volumes: spec.template.spec.volumes,
+    host: spec.template.spec.containers[0]?.volumeMounts,
+    api: {
+      env: spec.template.spec.containers[1]?.env,
+      volumeMounts: spec.template.spec.containers[1]?.volumeMounts,
+    },
+  }).toStrictEqual({
+    volumes: [
+      { name: 'tmp', emptyDir: {} },
+      { name: 'auth', persistentVolumeClaim: { claimName: authClaim } },
+      { name: 'service-tokens', configMap: { name: serviceTokensConfigMap } },
+    ],
+    host: [
+      { name: 'store', mountPath: '/store' },
+      { name: 'tmp', mountPath: '/tmp' },
+    ],
+    api: {
+      env: [
+        { name: 'PEPYS_STORE_DIR', value: '/store' },
+        { name: 'PEPYS_API_HOST', value: '0.0.0.0' },
+        { name: 'PEPYS_API_PORT', value: '8081' },
+        { name: 'PEPYS_API_PUBLIC_URL', value: 'https://pepys.geoff.cloud' },
+        { name: 'PEPYS_AUTH_DIR', value: '/auth' },
+        {
+          name: 'PEPYS_API_SERVICE_TOKENS_FILE',
+          value: '/service-tokens/service-tokens.json',
+        },
+      ],
+      volumeMounts: [
+        { name: 'store', mountPath: '/store' },
+        { name: 'tmp', mountPath: '/tmp' },
+        { name: 'auth', mountPath: '/auth' },
+        { name: 'service-tokens', mountPath: '/service-tokens', readOnly: true },
+      ],
+    },
+  });
+});
+
 test('it adds no auth volume and no public URL while the API is not public', () => {
   const fixture = setupTest();
 
