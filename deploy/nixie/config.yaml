@@ -41,7 +41,7 @@ models:
       context_tokens: 400000
       cache_ttl: 1h
       prices: { input: 4, cache_write: 5, cache_write_1h: 8, cached_input: 0.2, output: 20 }
-    # the memory writer extracts and files memories from each batch of messages
+    # Haiku at low effort; no role uses it since nixie 0.73.0 deleted the memory writer
     haiku-5-5-low:
       base_url: https://api.anthropic.com
       credential: deployment:anthropic
@@ -112,7 +112,6 @@ models:
       prices: { input: 10, cache_write: 12.5, cache_write_1h: 20, cached_input: 0.25, output: 50 }
   roles:
     conversation: fable-5-2
-    memory-writer: haiku-5-5-low
     checker: sonnet-5-5-high
   # the models a started task can choose in place of the task role's profile; the conversation sees
   # each name and its description
