@@ -77,8 +77,10 @@ fails when the release and a package version differ.
 1. Set `PEPYS_RELEASE` and `PEPYS_HOST_ASSET_SHA256` in
    [`images/pepys/versions.env`](../../images/pepys/versions.env). The checksum is the line of
    `pepys-host-linux-x64` in the release's `SHA256SUMS`, and the image build stops on a checksum of
-   another release. The bump pull request that [the release check](./release-check.md) opens on the
-   branch `release-check/pepys` sets both lines, and changes only this file.
+   another release. After an edit by hand, run `bun scripts/release/check-release-pins.ts --write`,
+   which copies both values into `scripts/release/release-pins.json`, or CI's release-pin check
+   fails. The bump pull request that [the release check](./release-check.md) opens on the branch
+   `release-check/pepys` writes all three.
 2. Set each `@pepys/*` version in `deploy/pepys/package.json` to that release, by hand.
 3. Check that `@boxxy/pepys`, the boxxy plug-in in `deploy/pepys/package.json`, admits the release.
    The plug-in's own `package.json` gives its range on `@pepys/kit` under `peerDependencies`. When
