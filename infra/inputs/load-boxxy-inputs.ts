@@ -31,6 +31,21 @@ const publicURLMessage =
 const folders = z.array(name);
 const digest = z.string().regex(/^[\da-f]{64}$/u, 'a sha256 digest in hex');
 
+// the door's own rules for its service-token file, which refuses a file that breaks one and stops
+// the server; a record's key schema drops its message, so the names get a refine
+const clientName = /^[a-z][\da-z-]{0,31}$/u;
+
+const serviceClientDigests = z
+  .record(name, digest)
+  .refine(
+    (digests) => Object.keys(digests).every((client) => clientName.test(client)),
+    'each client name must be a lowercase name of at most 32 letters, digits and dashes',
+  )
+  .refine(
+    (digests) => new Set(Object.values(digests)).size === Object.keys(digests).length,
+    'each service client needs a digest of its own',
+  );
+
 // the image reaches its own check below, which names what the field must hold
 const boxxyConfigSchema = z.strictObject({
   image: z.string().optional(),
@@ -61,7 +76,7 @@ const boxxyConfigSchema = z.strictObject({
       trustForwardedFrom: z.array(name),
 
       // the sha256 digest of each service client's secret, by client name
-      serviceClientDigests: z.record(name, digest).optional(),
+      serviceClientDigests: serviceClientDigests.optional(),
     })
     .optional(),
 });
