@@ -258,9 +258,9 @@ jobs:
 
       # nixie's own prod doctor, from the release the applied commit pins, as the nixie-verify
       # account with a 10-minute token: the pod's version, its readiness and its last hour of errors
-      # (run-nixie-doctor-check.ts). The admin kubeconfig only mints the token, and nixie's code
-      # runs with no job credential in its environment. Like the step above, a failure fails the
-      # check job.
+      # (run-nixie-doctor-check.ts). The admin kubeconfig only mints the token. nixie's code gets
+      # no job credential in its environment, but runs as the runner's user, beside the files the
+      # job wrote. Like the step above, a failure fails the check job.
       - name: Check nixie with its doctor
         id: nixie_doctor
         if: steps.outcome.outputs.outcome == 'apply'
