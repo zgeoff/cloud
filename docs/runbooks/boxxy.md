@@ -165,6 +165,40 @@ section and does not start.
 `boxxy auth clients` and `boxxy auth grants` list and remove clients and grants. The backup copies
 the door's auth database with the store, and a restore puts both back.
 
+## Add a service client
+
+A service client signs in at the door's `/mcp` with a secret and the read scope, with no person
+present ([the public door](../architecture/workloads/boxxy.md#the-public-door)). The door must be
+on, and the image must hold `@boxxy/server` 0.2.9 or later, because an older server refuses the
+configuration's `serviceTokensFile` and does not start.
+
+1. Keep the client's secret in the 1Password vault of the client's owner, never in this repo. Take
+   the sha256 digest of the secret, in hex, `<digest>`.
+2. In a PR, add the client to the `publicDoor` section of the `boxxy` object in
+   `infra/Pulumi.prod.yaml`:
+
+   ```yaml
+   serviceClientDigests:
+     <client_name>: <digest>
+   ```
+
+3. Run `bun run preview`. Expect it to create the ConfigMap `boxxy-service-tokens`, or to replace it
+   when the field held a client already. Expect it to replace the ConfigMap `boxxy-config` the first
+   time, and to update the StatefulSet.
+4. Merge it. `Deploy prod` applies it once CI passes on `main`, and the pod `boxxy-0` rolls.
+5. Check the server's start log:
+
+   ```bash
+   ssh root@geoffcloud k3s kubectl -n boxxy logs boxxy-0 -c boxxy | grep 'boxxy server listening'
+   ```
+
+   Expect one line.
+
+6. Sign the client in once with its secret, such as with boxxy's own `bun verify` `prod` target, as
+   boxxy's verify skill describes.
+
+To remove a client, delete its line. When it is the last one, delete the whole field.
+
 ## Let sessions reach the server
 
 A worker session in an imp reaches the worker listener at `https://boxxy.imp.internal`, the broker

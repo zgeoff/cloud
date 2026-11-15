@@ -29,6 +29,22 @@ const publicURLMessage =
   'must be the https:// origin clients reach, with no path, such as https://boxxy.example.com';
 
 const folders = z.array(name);
+const digest = z.string().regex(/^[\da-f]{64}$/u, 'a sha256 digest in hex');
+
+// the door's own rules for its service-token file, which refuses a file that breaks one and stops
+// the server; a record's key schema drops its message, so the names get a refine
+const clientName = /^[a-z][\da-z-]{0,31}$/u;
+
+const serviceClientDigests = z
+  .record(name, digest)
+  .refine(
+    (digests) => Object.keys(digests).every((client) => clientName.test(client)),
+    'each client name must be a lowercase name of at most 32 letters, digits and dashes',
+  )
+  .refine(
+    (digests) => new Set(Object.values(digests)).size === Object.keys(digests).length,
+    'each service client needs a digest of its own',
+  );
 
 // the image reaches its own check below, which names what the field must hold
 const boxxyConfigSchema = z.strictObject({
@@ -58,6 +74,9 @@ const boxxyConfigSchema = z.strictObject({
 
       // the socket peers whose forwarded client address the door's security events trust
       trustForwardedFrom: z.array(name),
+
+      // the sha256 digest of each service client's secret, by client name
+      serviceClientDigests: serviceClientDigests.optional(),
     })
     .optional(),
 });
@@ -113,7 +132,17 @@ export function loadBoxxyInputs(
         },
         ...(config.pepys === undefined ? {} : { pepys: config.pepys }),
         ...(config.github === undefined ? {} : { github: config.github }),
-        ...(config.publicDoor === undefined ? {} : { publicDoor: config.publicDoor }),
+        ...(config.publicDoor === undefined
+          ? {}
+          : {
+              publicDoor: {
+                publicURL: config.publicDoor.publicURL,
+                trustForwardedFrom: config.publicDoor.trustForwardedFrom,
+                ...(config.publicDoor.serviceClientDigests === undefined
+                  ? {}
+                  : { serviceClientDigests: config.publicDoor.serviceClientDigests }),
+              },
+            }),
       },
       repos: spawnRepos,
       pullCredential: { username: pull.username, token: secret(pull.token) },

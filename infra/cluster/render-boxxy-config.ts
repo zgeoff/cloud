@@ -3,7 +3,6 @@ import type { BoxxyConfig, BoxxyRepos } from '../inputs/index.ts';
 
 export const boxxyOwnerPort = topology.boxxy.ownerPort;
 export const boxxyWorkerPort = topology.boxxy.workerPort;
-const boxxyDoorPort = topology.boxxy.doorPort;
 
 // The volume holds the store, and the door's auth database beside it, `boxxy-auth.db`; the atc
 // gateway's backup image copies and restores every *.db in it.
@@ -70,8 +69,29 @@ export function renderBoxxyConfig(inputs: BoxxyConfigFileInputs): string {
     // on the pod's loopback, the default, where only the tunnel's sidecar reaches it
     ...(inputs.config.publicDoor === undefined
       ? {}
-      : { publicDoor: { port: boxxyDoorPort, ...inputs.config.publicDoor } }),
+      : { publicDoor: renderPublicDoor(inputs.config.publicDoor) }),
   };
 
   return `${JSON.stringify(file, null, 2)}\n`;
+}
+
+const boxxyDoorPort = topology.boxxy.doorPort;
+
+// where the pod mounts the ConfigMap of the door's service-token file, whole, with no subPath: a
+// subPath mount keeps the first copy of the file, so the server's SIGHUP reload would miss an edit
+export const boxxyServiceTokensFolder = '/service-tokens';
+export const boxxyServiceTokensFileName = 'service-tokens.json';
+
+// The digests stay out of the server's file, whose strict schema refuses the field; the server
+// reads them from the service-token file that the pod mounts.
+function renderPublicDoor(door: NonNullable<BoxxyConfig['publicDoor']>) {
+  const { serviceClientDigests, ...section } = door;
+
+  return {
+    port: boxxyDoorPort,
+    ...section,
+    ...(serviceClientDigests === undefined
+      ? {}
+      : { serviceTokensFile: `${boxxyServiceTokensFolder}/${boxxyServiceTokensFileName}` }),
+  };
 }

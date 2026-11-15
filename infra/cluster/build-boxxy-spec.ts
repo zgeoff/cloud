@@ -6,6 +6,7 @@ import { buildCloudflaredSidecar, tunnelTokenVolume } from './build-cloudflared-
 import {
   boxxyOwnerPort,
   boxxyRulesMount,
+  boxxyServiceTokensFolder,
   boxxyTrustedIssuersFolder,
   boxxyWorkerPort,
 } from './render-boxxy-config.ts';
@@ -45,6 +46,10 @@ export interface BoxxySpecInputs {
   // the Secret with the token of the public door's tunnel; with it, the pod runs the tunnel's
   // connector beside the server
   readonly doorTunnelToken?: Output<string>;
+
+  // the ConfigMap of the public door's service-token file; with it, the server's container mounts
+  // the file
+  readonly serviceTokensConfigMap?: Output<string>;
 }
 
 const rulesSyncTmpVolume = 'rules-sync-tmp';
@@ -81,6 +86,9 @@ export function buildBoxxySpec(inputs: BoxxySpecInputs): input.apps.v1.StatefulS
           ...(inputs.trustDocuments === undefined
             ? []
             : [{ name: 'issuers', configMap: { name: inputs.trustDocuments.configMap } }]),
+          ...(inputs.serviceTokensConfigMap === undefined
+            ? []
+            : [{ name: 'service-tokens', configMap: { name: inputs.serviceTokensConfigMap } }]),
 
           // group-readable, so the connector reads it through fsGroup
           ...(inputs.doorTunnelToken === undefined
@@ -287,6 +295,9 @@ function buildBoxxyContainer(inputs: BoxxySpecInputs): input.core.v1.Container {
         subPath: file,
         readOnly: true,
       })),
+      ...(inputs.serviceTokensConfigMap === undefined
+        ? []
+        : [{ name: 'service-tokens', mountPath: boxxyServiceTokensFolder, readOnly: true }]),
     ],
     securityContext: {
       allowPrivilegeEscalation: false,

@@ -100,6 +100,38 @@ test("it puts the public door on its port, with the stack config's URL and trust
   });
 });
 
+test("it points the public door at the mounted service-token file and leaves the digests out of the server's file", () => {
+  const fixture = setupTest();
+
+  expect(
+    JSON.parse(
+      renderBoxxyConfig({
+        config: {
+          ...fixture.config,
+          publicDoor: {
+            publicURL: 'https://boxxy.example.com',
+            trustForwardedFrom: [],
+            serviceClientDigests: {
+              'lighthouse-ro': '1111111111111111111111111111111111111111111111111111111111111111',
+            },
+          },
+        },
+        repos: fixture.repos,
+        atc: {
+          url: 'http://atc-gateway.atc.svc.cluster.local:8414/mcp',
+          host: 'atc.fixture.invalid',
+        },
+        trusted: false,
+      }),
+    ),
+  ).toHaveProperty('publicDoor', {
+    port: 8092,
+    publicURL: 'https://boxxy.example.com',
+    trustForwardedFrom: [],
+    serviceTokensFile: '/service-tokens/service-tokens.json',
+  });
+});
+
 test('it ends the file with one newline', () => {
   const fixture = setupTest();
 

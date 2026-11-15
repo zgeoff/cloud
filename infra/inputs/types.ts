@@ -176,6 +176,10 @@ export interface BoxxyConfig {
 
     // the socket peers whose forwarded client address the door's security events trust
     readonly trustForwardedFrom: readonly string[];
+
+    // the sha256 digest of each service client's secret, by client name; each client signs in at
+    // the door's /mcp with the read scope. A digest is no secret, so the stack config holds it.
+    readonly serviceClientDigests?: Readonly<Record<string, string>>;
   };
 }
 

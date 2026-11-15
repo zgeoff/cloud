@@ -162,6 +162,104 @@ test('it keeps the public door when the stack config sets one', () => {
   });
 });
 
+test("it keeps the public door's service client digests", () => {
+  const fixture = setupTest();
+
+  const digests = {
+    'lighthouse-ro': '1111111111111111111111111111111111111111111111111111111111111111',
+  };
+
+  const withDoor = {
+    ...fixture.boxxy,
+    publicDoor: {
+      publicURL: 'https://boxxy.example.com',
+      trustForwardedFrom: [],
+      serviceClientDigests: digests,
+    },
+  };
+
+  const stackConfig = buildStubConfig({ ...fixture.stackValues, boxxy: JSON.stringify(withDoor) });
+  const inputs = loadBoxxyInputs(stackConfig, fixture.tokens, undefined);
+
+  expect(inputs.boxxy?.config.publicDoor?.serviceClientDigests).toStrictEqual(digests);
+});
+
+test('it refuses a service client digest that is not sha256 hex', () => {
+  const fixture = setupTest();
+
+  const withDoor = {
+    ...fixture.boxxy,
+    publicDoor: {
+      publicURL: 'https://boxxy.example.com',
+      trustForwardedFrom: [],
+      serviceClientDigests: { 'lighthouse-ro': 'not-a-digest' },
+    },
+  };
+
+  const stackConfig = buildStubConfig({ ...fixture.stackValues, boxxy: JSON.stringify(withDoor) });
+
+  expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrow(
+    'a sha256 digest in hex',
+  );
+});
+
+test.each([
+  [
+    'a client name the door refuses',
+    { report_reader: '1111111111111111111111111111111111111111111111111111111111111111' },
+    'a lowercase name of at most 32 letters, digits and dashes',
+  ],
+  [
+    'two clients with one digest',
+    {
+      'lighthouse-ro': '1111111111111111111111111111111111111111111111111111111111111111',
+      'harbour-ro': '1111111111111111111111111111111111111111111111111111111111111111',
+    },
+    'each service client needs a digest of its own',
+  ],
+])(
+  'it refuses service client digests with %s',
+  (_variant: string, digests: Record<string, string>, message: string) => {
+    const fixture = setupTest();
+
+    const withDoor = {
+      ...fixture.boxxy,
+      publicDoor: {
+        publicURL: 'https://boxxy.example.com',
+        trustForwardedFrom: [],
+        serviceClientDigests: digests,
+      },
+    };
+
+    const stackConfig = buildStubConfig({
+      ...fixture.stackValues,
+      boxxy: JSON.stringify(withDoor),
+    });
+
+    expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrow(message);
+  },
+);
+
+test('it refuses service client digests outside the public door', () => {
+  const fixture = setupTest();
+
+  const withDigests = {
+    ...fixture.boxxy,
+    serviceClientDigests: {
+      'lighthouse-ro': '1111111111111111111111111111111111111111111111111111111111111111',
+    },
+  };
+
+  const stackConfig = buildStubConfig({
+    ...fixture.stackValues,
+    boxxy: JSON.stringify(withDigests),
+  });
+
+  expect(() => loadBoxxyInputs(stackConfig, fixture.tokens, undefined)).toThrow(
+    'serviceClientDigests',
+  );
+});
+
 test.each([
   ['plain http', 'http://boxxy.example.com'],
   ['a path', 'https://boxxy.example.com/mcp'],

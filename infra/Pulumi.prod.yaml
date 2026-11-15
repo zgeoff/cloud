@@ -35,7 +35,7 @@ config:
     serviceClientDigests:
       wringer-ro: bd9b7496b91be8979ea3f37cb5cdf55b3a35bc22b154846f671bb4e31cea3689
   geoff-cloud:boxxy:
-    image: ghcr.io/zgeoff/cloud-boxxy:5fb30903921008ebe4de22c98eec1c5eb74e08e1@sha256:c6949002b10685b6cb8c47c518852e4b59c8926cfa58fd79d8e4e905b4bd5e8f
+    image: ghcr.io/zgeoff/cloud-boxxy:e6c627e662d978c0a80d7b1b0adceeb1462a1512@sha256:b89f2d52d8fdb5dda9f7432ca6092bade14566054fa7b18c1939bc86ab9b413d
     runner: geoffcloud
     atc:
       trustedFolders: {}
@@ -50,6 +50,8 @@ config:
       publicURL: https://boxxy.geoff.cloud
       trustForwardedFrom:
         - 127.0.0.1
+      serviceClientDigests:
+        wringer-ro: 2ca3a5109e17901ae92e0434ee4eba039b962fbc7b805dab06ecd226da30d188
   geoff-cloud:atcGatewayOwnerEmail:
     secure: v1:qtn2w/XR0+liFzQ/:W1+yrhJlqaefFrlRSnptVnSirINfeT8elzOilqkmF0VmHbE=
   geoff-cloud:boxxySpawnRepos:

@@ -15,6 +15,7 @@ import {
   buildBoxxyOwnerServiceSpec,
   buildBoxxyWorkerServiceSpec,
 } from './build-boxxy-service-specs.ts';
+import { buildBoxxyServiceTokenFile } from './build-boxxy-service-token-file.ts';
 import {
   atcTokenKey,
   buildBoxxySpec,
@@ -29,7 +30,11 @@ import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
 import { createBoxxyBackupJob } from './create-boxxy-backup-job.ts';
 import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
 import { readBoxxyTrustDocuments } from './read-boxxy-trust-documents.ts';
-import { boxxyOwnerPort, renderBoxxyConfig } from './render-boxxy-config.ts';
+import {
+  boxxyOwnerPort,
+  boxxyServiceTokensFileName,
+  renderBoxxyConfig,
+} from './render-boxxy-config.ts';
 
 // the trust documents, one `<issuer>.json` per impd host, as `impz identity jwks` prints them
 const trustDocumentsFolder = fileURLToPath(new URL('../../deploy/boxxy/issuers', import.meta.url));
@@ -111,6 +116,24 @@ export function createBoxxy(
         { provider: cluster },
       )
     : undefined;
+
+  const door = inputs.config.publicDoor;
+  const digests = door?.serviceClientDigests;
+
+  // Pulumi names the ConfigMap, so a change of digests replaces it and rolls the pod onto the new one
+  const serviceTokens =
+    door === undefined || digests === undefined
+      ? undefined
+      : new ConfigMap(
+          'boxxy-service-tokens',
+          {
+            metadata: { namespace },
+            data: {
+              [boxxyServiceTokensFileName]: buildBoxxyServiceTokenFile(door.publicURL, digests),
+            },
+          },
+          { provider: cluster },
+        );
 
   const config = new ConfigMap(
     'boxxy-config',
@@ -207,6 +230,9 @@ export function createBoxxy(
         noticeToken: inputs.secrets.noticeToken !== undefined,
         pullSecret: ghcrPullSecretName,
         ...(doorTunnel === undefined ? {} : { doorTunnelToken: doorTunnel.metadata.name }),
+        ...(serviceTokens === undefined
+          ? {}
+          : { serviceTokensConfigMap: serviceTokens.metadata.name }),
       }),
     },
     { provider: cluster, dependsOn: [pull, worker, ingress] },

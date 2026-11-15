@@ -59,6 +59,15 @@ The door keeps its OAuth state, which holds the owner's passkeys, clients, grant
 client with `boxxy auth` commands on the owner listener
 ([the runbook](../../runbooks/boxxy.md#turn-on-the-public-door)).
 
+With `boxxy.publicDoor.serviceClientDigests`, the door also signs in service clients, such as a
+`bun verify` run, with no person present. Pulumi writes a service-token file to the ConfigMap
+`boxxy-service-tokens`: the door's `/mcp` resource and, for each client, the read scope and the
+sha256 digest of its secret. The file holds no secret. The pod mounts the ConfigMap whole at
+`/service-tokens`, with no `subPath`, and the configuration file's `publicDoor.serviceTokensFile`
+names the file there; the digests stay out of the configuration file. Pulumi names the ConfigMap, so
+a change of digests replaces it and rolls the pod. A client's secret starts `boxxy_svc_` and lives
+in the client's own vault ([the runbook](../../runbooks/boxxy.md#add-a-service-client)).
+
 ## Configuration and secrets
 
 Pulumi writes the server's configuration file into a ConfigMap, mounted at `/etc/boxxy/config.json`.
