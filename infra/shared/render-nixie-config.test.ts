@@ -38,7 +38,7 @@ test('it renders deploy/nixie/config.yaml as YAML holding the file’s keys and 
   expect(rendered).toStrictEqual({ ...file, imp: buildNixieImpConfig(topology) });
 });
 
-test('it renders the conversation on Fable 5.2 with a 400k context and a 1-hour cache, and the memory writer and the checker with neither', async () => {
+test('it renders the conversation on Fable 5.2 with a 400k context and a 1-hour cache, and the checker with neither', async () => {
   const text = await readFile(new URL('../../deploy/nixie/config.yaml', import.meta.url), 'utf8');
 
   const profileSchema = z.object({
@@ -51,7 +51,6 @@ test('it renders the conversation on Fable 5.2 with a 400k context and a 1-hour 
     roles: z.record(z.string(), z.string()),
     profiles: z.object({
       'fable-5-2': profileSchema,
-      'haiku-5-5-low': profileSchema,
       'sonnet-5-5-high': profileSchema,
     }),
   });
@@ -61,12 +60,10 @@ test('it renders the conversation on Fable 5.2 with a 400k context and a 1-hour 
   expect(z.object({ models: modelsSchema }).parse(rendered).models).toStrictEqual({
     roles: {
       conversation: 'fable-5-2',
-      'memory-writer': 'haiku-5-5-low',
       checker: 'sonnet-5-5-high',
     },
     profiles: {
       'fable-5-2': { model: 'claude-fable-5-2', context_tokens: 400_000, cache_ttl: '1h' },
-      'haiku-5-5-low': { model: 'claude-haiku-5-5' },
       'sonnet-5-5-high': { model: 'claude-sonnet-5-5' },
     },
   });
