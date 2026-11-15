@@ -29,6 +29,7 @@ const publicURLMessage =
   'must be the https:// origin clients reach, with no path, such as https://boxxy.example.com';
 
 const folders = z.array(name);
+const digest = z.string().regex(/^[\da-f]{64}$/u, 'a sha256 digest in hex');
 
 // the image reaches its own check below, which names what the field must hold
 const boxxyConfigSchema = z.strictObject({
@@ -58,6 +59,9 @@ const boxxyConfigSchema = z.strictObject({
 
       // the socket peers whose forwarded client address the door's security events trust
       trustForwardedFrom: z.array(name),
+
+      // the sha256 digest of each service client's secret, by client name
+      serviceClientDigests: z.record(name, digest).optional(),
     })
     .optional(),
 });
@@ -113,7 +117,17 @@ export function loadBoxxyInputs(
         },
         ...(config.pepys === undefined ? {} : { pepys: config.pepys }),
         ...(config.github === undefined ? {} : { github: config.github }),
-        ...(config.publicDoor === undefined ? {} : { publicDoor: config.publicDoor }),
+        ...(config.publicDoor === undefined
+          ? {}
+          : {
+              publicDoor: {
+                publicURL: config.publicDoor.publicURL,
+                trustForwardedFrom: config.publicDoor.trustForwardedFrom,
+                ...(config.publicDoor.serviceClientDigests === undefined
+                  ? {}
+                  : { serviceClientDigests: config.publicDoor.serviceClientDigests }),
+              },
+            }),
       },
       repos: spawnRepos,
       pullCredential: { username: pull.username, token: secret(pull.token) },

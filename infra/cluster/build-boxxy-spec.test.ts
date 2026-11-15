@@ -479,3 +479,65 @@ test("it reads each of the boxxy App's keys from the Secret when the server call
     },
   });
 });
+
+test("it mounts the service-token ConfigMap whole and read-only, with no subPath, so the server's reload sees an edit", () => {
+  const images = setupTest();
+  const serviceTokensConfigMap = output('boxxy-service-tokens-0a1b2c3d');
+
+  const spec = buildBoxxySpec({
+    ...images,
+    serviceName: output('boxxy'),
+    configMap: output('boxxy-config-0a1b2c3d'),
+    tokenSecret: output('boxxy-tokens-0a1b2c3d'),
+    pepysSigningSecret: false,
+    githubApp: false,
+    reviewApp: false,
+    noticeToken: false,
+    pullSecret: 'ghcr-pull',
+    serviceTokensConfigMap,
+  });
+
+  expect(spec.template).toMatchObject({
+    spec: {
+      volumes: expect.arrayContaining([
+        { name: 'service-tokens', configMap: { name: serviceTokensConfigMap } },
+      ]),
+      containers: [
+        {
+          volumeMounts: expect.arrayContaining([
+            { name: 'service-tokens', mountPath: '/service-tokens', readOnly: true },
+          ]),
+        },
+      ],
+    },
+  });
+});
+
+test('it mounts no service-token file without its ConfigMap', () => {
+  const images = setupTest();
+
+  const spec = buildBoxxySpec({
+    ...images,
+    serviceName: output('boxxy'),
+    configMap: output('boxxy-config-0a1b2c3d'),
+    tokenSecret: output('boxxy-tokens-0a1b2c3d'),
+    pepysSigningSecret: false,
+    githubApp: false,
+    reviewApp: false,
+    noticeToken: false,
+    pullSecret: 'ghcr-pull',
+  });
+
+  expect(spec.template).toMatchObject({
+    spec: {
+      volumes: expect.not.arrayContaining([expect.objectContaining({ name: 'service-tokens' })]),
+      containers: [
+        {
+          volumeMounts: expect.not.arrayContaining([
+            expect.objectContaining({ name: 'service-tokens' }),
+          ]),
+        },
+      ],
+    },
+  });
+});
