@@ -116,16 +116,19 @@ reproduce the failure.
 
 The apply job's step `Check nixie with its doctor` runs `bun verify doctor --target prod` from a
 checkout of the nixie release that the applied commit pins, as the `nixie-verify` account
-([the prod check's access](../architecture/workloads/nixie.md#the-prod-checks-access)). It logs each
-doctor check as a JSON line, then the doctor's verdict:
+([the prod check's access](../architecture/workloads/nixie.md#the-prod-checks-access)). The install
+and the doctor run in a container built from `images/nixie-doctor`, whose Bun must match the
+release's `.bun-version`. It logs each doctor check as a JSON line, then the doctor's verdict:
 
 - `prod-version` failed: the pod runs another release than the pin, or its rollout has not finished.
   The message names both versions.
 - `prod-health` failed: nixie reports itself degraded or unready, and the message names each part
   that fails.
 - `prod-errors` failed: nixie logged an error line in the last hour. The message names each event.
-- A `run-nixie-doctor-check:` line with no doctor output: the checkout of the release's tag, its
-  install, or the token mint failed, and the line gives the step and its error.
+- A `run-nixie-doctor-check:` line with no doctor output: the checkout of the release's tag, the
+  container's build or start, its install, or the token mint failed, and the line gives the step and
+  its error. When the line says the release wants another Bun, move the Bun image and its digest in
+  `images/nixie-doctor/Dockerfile` to that version.
 
 Read the cause in nixie's own logs, as [nixie's runbook](./nixie.md#failures) describes. To check
 again by hand, run the prod check of nixie's verify skill with the kubeconfig in vault `nixie`.

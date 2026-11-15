@@ -1,4 +1,4 @@
-import { readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createNixieVerifyKubeconfig } from './nixie-verify/create-nixie-verify-kubeconfig.ts';
 import { findNixieVersion } from './nixie-verify/find-nixie-version.ts';
@@ -11,13 +11,22 @@ export interface RunNixieDoctorCheckOptions {
   // the applied commit's stack config, whose nixie pin names the release to check
   readonly stackConfigPath: string;
 
-  // the deploy job's admin kubeconfig, which only mints the doctor's token
+  // the deploy job's admin kubeconfig, which only mints the doctor's token on the runner
   readonly adminKubeconfig: string;
 
   // an empty folder for nixie's checkout and the doctor's kubeconfig
   readonly workDir: string;
 
-  // what nixie's own processes inherit: PATH and HOME, and nothing of the job's credentials
+  // the folder that holds the doctor container's Dockerfile
+  readonly imageContext: string;
+
+  // the runner's kubectl, which the container gets read-only
+  readonly kubectlPath: string;
+
+  // the uid:gid the container runs as, which owns the checkout and the doctor's kubeconfig
+  readonly user: string;
+
+  // what git and docker on the runner inherit: PATH and HOME, and nothing of the job's credentials
   readonly path: string;
   readonly home: string;
   readonly printOut: (text: string) => void;
@@ -25,18 +34,27 @@ export interface RunNixieDoctorCheckOptions {
 }
 
 const nixieRepoURL = 'https://github.com/zgeoff/nixie.git';
+const image = 'nixie-doctor-check:local';
+const container = 'nixie-doctor-check';
 
 // how long a call that its timeout's SIGTERM did not stop gets before SIGKILL; the step's
 // timeout covers every call's timeout and this
 const forceStopAfterMs = 10_000;
 
-// Runs nixie's own prod doctor, from the release the commit pins, as the nixie-verify account,
-// which may only read nixie's pod, its log, its StatefulSet and its readiness.
+// Runs nixie's prod doctor, from the pinned release, as the read-only nixie-verify account. nixie's
+// code and dependencies run in a container that holds only the checkout, that account's
+// kubeconfig and kubectl, so they never reach the admin kubeconfig or another file of the job.
 export async function runNixieDoctorCheck(
   options: Readonly<RunNixieDoctorCheckOptions>,
 ): Promise<number> {
   if (options.adminKubeconfig === '') {
     options.printErr('run-nixie-doctor-check: KUBECONFIG names no admin kubeconfig\n');
+
+    return 1;
+  }
+
+  if (options.kubectlPath === '') {
+    options.printErr('run-nixie-doctor-check: no kubectl on PATH for the container\n');
 
     return 1;
   }
@@ -54,6 +72,7 @@ export async function runNixieDoctorCheck(
   }
 
   const checkout = join(options.workDir, 'nixie');
+  const kubeconfigDirectory = join(options.workDir, 'kube');
   const env = { PATH: options.path, HOME: options.home };
 
   const prepared = await runSteps(options, [
@@ -81,10 +100,9 @@ export async function runNixieDoctorCheck(
       options: { env, timeoutMs: 30_000 },
     },
     {
-      // the doctor runs none of the install scripts, which build nixie's web client and git hooks
-      what: "install nixie's dependencies",
-      argv: ['bun', 'install', '--frozen-lockfile', '--ignore-scripts'],
-      options: { env, cwd: checkout, timeoutMs: 300_000 },
+      what: "build the doctor's container image",
+      argv: ['docker', 'build', '--quiet', '--tag', image, options.imageContext],
+      options: { env, timeoutMs: 300_000 },
     },
   ]);
 
@@ -92,29 +110,26 @@ export async function runNixieDoctorCheck(
     return 1;
   }
 
-  const minted = await createNixieVerifyKubeconfig(options.run, {
-    adminKubeconfig: options.adminKubeconfig,
-    duration: '10m',
+  await mkdir(kubeconfigDirectory, { mode: 0o700 });
+
+  const started = await runSteps(options, [
+    {
+      what: "start the doctor's container",
+      argv: buildContainerArgv(options, { checkout, kubeconfigDirectory, version }),
+      options: { env, timeoutMs: 60_000 },
+    },
+  ]);
+
+  const exitCode = started
+    ? await runInContainer(options, { checkout, kubeconfigDirectory, version })
+    : 1;
+
+  await runBounded(options.run, ['docker', 'rm', '--force', container], {
+    env,
+    timeoutMs: 30_000,
   });
 
-  if (!minted.ok) {
-    options.printErr(`run-nixie-doctor-check: ${minted.error}\n`);
-
-    return 1;
-  }
-
-  options.printOut(`::add-mask::${minted.token}\n`);
-
-  const kubeconfig = join(options.workDir, 'nixie-verify-kubeconfig.yaml');
-
-  await writeFile(kubeconfig, minted.text, { mode: 0o600 });
-
-  const exitCode = await runDoctor(options, {
-    cwd: checkout,
-    env: { ...env, NIXIE_PROD_KUBECONFIG: kubeconfig, NIXIE_PROD_VERSION: version },
-  });
-
-  await rm(kubeconfig, { force: true });
+  await rm(kubeconfigDirectory, { recursive: true, force: true });
 
   return exitCode;
 }
@@ -162,24 +177,125 @@ async function runBounded(
   return ran.timedOut && ran.exitCode === 0 ? { ...ran, exitCode: 124 } : ran;
 }
 
-interface DoctorRun {
-  readonly cwd: string;
-  readonly env: Readonly<Record<string, string>>;
+interface DoctorPaths {
+  readonly checkout: string;
+  readonly kubeconfigDirectory: string;
+  readonly version: string;
 }
+
+// The container sees the checkout, the folder that will hold the doctor's kubeconfig, read-only,
+// and the runner's kubectl, read-only; its environment is the three variables below. It shares
+// the runner's network, which reaches the k3s API over the tailnet, and keeps no capability.
+function buildContainerArgv(
+  options: Readonly<RunNixieDoctorCheckOptions>,
+  paths: Readonly<DoctorPaths>,
+): readonly string[] {
+  return [
+    'docker',
+    'run',
+    '--detach',
+    '--name',
+    container,
+    '--network',
+    'host',
+    '--read-only',
+    '--tmpfs',
+    '/tmp',
+    '--cap-drop',
+    'ALL',
+    '--security-opt',
+    'no-new-privileges',
+    '--user',
+    options.user,
+    '--env',
+    'HOME=/tmp',
+    '--env',
+    'NIXIE_PROD_KUBECONFIG=/kube/config',
+    '--env',
+    `NIXIE_PROD_VERSION=${paths.version}`,
+    '--volume',
+    `${paths.checkout}:/nixie`,
+    '--volume',
+    `${paths.kubeconfigDirectory}:/kube:ro`,
+    '--volume',
+    `${options.kubectlPath}:/usr/local/bin/kubectl:ro`,
+    '--workdir',
+    '/nixie',
+    image,
+    'sleep',
+    'infinity',
+  ];
+}
+
+async function runInContainer(
+  options: Readonly<RunNixieDoctorCheckOptions>,
+  paths: Readonly<DoctorPaths>,
+): Promise<number> {
+  const env = { PATH: options.path, HOME: options.home };
+
+  const exec = (args: readonly string[], timeoutMs: number) =>
+    runBounded(options.run, ['docker', 'exec', container, ...args], { env, timeoutMs });
+
+  const bunVersion = await exec(['bun', '--version'], 30_000);
+  const wanted = await readFile(join(paths.checkout, '.bun-version'), 'utf8').catch(() => '');
+
+  if (bunVersion.stdout.toString().trim() !== wanted.trim()) {
+    options.printErr(
+      `run-nixie-doctor-check: nixie v${paths.version} wants Bun ${wanted.trim()}, and the doctor's image has Bun ${bunVersion.stdout.toString().trim()}; move images/nixie-doctor/Dockerfile to it\n`,
+    );
+
+    return 1;
+  }
+
+  const installed = await runSteps(options, [
+    {
+      // the doctor runs none of the install scripts, which build nixie's web client and git hooks
+      what: "install nixie's dependencies",
+      argv: [
+        'docker',
+        'exec',
+        container,
+        'bun',
+        'install',
+        '--frozen-lockfile',
+        '--ignore-scripts',
+      ],
+      options: { env, timeoutMs: 300_000 },
+    },
+  ]);
+
+  if (!installed) {
+    return 1;
+  }
+
+  const minted = await createNixieVerifyKubeconfig(options.run, {
+    adminKubeconfig: options.adminKubeconfig,
+    duration: '10m',
+  });
+
+  if (!minted.ok) {
+    options.printErr(`run-nixie-doctor-check: ${minted.error}\n`);
+
+    return 1;
+  }
+
+  options.printOut(`::add-mask::${minted.token}\n`);
+
+  await writeFile(join(paths.kubeconfigDirectory, 'config'), minted.text, { mode: 0o600 });
+
+  return runDoctor(options, (args, timeoutMs) =>
+    exec(['bun', 'run', '--silent', 'verify', ...args, '--target', 'prod'], timeoutMs),
+  );
+}
+
+type Verify = (args: readonly string[], timeoutMs: number) => Promise<RunResult>;
 
 // The verify CLI prints one JSON line per check and a last line with every result. Only check
 // names, statuses and messages leave nixie's checks, never a log line or a record.
 async function runDoctor(
   options: Readonly<RunNixieDoctorCheckOptions>,
-  doctor: DoctorRun,
+  verify: Verify,
 ): Promise<number> {
-  const verify = (args: readonly string[], timeoutMs: number) =>
-    runBounded(options.run, ['bun', 'run', '--silent', 'verify', ...args, '--target', 'prod'], {
-      cwd: doctor.cwd,
-      env: doctor.env,
-      timeoutMs,
-    });
-
   const attached = await verify(['attach'], 60_000);
 
   if (attached.exitCode !== 0) {
@@ -223,6 +339,9 @@ if (import.meta.main) {
     stackConfigPath: 'infra/Pulumi.prod.yaml',
     adminKubeconfig: process.env['KUBECONFIG'] ?? '',
     workDir: join(process.env['RUNNER_TEMP'] ?? '', 'nixie-doctor'),
+    imageContext: 'images/nixie-doctor',
+    kubectlPath: Bun.which('kubectl') ?? '',
+    user: `${String(process.getuid?.() ?? 0)}:${String(process.getgid?.() ?? 0)}`,
     path: process.env['PATH'] ?? '',
     home: process.env['HOME'] ?? '',
     printOut: (text) => {

@@ -133,7 +133,9 @@ No pod runs as the account, so it has no mounted token. Two callers mint one wit
 kubeconfig:
 
 - The `Deploy prod` workflow mints a short-lived token after each apply, and runs the doctor of the
-  release that the commit pins ([prod apply](../../runbooks/prod-apply.md)).
+  release that the commit pins ([prod apply](../../runbooks/prod-apply.md)). The doctor and its
+  install run in a container that mounts only the checkout, the token's kubeconfig and kubectl, so
+  no nixie dependency can read the admin kubeconfig on the runner.
 - The owner mints a token that lasts months into a kubeconfig in vault `nixie`, for an agent's prod
   check
   ([`ops:store-nixie-verify-kubeconfig`](../../runbooks/ops.md#bun-run-opsstore-nixie-verify-kubeconfig)).

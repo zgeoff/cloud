@@ -7,8 +7,7 @@ import { findJSONField } from './find-json-field.ts';
 import { runNixieDoctorCheck } from './run-nixie-doctor-check.ts';
 import type { Runner } from './run-process.ts';
 import { buildStubKubectlToken } from './test-utils/build-stub-kubectl-token.ts';
-import { buildStubNixieCheckout } from './test-utils/build-stub-nixie-checkout.ts';
-import type { StubCall } from './test-utils/build-stub-runner.ts';
+import { buildStubNixieContainer } from './test-utils/build-stub-nixie-container.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 
 async function setupTest() {
@@ -17,21 +16,31 @@ async function setupTest() {
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   const stackConfigPath = join(directory, 'Pulumi.prod.yaml');
-  const workDir = join(directory, 'work');
+  const workDir = join(directory, 'runner-temp', 'nixie-doctor');
+  const adminKubeconfig = join(directory, 'runner-temp', 'k3s-kubeconfig');
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
+
+  await writeFile(
+    stackConfigPath,
+    'config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.74.0@sha256:456a48906e5ae0c444d84860057ad59e52a90ba485eceb64ea9437474372db6f\n',
+  );
 
   return {
     stackConfigPath,
     workDir,
+    adminKubeconfig,
     printOut,
     printErr,
     check: (run: Runner) =>
       runNixieDoctorCheck({
         run,
         stackConfigPath,
-        adminKubeconfig: '/runner/k3s-kubeconfig',
+        adminKubeconfig,
         workDir,
+        imageContext: 'images/nixie-doctor',
+        kubectlPath: '/usr/local/bin/kubectl',
+        user: '1001:118',
         path: '/usr/bin:/bin',
         home: '/runner/home',
         printOut,
@@ -40,35 +49,25 @@ async function setupTest() {
   };
 }
 
-test("it runs the pinned release's prod doctor as nixie-verify with a 10-minute token", async () => {
+test("it runs the pinned release's prod doctor in a container, as nixie-verify with a 10-minute token", async () => {
   const ctx = await setupTest();
 
-  await writeFile(
-    ctx.stackConfigPath,
-    'config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.74.0@sha256:456a48906e5ae0c444d84860057ad59e52a90ba485eceb64ea9437474372db6f\n',
-  );
-
   const kubectl = buildStubKubectlToken({
-    adminKubeconfig: '/runner/k3s-kubeconfig',
+    adminKubeconfig: ctx.adminKubeconfig,
     server: 'https://cluster.example.test:6443',
     certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
     token: 'fake-token-for-tests',
     nowMs: Date.parse('2026-11-15T06:00:00Z'),
   });
 
-  const checkout = buildStubNixieCheckout({ doctor: { stdout: '{"ok":true}\n' } });
-  const runner = buildStubRunner(kubectl.handler, checkout.handler);
+  const docker = buildStubNixieContainer({ doctor: { stdout: '{"ok":true}\n' } });
+  const runner = buildStubRunner(kubectl.handler, docker.handler);
 
   const exitCode = await ctx.check(runner.run);
 
   const nixie = join(ctx.workDir, 'nixie');
-  const nixieEnv = { PATH: '/usr/bin:/bin', HOME: '/runner/home' };
-
-  const doctorEnv = {
-    ...nixieEnv,
-    NIXIE_PROD_KUBECONFIG: join(ctx.workDir, 'nixie-verify-kubeconfig.yaml'),
-    NIXIE_PROD_VERSION: '0.74.0',
-  };
+  const kube = join(ctx.workDir, 'kube');
+  const env = { PATH: '/usr/bin:/bin', HOME: '/runner/home' };
 
   expect({ exitCode, out: ctx.printOut.mock.calls, err: ctx.printErr.mock.calls }).toStrictEqual({
     exitCode: 0,
@@ -80,9 +79,7 @@ test("it runs the pinned release's prod doctor as nixie-verify with a 10-minute 
     err: [],
   });
 
-  expect(
-    runner.calls.map((call) => ({ argv: call.argv, cwd: call.options.cwd, env: call.options.env })),
-  ).toStrictEqual([
+  expect(runner.calls.map((call) => ({ argv: call.argv, env: call.options.env }))).toStrictEqual([
     {
       argv: [
         'git',
@@ -97,24 +94,76 @@ test("it runs the pinned release's prod doctor as nixie-verify with a 10-minute 
         'https://github.com/zgeoff/nixie.git',
         nixie,
       ],
-      cwd: undefined,
-      env: nixieEnv,
+      env,
+    },
+    { argv: ['git', '-C', nixie, 'switch', '--quiet', '--create', 'main'], env },
+    {
+      argv: [
+        'docker',
+        'build',
+        '--quiet',
+        '--tag',
+        'nixie-doctor-check:local',
+        'images/nixie-doctor',
+      ],
+      env,
     },
     {
-      argv: ['git', '-C', nixie, 'switch', '--quiet', '--create', 'main'],
-      cwd: undefined,
-      env: nixieEnv,
+      argv: [
+        'docker',
+        'run',
+        '--detach',
+        '--name',
+        'nixie-doctor-check',
+        '--network',
+        'host',
+        '--read-only',
+        '--tmpfs',
+        '/tmp',
+        '--cap-drop',
+        'ALL',
+        '--security-opt',
+        'no-new-privileges',
+        '--user',
+        '1001:118',
+        '--env',
+        'HOME=/tmp',
+        '--env',
+        'NIXIE_PROD_KUBECONFIG=/kube/config',
+        '--env',
+        'NIXIE_PROD_VERSION=0.74.0',
+        '--volume',
+        `${nixie}:/nixie`,
+        '--volume',
+        `${kube}:/kube:ro`,
+        '--volume',
+        '/usr/local/bin/kubectl:/usr/local/bin/kubectl:ro',
+        '--workdir',
+        '/nixie',
+        'nixie-doctor-check:local',
+        'sleep',
+        'infinity',
+      ],
+      env,
     },
+    { argv: ['docker', 'exec', 'nixie-doctor-check', 'bun', '--version'], env },
     {
-      argv: ['bun', 'install', '--frozen-lockfile', '--ignore-scripts'],
-      cwd: nixie,
-      env: nixieEnv,
+      argv: [
+        'docker',
+        'exec',
+        'nixie-doctor-check',
+        'bun',
+        'install',
+        '--frozen-lockfile',
+        '--ignore-scripts',
+      ],
+      env,
     },
     {
       argv: [
         'kubectl',
         '--kubeconfig',
-        '/runner/k3s-kubeconfig',
+        ctx.adminKubeconfig,
         'config',
         'view',
         '--minify',
@@ -122,14 +171,13 @@ test("it runs the pinned release's prod doctor as nixie-verify with a 10-minute 
         '--output',
         String.raw`jsonpath={.clusters[0].cluster.server}{"\n"}{.clusters[0].cluster.certificate-authority-data}`,
       ],
-      cwd: undefined,
       env: undefined,
     },
     {
       argv: [
         'kubectl',
         '--kubeconfig',
-        '/runner/k3s-kubeconfig',
+        ctx.adminKubeconfig,
         '--namespace',
         'nixie',
         'create',
@@ -139,107 +187,148 @@ test("it runs the pinned release's prod doctor as nixie-verify with a 10-minute 
         '--output',
         'json',
       ],
-      cwd: undefined,
       env: undefined,
     },
     {
-      argv: ['bun', 'run', '--silent', 'verify', 'attach', '--target', 'prod'],
-      cwd: nixie,
-      env: doctorEnv,
+      argv: [
+        'docker',
+        'exec',
+        'nixie-doctor-check',
+        'bun',
+        'run',
+        '--silent',
+        'verify',
+        'attach',
+        '--target',
+        'prod',
+      ],
+      env,
     },
     {
-      argv: ['bun', 'run', '--silent', 'verify', 'doctor', '--json', '--target', 'prod'],
-      cwd: nixie,
-      env: doctorEnv,
+      argv: [
+        'docker',
+        'exec',
+        'nixie-doctor-check',
+        'bun',
+        'run',
+        '--silent',
+        'verify',
+        'doctor',
+        '--json',
+        '--target',
+        'prod',
+      ],
+      env,
     },
     {
-      argv: ['bun', 'run', '--silent', 'verify', 'detach', '--target', 'prod'],
-      cwd: nixie,
-      env: doctorEnv,
+      argv: [
+        'docker',
+        'exec',
+        'nixie-doctor-check',
+        'bun',
+        'run',
+        '--silent',
+        'verify',
+        'detach',
+        '--target',
+        'prod',
+      ],
+      env,
     },
+    { argv: ['docker', 'rm', '--force', 'nixie-doctor-check'], env },
   ]);
 });
 
-test('it gives the doctor a kubeconfig that only its owner reads, which holds the token, and removes it after', async () => {
+test('it gives the container no mount that holds the admin kubeconfig, and no environment but its own three', async () => {
   const ctx = await setupTest();
 
-  await writeFile(
-    ctx.stackConfigPath,
-    'config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.74.0@sha256:456a48906e5ae0c444d84860057ad59e52a90ba485eceb64ea9437474372db6f\n',
-  );
-
   const kubectl = buildStubKubectlToken({
-    adminKubeconfig: '/runner/k3s-kubeconfig',
+    adminKubeconfig: ctx.adminKubeconfig,
     server: 'https://cluster.example.test:6443',
     certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
     token: 'fake-token-for-tests',
     nowMs: Date.parse('2026-11-15T06:00:00Z'),
   });
 
-  const checkout = buildStubNixieCheckout({});
-  const runner = buildStubRunner(kubectl.handler, checkout.handler);
+  const runner = buildStubRunner(kubectl.handler, buildStubNixieContainer({}).handler);
 
   await ctx.check(runner.run);
 
-  expect(
-    checkout.kubeconfigs.map((read) => ({
+  const dockerCalls = runner.calls.filter((call) => call.argv[0] === 'docker');
+  const started = dockerCalls.find((call) => call.argv[1] === 'run')?.argv ?? [];
+  const valuesOf = (flag: string) => started.filter((_, index) => started[index - 1] === flag);
+  const mountSources = valuesOf('--volume').map((volume) => volume.split(':')[0] ?? '');
+
+  expect({
+    mountSources,
+    mountsHoldingTheAdminKubeconfig: mountSources.filter((source) =>
+      ctx.adminKubeconfig.startsWith(source),
+    ),
+    environment: valuesOf('--env'),
+    otherEnvironmentFlags: started.filter(
+      (arg) => arg === '-e' || arg === '-v' || arg.startsWith('--env-file') || arg === '--mount',
+    ),
+
+    // `docker exec --env` or `-e` would add a variable after the start
+    execEnvironment: dockerCalls
+      .filter((call) => call.argv[1] === 'exec')
+      .flatMap((call) => call.argv.filter((arg) => arg.startsWith('--env') || arg === '-e')),
+  }).toStrictEqual({
+    mountSources: [join(ctx.workDir, 'nixie'), join(ctx.workDir, 'kube'), '/usr/local/bin/kubectl'],
+    mountsHoldingTheAdminKubeconfig: [],
+    environment: ['HOME=/tmp', 'NIXIE_PROD_KUBECONFIG=/kube/config', 'NIXIE_PROD_VERSION=0.74.0'],
+    otherEnvironmentFlags: [],
+    execEnvironment: [],
+  });
+});
+
+test('it keeps the token out of every argv and every environment, and gives it to the container only as a file', async () => {
+  const ctx = await setupTest();
+
+  const kubectl = buildStubKubectlToken({
+    adminKubeconfig: ctx.adminKubeconfig,
+    server: 'https://cluster.example.test:6443',
+    certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
+    token: 'fake-token-for-tests',
+    nowMs: Date.parse('2026-11-15T06:00:00Z'),
+  });
+
+  const docker = buildStubNixieContainer({});
+  const runner = buildStubRunner(kubectl.handler, docker.handler);
+
+  await ctx.check(runner.run);
+
+  expect({
+    leaks: runner.calls.filter((call) =>
+      JSON.stringify([call.argv, call.options.env ?? {}]).includes('fake-token-for-tests'),
+    ),
+    kubeconfigs: docker.kubeconfigs.map((read) => ({
       mode: read.mode,
       users: findJSONField(Bun.YAML.parse(read.text), 'users'),
     })),
-  ).toStrictEqual([
-    { mode: 0o600, users: [{ name: 'nixie-verify', user: { token: 'fake-token-for-tests' } }] },
-  ]);
-
-  expect(existsSync(join(ctx.workDir, 'nixie-verify-kubeconfig.yaml'))).toBeFalse();
+    left: existsSync(join(ctx.workDir, 'kube')),
+  }).toStrictEqual({
+    leaks: [],
+    kubeconfigs: [
+      { mode: 0o600, users: [{ name: 'nixie-verify', user: { token: 'fake-token-for-tests' } }] },
+    ],
+    left: false,
+  });
 });
 
-test('it keeps the token out of every argv and every environment', async () => {
+test('it fails, prints the doctor, still detaches and removes the container when a check fails', async () => {
   const ctx = await setupTest();
 
-  await writeFile(
-    ctx.stackConfigPath,
-    'config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.74.0@sha256:456a48906e5ae0c444d84860057ad59e52a90ba485eceb64ea9437474372db6f\n',
-  );
-
   const kubectl = buildStubKubectlToken({
-    adminKubeconfig: '/runner/k3s-kubeconfig',
+    adminKubeconfig: ctx.adminKubeconfig,
     server: 'https://cluster.example.test:6443',
     certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
     token: 'fake-token-for-tests',
     nowMs: Date.parse('2026-11-15T06:00:00Z'),
   });
 
-  const runner = buildStubRunner(kubectl.handler, buildStubNixieCheckout({}).handler);
-
-  await ctx.check(runner.run);
-
-  expect(runner.calls).toSatisfyAll(
-    (call: StubCall) =>
-      !JSON.stringify([call.argv, call.options.env ?? {}]).includes('fake-token-for-tests'),
-  );
-});
-
-test('it fails, prints the doctor, still detaches and removes the kubeconfig when a check fails', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(
-    ctx.stackConfigPath,
-    'config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.74.0@sha256:456a48906e5ae0c444d84860057ad59e52a90ba485eceb64ea9437474372db6f\n',
-  );
-
-  const kubectl = buildStubKubectlToken({
-    adminKubeconfig: '/runner/k3s-kubeconfig',
-    server: 'https://cluster.example.test:6443',
-    certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
-    token: 'fake-token-for-tests',
-    nowMs: Date.parse('2026-11-15T06:00:00Z'),
-  });
-
-  const checkout = buildStubNixieCheckout({
-    doctor: { exitCode: 1, stdout: '{"ok":false}\n' },
-  });
-
-  const runner = buildStubRunner(kubectl.handler, checkout.handler);
+  const docker = buildStubNixieContainer({ doctor: { exitCode: 1, stdout: '{"ok":false}\n' } });
+  const runner = buildStubRunner(kubectl.handler, docker.handler);
 
   const exitCode = await ctx.check(runner.run);
 
@@ -247,75 +336,61 @@ test('it fails, prints the doctor, still detaches and removes the kubeconfig whe
     exitCode,
     out: ctx.printOut.mock.calls,
     err: ctx.printErr.mock.calls,
-    last: runner.calls.at(-1)?.argv,
-    kubeconfig: existsSync(join(ctx.workDir, 'nixie-verify-kubeconfig.yaml')),
+    lastTwo: runner.calls.slice(-2).map((call) => call.argv.slice(-3)),
+    left: existsSync(join(ctx.workDir, 'kube')),
   }).toStrictEqual({
     exitCode: 1,
     out: [['::add-mask::fake-token-for-tests\n'], ['{"ok":false}\n']],
     err: [["run-nixie-doctor-check: nixie's prod doctor exited 1; its results are above\n"]],
-    last: ['bun', 'run', '--silent', 'verify', 'detach', '--target', 'prod'],
-    kubeconfig: false,
+    lastTwo: [
+      ['detach', '--target', 'prod'],
+      ['rm', '--force', 'nixie-doctor-check'],
+    ],
+    left: false,
   });
 });
 
 test('it fails when the doctor passes but detach fails', async () => {
   const ctx = await setupTest();
 
-  await writeFile(
-    ctx.stackConfigPath,
-    'config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.74.0@sha256:456a48906e5ae0c444d84860057ad59e52a90ba485eceb64ea9437474372db6f\n',
-  );
-
   const kubectl = buildStubKubectlToken({
-    adminKubeconfig: '/runner/k3s-kubeconfig',
+    adminKubeconfig: ctx.adminKubeconfig,
     server: 'https://cluster.example.test:6443',
     certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
     token: 'fake-token-for-tests',
     nowMs: Date.parse('2026-11-15T06:00:00Z'),
   });
 
-  const checkout = buildStubNixieCheckout({
+  const docker = buildStubNixieContainer({
     doctor: { stdout: '{"ok":true}\n' },
     detach: { exitCode: 1, stdout: '{"ok":false,"command":"detach"}\n' },
   });
 
-  const runner = buildStubRunner(kubectl.handler, checkout.handler);
+  const runner = buildStubRunner(kubectl.handler, docker.handler);
 
   const exitCode = await ctx.check(runner.run);
 
-  expect({
-    exitCode,
-    out: ctx.printOut.mock.calls,
-    err: ctx.printErr.mock.calls,
-    kubeconfig: existsSync(join(ctx.workDir, 'nixie-verify-kubeconfig.yaml')),
-  }).toStrictEqual({
+  expect({ exitCode, err: ctx.printErr.mock.calls }).toStrictEqual({
     exitCode: 1,
-    out: [['::add-mask::fake-token-for-tests\n'], ['{"ok":true}\n']],
     err: [
       ['run-nixie-doctor-check: bun verify detach exited 1: {"ok":false,"command":"detach"}\n'],
     ],
-    kubeconfig: false,
   });
 });
 
 test('it fails when the doctor outlives its timeout, even when it then exits 0', async () => {
   const ctx = await setupTest();
 
-  await writeFile(
-    ctx.stackConfigPath,
-    'config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.74.0@sha256:456a48906e5ae0c444d84860057ad59e52a90ba485eceb64ea9437474372db6f\n',
-  );
-
   const kubectl = buildStubKubectlToken({
-    adminKubeconfig: '/runner/k3s-kubeconfig',
+    adminKubeconfig: ctx.adminKubeconfig,
     server: 'https://cluster.example.test:6443',
     certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
     token: 'fake-token-for-tests',
     nowMs: Date.parse('2026-11-15T06:00:00Z'),
   });
 
-  const checkout = buildStubNixieCheckout({ doctor: { timedOut: true, stdout: '{"ok":true}\n' } });
-  const runner = buildStubRunner(kubectl.handler, checkout.handler);
+  const docker = buildStubNixieContainer({ doctor: { timedOut: true, stdout: '{"ok":true}\n' } });
+  const runner = buildStubRunner(kubectl.handler, docker.handler);
 
   const exitCode = await ctx.check(runner.run);
 
@@ -325,23 +400,18 @@ test('it fails when the doctor outlives its timeout, even when it then exits 0',
   });
 });
 
-test('it gives each call to git and to nixie a SIGKILL after its timeout', async () => {
+test('it gives each call to git and docker a SIGKILL after its timeout', async () => {
   const ctx = await setupTest();
 
-  await writeFile(
-    ctx.stackConfigPath,
-    'config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.74.0@sha256:456a48906e5ae0c444d84860057ad59e52a90ba485eceb64ea9437474372db6f\n',
-  );
-
   const kubectl = buildStubKubectlToken({
-    adminKubeconfig: '/runner/k3s-kubeconfig',
+    adminKubeconfig: ctx.adminKubeconfig,
     server: 'https://cluster.example.test:6443',
     certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
     token: 'fake-token-for-tests',
     nowMs: Date.parse('2026-11-15T06:00:00Z'),
   });
 
-  const runner = buildStubRunner(kubectl.handler, buildStubNixieCheckout({}).handler);
+  const runner = buildStubRunner(kubectl.handler, buildStubNixieContainer({}).handler);
   const stops: string[] = [];
 
   await ctx.check((argv, options) => {
@@ -353,25 +423,57 @@ test('it gives each call to git and to nixie a SIGKILL after its timeout', async
   expect(stops).toStrictEqual([
     'git SIGKILL',
     'git SIGKILL',
-    'bun SIGKILL',
+    'docker SIGKILL',
+    'docker SIGKILL',
+    'docker SIGKILL',
+    'docker SIGKILL',
     'kubectl none',
     'kubectl none',
-    'bun SIGKILL',
-    'bun SIGKILL',
-    'bun SIGKILL',
+    'docker SIGKILL',
+    'docker SIGKILL',
+    'docker SIGKILL',
+    'docker SIGKILL',
   ]);
+});
+
+test("it removes the container and mints no token when the image's Bun differs from nixie's", async () => {
+  const ctx = await setupTest();
+
+  const kubectl = buildStubKubectlToken({
+    adminKubeconfig: ctx.adminKubeconfig,
+    server: 'https://cluster.example.test:6443',
+    certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
+    token: 'fake-token-for-tests',
+    nowMs: Date.parse('2026-11-15T06:00:00Z'),
+  });
+
+  const docker = buildStubNixieContainer({ bunVersion: '1.5.0', imageBunVersion: '1.4.4' });
+  const runner = buildStubRunner(kubectl.handler, docker.handler);
+
+  const exitCode = await ctx.check(runner.run);
+
+  expect({
+    exitCode,
+    err: ctx.printErr.mock.calls,
+    durations: kubectl.durations,
+    last: runner.calls.at(-1)?.argv,
+  }).toStrictEqual({
+    exitCode: 1,
+    err: [
+      [
+        "run-nixie-doctor-check: nixie v0.74.0 wants Bun 1.5.0, and the doctor's image has Bun 1.4.4; move images/nixie-doctor/Dockerfile to it\n",
+      ],
+    ],
+    durations: [],
+    last: ['docker', 'rm', '--force', 'nixie-doctor-check'],
+  });
 });
 
 test('it fails before it mints a token when the pinned release has no tag', async () => {
   const ctx = await setupTest();
 
-  await writeFile(
-    ctx.stackConfigPath,
-    'config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.74.0@sha256:456a48906e5ae0c444d84860057ad59e52a90ba485eceb64ea9437474372db6f\n',
-  );
-
   const kubectl = buildStubKubectlToken({
-    adminKubeconfig: '/runner/k3s-kubeconfig',
+    adminKubeconfig: ctx.adminKubeconfig,
     server: 'https://cluster.example.test:6443',
     certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
     token: 'fake-token-for-tests',
@@ -379,7 +481,7 @@ test('it fails before it mints a token when the pinned release has no tag', asyn
   });
 
   // git's answer to a clone of a branch or tag that the remote lacks
-  const checkout = buildStubNixieCheckout({
+  const docker = buildStubNixieContainer({
     clone: {
       exitCode: 128,
       stderr:
@@ -387,7 +489,7 @@ test('it fails before it mints a token when the pinned release has no tag', asyn
     },
   });
 
-  const runner = buildStubRunner(kubectl.handler, checkout.handler);
+  const runner = buildStubRunner(kubectl.handler, docker.handler);
 
   const exitCode = await ctx.check(runner.run);
 
@@ -402,22 +504,17 @@ test('it fails before it mints a token when the pinned release has no tag', asyn
   });
 });
 
-test('it fails before the doctor runs when kubectl mints no token', async () => {
+test('it fails before the doctor runs, and removes the container, when kubectl mints no token', async () => {
   const ctx = await setupTest();
 
-  await writeFile(
-    ctx.stackConfigPath,
-    'config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.74.0@sha256:456a48906e5ae0c444d84860057ad59e52a90ba485eceb64ea9437474372db6f\n',
-  );
-
   const kubectl = buildStubKubectlToken({
-    adminKubeconfig: '/runner/k3s-kubeconfig',
+    adminKubeconfig: ctx.adminKubeconfig,
     server: 'https://cluster.example.test:6443',
     certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
     nowMs: Date.parse('2026-11-15T06:00:00Z'),
   });
 
-  const runner = buildStubRunner(kubectl.handler, buildStubNixieCheckout({}).handler);
+  const runner = buildStubRunner(kubectl.handler, buildStubNixieContainer({}).handler);
 
   const exitCode = await ctx.check(runner.run);
 
@@ -425,6 +522,7 @@ test('it fails before the doctor runs when kubectl mints no token', async () => 
     exitCode,
     err: ctx.printErr.mock.calls,
     verifyCalls: runner.calls.filter((call) => call.argv.includes('verify')),
+    last: runner.calls.at(-1)?.argv,
   }).toStrictEqual({
     exitCode: 1,
     err: [
@@ -433,19 +531,15 @@ test('it fails before the doctor runs when kubectl mints no token', async () => 
       ],
     ],
     verifyCalls: [],
+    last: ['docker', 'rm', '--force', 'nixie-doctor-check'],
   });
 });
 
 test('it fails without running the doctor when attach fails', async () => {
   const ctx = await setupTest();
 
-  await writeFile(
-    ctx.stackConfigPath,
-    'config:\n  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.74.0@sha256:456a48906e5ae0c444d84860057ad59e52a90ba485eceb64ea9437474372db6f\n',
-  );
-
   const kubectl = buildStubKubectlToken({
-    adminKubeconfig: '/runner/k3s-kubeconfig',
+    adminKubeconfig: ctx.adminKubeconfig,
     server: 'https://cluster.example.test:6443',
     certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
     token: 'fake-token-for-tests',
@@ -453,7 +547,7 @@ test('it fails without running the doctor when attach fails', async () => {
   });
 
   // the verify CLI's answer in a release with no prod target
-  const checkout = buildStubNixieCheckout({
+  const docker = buildStubNixieContainer({
     attach: {
       exitCode: 2,
       stdout:
@@ -461,15 +555,15 @@ test('it fails without running the doctor when attach fails', async () => {
     },
   });
 
-  const runner = buildStubRunner(kubectl.handler, checkout.handler);
+  const runner = buildStubRunner(kubectl.handler, docker.handler);
 
   const exitCode = await ctx.check(runner.run);
 
   expect({
     exitCode,
     err: ctx.printErr.mock.calls,
-    doctors: checkout.kubeconfigs.length,
-    kubeconfig: existsSync(join(ctx.workDir, 'nixie-verify-kubeconfig.yaml')),
+    doctors: docker.kubeconfigs.length,
+    left: existsSync(join(ctx.workDir, 'kube')),
   }).toStrictEqual({
     exitCode: 1,
     err: [
@@ -478,7 +572,7 @@ test('it fails without running the doctor when attach fails', async () => {
       ],
     ],
     doctors: 0,
-    kubeconfig: false,
+    left: false,
   });
 });
 
