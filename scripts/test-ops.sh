@@ -377,7 +377,37 @@ it_exits_2_with_the_verbs_for_an_unknown_verb() {
     bash repo/scripts/ops.sh destroy) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'usage: ops.sh <verb> [--dry-run] [<argument>…], where <verb> is one of: switch-host deploy-prod nixos-checks preview up switch-agent-image host cancel-prod-lock'
+  diff - "$tree/err" <<< 'usage: ops.sh <verb> [--dry-run] [<argument>…], where <verb> is one of: switch-host deploy-prod nixos-checks preview up switch-agent-image host cancel-prod-lock store-nixie-verify-kubeconfig'
+  diff /dev/null "$tree/calls"
+  assert_status 2 "$status"
+}
+
+it_store_nixie_verify_kubeconfig_runs_the_store_script_and_passes_its_failure_through() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  echo 1 > "$tree/answers/bun/1.status"
+  echo 'write-nixie-verify-kubeconfig: kubectl minted no token for nixie-verify (exit 1)' > "$tree/answers/bun/1.err"
+
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    bash repo/scripts/ops.sh store-nixie-verify-kubeconfig) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'write-nixie-verify-kubeconfig: kubectl minted no token for nixie-verify (exit 1)'
+  diff - <(sed "s|$tree|<tree>|g" "$tree/calls") <<< '{"cwd":"<tree>/repo","argv":["bun","<tree>/repo/scripts/write-nixie-verify-kubeconfig.ts"]}'
+  assert_status 1 "$status"
+}
+
+it_store_nixie_verify_kubeconfig_exits_2_without_a_call_for_an_argument() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    bash repo/scripts/ops.sh store-nixie-verify-kubeconfig 90d) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'usage: ops.sh store-nixie-verify-kubeconfig'
   diff /dev/null "$tree/calls"
   assert_status 2 "$status"
 }

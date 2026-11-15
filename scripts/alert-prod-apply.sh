@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Posts the Deploy prod alert to Discord: "The prod apply is held for a manual dispatch: <run>"
-# when the run ended held (OUTCOME held), "The prod apply passed, but nixie's API check after it
+# when the run ended held (OUTCOME held), "The prod apply passed, but a check of nixie after it
 # failed: <run>" when the check job failed (CHECK_RESULT failure), else "The prod apply failed:
 # <run>". The webhook URL is a secret: it reads ALERT_WEBHOOK_URL's
 # op:// reference from <env file>, resolves it with `op read`, and prints only the
@@ -26,7 +26,7 @@ file="$1"
 if [ "${OUTCOME:-}" = held ]; then
   what="The prod apply is held for a manual dispatch"
 elif [ "${CHECK_RESULT:-}" = failure ]; then
-  what="The prod apply passed, but nixie's API check after it failed"
+  what="The prod apply passed, but a check of nixie after it failed"
 else
   what="The prod apply failed"
 fi

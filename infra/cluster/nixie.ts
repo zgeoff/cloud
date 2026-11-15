@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs';
 import { Command } from '@pulumi/command/local';
 import type { Provider } from '@pulumi/kubernetes';
 import { Deployment, StatefulSet } from '@pulumi/kubernetes/apps/v1';
-import { ConfigMap, Secret, Service } from '@pulumi/kubernetes/core/v1';
+import { ConfigMap, Secret, Service, ServiceAccount } from '@pulumi/kubernetes/core/v1';
 import type { NetworkPolicy } from '@pulumi/kubernetes/networking/v1';
+import { Role, RoleBinding } from '@pulumi/kubernetes/rbac/v1';
 import type { Output, Resource } from '@pulumi/pulumi';
 import { interpolate, secret } from '@pulumi/pulumi';
 import { topology } from '@zgeoff/cloud-topology';
@@ -15,7 +16,7 @@ import { egressAllows } from '../shared/egress-allows.ts';
 import { renderNixieConfig } from '../shared/render-nixie-config.ts';
 import { buildNixieSandboxImagesCommandArgs } from './build-nixie-sandbox-images-command-args.ts';
 import { buildNixieSandboxImagesPayload } from './build-nixie-sandbox-images-payload.ts';
-import { buildNixieServiceArgs } from './build-nixie-service-args.ts';
+import { buildNixieServiceArgs, nixieServicePortName } from './build-nixie-service-args.ts';
 import {
   buildNixieSpec,
   definitionsDeployKeyKey,
@@ -31,6 +32,7 @@ import {
   buildNixieStatefulSetOptions,
   nixieRolloutTimeouts,
 } from './build-nixie-stateful-set-options.ts';
+import { buildNixieVerifyAccessArgs } from './build-nixie-verify-access-args.ts';
 import { buildNixieWebSpec, nixieWebLabels, nixieWebPort } from './build-nixie-web-spec.ts';
 import { createNixieBackupJob } from './create-nixie-backup-job.ts';
 import type { NixieIngressOutputs } from './create-nixie-ingress.ts';
@@ -88,6 +90,8 @@ export function createNixie(
     inputs,
     dependsOn: [sandboxImages],
   });
+
+  createVerifyAccess(cluster, namespace);
 
   const statefulSet = createStatefulSet(cluster, namespace, {
     inputs,
@@ -184,6 +188,26 @@ function createSandboxImagesCommand(shape: SandboxImagesShape): Command {
     buildNixieSandboxImagesCommandArgs({ payload, kubeconfig: shape.kubeconfig }),
     { dependsOn: [shape.secrets, shape.egressAllow] },
   );
+}
+
+function createVerifyAccess(cluster: Provider, namespace: Output<string>): RoleBinding {
+  const access = buildNixieVerifyAccessArgs({
+    namespace,
+    statefulSet: 'nixie',
+    service: 'nixie',
+    servicePort: nixieServicePortName,
+  });
+
+  const serviceAccount = new ServiceAccount('nixie-verify', access.serviceAccount, {
+    provider: cluster,
+  });
+
+  const role = new Role('nixie-verify', access.role, { provider: cluster });
+
+  return new RoleBinding('nixie-verify', access.roleBinding, {
+    provider: cluster,
+    dependsOn: [serviceAccount, role],
+  });
 }
 
 interface StatefulSetShape {

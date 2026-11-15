@@ -53,6 +53,7 @@ jobs:
     outputs:
       outcome: ${{ steps.outcome.outputs.outcome }}
       nixie-check: ${{ steps.nixie_check.outcome }}
+      nixie-doctor: ${{ steps.nixie_doctor.outcome }}
     # contents: write moves the deployed/prod tag; id-token: write joins the tailnet through the
     # federated identity; actions: read lists CI's runs for a dispatch
     permissions:
@@ -255,6 +256,21 @@ jobs:
           KUBECONFIG: ${{ runner.temp }}/k3s-kubeconfig
         run: bun run ci:check-nixie-api
 
+      # nixie's own prod doctor, from the release the applied commit pins, as the nixie-verify
+      # account with a 10-minute token: the pod's version, its readiness and its last hour of errors
+      # (run-nixie-doctor-check.ts). The admin kubeconfig only mints the token, and nixie's code
+      # runs with no job credential in its environment. Like the step above, a failure fails the
+      # check job.
+      - name: Check nixie with its doctor
+        id: nixie_doctor
+        if: steps.outcome.outputs.outcome == 'apply'
+        continue-on-error: true
+        timeout-minutes: 15
+        working-directory: program
+        env:
+          KUBECONFIG: ${{ runner.temp }}/k3s-kubeconfig
+        run: bun run --silent ci:check-nixie-doctor
+
       # a cancel or a timeout that stops the refresh or the apply leaves their lock on the prod
       # stack's state, and the next run then fails on "the stack is currently locked"; the runner
       # reports a job that its timeout ended as cancelled. The previews and drift checks take no
@@ -284,7 +300,7 @@ jobs:
         run: bun run ci:hold-deploy-prod-lock release
 
   # the deploy's check stage, after an apply job that applied and passed: it fails when nixie's API
-  # check failed, so the run shows the check failing and the apply passing
+  # check or its prod doctor failed, so the run shows the check failing and the apply passing
   check:
     needs: [apply]
     if: needs.apply.outputs.outcome == 'apply'
@@ -301,9 +317,10 @@ jobs:
         with:
           bun-version-file: .bun-version
 
-      - name: Check nixie's API
+      - name: Require nixie's checks
         env:
-          NIXIE_CHECK: ${{ needs.apply.outputs.nixie-check }}
+          NIXIE_API_CHECK: ${{ needs.apply.outputs.nixie-check }}
+          NIXIE_DOCTOR_CHECK: ${{ needs.apply.outputs.nixie-doctor }}
         run: bun run ci:require-nixie-check
 
   # posts a held run, a failed one, a cancelled one and a failed check to Discord
