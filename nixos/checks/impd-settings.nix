@@ -105,6 +105,52 @@ let
         EOF
       '';
     }
+    {
+      title = "it hands impd the service files of wringer-ro, a client that reads every imp";
+      script =
+        let
+          etc = geoffcloud.config.environment.etc;
+        in
+        ''
+          assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
+          settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
+          grep '^IMP_MCP_SERVICE_' "$settings" | sort > actual
+          jq -S . > expected-files <<'EOF'
+          ${builtins.toJSON {
+            modes = [
+              "0444"
+              "0444"
+            ];
+            tokenFile = {
+              resource = "https://imp.geoff.cloud/mcp";
+              clients.wringer-ro = {
+                scopes = [ "read" ];
+                secretDigests = [ "51f9e0b8220f5f07e9987a396feeb80c9c31b4b104a8e285587c86b7bc463910" ];
+              };
+            };
+            clientsFile.clients.wringer-ro.imps = [ "*" ];
+          }}
+          EOF
+          jq -S -n \
+            --argjson tokenFile ${lib.escapeShellArg etc."imp/service-tokens.json".text} \
+            --argjson clientsFile ${lib.escapeShellArg etc."imp/service-clients.json".text} \
+            --argjson modes ${
+              lib.escapeShellArg (
+                builtins.toJSON [
+                  etc."imp/service-tokens.json".mode
+                  etc."imp/service-clients.json".mode
+                ]
+              )
+            } \
+            '{$modes, $tokenFile, $clientsFile}' > actual-files
+
+          assert_files_equal - actual <<'EOF'
+          IMP_MCP_SERVICE_CLIENTS_FILE=/etc/imp/service-clients.json
+          IMP_MCP_SERVICE_TOKEN_FILE=/etc/imp/service-tokens.json
+          EOF
+          assert_files_equal expected-files actual-files
+        '';
+    }
   ];
 in
 pkgs.runCommand "impd-settings-check"
@@ -113,6 +159,7 @@ pkgs.runCommand "impd-settings-check"
       pkgs.diffutils
       pkgs.gnugrep
       pkgs.gnused
+      pkgs.jq
     ];
     # the shared test utilities pass their own tests before any case relies on them
     inherit testUtilsCheck;

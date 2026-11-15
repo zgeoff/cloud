@@ -308,6 +308,10 @@ in
     # the TLS front below proxies the route's paths to it
     settings.IMP_MCP_PUBLIC_URL = "https://${impdMCPRouteExposure.hostname}";
     settings.IMP_MCP_PUBLIC_PORT = impdMCPListenerExposure.port;
+    # the service clients below, which sign in on that route with a secret and no person present.
+    # impd refuses to start with only one of the two set
+    settings.IMP_MCP_SERVICE_TOKEN_FILE = config.services.impd-service-clients.tokenFile;
+    settings.IMP_MCP_SERVICE_CLIENTS_FILE = config.services.impd-service-clients.clientsFile;
     publicPorts = [ "127.0.0.1:${impdMCPListenerPort}:${impdMCPListenerPort}" ];
     # every imp of fixed memory runs on the host's pool of 2 MiB pages, restored and woken through
     # a page handler (docs/architecture/host/imp.md)
@@ -325,6 +329,19 @@ in
     # name beside the imp it names, so a change orphans those rows, and no other impd may use it.
     # An impd older than 6.12.0 does not read the setting
     settings.IMP_IDENTITY_ISSUER = "geoffcloud";
+  };
+
+  # the clients that sign in on impd's public MCP route with a secret (docs/architecture/host/imp.md).
+  # Each secret stays in its owner's vault; this file holds only its sha256 digest
+  services.impd-service-clients = {
+    enable = true;
+    resource = "https://${impdMCPRouteExposure.hostname}/mcp";
+    # impz's verify run reads the deployed impd as service:wringer-ro, read-only
+    clients.wringer-ro = {
+      scopes = [ "read" ];
+      secretDigests = [ "51f9e0b8220f5f07e9987a396feeb80c9c31b4b104a8e285587c86b7bc463910" ];
+      imps = [ "*" ];
+    };
   };
 
   # the pool of 2 MiB pages that impd's huge pages run on: the whole imp RAM budget, since no imp
