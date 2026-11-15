@@ -530,12 +530,15 @@ test('it mounts no service-token file without its ConfigMap', () => {
 
   expect(spec.template).toMatchObject({
     spec: {
-      volumes: expect.not.arrayContaining([expect.objectContaining({ name: 'service-tokens' })]),
+      volumes: [{ name: 'config' }, { name: 'rules-sync-tmp' }, { name: 'tmp' }],
       containers: [
         {
-          volumeMounts: expect.not.arrayContaining([
-            expect.objectContaining({ name: 'service-tokens' }),
-          ]),
+          volumeMounts: [
+            { name: 'data' },
+            { name: 'config' },
+            { name: 'tmp' },
+            { name: 'data', subPath: 'rules' },
+          ],
         },
       ],
     },
