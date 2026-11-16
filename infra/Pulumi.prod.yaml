@@ -17,6 +17,8 @@ config:
     defaultDaemon: geoffcloud
     trustForwardedFrom:
       - 127.0.0.1
+    serviceClientDigests:
+      wringer-ro: 103b0b349a550d29ba54f9f0a4d16efc66c661f9f073198e0ff9675d3d45ef30
   geoff-cloud:discordAlerts: 'true'
   geoff-cloud:nixie:
     image: ghcr.io/zgeoff/nixie:0.74.0@sha256:8ac2a0564012bcf1238b8065f42c7adf61336d44cdf93954566d993d2b652db3

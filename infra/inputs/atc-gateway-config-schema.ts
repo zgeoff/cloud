@@ -1,6 +1,7 @@
 import { isIP } from 'node:net';
 import { topology } from '@zgeoff/cloud-topology';
 import { z } from 'zod';
+import { atcGatewayServiceClients } from '../shared/atc-gateway-service-clients.ts';
 import { pinnedImagePattern } from './pinned-image-pattern.ts';
 
 // atc-gateway:2.10.0 holds atc 2.10.0's `atc` binary, published for the fixture
@@ -58,6 +59,29 @@ const defaultDaemonUnsetMessage =
 const trustedProxyMessage =
   'must be an IP address as the socket reports the proxy, such as 127.0.0.1: atc takes no range or name';
 
+// atc's rule for a service client's name; a record's key schema drops its message, so the names get
+// a refine
+const serviceClientNamePattern = /^[a-z][\da-z-]{0,31}$/u;
+
+// the first atc release whose gateway takes `secretDigests` in --service-token-file; an older
+// gateway refuses the file and exits at start
+const secretDigestRelease = [7, 16, 0] as const;
+
+const serviceClientDigestsSchema = z
+  .record(z.string(), z.string().regex(/^[\da-f]{64}$/u, 'must be a sha256 digest in hex'))
+  .refine(
+    (digests) => Object.keys(digests).every((client) => serviceClientNamePattern.test(client)),
+    'each client name must be a lowercase name of at most 32 letters, digits and dashes',
+  )
+  .refine(
+    (digests) => Object.keys(digests).every((client) => !isTokenClient(client)),
+    `must not name a client that signs in with a token (${atcGatewayServiceClients.join(', ')})`,
+  )
+  .refine(
+    (digests) => new Set(Object.values(digests)).size === Object.keys(digests).length,
+    'each service client needs a digest of its own',
+  );
+
 export const atcGatewayConfigSchema = z
   .object(
     {
@@ -107,6 +131,10 @@ export const atcGatewayConfigSchema = z
       trustForwardedFrom: z
         .array(z.string().refine((address) => isIP(address) !== 0, trustedProxyMessage))
         .optional(),
+
+      // the sha256 digest of each read-only service client's secret, by client name. Each signs in
+      // with the OAuth client_credentials grant.
+      serviceClientDigests: serviceClientDigestsSchema.optional(),
     },
     { error: 'must be an object' },
   )
@@ -118,10 +146,48 @@ export const atcGatewayConfigSchema = z
         message: `'${config.defaultDaemon}' is not in atcGateway.daemons (${Object.keys(config.daemons).join(', ')})`,
       });
     }
+
+    if (
+      config.serviceClientDigests !== undefined &&
+      Object.keys(config.serviceClientDigests).length > 0 &&
+      !isSecretDigestImage(config.image)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['serviceClientDigests'],
+        message: `needs an image of atc ${secretDigestRelease.join('.')} or later, whose gateway takes secretDigests; the gateway exits at start on an older one`,
+      });
+    }
   });
 
 function isPort(port: string | undefined): boolean {
   const value = Number(port ?? 0);
 
   return value >= 1 && value <= 65_535;
+}
+
+function isTokenClient(client: string): boolean {
+  return atcGatewayServiceClients.some((name) => name === client);
+}
+
+// whether a pinned image such as `ghcr.io/zgeoff/atc-gateway:7.17.0@sha256:...` is a release that
+// takes secretDigests
+function isSecretDigestImage(image: string): boolean {
+  const release = /:(?<release>\d+\.\d+\.\d+)@/u.exec(image)?.groups?.['release'];
+
+  if (release === undefined) {
+    return false;
+  }
+
+  const parts = release.split('.').map(Number);
+
+  for (const [index, floor] of secretDigestRelease.entries()) {
+    const part = parts[index] ?? 0;
+
+    if (part !== floor) {
+      return part > floor;
+    }
+  }
+
+  return true;
 }

@@ -471,3 +471,99 @@ test("it reads the committed prod config's trusted proxies as the pod's loopback
       ?.trustForwardedFrom,
   ).toStrictEqual(['127.0.0.1']);
 });
+
+test('it takes the serviceClientDigests of an image of atc 7.16.0', () => {
+  const payload: ATCGatewayConfig = {
+    image: `ghcr.io/zgeoff/atc-gateway:7.16.0@sha256:${'0'.repeat(64)}`,
+    backupImage: `ghcr.io/zgeoff/atc-gateway-backup:3.0.0@sha256:${'1'.repeat(64)}`,
+    publicURL: 'https://atc.geoff.cloud',
+    daemons: {
+      geoffcloud: {
+        address: '100.69.47.33:8415',
+        daemonID: '0f8e2c1a-4b6d-4e3f-9a7b-1c2d3e4f5a6b',
+        alertSeverity: 'critical',
+      },
+    },
+    defaultDaemon: 'geoffcloud',
+    serviceClientDigests: { 'reader-one': '2'.repeat(64) },
+  };
+
+  expect(atcGatewayConfigSchema.safeParse(payload).data).toStrictEqual(payload);
+});
+
+test.each(['7.15.9', '6.20.0'])(
+  'it rejects serviceClientDigests on an image of atc %s, whose gateway refuses secretDigests',
+  (release) => {
+    const result = atcGatewayConfigSchema.safeParse({
+      image: `ghcr.io/zgeoff/atc-gateway:${release}@sha256:${'0'.repeat(64)}`,
+      backupImage: `ghcr.io/zgeoff/atc-gateway-backup:3.0.0@sha256:${'1'.repeat(64)}`,
+      publicURL: 'https://atc.geoff.cloud',
+      daemons: {
+        geoffcloud: {
+          address: '100.69.47.33:8415',
+          daemonID: '0f8e2c1a-4b6d-4e3f-9a7b-1c2d3e4f5a6b',
+        },
+      },
+      defaultDaemon: 'geoffcloud',
+      serviceClientDigests: { 'reader-one': '2'.repeat(64) },
+    });
+
+    expect(result.error?.issues).toPartiallyContain({
+      path: ['serviceClientDigests'],
+      message:
+        'needs an image of atc 7.16.0 or later, whose gateway takes secretDigests; the gateway exits at start on an older one',
+    });
+  },
+);
+
+test.each([
+  [
+    'a digest that is not 64 hex characters',
+    { 'reader-one': 'A'.repeat(64) },
+    'must be a sha256 digest in hex',
+  ],
+  [
+    'a client name atc refuses',
+    { Reader: '2'.repeat(64) },
+    'each client name must be a lowercase name of at most 32 letters, digits and dashes',
+  ],
+  [
+    'the name of a token client',
+    { boxxy: '2'.repeat(64) },
+    'must not name a client that signs in with a token (boxxy, boxxy-notices)',
+  ],
+  [
+    'one digest for two clients',
+    { 'reader-one': '2'.repeat(64), 'reader-two': '2'.repeat(64) },
+    'each service client needs a digest of its own',
+  ],
+])('it rejects serviceClientDigests with %s', (_kind, digests, message) => {
+  const result = atcGatewayConfigSchema.safeParse({
+    image: `ghcr.io/zgeoff/atc-gateway:7.17.0@sha256:${'0'.repeat(64)}`,
+    backupImage: `ghcr.io/zgeoff/atc-gateway-backup:3.0.0@sha256:${'1'.repeat(64)}`,
+    publicURL: 'https://atc.geoff.cloud',
+    daemons: {
+      geoffcloud: {
+        address: '100.69.47.33:8415',
+        daemonID: '0f8e2c1a-4b6d-4e3f-9a7b-1c2d3e4f5a6b',
+      },
+    },
+    defaultDaemon: 'geoffcloud',
+    serviceClientDigests: digests,
+  });
+
+  expect(result.error?.issues).toPartiallyContain({ message });
+});
+
+test("it reads the committed prod config's service client digests as the read client of atc's verify prod target", async () => {
+  const text = await Bun.file(join(import.meta.dir, '..', 'Pulumi.prod.yaml')).text();
+
+  const stack = z.object({ config: z.record(z.string(), z.unknown()) }).parse(Bun.YAML.parse(text));
+
+  expect(
+    Object.keys(
+      atcGatewayConfigSchema.safeParse(stack.config['geoff-cloud:atcGateway']).data
+        ?.serviceClientDigests ?? {},
+    ),
+  ).toStrictEqual(['wringer-ro']);
+});

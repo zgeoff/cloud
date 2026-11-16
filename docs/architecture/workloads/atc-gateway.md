@@ -111,14 +111,29 @@ its token holds no `read`, `spawn` or `kill`, and the cloud daemon never lists i
 config lives on the PC, outside this repo
 ([send notices to the owner](../../runbooks/boxxy.md#send-notices-to-the-owner)).
 
+A read-only client outside the cluster signs in with a secret instead, through the OAuth
+`client_credentials` grant (atc 7.16.0 and later). Stack config `atcGateway.serviceClientDigests`
+maps each such client's name to the sha256 digest of its secret, and the file gives each one the
+`read` scope alone. The secret itself never reaches the stack. `atc mcp service-secret` prints a new
+secret and its digest.
+
+| Client       | Secret                                                      | Scopes | Granted by                       |
+| ------------ | ----------------------------------------------------------- | ------ | -------------------------------- |
+| `wringer-ro` | `atc verify prod mcp client` in atc's 1Password vault `atc` | `read` | the cloud daemon, its one target |
+
+`wringer-ro` is the client of atc's verify `prod` target. The PC daemon does not list it, so that
+daemon reports `unauthorized` to it.
+
 atc refuses a token file that another user owns or that its group or others can open. Kubernetes
 makes the files of a Secret volume root's, so no mode on that volume passes for the gateway's user.
 An init container in the backup image, running as the gateway's user, copies the file into a memory
 volume with mode 0600, and the gateway mounts that volume read-only. The Secret has no fixed name,
 so a new token rolls the Deployment.
 
-Each input is optional. While both variables are unset, the pod has no Secret, no init container, no
-mount and no flag, and the file leaves out each client whose variable is unset. While
+Each input is optional. While both variables and `serviceClientDigests` are unset, the pod has no
+Secret, no init container, no mount and no flag, and the file leaves out each client whose variable
+is unset. Pulumi refuses `serviceClientDigests` while the stack's `atcGateway.image` is older than
+7.16.0, because that gateway refuses the file and exits at start. While
 `images/atc-gateway/versions.env` pins an atc release older than 7.14.0, or the stack's
 `atcGateway.image` is older than 7.14.0, the image has no such flag. Pulumi then leaves them out and
 prints one warning for each variable that is set, so a deploy never starts a gateway that cannot
@@ -181,8 +196,9 @@ the grantable list of the daemon's impd token (`scripts/atc-cloud-grantable.ts`)
 `boxxy`. A new profile changes both, and the token's list changes by hand
 ([the boxxy runbook](../../runbooks/boxxy.md#let-sessions-reach-the-server)).
 
-The daemon's `principals` lists the OAuth clients of the gateway and, as `service:boxxy`, the boxxy
-server's service token ([service tokens](#service-tokens)). Each is granted the target `geoffcloud`.
+The daemon's `principals` lists the OAuth clients of the gateway, the boxxy server's service token
+as `service:boxxy`, and atc's verify read client as `service:wringer-ro`
+([service tokens](#service-tokens)). Each is granted the target `geoffcloud`.
 
 A Claude session runs its prompt only in a folder that Claude Code trusts, and the imp's Claude
 config trusts only the root of a workspace that the spawn cloned with trust opted in. The daemon

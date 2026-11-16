@@ -9,6 +9,7 @@ test('#buildATCGatewayServiceTokenFile names the public URL and /mcp as the reso
       buildATCGatewayServiceTokenFile({
         publicURL: 'https://atc.geoff.cloud',
         tokens: { boxxy: token },
+        secretDigests: {},
       }),
     ),
   ).toStrictEqual({
@@ -25,6 +26,7 @@ test('#buildATCGatewayServiceTokenFile takes the origin of a public URL with a t
       buildATCGatewayServiceTokenFile({
         publicURL: 'https://atc.geoff.cloud/',
         tokens: { boxxy: token },
+        secretDigests: {},
       }),
     ),
   ).toMatchObject({ resource: 'https://atc.geoff.cloud/mcp' });
@@ -39,6 +41,7 @@ test('#buildATCGatewayServiceTokenFile gives the boxxy-notices client the messag
       buildATCGatewayServiceTokenFile({
         publicURL: 'https://atc.geoff.cloud',
         tokens: { boxxy: token, 'boxxy-notices': noticeToken },
+        secretDigests: {},
       }),
     ),
   ).toStrictEqual({
@@ -46,6 +49,29 @@ test('#buildATCGatewayServiceTokenFile gives the boxxy-notices client the messag
     clients: {
       boxxy: { scopes: ['read', 'spawn', 'message', 'kill'], tokens: [token] },
       'boxxy-notices': { scopes: ['message'], tokens: [noticeToken] },
+    },
+  });
+});
+
+test('#buildATCGatewayServiceTokenFile gives each client of a secret digest the read scope alone and its one digest, beside the token clients', () => {
+  const token = `atcs_${'a'.repeat(40)}`;
+  const firstDigest = '1'.repeat(64);
+  const secondDigest = '2'.repeat(64);
+
+  expect(
+    JSON.parse(
+      buildATCGatewayServiceTokenFile({
+        publicURL: 'https://atc.geoff.cloud',
+        tokens: { boxxy: token },
+        secretDigests: { 'reader-one': firstDigest, 'reader-two': secondDigest },
+      }),
+    ),
+  ).toStrictEqual({
+    resource: 'https://atc.geoff.cloud/mcp',
+    clients: {
+      boxxy: { scopes: ['read', 'spawn', 'message', 'kill'], tokens: [token] },
+      'reader-one': { scopes: ['read'], secretDigests: [firstDigest] },
+      'reader-two': { scopes: ['read'], secretDigests: [secondDigest] },
     },
   });
 });

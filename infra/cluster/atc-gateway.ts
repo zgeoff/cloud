@@ -174,21 +174,22 @@ function createConfigObjects(
   };
 }
 
-// the service token file, built from the clients' tokens and the public URL. No fixed name, so a
-// change rolls the Deployment: the gateway reads the file only at start.
+// the service token file, built from the clients' tokens, their secret digests and the public URL.
+// No fixed name, so a change rolls the Deployment: the gateway reads the file only at start.
 function createServiceTokenSecret(
   cluster: Provider,
   namespace: Output<string>,
   inputs: ATCGatewayInputs,
 ): Secret | undefined {
   const serviceTokens = inputs.secrets.serviceTokens;
+  const secretDigests = inputs.config.serviceClientDigests ?? {};
 
-  if (serviceTokens === undefined) {
+  if (serviceTokens === undefined && Object.keys(secretDigests).length === 0) {
     return undefined;
   }
 
-  const file = all(serviceTokens).apply((tokens) =>
-    buildATCGatewayServiceTokenFile({ publicURL: inputs.config.publicURL, tokens }),
+  const file = all(serviceTokens ?? {}).apply((tokens) =>
+    buildATCGatewayServiceTokenFile({ publicURL: inputs.config.publicURL, tokens, secretDigests }),
   );
 
   return new Secret(
