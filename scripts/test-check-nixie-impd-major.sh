@@ -2,7 +2,7 @@
 # Test for check-nixie-impd-major.sh: it passes an impd pin of the nixie imp client's major, from
 # @zgeoff/imp-client or @impz/client, with @impz/client's version when the lock names both,
 # nixie 0.28.0 or later on a 1.x client beside impd 2, and from nixie 0.42.0 an impd major in
-# nixie's EXTRA_IMPD_MAJORS set. It refuses an impd major bump ahead of the client, an older nixie
+# nixie's EXTRA_IMPD_MAJORS set, read from the adapter's sandbox folder from nixie 0.72.0. It refuses an impd major bump ahead of the client, an older nixie
 # on a 1.x client beside impd 2, an impd major outside the set or before nixie 0.42.0, no nixie
 # pod, an image that is no nixie release, a lock without the client, a failed lock or source read,
 # and a configuration.nix without the imp-host pin. gh is the stand-in from test-support/shell,
@@ -229,6 +229,31 @@ it_passes_a_nixie_whose_extra_impd_majors_hold_the_impd_major() {
   diff - "$tree/calls" << 'EOF'
 ["gh","api","-H","Accept: application/vnd.github.raw","repos/zgeoff/nixie/contents/bun.lock?ref=v0.42.0"]
 ["gh","api","-H","Accept: application/vnd.github.raw","repos/zgeoff/nixie/contents/adapters/sandbox-imp/src/build-imp-port.ts?ref=v0.42.0"]
+EOF
+  assert_status 0 "$status"
+}
+
+it_reads_the_extra_impd_majors_from_the_sandbox_folder_from_nixie_0_72_0() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  write_config "$tree" 4.0.0
+  jq -cn --arg lock "$recordings/nixie-bun-lock-impz-client-3.0.0.lock" \
+    --arg source "$recordings/nixie-build-imp-port-extra-impd-majors-2-4.txt" '{
+    argv: ["gh", "api", "-H", "Accept: application/vnd.github.raw", "repos/zgeoff/nixie/contents/bun.lock?ref=v0.72.0"],
+    stdout_file: $lock}, {
+    argv: ["gh", "api", "-H", "Accept: application/vnd.github.raw", "repos/zgeoff/nixie/contents/adapters/sandbox-imp/src/sandbox/build-imp-port.ts?ref=v0.72.0"],
+    stdout_file: $source}' > "$tree/gh-responses"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    bash "$script" "$tree/configuration.nix" "ghcr.io/zgeoff/nixie:0.72.0@$digest" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '== impd 4.0.0 on the host, nixie 0.72.0 (imp-client 3.0.0) in the cluster'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'EOF'
+["gh","api","-H","Accept: application/vnd.github.raw","repos/zgeoff/nixie/contents/bun.lock?ref=v0.72.0"]
+["gh","api","-H","Accept: application/vnd.github.raw","repos/zgeoff/nixie/contents/adapters/sandbox-imp/src/sandbox/build-imp-port.ts?ref=v0.72.0"]
 EOF
   assert_status 0 "$status"
 }
