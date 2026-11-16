@@ -634,6 +634,9 @@ in
         # the boxxy server's service token at the atc gateway
         # (docs/architecture/workloads/atc-gateway.md#service-tokens)
         "service:boxxy".targets = [ "geoffcloud" ];
+        # atc's verify read client, which holds the read scope alone
+        # (docs/architecture/workloads/atc-gateway.md#service-tokens)
+        "service:wringer-ro".targets = [ "geoffcloud" ];
       };
     };
 

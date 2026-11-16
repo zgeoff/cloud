@@ -239,6 +239,60 @@ test("it writes the gateway's service token Secret, with the public URL's /mcp a
   expect(deployment).toContain('--service-token-file');
 });
 
+test('it writes the service token Secret with each read client of a secret digest, and passes the flag, while no service token is set', async () => {
+  const stub = buildStubResourceMocks();
+  const digest = '3'.repeat(64);
+
+  await runtime.setMocks(stub.mocks, 'geoff-cloud', 'test');
+
+  onTestFinished(() => {
+    stub.release();
+    runtime.resetOptions('', '', -1, '', '', false, '');
+  });
+
+  createCluster(createClusterProvider('k3s', { kubeconfig: output('kubeconfig-for-tests') }), {
+    onePasswordConnect: { credentials: output('{}') },
+    atcGateway: {
+      inputs: {
+        config: buildMockATCGatewayConfig({
+          publicURL: 'https://atc.geoff.cloud',
+          serviceClientDigests: { 'reader-one': digest },
+        }),
+        secrets: {
+          pullCredential: {
+            username: 'octo-puller',
+            token: output('ghp_fake0token0for0tests0only0000000000'),
+          },
+          tokens: { geoffcloud: output('daemon-token-for-tests') },
+          ownerEmail: output('owner@fixture.invalid'),
+        },
+      },
+      tunnelToken: output('tunnel-token-for-tests'),
+    },
+    zoneID: output('zone'),
+    kubeconfig: output('kubeconfig-for-tests'),
+  });
+
+  await stub.whenRegistered('kubernetes:apps/v1:Deployment::atc-gateway');
+  await stub.whenRegistered('kubernetes:core/v1:Secret::atc-gateway-service-tokens');
+
+  // the mock keeps a secret value under `value`, beside Pulumi's secret signature
+  const tokenFile = z.object({ 'service-tokens.json': z.string() });
+
+  const tokenSecret = z
+    .object({ stringData: z.object({ value: tokenFile }) })
+    .parse(stub.inputs.get('kubernetes:core/v1:Secret::atc-gateway-service-tokens'));
+
+  const deployment = JSON.stringify(stub.inputs.get('kubernetes:apps/v1:Deployment::atc-gateway'));
+
+  expect(JSON.parse(tokenSecret.stringData.value['service-tokens.json'])).toStrictEqual({
+    resource: 'https://atc.geoff.cloud/mcp',
+    clients: { 'reader-one': { scopes: ['read'], secretDigests: [digest] } },
+  });
+
+  expect(deployment).toContain('--service-token-file');
+});
+
 test('it writes no service token Secret and passes no flag to the gateway while no service token is set', async () => {
   const stub = buildStubResourceMocks();
 

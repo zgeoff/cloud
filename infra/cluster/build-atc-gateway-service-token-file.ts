@@ -13,6 +13,9 @@ interface ServiceTokenFileInputs {
 
   // the bearer token of each service client, by client name
   readonly tokens: Readonly<Partial<Record<ATCGatewayServiceClient, string>>>;
+
+  // the sha256 digest of each read-only client's secret, by client name
+  readonly secretDigests: Readonly<Record<string, string>>;
 }
 
 // The JSON file that `atc-gateway --service-token-file` reads (atc's docs/guides/gateway.md). The
@@ -22,15 +25,19 @@ export function buildATCGatewayServiceTokenFile(inputs: ServiceTokenFileInputs):
   return JSON.stringify(
     {
       resource: `${new URL(inputs.publicURL).origin}/mcp`,
-      clients: Object.fromEntries(
-        atcGatewayServiceClients.flatMap((name) => {
+      clients: Object.fromEntries([
+        ...atcGatewayServiceClients.flatMap((name) => {
           const token = inputs.tokens[name];
 
           return token === undefined
             ? []
             : [[name, { scopes: atcGatewayServiceClientScopes[name], tokens: [token] }]];
         }),
-      ),
+        ...Object.entries(inputs.secretDigests).map(([name, digest]) => [
+          name,
+          { scopes: ['read'], secretDigests: [digest] },
+        ]),
+      ]),
     },
     null,
     2,
