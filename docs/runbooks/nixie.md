@@ -19,6 +19,8 @@ secret the file ever held. Never print a decrypted value, and never put one on a
 | vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind every model profile; impd's model secrets hold copies of it                          |
 | vault `cloud`, item `nixie-definitions-deploy-key`   | git-sync's read-only deploy key for `zgeoff/nixie-definitions`                                                     |
 | vault `nixie`, item `nixie-definitions-export-token` | the token nixie opens skill pull requests in `zgeoff/nixie-definitions` with                                       |
+| vault `nixie`, item `nixie-prod-read-token`          | the API token that nixie answers only read procedures for; `config.yaml` lists its SHA-256                         |
+| vault `nixie`, item `nixie-prod-kubeconfig`          | a kubeconfig for the `nixie-verify` account, whose token lasts 90 days                                             |
 | vault `cloud`, item `nixie-restic`                   | the restic password of nixie's backup data repository                                                              |
 | vault `cloud`, item `nixie-key-restic`               | the restic password of nixie's backup key repository                                                               |
 | vault `cloud`, item `r2-nixie-backup`                | the R2 key, endpoint and bucket of both of nixie's backup repositories                                             |
@@ -367,10 +369,11 @@ cause and dispatch again. The new StatefulSet mounts the same claim.
 
 ## Check a deploy
 
-Two checks prove a deploy end to end. Run both after each deploy or upgrade of nixie, from a repo
-checkout on a tailnet device that reaches `root@geoffcloud` over SSH. They create nothing in the
-cluster and write nothing to nixie's conversation, and CI never runs them, because they need the
-live host.
+The `Deploy prod` workflow runs nixie's API check and nixie's own prod doctor after each apply, and
+[the prod apply runbook](./prod-apply.md) reads their failures. Two more checks prove a deploy end
+to end. Run both after each deploy or upgrade of nixie, from a repo checkout on a tailnet device
+that reaches `root@geoffcloud` over SSH. They create nothing in the cluster and write nothing to
+nixie's conversation, and CI never runs them, because they need the live host.
 
 **CAUTION:** A check that stops early can leave its session or its imp behind. The stream check
 prints the ID of a session it could not revoke: revoke it from nixie's device list. The sandbox
@@ -573,6 +576,22 @@ device enrolled after the set is lost. Back up first if the current data still m
 The certificate lives 90 days, and an apply in its last 30 days renews it. Nothing renews it between
 applies, so apply at least every 60 days. `bun run preview` shows the Certificate as an update when
 an apply would renew it.
+
+## Renew the prod check's kubeconfig
+
+An agent's prod check of nixie reads the cluster with the kubeconfig in vault `nixie`, item
+`nixie-prod-kubeconfig`, whose token lasts 90 days
+([the prod check's access](../architecture/workloads/nixie.md#the-prod-checks-access)). Before the
+token expires, store a new one from a 1Password session that reads vault `cloud` and writes vault
+`nixie`:
+
+```bash
+bun run ops:store-nixie-verify-kubeconfig
+```
+
+Expect
+`stored op://nixie/nixie-prod-kubeconfig/kubeconfig.yaml; its nixie-verify token expires at <time>`,
+with `<time>` 90 days on. Set a reminder for that time.
 
 ## Failures
 

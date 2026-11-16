@@ -2,9 +2,10 @@
 
 Each `bun run ops:<verb>` script is the stable name of one action that an operator or an agent
 session takes on cloud: switch the host, dispatch a workflow, preview or apply the prod stack,
-switch the agent image, run a root step on the host, or clear a stale prod stack lock. A caller
-names the verb and never the script, workflow file or address behind it, so a change to those
-changes [`scripts/ops.sh`](../../scripts/ops.sh) and leaves the callers alone.
+switch the agent image, run a root step on the host, clear a stale prod stack lock, or store the
+kubeconfig of nixie's prod check. A caller names the verb and never the script, workflow file or
+address behind it, so a change to those changes [`scripts/ops.sh`](../../scripts/ops.sh) and leaves
+the callers alone.
 
 A verb runs the command it wraps unchanged and passes its exit code through. Every check the wrapped
 script makes still runs, and this page lists the preconditions that no script checks. Two verbs add
@@ -159,3 +160,20 @@ bun run ops:cancel-prod-lock -- --yes
 
 **CAUTION:** `pulumi cancel` ends the update that holds the lock, and a live update stops half
 applied. Cancel only a lock whose holder you know has died.
+
+## `bun run ops:store-nixie-verify-kubeconfig`
+
+Stores the kubeconfig that a prod check of nixie reads the cluster with, as file `kubeconfig.yaml`
+of item `nixie-prod-kubeconfig` in vault `nixie`. Its token belongs to the `nixie-verify` service
+account and lasts 90 days.
+
+```bash
+bun run ops:store-nixie-verify-kubeconfig
+```
+
+- Wraps `bun scripts/write-nixie-verify-kubeconfig.ts`, which takes no argument.
+- Run it from a 1Password session that reads vault `cloud` and writes vault `nixie`, on a machine
+  that reaches the k3s API over the tailnet.
+- The script mints the token with the admin kubeconfig in `op://cloud/k3s-kubeconfig`, and replaces
+  the item's file when the item exists. It prints the token's expiry, and never the token.
+- Run it again before that expiry. A new token leaves the old one valid until the old one expires.

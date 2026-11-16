@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test for alert-prod-apply.sh: it resolves the webhook from the env file's ALERT_WEBHOOK_URL
 # reference, prints only its ::add-mask:: line, and posts "held for a manual dispatch" for a run
-# that ended held, that nixie's API check failed for a run whose check job failed, and "failed" for
+# that ended held, that a check of nixie failed for a run whose check job failed, and "failed" for
 # every other run; it fails with curl's status when the
 # webhook refuses the post, with op's when the reference does not resolve, and before op runs for
 # an env file without the variable, an empty 1Password token, a missing GitHub variable or a bad
@@ -92,7 +92,7 @@ EOF
   assert_status 0 "$status"
 }
 
-it_posts_that_the_nixie_api_check_failed_when_the_check_job_failed_after_the_apply() {
+it_posts_that_a_check_of_nixie_failed_when_the_check_job_failed_after_the_apply() {
   local status=0
   create_case_tree
   setup_test "$tree"
@@ -108,7 +108,7 @@ it_posts_that_the_nixie_api_check_failed_when_the_check_job_failed_after_the_app
   diff /dev/null "$tree/err"
   diff - "$tree/webhook-body" << 'EOF'
 {
-  "content": "The prod apply passed, but nixie's API check after it failed: https://github.com/zgeoff/cloud/actions/runs/7"
+  "content": "The prod apply passed, but a check of nixie after it failed: https://github.com/zgeoff/cloud/actions/runs/7"
 }
 EOF
   assert_status 0 "$status"

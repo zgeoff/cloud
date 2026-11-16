@@ -121,6 +121,7 @@ flowchart LR
   U --> D2["drift check<br>at the commit"]
   D2 --> T["move deployed/prod"]
   T --> N["nixie API check"]
+  N --> ND["nixie's prod doctor"]
 ```
 
 The tag `deployed/prod` marks the last revision the job applied, and it moves only after an apply

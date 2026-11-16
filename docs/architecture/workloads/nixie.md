@@ -116,6 +116,35 @@ pinned host key sit in a second Secret that only git-sync mounts, so neither con
 other's credential. The deploy key reads the definitions repo and nothing else. git-sync reaches
 GitHub's SSH on port 443, because the host blocks outbound port 22.
 
+## The prod check's access
+
+nixie's verify CLI has a read-only `prod` target, whose doctor reads the cluster with kubectl and
+whose reads call nixie's API. Each half has its own credential, and neither can change nixie.
+
+The doctor reads the cluster as the service account `nixie-verify`. Its Role grants only `get`, each
+on one named object: the pod `nixie-0` and its log, the StatefulSet `nixie`, and `services/proxy` on
+`http:nixie:http`. The API server authorizes a proxy call by the whole name in the URL, scheme and
+port included, so the bare Service name refuses it. A `get` through the proxy reaches nixie's API
+port as an anonymous call, because the API server strips the caller's token before it proxies. The
+account cannot list, exec, port-forward, read a Secret or proxy to another Service, and the
+port-forward guard in the Pulumi program checks the Role like any other.
+
+No pod runs as the account, so it has no mounted token. Two callers mint one with the admin
+kubeconfig:
+
+- The `Deploy prod` workflow mints a short-lived token after each apply, and runs the doctor of the
+  release that the commit pins ([prod apply](../../runbooks/prod-apply.md)). The doctor and its
+  install run in a container that mounts only the checkout, the token's kubeconfig and kubectl, so
+  no nixie dependency can read the admin kubeconfig on the runner.
+- The owner mints a token that lasts months into a kubeconfig in vault `nixie`, for an agent's prod
+  check
+  ([`ops:store-nixie-verify-kubeconfig`](../../runbooks/ops.md#bun-run-opsstore-nixie-verify-kubeconfig)).
+
+The reads use an API token that nixie answers only read procedures for. `config.yaml` lists the
+token's SHA-256 under `api.read_only_token_hashes`, and the token itself stays in vault `nixie`, so
+the public repo holds no credential. The deploy job runs no read, because the conversation and the
+task list are the owner's data.
+
 ## Reaching impd
 
 nixie calls impd's API at `imps.geoff.cloud` over HTTPS. A pod has no tailnet identity of its own,

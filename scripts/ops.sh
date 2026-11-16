@@ -13,6 +13,7 @@
 #   bun run ops:switch-agent-image -- <image> [<atc config file>]
 #   bun run ops:host -- '<remote command>'
 #   bun run ops:cancel-prod-lock [-- <pulumi cancel flag>…]
+#   bun run ops:store-nixie-verify-kubeconfig
 #
 # --dry-run, as the first argument after the verb, prints the command and any check the verb runs
 # before it, then exits 0 without running either. `up` and `cancel-prod-lock` first refuse, with
@@ -23,7 +24,7 @@ set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 slug=zgeoff/cloud
 host="${GEOFFCLOUD_HOST:-root@geoffcloud}"
-verbs=(switch-host deploy-prod nixos-checks preview up switch-agent-image host cancel-prod-lock)
+verbs=(switch-host deploy-prod nixos-checks preview up switch-agent-image host cancel-prod-lock store-nixie-verify-kubeconfig)
 
 usage() {
   echo "usage: ops.sh <verb> [--dry-run] [<argument>…], where <verb> is one of: ${verbs[*]}" >&2
@@ -103,6 +104,13 @@ case "$verb" in
     guard=require_no_deploy_prod_run
     dir="$repo/infra"
     command=(op run --env-file=../.env -- pulumi cancel --stack prod "$@")
+    ;;
+  store-nixie-verify-kubeconfig)
+    if [ "$#" -ne 0 ]; then
+      echo "usage: ops.sh store-nixie-verify-kubeconfig" >&2
+      exit 2
+    fi
+    command=(bun "$repo/scripts/write-nixie-verify-kubeconfig.ts")
     ;;
   *) usage ;;
 esac

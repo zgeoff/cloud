@@ -56,6 +56,22 @@ const commands: readonly (readonly [RegExp, OpAnswer])[] = [
     /^read op:\/\/(?<vault>[^/]+)\/(?<item>[^/]+)\/credential$/u,
     (scenario, _call, args) => buildReadAnswer(scenario, args),
   ],
+  [
+    /^read --no-newline op:\/\/(?<vault>[^/]+)\/(?<item>[^/]+)\/[^/]+$/u,
+    (scenario, _call, args) => buildDocumentReadAnswer(scenario, args),
+  ],
+  [
+    /^item get (?<item>\S+) --vault (?<vault>\S+) --format json$/u,
+    (scenario, _call, args) => buildItemGetAnswer(scenario, args),
+  ],
+  [
+    /^document create --vault (?<vault>\S+) --title (?<item>\S+) --file-name \S+ -$/u,
+    (scenario, call, args) => writeDocument(scenario, call, args[0] ?? '', args[1] ?? ''),
+  ],
+  [
+    /^document edit (?<item>\S+) --vault (?<vault>\S+) --file-name \S+ -$/u,
+    (scenario, call, args) => writeDocument(scenario, call, args[1] ?? '', args[0] ?? ''),
+  ],
 ];
 
 function buildOpAnswer(scenario: StubOpScenario, call: StubCall) {
@@ -166,4 +182,62 @@ function buildReadAnswer(scenario: StubOpScenario, args: readonly string[]) {
 
   // op read prints a newline after the secret unless -n is given
   return { stdout: `${credential}\n` };
+}
+
+// a document item's file reads back as the text it was stored with
+function buildDocumentReadAnswer(scenario: StubOpScenario, args: readonly string[]) {
+  const [vault = '', item = ''] = args;
+  const text = scenario.vaults[vault]?.[item];
+
+  if (text === undefined) {
+    return {
+      exitCode: 1,
+      stderr: `[ERROR] 2026/10/07 12:00:00 could not read secret op://${vault}/${item}: could not get item ${vault}/${item}: "${item}" isn't an item in the "${vault}" vault.\n`,
+    };
+  }
+
+  return { stdout: text };
+}
+
+function buildItemGetAnswer(scenario: StubOpScenario, args: readonly string[]) {
+  const [item = '', vault = ''] = args;
+  const items = scenario.vaults[vault];
+
+  if (items === undefined) {
+    return buildNoVaultError(vault);
+  }
+
+  if (items[item] === undefined) {
+    return buildNoItemError(vault, item);
+  }
+
+  return { stdout: `${JSON.stringify(buildItem(vault, item), null, 2)}\n` };
+}
+
+function buildNoItemError(vault: string, item: string) {
+  return {
+    exitCode: 1,
+    stderr: `[ERROR] 2026/10/07 12:00:00 "${item}" isn't an item in the "${vault}" vault. Specify the item with its UUID, name, or domain.\n`,
+  };
+}
+
+// `document create` adds the item and `document edit` replaces the file of one that exists; both
+// read the file from stdin when it is `-`
+function writeDocument(scenario: StubOpScenario, call: StubCall, vault: string, item: string) {
+  const items = scenario.vaults[vault];
+  const isEdit = call.argv[2] === 'edit';
+
+  if (items === undefined) {
+    return buildNoVaultError(vault);
+  }
+
+  if (isEdit && items[item] === undefined) {
+    return buildNoItemError(vault, item);
+  }
+
+  items[item] = call.stdin;
+
+  return isEdit
+    ? {}
+    : { stdout: `${JSON.stringify({ uuid: 'fixture-item-id', vaultUuid: 'fixture-vault-id' })}\n` };
 }

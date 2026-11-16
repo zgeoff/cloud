@@ -92,6 +92,80 @@ test('it records the service account token each call ran with', async () => {
   expect(op.tokensSeen).toStrictEqual(['ops_fixture', undefined]);
 });
 
+test('it stores a document created from stdin, and reads its file back with no newline', async () => {
+  const op = buildStubOp({ vaults: { nixie: {} } });
+  const stub = buildStubRunner(op.answer);
+
+  await stub.run(
+    [
+      'op',
+      'document',
+      'create',
+      '--vault',
+      'nixie',
+      '--title',
+      'fixture-kubeconfig',
+      '--file-name',
+      'kubeconfig.yaml',
+      '-',
+    ],
+    { stdin: Buffer.from('apiVersion: v1\n') },
+  );
+
+  const read = await stub.run([
+    'op',
+    'read',
+    '--no-newline',
+    'op://nixie/fixture-kubeconfig/kubeconfig.yaml',
+  ]);
+
+  expect(read.stdout.toString()).toBe('apiVersion: v1\n');
+});
+
+test('it replaces the file of a document that an edit names', async () => {
+  const op = buildStubOp({ vaults: { nixie: { 'fixture-kubeconfig': 'old\n' } } });
+  const stub = buildStubRunner(op.answer);
+
+  const result = await stub.run(
+    [
+      'op',
+      'document',
+      'edit',
+      'fixture-kubeconfig',
+      '--vault',
+      'nixie',
+      '--file-name',
+      'kubeconfig.yaml',
+      '-',
+    ],
+    { stdin: Buffer.from('new\n') },
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(op.vaults).toStrictEqual({ nixie: { 'fixture-kubeconfig': 'new\n' } });
+});
+
+test('it fails an item get of a missing item op’s way', async () => {
+  const stub = buildStubRunner(buildStubOp({ vaults: { nixie: {} } }).answer);
+
+  const result = await stub.run([
+    'op',
+    'item',
+    'get',
+    'fixture-kubeconfig',
+    '--vault',
+    'nixie',
+    '--format',
+    'json',
+  ]);
+
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 1,
+    stderr:
+      '[ERROR] 2026/10/07 12:00:00 "fixture-kubeconfig" isn\'t an item in the "nixie" vault. Specify the item with its UUID, name, or domain.\n',
+  });
+});
+
 test('it leaves a call to op it does not model to the next handler', async () => {
   const stub = buildStubRunner(buildStubOp({ vaults: {} }).answer);
 

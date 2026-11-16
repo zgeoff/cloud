@@ -103,13 +103,35 @@ and waits. A run whose check never released the lock fails that step with
 dispatch the run again once the check ends.
 
 A run that applied and whose `check` job failed posts
-`The prod apply passed, but nixie's API check after it failed`. The apply job's step
-`Check nixie's API` logs a `check-nixie-api:` line for each call that nixie answered with anything
-other than `401 UNAUTHORIZED`, or a `run-nixie-api-check:` line when nixie's rollout did not finish
-or `kubectl proxy` did not start. A 404 with no error that nixie's contract defines means the
-release dropped or renamed a procedure that the check calls, so vendor the release's contract as
-[nixie's runbook](./nixie.md) describes. A 401 with no such error comes from the k3s API server, not
-nixie, so check the deploy kubeconfig. Never send nixie a call by hand to reproduce the failure.
+`The prod apply passed, but a check of nixie after it failed`. The `check` job's step
+`Require nixie's checks` prints an `::error::` line for each of the two checks below that failed.
+
+The apply job's step `Check nixie's API` logs a `check-nixie-api:` line for each call that nixie
+answered with anything other than `401 UNAUTHORIZED`, or a `run-nixie-api-check:` line when nixie's
+rollout did not finish or `kubectl proxy` did not start. A 404 with no error that nixie's contract
+defines means the release dropped or renamed a procedure that the check calls, so vendor the
+release's contract as [nixie's runbook](./nixie.md) describes. A 401 with no such error comes from
+the k3s API server, not nixie, so check the deploy kubeconfig. Never send nixie a call by hand to
+reproduce the failure.
+
+The apply job's step `Check nixie with its doctor` runs `bun verify doctor --target prod` from a
+checkout of the nixie release that the applied commit pins, as the `nixie-verify` account
+([the prod check's access](../architecture/workloads/nixie.md#the-prod-checks-access)). The install
+and the doctor run in a container built from `images/nixie-doctor`, whose Bun must match the
+release's `.bun-version`. It logs each doctor check as a JSON line, then the doctor's verdict:
+
+- `prod-version` failed: the pod runs another release than the pin, or its rollout has not finished.
+  The message names both versions.
+- `prod-health` failed: nixie reports itself degraded or unready, and the message names each part
+  that fails.
+- `prod-errors` failed: nixie logged an error line in the last hour. The message names each event.
+- A `run-nixie-doctor-check:` line with no doctor output: the checkout of the release's tag, the
+  container's build or start, its install, or the token mint failed, and the line gives the step and
+  its error. When the line says the release wants another Bun, move the Bun image and its digest in
+  `images/nixie-doctor/Dockerfile` to that version.
+
+Read the cause in nixie's own logs, as [nixie's runbook](./nixie.md#failures) describes. To check
+again by hand, run the prod check of nixie's verify skill with the kubeconfig in vault `nixie`.
 
 A run that applies a new nixie image runs the Job that adds the release's sandbox images to impd
 before it rolls nixie

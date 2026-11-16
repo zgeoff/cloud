@@ -1,5 +1,6 @@
 # nixie's deployment configuration, mounted read-only at /etc/nixie/config.yaml from a ConfigMap
-# (infra/nixie.ts). nixie reads it once at start and refuses an unknown key. It holds no secret:
+# (infra/nixie.ts). nixie reads it once at start, and refuses a bad value. A release that does not
+# know a key logs `config.unknown_key` and starts without it. The file holds no secret:
 # `deployment:<name>` names an entry in the sops file beside it. infra adds the `imp` section,
 # impd's URL and the host's addresses, from packages/topology
 # (infra/shared/build-nixie-imp-config.ts).
@@ -166,6 +167,11 @@ definitions:
   # nixie opens a pull request here for each skill it writes, with the token in the sops file
   export:
     repository: zgeoff/nixie-definitions
+# the SHA-256, in hex, of each API token that nixie answers only read procedures for. The one token
+# is the prod check's, in 1Password vault `nixie`, item `nixie-prod-read-token`.
+api:
+  read_only_token_hashes:
+    - 96fe0c2a5f7e772c5fd3a6db1a5d2f83bdea79de978eec4fd864b0ef81e6cf7a
 # the owner's name, which the conversation reads in place of "the owner", and the owner's pronouns
 # for the review sentences; both stay out of this public file, in the sops file's settings
 owner:

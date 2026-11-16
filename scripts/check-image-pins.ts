@@ -21,6 +21,7 @@ const pinFiles = [
   'images/atc-gateway/restore-job.yaml',
   'images/boxxy/versions.env',
   'images/agent/Dockerfile',
+  'images/nixie-doctor/Dockerfile',
   'deploy/nixie/restore-job.yaml',
   'nixos/hosts/geoffcloud/configuration.nix',
   'scripts/nix-image.sh',

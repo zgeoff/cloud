@@ -8,6 +8,8 @@ export interface NixieServiceInputs {
   readonly port: number;
 }
 
+export const nixieServicePortName = 'http';
+
 export function buildNixieServiceArgs(inputs: NixieServiceInputs): ServiceArgs {
   return {
     metadata: {
@@ -20,7 +22,7 @@ export function buildNixieServiceArgs(inputs: NixieServiceInputs): ServiceArgs {
     },
     spec: {
       selector: inputs.labels,
-      ports: [{ name: 'http', port: inputs.port, targetPort: 'http' }],
+      ports: [{ name: nixieServicePortName, port: inputs.port, targetPort: 'http' }],
     },
   };
 }

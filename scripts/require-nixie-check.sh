@@ -1,16 +1,26 @@
 #!/usr/bin/env bash
-# The Deploy prod check job's verdict on nixie's API check, which the apply job runs with
+# The Deploy prod check job's verdict on the checks of nixie that the apply job runs with
 # continue-on-error once the apply is done, so a failed check fails this job and not the apply. It
-# reads NIXIE_CHECK, the outcome of the apply job's step `Check nixie's API`: success passes
-# (exit 0), and any other outcome, an empty one included, fails (exit 1) with an error annotation
-# that points at the step's log.
+# reads NIXIE_API_CHECK and NIXIE_DOCTOR_CHECK, the outcomes of the apply job's steps `Check
+# nixie's API` and `Check nixie with its doctor`. It prints a line for each: success passes, and any
+# other outcome, an empty one included, prints an error annotation that points at the step's log.
+# It exits 0 when both passed, else 1.
 #
-#   NIXIE_CHECK=<outcome> bash scripts/require-nixie-check.sh
+#   NIXIE_API_CHECK=<outcome> NIXIE_DOCTOR_CHECK=<outcome> bash scripts/require-nixie-check.sh
 set -euo pipefail
 
-if [ "${NIXIE_CHECK:-}" = success ]; then
-  echo "nixie's API check passed"
-  exit 0
-fi
-echo "::error::nixie's API check ended '${NIXIE_CHECK:-}'; the apply job's step Check nixie's API logs why"
-exit 1
+status=0
+
+# require_outcome <what> <step> <outcome>
+require_outcome() {
+  if [ "$3" = success ]; then
+    echo "$1 passed"
+  else
+    echo "::error::$1 ended '$3'; the apply job's step $2 logs why"
+    status=1
+  fi
+}
+
+require_outcome "nixie's API check" "Check nixie's API" "${NIXIE_API_CHECK:-}"
+require_outcome "nixie's prod doctor" "Check nixie with its doctor" "${NIXIE_DOCTOR_CHECK:-}"
+exit "$status"
