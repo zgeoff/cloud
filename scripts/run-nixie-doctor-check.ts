@@ -112,26 +112,34 @@ export async function runNixieDoctorCheck(
 
   await mkdir(kubeconfigDirectory, { mode: 0o700 });
 
-  const started = await runSteps(options, [
-    {
-      what: "start the doctor's container",
-      argv: buildContainerArgv(options, { checkout, kubeconfigDirectory, version }),
-      options: { env, timeoutMs: 60_000 },
-    },
-  ]);
+  const paths = { checkout, kubeconfigDirectory, version };
 
-  const exitCode = started
-    ? await runInContainer(options, { checkout, kubeconfigDirectory, version })
-    : 1;
+  // the container and the kubeconfig go even when a step throws, and the throw then goes on
+  const outcome = await startAndRunContainer(options, paths).then(
+    (exitCode) => ({ exitCode }),
+    (error: unknown) => ({ error }),
+  );
 
-  await runBounded(options.run, ['docker', 'rm', '--force', container], {
+  const removed = await runBounded(options.run, ['docker', 'rm', '--force', container], {
     env,
     timeoutMs: 30_000,
   });
 
   await rm(kubeconfigDirectory, { recursive: true, force: true });
 
-  return exitCode;
+  if ('error' in outcome) {
+    throw outcome.error;
+  }
+
+  if (removed.exitCode !== 0) {
+    options.printErr(
+      `run-nixie-doctor-check: could not remove the doctor's container (exit ${String(removed.exitCode)}): ${removed.stderr.toString().trim()}\n`,
+    );
+
+    return 1;
+  }
+
+  return outcome.exitCode;
 }
 
 interface BoundedRunOptions extends Omit<RunOptions, 'forceStop'> {
@@ -181,6 +189,21 @@ interface DoctorPaths {
   readonly checkout: string;
   readonly kubeconfigDirectory: string;
   readonly version: string;
+}
+
+async function startAndRunContainer(
+  options: Readonly<RunNixieDoctorCheckOptions>,
+  paths: Readonly<DoctorPaths>,
+): Promise<number> {
+  const started = await runSteps(options, [
+    {
+      what: "start the doctor's container",
+      argv: buildContainerArgv(options, paths),
+      options: { env: { PATH: options.path, HOME: options.home }, timeoutMs: 60_000 },
+    },
+  ]);
+
+  return started ? runInContainer(options, paths) : 1;
 }
 
 // The container sees the checkout, the folder that will hold the doctor's kubeconfig, read-only,
@@ -268,7 +291,11 @@ async function runInContainer(
     return 1;
   }
 
-  const minted = await createNixieVerifyKubeconfig(options.run, {
+  // kubectl's calls get the same SIGKILL as every other call
+  const boundedRun: Runner = (argv, runOptions) =>
+    runBounded(options.run, argv, { ...runOptions, timeoutMs: runOptions?.timeoutMs ?? 30_000 });
+
+  const minted = await createNixieVerifyKubeconfig(boundedRun, {
     adminKubeconfig: options.adminKubeconfig,
     duration: '10m',
   });

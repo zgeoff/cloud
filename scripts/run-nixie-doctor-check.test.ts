@@ -427,13 +427,80 @@ test('it gives each call to git and docker a SIGKILL after its timeout', async (
     'docker SIGKILL',
     'docker SIGKILL',
     'docker SIGKILL',
-    'kubectl none',
-    'kubectl none',
+    'kubectl SIGKILL',
+    'kubectl SIGKILL',
     'docker SIGKILL',
     'docker SIGKILL',
     'docker SIGKILL',
     'docker SIGKILL',
   ]);
+});
+
+test('it fails when the container outlives its removal, even after the doctor passed', async () => {
+  const ctx = await setupTest();
+
+  const kubectl = buildStubKubectlToken({
+    adminKubeconfig: ctx.adminKubeconfig,
+    server: 'https://cluster.example.test:6443',
+    certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
+    token: 'fake-token-for-tests',
+    nowMs: Date.parse('2026-11-15T06:00:00Z'),
+  });
+
+  const docker = buildStubNixieContainer({
+    remove: {
+      exitCode: 1,
+      stderr: 'Error response from daemon: cannot remove container "nixie-doctor-check"\n',
+    },
+  });
+
+  const runner = buildStubRunner(kubectl.handler, docker.handler);
+
+  const exitCode = await ctx.check(runner.run);
+
+  expect({ exitCode, err: ctx.printErr.mock.calls }).toStrictEqual({
+    exitCode: 1,
+    err: [
+      [
+        'run-nixie-doctor-check: could not remove the doctor\'s container (exit 1): Error response from daemon: cannot remove container "nixie-doctor-check"\n',
+      ],
+    ],
+  });
+});
+
+test('it removes the container and the kubeconfig folder when a step throws, then throws on', async () => {
+  const ctx = await setupTest();
+
+  const kubectl = buildStubKubectlToken({
+    adminKubeconfig: ctx.adminKubeconfig,
+    server: 'https://cluster.example.test:6443',
+    certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
+    token: 'fake-token-for-tests',
+    nowMs: Date.parse('2026-11-15T06:00:00Z'),
+  });
+
+  const kube = join(ctx.workDir, 'kube');
+
+  // the folder goes before the mint, so the kubeconfig's write throws ENOENT
+  const runner = buildStubRunner(async (call) => {
+    if (call.argv.includes('create')) {
+      await rm(kube, { recursive: true });
+    }
+
+    return kubectl.handler(call);
+  }, buildStubNixieContainer({}).handler);
+
+  const thrown = await ctx.check(runner.run).catch((error: unknown) => error);
+
+  expect({
+    thrown: thrown instanceof Error && 'code' in thrown ? thrown.code : thrown,
+    last: runner.calls.at(-1)?.argv,
+    left: existsSync(kube),
+  }).toStrictEqual({
+    thrown: 'ENOENT',
+    last: ['docker', 'rm', '--force', 'nixie-doctor-check'],
+    left: false,
+  });
 });
 
 test("it removes the container and mints no token when the image's Bun differs from nixie's", async () => {

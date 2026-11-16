@@ -15,6 +15,7 @@ export interface StubNixieContainerAnswers {
   readonly attach?: StubAnswer;
   readonly doctor?: StubAnswer;
   readonly detach?: StubAnswer;
+  readonly remove?: StubAnswer;
 }
 
 interface KubeconfigRead {
@@ -90,6 +91,10 @@ export function buildStubNixieContainer(
 
     if (command === 'exec') {
       return answerExec(args.slice(1));
+    }
+
+    if (command === 'rm') {
+      return answers.remove ?? {};
     }
 
     return command === 'build' ? (answers.build ?? {}) : {};
