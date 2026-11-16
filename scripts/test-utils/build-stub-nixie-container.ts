@@ -1,10 +1,13 @@
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
 export interface StubNixieContainerAnswers {
   // the .bun-version the clone writes; unset, 1.4.4
   readonly bunVersion?: string;
+
+  // when set, the clone makes .bun-version a symlink to this path in place of a file
+  readonly bunVersionLinksTo?: string;
 
   // what `bun --version` in the container prints; unset, 1.4.4
   readonly imageBunVersion?: string;
@@ -109,7 +112,12 @@ function answerClone(checkout: string, answers: Readonly<StubNixieContainerAnswe
   }
 
   mkdirSync(checkout, { recursive: true });
-  writeFileSync(join(checkout, '.bun-version'), `${answers.bunVersion ?? '1.4.4'}\n`);
+
+  if (answers.bunVersionLinksTo === undefined) {
+    writeFileSync(join(checkout, '.bun-version'), `${answers.bunVersion ?? '1.4.4'}\n`);
+  } else {
+    symlinkSync(answers.bunVersionLinksTo, join(checkout, '.bun-version'));
+  }
 
   return answers.clone ?? {};
 }

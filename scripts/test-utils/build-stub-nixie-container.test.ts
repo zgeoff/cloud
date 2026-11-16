@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readlinkSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,6 +23,18 @@ test('it makes the folder a clone names, with the .bun-version it was given', as
   await runner.run(['git', 'clone', '--depth', '1', 'https://example.test/nixie.git', checkout]);
 
   expect(readFileSync(join(checkout, '.bun-version'), 'utf8')).toBe('1.5.0\n');
+});
+
+test('it makes .bun-version a symlink when given a target', async () => {
+  const ctx = await setupTest();
+
+  const target = join(ctx.directory, 'elsewhere');
+  const runner = buildStubRunner(buildStubNixieContainer({ bunVersionLinksTo: target }).handler);
+  const checkout = join(ctx.directory, 'work', 'nixie');
+
+  await runner.run(['git', 'clone', '--depth', '1', 'https://example.test/nixie.git', checkout]);
+
+  expect(readlinkSync(join(checkout, '.bun-version'))).toBe(target);
 });
 
 test("it records the kubeconfig the container's doctor gets, and gives the doctor its answer", async () => {

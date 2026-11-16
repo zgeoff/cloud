@@ -1,4 +1,5 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { mkdir, open, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createNixieVerifyKubeconfig } from './nixie-verify/create-nixie-verify-kubeconfig.ts';
 import { findNixieVersion } from './nixie-verify/find-nixie-version.ts';
@@ -260,7 +261,7 @@ async function runInContainer(
     runBounded(options.run, ['docker', 'exec', container, ...args], { env, timeoutMs });
 
   const bunVersion = await exec(['bun', '--version'], 30_000);
-  const wanted = await readFile(join(paths.checkout, '.bun-version'), 'utf8').catch(() => '');
+  const wanted = await readFileInCheckout(join(paths.checkout, '.bun-version'));
 
   if (bunVersion.stdout.toString().trim() !== wanted.trim()) {
     options.printErr(
@@ -313,6 +314,22 @@ async function runInContainer(
   return runDoctor(options, (args, timeoutMs) =>
     exec(['bun', 'run', '--silent', 'verify', ...args, '--target', 'prod'], timeoutMs),
   );
+}
+
+// Reads a file of nixie's checkout on the runner. It refuses a symlink, which a release could
+// point at the admin kubeconfig or another job file, and gives '' for that or a missing file.
+async function readFileInCheckout(path: string): Promise<string> {
+  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => null);
+
+  if (file === null) {
+    return '';
+  }
+
+  try {
+    return await file.readFile('utf8');
+  } finally {
+    await file.close();
+  }
 }
 
 type Verify = (args: readonly string[], timeoutMs: number) => Promise<RunResult>;

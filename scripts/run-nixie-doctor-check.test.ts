@@ -1,8 +1,8 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { findJSONField } from './find-json-field.ts';
 import { runNixieDoctorCheck } from './run-nixie-doctor-check.ts';
 import type { Runner } from './run-process.ts';
@@ -531,6 +531,40 @@ test("it removes the container and mints no token when the image's Bun differs f
         "run-nixie-doctor-check: nixie v0.74.0 wants Bun 1.5.0, and the doctor's image has Bun 1.4.4; move images/nixie-doctor/Dockerfile to it\n",
       ],
     ],
+    durations: [],
+    last: ['docker', 'rm', '--force', 'nixie-doctor-check'],
+  });
+});
+
+test('it never reads the admin kubeconfig through a .bun-version that links to it', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(dirname(ctx.adminKubeconfig), { recursive: true });
+  await writeFile(ctx.adminKubeconfig, 'users:\n- user:\n    token: fake-admin-token-for-tests\n');
+
+  const kubectl = buildStubKubectlToken({
+    adminKubeconfig: ctx.adminKubeconfig,
+    server: 'https://cluster.example.test:6443',
+    certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
+    token: 'fake-token-for-tests',
+    nowMs: Date.parse('2026-11-15T06:00:00Z'),
+  });
+
+  const docker = buildStubNixieContainer({ bunVersionLinksTo: ctx.adminKubeconfig });
+  const runner = buildStubRunner(kubectl.handler, docker.handler);
+
+  const exitCode = await ctx.check(runner.run);
+
+  const printed = JSON.stringify([ctx.printOut.mock.calls, ctx.printErr.mock.calls]);
+
+  expect({
+    exitCode,
+    leaked: printed.includes('fake-admin-token-for-tests'),
+    durations: kubectl.durations,
+    last: runner.calls.at(-1)?.argv,
+  }).toStrictEqual({
+    exitCode: 1,
+    leaked: false,
     durations: [],
     last: ['docker', 'rm', '--force', 'nixie-doctor-check'],
   });
