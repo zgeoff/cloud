@@ -11,6 +11,13 @@ export interface StubNixieContainerAnswers {
 
   // what `bun --version` in the container prints; unset, 1.4.4
   readonly imageBunVersion?: string;
+
+  // what the runner's `getent ahostsv4` prints; unset, 100.64.0.10 for any name
+  readonly runnerLookup?: StubAnswer;
+
+  // what `getent -s files hosts` in the container prints; unset, the `--add-host` entry, as the
+  // /etc/hosts that Docker writes holds it
+  readonly containerLookup?: StubAnswer;
   readonly clone?: StubAnswer;
   readonly build?: StubAnswer;
   readonly start?: StubAnswer;
@@ -33,16 +40,21 @@ export interface StubNixieContainer {
   readonly kubeconfigs: readonly KubeconfigRead[];
 }
 
-// Stands in for git and docker: the clone makes its folder with a .bun-version, `docker run`'s
-// `<folder>:/kube:ro` volume names the folder the doctor reads, and every other call passes with
-// no output unless the answers name it.
+// Stands in for git, the runner's getent and docker. The clone writes a .bun-version, `docker
+// run`'s volume and `--add-host` give the doctor's kubeconfig folder and the container's hosts
+// entry, and every other call passes with no output unless the answers name it.
 export function buildStubNixieContainer(
   answers: Readonly<StubNixieContainerAnswers>,
 ): StubNixieContainer {
   const kubeconfigs: KubeconfigRead[] = [];
   let kubeconfigDirectory = '';
+  let addedHost = '';
 
   const answerExec = (args: readonly string[]): StubAnswer | undefined => {
+    if (args.slice(0, 4).join(' ') === 'getent -s files hosts') {
+      return answers.containerLookup ?? answerHostsLookup(addedHost, args[4] ?? '');
+    }
+
     if (args.join(' ') === 'bun --version') {
       return { stdout: `${answers.imageBunVersion ?? '1.4.4'}\n` };
     }
@@ -80,6 +92,14 @@ export function buildStubNixieContainer(
       return {};
     }
 
+    if (tool === 'getent' && command === 'ahostsv4') {
+      return (
+        answers.runnerLookup ?? {
+          stdout: `100.64.0.10     STREAM ${args[0] ?? ''}\n100.64.0.10     DGRAM  \n100.64.0.10     RAW    \n`,
+        }
+      );
+    }
+
     if (tool !== 'docker') {
       return undefined;
     }
@@ -88,6 +108,7 @@ export function buildStubNixieContainer(
       const volume = args.find((arg) => arg.endsWith(':/kube:ro')) ?? '';
 
       kubeconfigDirectory = volume.slice(0, -':/kube:ro'.length);
+      addedHost = args[args.indexOf('--add-host') + 1] ?? '';
 
       return answers.start ?? { stdout: 'a1b2c3\n' };
     }
@@ -104,6 +125,16 @@ export function buildStubNixieContainer(
   };
 
   return { handler: answer, kubeconfigs };
+}
+
+// getent's answer from an /etc/hosts that holds one `<name>:<address>` entry: the address and the
+// name, or exit 2 for a name it lacks
+function answerHostsLookup(addedHost: string, name: string): StubAnswer {
+  const separator = addedHost.indexOf(':');
+
+  return addedHost.slice(0, separator) === name
+    ? { stdout: `${addedHost.slice(separator + 1)}     ${name}\n` }
+    : { exitCode: 2 };
 }
 
 function answerClone(checkout: string, answers: Readonly<StubNixieContainerAnswers>): StubAnswer {

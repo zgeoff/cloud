@@ -72,6 +72,9 @@ test("it runs the pinned release's prod doctor in a container, as nixie-verify w
   expect({ exitCode, out: ctx.printOut.mock.calls, err: ctx.printErr.mock.calls }).toStrictEqual({
     exitCode: 0,
     out: [
+      [
+        "the doctor's container resolves cluster.example.test to 100.64.0.10 from its /etc/hosts, the runner's resolver's answer\n",
+      ],
       ['::add-mask::fake-token-for-tests\n'],
       ['{"ok":true}\n'],
       ['nixie prod doctor passed\n'],
@@ -110,6 +113,21 @@ test("it runs the pinned release's prod doctor in a container, as nixie-verify w
     },
     {
       argv: [
+        'kubectl',
+        '--kubeconfig',
+        ctx.adminKubeconfig,
+        'config',
+        'view',
+        '--minify',
+        '--flatten',
+        '--output',
+        String.raw`jsonpath={.clusters[0].cluster.server}{"\n"}{.clusters[0].cluster.certificate-authority-data}`,
+      ],
+      env: undefined,
+    },
+    { argv: ['getent', 'ahostsv4', 'cluster.example.test'], env },
+    {
+      argv: [
         'docker',
         'run',
         '--detach',
@@ -117,6 +135,8 @@ test("it runs the pinned release's prod doctor in a container, as nixie-verify w
         'nixie-doctor-check',
         '--network',
         'host',
+        '--add-host',
+        'cluster.example.test:100.64.0.10',
         '--read-only',
         '--tmpfs',
         '/tmp',
@@ -143,6 +163,19 @@ test("it runs the pinned release's prod doctor in a container, as nixie-verify w
         'nixie-doctor-check:local',
         'sleep',
         'infinity',
+      ],
+      env,
+    },
+    {
+      argv: [
+        'docker',
+        'exec',
+        'nixie-doctor-check',
+        'getent',
+        '-s',
+        'files',
+        'hosts',
+        'cluster.example.test',
       ],
       env,
     },
@@ -340,7 +373,13 @@ test('it fails, prints the doctor, still detaches and removes the container when
     left: existsSync(join(ctx.workDir, 'kube')),
   }).toStrictEqual({
     exitCode: 1,
-    out: [['::add-mask::fake-token-for-tests\n'], ['{"ok":false}\n']],
+    out: [
+      [
+        "the doctor's container resolves cluster.example.test to 100.64.0.10 from its /etc/hosts, the runner's resolver's answer\n",
+      ],
+      ['::add-mask::fake-token-for-tests\n'],
+      ['{"ok":false}\n'],
+    ],
     err: [["run-nixie-doctor-check: nixie's prod doctor exited 1; its results are above\n"]],
     lastTwo: [
       ['detach', '--target', 'prod'],
@@ -423,6 +462,9 @@ test('it gives each call to git and docker a SIGKILL after its timeout', async (
   expect(stops).toStrictEqual([
     'git SIGKILL',
     'git SIGKILL',
+    'docker SIGKILL',
+    'kubectl SIGKILL',
+    'getent SIGKILL',
     'docker SIGKILL',
     'docker SIGKILL',
     'docker SIGKILL',
@@ -602,6 +644,73 @@ test('it fails before it mints a token when the pinned release has no tag', asyn
       ],
     ],
     durations: [],
+  });
+});
+
+test("it fails before it starts the container when the runner's resolver has no address for the API's host", async () => {
+  const ctx = await setupTest();
+
+  const kubectl = buildStubKubectlToken({
+    adminKubeconfig: ctx.adminKubeconfig,
+    server: 'https://cluster.example.test:6443',
+    certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
+    token: 'fake-token-for-tests',
+    nowMs: Date.parse('2026-11-15T06:00:00Z'),
+  });
+
+  // getent's exit for a name no source knows
+  const docker = buildStubNixieContainer({ runnerLookup: { exitCode: 2 } });
+  const runner = buildStubRunner(kubectl.handler, docker.handler);
+
+  const exitCode = await ctx.check(runner.run);
+
+  expect({
+    exitCode,
+    err: ctx.printErr.mock.calls,
+    started: runner.calls.filter((call) => call.argv[1] === 'run' && call.argv[0] === 'docker'),
+    durations: kubectl.durations,
+  }).toStrictEqual({
+    exitCode: 1,
+    err: [
+      [
+        "run-nixie-doctor-check: the runner's resolver has no IPv4 address for cluster.example.test (getent exit 2)\n",
+      ],
+    ],
+    started: [],
+    durations: [],
+  });
+});
+
+test("it fails, mints no token and removes the container when the container's /etc/hosts lacks the runner's address", async () => {
+  const ctx = await setupTest();
+
+  const kubectl = buildStubKubectlToken({
+    adminKubeconfig: ctx.adminKubeconfig,
+    server: 'https://cluster.example.test:6443',
+    certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
+    token: 'fake-token-for-tests',
+    nowMs: Date.parse('2026-11-15T06:00:00Z'),
+  });
+
+  const docker = buildStubNixieContainer({ containerLookup: { exitCode: 2 } });
+  const runner = buildStubRunner(kubectl.handler, docker.handler);
+
+  const exitCode = await ctx.check(runner.run);
+
+  expect({
+    exitCode,
+    err: ctx.printErr.mock.calls,
+    durations: kubectl.durations,
+    last: runner.calls.at(-1)?.argv,
+  }).toStrictEqual({
+    exitCode: 1,
+    err: [
+      [
+        "run-nixie-doctor-check: the doctor's container finds cluster.example.test at no address in its /etc/hosts, and the runner's resolver gave 100.64.0.10\n",
+      ],
+    ],
+    durations: [],
+    last: ['docker', 'rm', '--force', 'nixie-doctor-check'],
   });
 });
 

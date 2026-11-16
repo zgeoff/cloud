@@ -3,6 +3,7 @@ import { mkdir, open, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createNixieVerifyKubeconfig } from './nixie-verify/create-nixie-verify-kubeconfig.ts';
 import { findNixieVersion } from './nixie-verify/find-nixie-version.ts';
+import { readAdminCluster } from './nixie-verify/read-admin-cluster.ts';
 import type { RunOptions, RunResult, Runner } from './run-process.ts';
 import { runProcess } from './run-process.ts';
 
@@ -111,9 +112,17 @@ export async function runNixieDoctorCheck(
     return 1;
   }
 
+  const apiHost = await readAPIHost(options);
+
+  if (!apiHost.ok) {
+    options.printErr(`run-nixie-doctor-check: ${apiHost.error}\n`);
+
+    return 1;
+  }
+
   await mkdir(kubeconfigDirectory, { mode: 0o700 });
 
-  const paths = { checkout, kubeconfigDirectory, version };
+  const paths = { checkout, kubeconfigDirectory, version, apiHost };
 
   // the container and the kubeconfig go even when a step throws, and the throw then goes on
   const outcome = await startAndRunContainer(options, paths).then(
@@ -186,10 +195,61 @@ async function runBounded(
   return ran.timedOut && ran.exitCode === 0 ? { ...ran, exitCode: 124 } : ran;
 }
 
+interface APIHost {
+  readonly name: string;
+  readonly address: string;
+}
+
+type APIHostRead =
+  | ({ readonly ok: true } & APIHost)
+  | { readonly ok: false; readonly error: string };
+
+// The k3s API's host name in the admin kubeconfig, and the IPv4 address the runner's own resolver
+// gives it: glibc through systemd-resolved, which sends a tailnet name to the tailnet's DNS.
+async function readAPIHost(options: Readonly<RunNixieDoctorCheckOptions>): Promise<APIHostRead> {
+  const cluster = await readAdminCluster(makeBoundedRunner(options.run), options.adminKubeconfig);
+
+  if (!cluster.ok) {
+    return cluster;
+  }
+
+  const name = new URL(cluster.server).hostname;
+
+  const looked = await runBounded(options.run, ['getent', 'ahostsv4', name], {
+    env: { PATH: options.path, HOME: options.home },
+    timeoutMs: 30_000,
+  });
+
+  const address = findFirstAddress(looked.stdout.toString());
+
+  if (looked.exitCode !== 0 || address === null) {
+    return {
+      ok: false,
+      error: `the runner's resolver has no IPv4 address for ${name} (getent exit ${String(looked.exitCode)})`,
+    };
+  }
+
+  return { ok: true, name, address };
+}
+
+// kubectl's calls get the same SIGKILL as every other call
+function makeBoundedRunner(run: Runner): Runner {
+  return (argv, runOptions) =>
+    runBounded(run, argv, { ...runOptions, timeoutMs: runOptions?.timeoutMs ?? 30_000 });
+}
+
+// getent prints one address per line, first in its first column
+function findFirstAddress(getentOutput: string): string | null {
+  const address = getentOutput.trim().split(/\s+/u)[0] ?? '';
+
+  return address === '' ? null : address;
+}
+
 interface DoctorPaths {
   readonly checkout: string;
   readonly kubeconfigDirectory: string;
   readonly version: string;
+  readonly apiHost: APIHost;
 }
 
 async function startAndRunContainer(
@@ -207,9 +267,9 @@ async function startAndRunContainer(
   return started ? runInContainer(options, paths) : 1;
 }
 
-// The container sees the checkout, the folder that will hold the doctor's kubeconfig, read-only,
-// and the runner's kubectl, read-only; its environment is the three variables below. It shares
-// the runner's network, which reaches the k3s API over the tailnet, and keeps no capability.
+// The container sees the checkout, the kubeconfig's folder read-only and the runner's kubectl
+// read-only, shares the runner's network, and keeps no capability. Its /etc/hosts holds the API's
+// name, because its own DNS lookup can reach the cloud's resolver, which knows no tailnet name.
 function buildContainerArgv(
   options: Readonly<RunNixieDoctorCheckOptions>,
   paths: Readonly<DoctorPaths>,
@@ -222,6 +282,8 @@ function buildContainerArgv(
     container,
     '--network',
     'host',
+    '--add-host',
+    `${paths.apiHost.name}:${paths.apiHost.address}`,
     '--read-only',
     '--tmpfs',
     '/tmp',
@@ -260,6 +322,25 @@ async function runInContainer(
   const exec = (args: readonly string[], timeoutMs: number) =>
     runBounded(options.run, ['docker', 'exec', container, ...args], { env, timeoutMs });
 
+  const apiHost = paths.apiHost;
+
+  // -s files reads /etc/hosts alone, so the line below shows no DNS server answered
+  const looked = await exec(['getent', '-s', 'files', 'hosts', apiHost.name], 30_000);
+
+  const containerAddress = findFirstAddress(looked.stdout.toString());
+
+  if (containerAddress !== apiHost.address) {
+    options.printErr(
+      `run-nixie-doctor-check: the doctor's container finds ${apiHost.name} at ${containerAddress ?? 'no address'} in its /etc/hosts, and the runner's resolver gave ${apiHost.address}\n`,
+    );
+
+    return 1;
+  }
+
+  options.printOut(
+    `the doctor's container resolves ${apiHost.name} to ${apiHost.address} from its /etc/hosts, the runner's resolver's answer\n`,
+  );
+
   const bunVersion = await exec(['bun', '--version'], 30_000);
   const wanted = await readFileInCheckout(join(paths.checkout, '.bun-version'));
 
@@ -292,11 +373,7 @@ async function runInContainer(
     return 1;
   }
 
-  // kubectl's calls get the same SIGKILL as every other call
-  const boundedRun: Runner = (argv, runOptions) =>
-    runBounded(options.run, argv, { ...runOptions, timeoutMs: runOptions?.timeoutMs ?? 30_000 });
-
-  const minted = await createNixieVerifyKubeconfig(boundedRun, {
+  const minted = await createNixieVerifyKubeconfig(makeBoundedRunner(options.run), {
     adminKubeconfig: options.adminKubeconfig,
     duration: '10m',
   });
