@@ -52,7 +52,7 @@
         "@pulumi/tailscale": "0.29.4",
         "@pulumi/tls": "5.6.3",
         "@pulumiverse/acme": "0.19.0",
-        "@pulumiverse/grafana": "2.44.0",
+        "@pulumiverse/grafana": "2.45.0",
         "@zgeoff/cloud-health-check": "workspace:*",
         "@zgeoff/cloud-topology": "workspace:*",
         "@zgeoff/pulumi-onidel": "workspace:*",
@@ -653,7 +653,7 @@
 
     "@pulumiverse/acme": ["@pulumiverse/acme@0.19.0", "", { "dependencies": { "@pulumi/pulumi": "^3.0.0" } }, "sha512-DrcfCOg9CwBNfI0jJOAU1I791KGDGsdMzMcg/FBYBb3VRF9imsjKZgUzHRgJF63qz8WnulDm44zMD7KgbjWEmA=="],
 
-    "@pulumiverse/grafana": ["@pulumiverse/grafana@2.44.0", "", { "dependencies": { "@pulumi/pulumi": "^3.142.0" } }, "sha512-7uS+wSn6J2zgWevbZsOZQvw7NbPADDwIwzTXBThTDxSYSbjsm3FNieRUKV1bQviiqMTzQeQFFSNQ01RTmDKf/g=="],
+    "@pulumiverse/grafana": ["@pulumiverse/grafana@2.45.0", "", { "dependencies": { "@pulumi/pulumi": "^3.142.0" } }, "sha512-GkeYsSSyc6nECmmt1HY3WhO3WAl5Rw5wN4Nhs8wR/gfdq8cZBEEAqHLQZZwJkvhtwG1bUsZVJRnTW1oxj/Tikw=="],
 
     "@simple-libs/child-process-utils": ["@simple-libs/child-process-utils@2.0.0", "", { "dependencies": { "@simple-libs/stream-utils": "^2.0.0" } }, "sha512-dvNoRKLijXnD0XoJAz94pbNuB5GQgDr55UhpSPhffDkTT0Cmcqh9jSCOtwfT2d4H6MI9E7c4SgtMuJXZ6F3c6A=="],
 
