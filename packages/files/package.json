@@ -7,10 +7,10 @@
     "./contract": "./files-contract.ts"
   },
   "dependencies": {
-    "@orpc/contract": "1.16.1",
-    "@orpc/openapi": "1.16.1",
-    "@orpc/server": "1.16.1",
-    "elysia": "1.4.30",
+    "@orpc/contract": "1.16.2",
+    "@orpc/openapi": "1.16.2",
+    "@orpc/server": "1.16.2",
+    "elysia": "1.4.31",
     "zod": "4.6.7"
   },
   "devDependencies": {
