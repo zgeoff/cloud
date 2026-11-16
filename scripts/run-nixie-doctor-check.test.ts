@@ -73,7 +73,7 @@ test("it runs the pinned release's prod doctor in a container, as nixie-verify w
     exitCode: 0,
     out: [
       [
-        "the doctor's container resolves cluster.example.test to 100.64.0.10 from its /etc/hosts, the runner's resolver's answer\n",
+        "the doctor's container resolves the API's host to 100.64.0.10 from its /etc/hosts, the runner's resolver's answer\n",
       ],
       ['::add-mask::fake-token-for-tests\n'],
       ['{"ok":true}\n'],
@@ -375,7 +375,7 @@ test('it fails, prints the doctor, still detaches and removes the container when
     exitCode: 1,
     out: [
       [
-        "the doctor's container resolves cluster.example.test to 100.64.0.10 from its /etc/hosts, the runner's resolver's answer\n",
+        "the doctor's container resolves the API's host to 100.64.0.10 from its /etc/hosts, the runner's resolver's answer\n",
       ],
       ['::add-mask::fake-token-for-tests\n'],
       ['{"ok":false}\n'],
@@ -673,7 +673,7 @@ test("it fails before it starts the container when the runner's resolver has no 
     exitCode: 1,
     err: [
       [
-        "run-nixie-doctor-check: the runner's resolver has no IPv4 address for cluster.example.test (getent exit 2)\n",
+        "run-nixie-doctor-check: the runner's resolver has no IPv4 address for the API's host (getent exit 2)\n",
       ],
     ],
     started: [],
@@ -706,12 +706,72 @@ test("it fails, mints no token and removes the container when the container's /e
     exitCode: 1,
     err: [
       [
-        "run-nixie-doctor-check: the doctor's container finds cluster.example.test at no address in its /etc/hosts, and the runner's resolver gave 100.64.0.10\n",
+        "run-nixie-doctor-check: the doctor's container finds the API's host at no address in its /etc/hosts (getent exit 2), and the runner's resolver gave 100.64.0.10\n",
       ],
     ],
     durations: [],
     last: ['docker', 'rm', '--force', 'nixie-doctor-check'],
   });
+});
+
+test("it fails and mints no token when the container's lookup prints the address but outlives its timeout", async () => {
+  const ctx = await setupTest();
+
+  const kubectl = buildStubKubectlToken({
+    adminKubeconfig: ctx.adminKubeconfig,
+    server: 'https://cluster.example.test:6443',
+    certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
+    token: 'fake-token-for-tests',
+    nowMs: Date.parse('2026-11-15T06:00:00Z'),
+  });
+
+  const docker = buildStubNixieContainer({
+    containerLookup: { timedOut: true, stdout: '100.64.0.10     cluster.example.test\n' },
+  });
+
+  const runner = buildStubRunner(kubectl.handler, docker.handler);
+
+  const exitCode = await ctx.check(runner.run);
+
+  expect({ exitCode, err: ctx.printErr.mock.calls, durations: kubectl.durations }).toStrictEqual({
+    exitCode: 1,
+    err: [
+      [
+        "run-nixie-doctor-check: the doctor's container finds the API's host at no address in its /etc/hosts (getent exit 124), and the runner's resolver gave 100.64.0.10\n",
+      ],
+    ],
+    durations: [],
+  });
+});
+
+test.each([
+  { failure: 'none', runnerLookup: undefined, containerLookup: undefined },
+  { failure: "the runner's lookup", runnerLookup: { exitCode: 2 }, containerLookup: undefined },
+  { failure: "the container's lookup", runnerLookup: undefined, containerLookup: { exitCode: 2 } },
+])("it never prints the API's host name when $failure fails", async (row) => {
+  const ctx = await setupTest();
+
+  const kubectl = buildStubKubectlToken({
+    adminKubeconfig: ctx.adminKubeconfig,
+    server: 'https://api.private-tailnet.example.test:6443',
+    certificateAuthorityData: 'Y2EtZm9yLXRlc3Rz',
+    token: 'fake-token-for-tests',
+    nowMs: Date.parse('2026-11-15T06:00:00Z'),
+  });
+
+  const docker = buildStubNixieContainer({
+    ...(row.runnerLookup === undefined ? {} : { runnerLookup: row.runnerLookup }),
+    ...(row.containerLookup === undefined ? {} : { containerLookup: row.containerLookup }),
+    doctor: { stdout: '{"ok":true}\n' },
+  });
+
+  const runner = buildStubRunner(kubectl.handler, docker.handler);
+
+  await ctx.check(runner.run);
+
+  const printed = JSON.stringify([ctx.printOut.mock.calls, ctx.printErr.mock.calls]);
+
+  expect(printed).not.toContain('private-tailnet');
 });
 
 test('it fails before the doctor runs, and removes the container, when kubectl mints no token', async () => {

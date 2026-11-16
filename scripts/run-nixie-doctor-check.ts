@@ -225,7 +225,7 @@ async function readAPIHost(options: Readonly<RunNixieDoctorCheckOptions>): Promi
   if (looked.exitCode !== 0 || address === null) {
     return {
       ok: false,
-      error: `the runner's resolver has no IPv4 address for ${name} (getent exit ${String(looked.exitCode)})`,
+      error: `the runner's resolver has no IPv4 address for the API's host (getent exit ${String(looked.exitCode)})`,
     };
   }
 
@@ -327,18 +327,20 @@ async function runInContainer(
   // -s files reads /etc/hosts alone, so the line below shows no DNS server answered
   const looked = await exec(['getent', '-s', 'files', 'hosts', apiHost.name], 30_000);
 
-  const containerAddress = findFirstAddress(looked.stdout.toString());
+  const containerAddress =
+    looked.exitCode === 0 ? findFirstAddress(looked.stdout.toString()) : null;
 
+  // the logs are public, so they name the API's address and never its host name
   if (containerAddress !== apiHost.address) {
     options.printErr(
-      `run-nixie-doctor-check: the doctor's container finds ${apiHost.name} at ${containerAddress ?? 'no address'} in its /etc/hosts, and the runner's resolver gave ${apiHost.address}\n`,
+      `run-nixie-doctor-check: the doctor's container finds the API's host at ${containerAddress ?? 'no address'} in its /etc/hosts (getent exit ${String(looked.exitCode)}), and the runner's resolver gave ${apiHost.address}\n`,
     );
 
     return 1;
   }
 
   options.printOut(
-    `the doctor's container resolves ${apiHost.name} to ${apiHost.address} from its /etc/hosts, the runner's resolver's answer\n`,
+    `the doctor's container resolves the API's host to ${apiHost.address} from its /etc/hosts, the runner's resolver's answer\n`,
   );
 
   const bunVersion = await exec(['bun', '--version'], 30_000);
