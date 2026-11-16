@@ -118,7 +118,10 @@ The apply job's step `Check nixie with its doctor` runs `bun verify doctor --tar
 checkout of the nixie release that the applied commit pins, as the `nixie-verify` account
 ([the prod check's access](../architecture/workloads/nixie.md#the-prod-checks-access)). The install
 and the doctor run in a container built from `images/nixie-doctor`, whose Bun must match the
-release's `.bun-version`. It logs each doctor check as a JSON line, then the doctor's verdict:
+release's `.bun-version`. The container finds the k3s API's host name in its `/etc/hosts`, at the
+address the runner's resolver gave, because a DNS lookup inside the container can reach the cloud's
+resolver, which knows no tailnet name. The step logs that address, then each doctor check as a JSON
+line, then the doctor's verdict:
 
 - `prod-version` failed: the pod runs another release than the pin, or its rollout has not finished.
   The message names both versions.
@@ -126,9 +129,9 @@ release's `.bun-version`. It logs each doctor check as a JSON line, then the doc
   that fails.
 - `prod-errors` failed: nixie logged an error line in the last hour. The message names each event.
 - A `run-nixie-doctor-check:` line with no doctor output: the checkout of the release's tag, the
-  container's build or start, its install, or the token mint failed, and the line gives the step and
-  its error. When the line says the release wants another Bun, move the Bun image and its digest in
-  `images/nixie-doctor/Dockerfile` to that version.
+  container's build or start, the lookup of the API's host name, the install, or the token mint
+  failed, and the line gives the step and its error. When the line says the release wants another
+  Bun, move the Bun image and its digest in `images/nixie-doctor/Dockerfile` to that version.
 
 Read the cause in nixie's own logs, as [nixie's runbook](./nixie.md#failures) describes. To check
 again by hand, run the prod check of nixie's verify skill with the kubeconfig in vault `nixie`.

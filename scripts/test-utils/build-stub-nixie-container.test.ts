@@ -83,6 +83,41 @@ test("it prints the image's Bun version", async () => {
   expect(result.stdout.toString()).toBe('1.4.3\n');
 });
 
+test("it answers the runner's getent with 100.64.0.10 for any name", async () => {
+  const runner = buildStubRunner(buildStubNixieContainer({}).handler);
+
+  const result = await runner.run(['getent', 'ahostsv4', 'cluster.example.test']);
+
+  expect(result.stdout.toString()).toBe(
+    '100.64.0.10     STREAM cluster.example.test\n100.64.0.10     DGRAM  \n100.64.0.10     RAW    \n',
+  );
+});
+
+test.each([
+  { name: 'cluster.example.test', exitCode: 0, stdout: '100.64.0.10     cluster.example.test\n' },
+  { name: 'other.example.test', exitCode: 2, stdout: '' },
+])("it answers the container's getent for $name from the --add-host entry", async (row) => {
+  const runner = buildStubRunner(buildStubNixieContainer({}).handler);
+
+  await runner.run(['docker', 'run', '--add-host', 'cluster.example.test:100.64.0.10', 'image']);
+
+  const result = await runner.run([
+    'docker',
+    'exec',
+    'box',
+    'getent',
+    '-s',
+    'files',
+    'hosts',
+    row.name,
+  ]);
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: row.exitCode,
+    stdout: row.stdout,
+  });
+});
+
 test('it leaves a call to another tool to the next handler', async () => {
   const runner = buildStubRunner(buildStubNixieContainer({}).handler);
 

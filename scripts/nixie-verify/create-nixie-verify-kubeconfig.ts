@@ -1,6 +1,7 @@
 import type { Runner } from '../run-process.ts';
 import { buildNixieVerifyKubeconfig } from './build-nixie-verify-kubeconfig.ts';
 import { parseTokenRequest } from './parse-token-request.ts';
+import { readAdminCluster } from './read-admin-cluster.ts';
 
 export interface NixieVerifyKubeconfigRequest {
   // the path of a kubeconfig that may create the account's tokens
@@ -16,35 +17,23 @@ export type NixieVerifyKubeconfig =
 
 const kubectlTimeoutMs = 30_000;
 
-// The jsonpath reads only the server and the CA, so none of the admin kubeconfig's credentials
-// leave kubectl; --flatten turns a CA file into its data.
-const clusterJSONPath = String.raw`jsonpath={.clusters[0].cluster.server}{"\n"}{.clusters[0].cluster.certificate-authority-data}`;
-
 // Mints a token for the nixie-verify service account and returns a kubeconfig that holds it. The
 // token comes back on kubectl's stdout and stays out of every argv.
 export async function createNixieVerifyKubeconfig(
   run: Runner,
   request: Readonly<NixieVerifyKubeconfigRequest>,
 ): Promise<NixieVerifyKubeconfig> {
-  const kubectl = ['kubectl', '--kubeconfig', request.adminKubeconfig];
+  const cluster = await readAdminCluster(run, request.adminKubeconfig);
 
-  const viewed = await run(
-    [...kubectl, 'config', 'view', '--minify', '--flatten', '--output', clusterJSONPath],
-    { timeoutMs: kubectlTimeoutMs },
-  );
-
-  const [server = '', certificateAuthorityData = ''] = viewed.stdout.toString().split('\n');
-
-  if (viewed.exitCode !== 0 || server === '' || certificateAuthorityData === '') {
-    return {
-      ok: false,
-      error: `the admin kubeconfig names no server and CA (exit ${String(viewed.exitCode)}): ${viewed.stderr.toString().trim()}`,
-    };
+  if (!cluster.ok) {
+    return cluster;
   }
 
   const created = await run(
     [
-      ...kubectl,
+      'kubectl',
+      '--kubeconfig',
+      request.adminKubeconfig,
       '--namespace',
       'nixie',
       'create',
@@ -68,7 +57,10 @@ export async function createNixieVerifyKubeconfig(
 
   return {
     ok: true,
-    text: buildNixieVerifyKubeconfig({ server, certificateAuthorityData }, minted.token),
+    text: buildNixieVerifyKubeconfig(
+      { server: cluster.server, certificateAuthorityData: cluster.certificateAuthorityData },
+      minted.token,
+    ),
     token: minted.token,
     expiresAt: minted.expiresAt,
   };
