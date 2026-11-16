@@ -38,6 +38,30 @@ let
   # each client list impd's parser refuses, with the assertion messages the module fails on it
   refusals = [
     {
+      title = "it fails an assertion on a public MCP URL with a port";
+      publicURL = "https://imp.example.com:443";
+      clients.reader = {
+        scopes = [ "read" ];
+        secretDigests = [ (lib.fixedWidthString 64 "a" "") ];
+        imps = [ "*" ];
+      };
+      messages = [
+        "services.impd-service-clients needs services.imp.settings.IMP_MCP_PUBLIC_URL, https:// and a lowercase host name with no port or path, the form impd normalises it to"
+      ];
+    }
+    {
+      title = "it fails an assertion on a public MCP URL with a capital letter";
+      publicURL = "https://Imp.example.com";
+      clients.reader = {
+        scopes = [ "read" ];
+        secretDigests = [ (lib.fixedWidthString 64 "a" "") ];
+        imps = [ "*" ];
+      };
+      messages = [
+        "services.impd-service-clients needs services.imp.settings.IMP_MCP_PUBLIC_URL, https:// and a lowercase host name with no port or path, the form impd normalises it to"
+      ];
+    }
+    {
       title = "it fails an assertion on a public MCP URL with a path";
       publicURL = "https://imp.example.com/base";
       clients.reader = {
@@ -46,7 +70,7 @@ let
         imps = [ "*" ];
       };
       messages = [
-        "services.impd-service-clients needs services.imp.settings.IMP_MCP_PUBLIC_URL, an https origin with no path"
+        "services.impd-service-clients needs services.imp.settings.IMP_MCP_PUBLIC_URL, https:// and a lowercase host name with no port or path, the form impd normalises it to"
       ];
     }
     {

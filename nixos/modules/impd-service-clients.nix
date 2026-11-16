@@ -9,14 +9,16 @@
 # Each file is a copy, not a link into the store, because a link would dangle inside imp-host,
 # which mounts /etc/imp and not the store. impd refuses to start on a file its parser refuses, so
 # the assertions refuse each such client list at evaluation, with the same rules: at least one
-# client, a public MCP origin of https and a host alone, a name of [a-z][a-z0-9-]{0,31}, at least one scope impd knows, 1 or 2 digests of 64
-# lowercase hex characters, no digest shared by two clients, and 1 to 32 imp patterns. impd reads
-# the files only at start, so a change to either restarts imp-host.
+# client, a name of [a-z][a-z0-9-]{0,31}, at least one scope impd knows, 1 or 2 digests of 64
+# lowercase hex characters, no digest shared by two clients, and 1 to 32 imp patterns. They also
+# refuse a public MCP URL other than https:// and a lowercase host, the form impd normalises it to,
+# since the resource keeps the URL's text. impd reads the files only at start, so a change to either
+# restarts imp-host.
 { config, lib, ... }:
 let
   cfg = config.services.impd-service-clients;
   publicURL = config.services.imp.settings.IMP_MCP_PUBLIC_URL or null;
-  isOrigin = builtins.isString publicURL && builtins.match "https://[^/]+" publicURL != null;
+  isOrigin = builtins.isString publicURL && builtins.match "https://[a-z0-9.-]+" publicURL != null;
   knownScopes = [
     "read"
     "exec"
@@ -117,7 +119,7 @@ in
       }
       {
         assertion = isOrigin;
-        message = "services.impd-service-clients needs services.imp.settings.IMP_MCP_PUBLIC_URL, an https origin with no path";
+        message = "services.impd-service-clients needs services.imp.settings.IMP_MCP_PUBLIC_URL, https:// and a lowercase host name with no port or path, the form impd normalises it to";
       }
       {
         assertion = sharedDigests == [ ];
