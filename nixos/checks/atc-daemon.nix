@@ -574,7 +574,8 @@ let
           "defaultTarget": "geoffcloud",
           "principals": {
             "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] },
-            "service:boxxy": { "targets": ["geoffcloud"] }
+            "service:boxxy": { "targets": ["geoffcloud"] },
+            "service:wringer-ro": { "targets": ["geoffcloud"] }
           },
           "targets": {
             "geoffcloud": {
