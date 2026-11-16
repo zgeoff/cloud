@@ -28,6 +28,7 @@
         disko.nixosModules.disko
         imp.nixosModules.imp
         ./modules/impd-local-health.nix
+        ./modules/impd-service-clients.nix
         ./modules/host-build-lag.nix
         ./modules/agent-image-build.nix
         ./modules/host-cgroup-cpu.nix
@@ -128,6 +129,9 @@
         inherit imp;
       };
       checks.x86_64-linux.impd-local-health = import ./checks/impd-local-health.nix {
+        inherit nixpkgs imp;
+      };
+      checks.x86_64-linux.impd-service-clients = import ./checks/impd-service-clients.nix {
         inherit nixpkgs imp;
       };
       checks.x86_64-linux.host-build-lag = import ./checks/host-build-lag.nix {

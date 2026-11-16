@@ -327,6 +327,19 @@ in
     settings.IMP_IDENTITY_ISSUER = "geoffcloud";
   };
 
+  # the clients that sign in on impd's public MCP route with a secret (docs/architecture/host/imp.md).
+  # Each secret stays in its owner's vault; this file holds only its sha256 digest. The module sets
+  # impd's two service-file settings and names IMP_MCP_PUBLIC_URL's /mcp as the resource
+  services.impd-service-clients = {
+    enable = true;
+    # impz's verify run reads the deployed impd as service:wringer-ro, read-only
+    clients.wringer-ro = {
+      scopes = [ "read" ];
+      secretDigests = [ "51f9e0b8220f5f07e9987a396feeb80c9c31b4b104a8e285587c86b7bc463910" ];
+      imps = [ "*" ];
+    };
+  };
+
   # the pool of 2 MiB pages that impd's huge pages run on: the whole imp RAM budget, since no imp
   # here is elastic and only an elastic imp runs on ordinary pages. systemd-sysctl reserves it early
   # in boot, before memory fragments; no page is made on demand past it, because Firecracker maps
