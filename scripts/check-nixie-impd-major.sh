@@ -14,9 +14,10 @@
 # nixie's sandbox-imp adapter imports only @impz/client from v0.35.1, so an @zgeoff/imp-client entry
 # beside it is a leftover that nixie does not talk to impd through.
 # From nixie 0.42.0, nixie's imp adapter also accepts each impd major in its EXTRA_IMPD_MAJORS set,
-# a constant in adapters/sandbox-imp/src/build-imp-port.ts that nixie reports nowhere, so when the
-# client's major differs from impd's, the check reads that file at the release's tag too. A file
-# without the set adds no major.
+# a constant in the adapter's build-imp-port.ts that nixie reports nowhere, so when the client's
+# major differs from impd's, the check reads that file at the release's tag too. The file is
+# adapters/sandbox-imp/src/build-imp-port.ts before nixie 0.72.0 and
+# adapters/sandbox-imp/src/sandbox/build-imp-port.ts from it. A file without the set adds no major.
 # It prints one line and exits 0 when every nixie pod accepts the impd major. It exits 1 when one
 # does not, when no nixie pod runs, when the pin or an image holds no release version, or when the
 # lock names no one client version; a gh failure stops it with gh's exit code.
@@ -53,13 +54,14 @@ is_release_at_least() {
 # nixie 0.28.0 and later accept impd 2 with a 1.x client: impd 2 renamed imp's CLI and kept impd
 # 1.6's wire API (RENAMED_IMPD in nixie's build-imp-port.ts, absent at v0.27.2).
 read_impd_majors() {
-  local client_major="${2%%.*}" source set_line
+  local client_major="${2%%.*}" source set_line port=adapters/sandbox-imp/src/build-imp-port.ts
   local -a extras=()
   majors=("$client_major")
   if [ "$client_major" = 1 ] && is_release_at_least "$1" 0.28.0; then majors+=(2); fi
   if [ "$client_major" != "$impd_major" ] && is_release_at_least "$1" 0.42.0; then
+    if is_release_at_least "$1" 0.72.0; then port=adapters/sandbox-imp/src/sandbox/build-imp-port.ts; fi
     source="$(gh api -H 'Accept: application/vnd.github.raw' \
-      "repos/zgeoff/nixie/contents/adapters/sandbox-imp/src/build-imp-port.ts?ref=v$1")"
+      "repos/zgeoff/nixie/contents/$port?ref=v$1")"
     # the set's one line, `const EXTRA_IMPD_MAJORS: ReadonlySet<number> = new Set([2, 4]);`
     set_line="$(sed -nE 's/^const EXTRA_IMPD_MAJORS: ReadonlySet<number> = new Set\(\[([0-9, ]*)\]\);$/\1/p' \
       <<< "$source")"
