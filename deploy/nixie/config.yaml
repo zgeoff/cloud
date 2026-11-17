@@ -179,15 +179,11 @@ owner:
   pronouns:
     they: deployment:owner_pronoun_they
     their: deployment:owner_pronoun_their
-# the names the owner calls the agent by, which per-turn retrieval leaves out of its query
+# the names the owner calls the agent by
 agent:
   names:
     - Nix
     - Nixie
-
-# per-turn retrieval: how many earlier messages join the query (nixie's default is 3)
-memory:
-  retrieval_messages: 1
 
 # web search through Kagi: the key is the sops file's connector_credentials entry kagi, and nixie
 # refuses a search past the daily cap, counted from midnight in time.default_zone (nixie's
