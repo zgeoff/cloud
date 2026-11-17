@@ -289,7 +289,7 @@ RUN curl -fsSL ${CURL_RETRY} -o /tmp/auto-mode.tgz \
 # bump (scripts/release/) writes both and regenerates the lock:
 #   cd images/agent/noslop && bun install --lockfile-only --no-cache
 # bin/noslop runs the CLI on /opt/bun/default, whatever Bun a checkout pins.
-ARG NOSLOP_VERSION=0.4.29
+ARG NOSLOP_VERSION=0.4.30
 COPY noslop/package.json noslop/bun.lock noslop/bunfig.toml /opt/noslop/
 RUN jq -e --arg version "$NOSLOP_VERSION" '.dependencies["@noslop/cli"] == $version'       /opt/noslop/package.json > /dev/null  && cd /opt/noslop  && BUN_INSTALL_CACHE_DIR=/tmp/noslop-cache /opt/bun/default/bun install       --frozen-lockfile --production --ignore-scripts  && rm -rf /tmp/noslop-cache
 COPY bin/noslop /usr/local/bin/noslop
