@@ -18,13 +18,14 @@ outside a host switch.
 
 ## What holds what
 
-| Where                                                                  | Holds                                                                  |
-| ---------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| vault `cloud`, item `model-gateway-control`, field `credential`        | the control token, 64 hex characters                                   |
-| `/var/lib/tank-cloud/host-secrets/model-gateway/control-token`         | the same token on the host, mode 0400 root, which the unit loads       |
-| `/var/lib/model-gateway/store.json`                                    | the counts, the limits nixie set, each sandbox's count, the lost mark  |
-| `/var/lib/model-gateway/override.json`                                 | the limit past a cap that `model-gateway raise` wrote, when one exists |
-| `services.model-gateway` in `nixos/hosts/geoffcloud/configuration.nix` | the zone, the caps and one priced route per nixie model profile        |
+| Where                                                                   | Holds                                                                     |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| vault `cloud`, item `model-gateway-control`, field `credential`         | the control token, 64 hex characters                                      |
+| `/var/lib/tank-cloud/host-secrets/model-gateway/control-token`          | the same token on the host, mode 0400 root, which the unit loads          |
+| `deploy/nixie/secrets.sops.yaml`, key `["settings"]["gateway-control"]` | nixie's copy of the control token, which nixie sends to the control relay |
+| `/var/lib/model-gateway/store.json`                                     | the counts, the limits nixie set, each sandbox's count, the lost mark     |
+| `/var/lib/model-gateway/override.json`                                  | the limit past a cap that `model-gateway raise` wrote, when one exists    |
+| `services.model-gateway` in `nixos/hosts/geoffcloud/configuration.nix`  | the zone, the caps and one priced route per nixie model profile           |
 
 The unit runs as the user `model-gateway`, which owns `/var/lib/model-gateway` with mode 0700.
 
@@ -112,6 +113,92 @@ for the cause, and check the provider's usage page, before you clear the mark.
 
 3. Start the unit: `ssh root@geoffcloud systemctl start model-gateway < /dev/null`, and read the
    status. Expect `"lost": false`.
+
+## Send nixie's model requests through the gateway
+
+nixie sends its model requests through the gateway when two halves agree: each `nixie-model-*`
+secret in impd has the gateway's model listener as its upstream, and nixie's config sets
+`spendStop`. Either half alone stops every model call: an older nixie's sandboxes lose their grants
+when the secrets change, and a nixie with `spendStop` refuses to create a sandbox whose secret sends
+anywhere else. So change the secrets while no nixie pod runs a turn, during the roll that brings the
+config.
+
+impd treats the upstream as part of a secret's binding, so the change needs `--replace --rebind`. A
+rebind drops every grant on the secret, and the token's list from before the rebind no longer covers
+it, so the token's list is set again after it
+([imp's rotate or rebind](https://github.com/zgeoff/impz/blob/main/docs/guides/connectors.md#rotate-or-rebind)).
+
+**CAUTION:** Model calls fail from the rebind until the new pod grants its sandboxes again, about a
+minute. Run this when no task works, and never send a test turn to production nixie.
+
+1. Set the helpers and `secret_names` and `secrets`, as
+   [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) step 1 does.
+2. Write the rebind as a function, to run at the right moment:
+
+   ```bash
+   rebind_model_secrets() { # $1: the upstream, or empty for none
+     printf '%s\n' "$secret_names" | while IFS= read -r secret; do
+       op read op://cloud/nixie-model-credential/credential | tr -d '\n' | host_imp secret add "$secret" \
+         --kind static --hosts api.anthropic.com --header authorization --scheme bearer \
+         ${1:+--upstream "$1"} --replace --rebind
+     done
+     host_imp token set nixie --grantable "$secrets" < /dev/null
+   }
+   ```
+
+3. Merge the PR that sets `spendStop`. The `Deploy prod` run holds it, because it changes
+   `deploy/nixie/config.yaml`. Read the held plan, as
+   [Answer a held run](./prod-apply.md#answer-a-held-run) describes: expect nixie's ConfigMap and
+   Secret replaced and the StatefulSet updated, and nothing else.
+4. Dispatch the run, and watch `nixie-0`:
+
+   ```bash
+   bun run ops:deploy-prod -- <full commit of main's tip>
+   ssh root@geoffcloud k3s kubectl -n nixie get pod nixie-0 -w < /dev/null
+   ```
+
+5. When `nixie-0` shows `Terminating`, run `rebind_model_secrets http://10.88.0.1:8789`. Expect a
+   table row for each secret, then the token's row.
+6. Check, once the new pod is ready:
+   - `host_imp secret ls < /dev/null | grep '^nixie-model-'` shows each secret with
+     `api.anthropic.com -> http://10.88.0.1:8789`;
+   - [the status](#read-the-status) shows the limits nixie set and `"tripped": null`;
+   - nixie's log holds no `spend.stop_tripped` and no `spend.limits_unsent` after its first poll;
+   - the status's `spent` rises as nixie works.
+
+## Roll back the spending stop
+
+- **nixie lost model access, with no pause:** revert the PR that set `spendStop`, merge it, and
+  dispatch its held run. When `nixie-0` shows `Terminating`, run `rebind_model_secrets` with no
+  argument, which removes the upstream.
+- **nixie came up paused with the cause `spending`:** fix the cause first. `unreachable` means nixie
+  cannot reach the control relay: check the relay's socket, the firewall admission and nixie's
+  network policy. A limit trip at the start means a limit or a zone that differs from the gateway's.
+  A revert does not end the pause: with no `spendStop`, nothing clears it. After a revert, the pause
+  stands until the owner resumes nixie, from the client or with `nixie resume` on the host.
+
+**CAUTION:** Never roll nixie's image back while a pause with the cause `spending` stands. The older
+release refuses to open the database.
+
+## Rotate the control token
+
+The host file and nixie's secrets file hold the same token, and nixie pauses as `unreachable` while
+they differ. Rotate both in one window:
+
+1. Replace the item's value with a new random token. The template reaches `op` through a file
+   descriptor, so the token never reaches a command line:
+
+   ```bash
+   op item edit model-gateway-control --vault cloud --template <(openssl rand -hex 32 | tr -d '\n' \
+     | jq --rawfile value /dev/stdin '(.fields[] | select(.id == "credential") | .value) = $value' \
+       <(op item get model-gateway-control --vault cloud --format json)) > /dev/null
+   ```
+
+2. Install it on the host, as step 2 there does, and restart the unit:
+   `ssh root@geoffcloud systemctl restart model-gateway < /dev/null`.
+3. Set nixie's copy, as [change a secret](./nixie.md#change-a-secret) does for the key
+   `["settings"]["gateway-control"]`, and merge its PR. nixie stays paused as `unreachable` from
+   step 2 until its new pod starts, and the stop clears on its own.
 
 ## Failures
 

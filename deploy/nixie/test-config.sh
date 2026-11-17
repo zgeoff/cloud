@@ -68,11 +68,15 @@ EOF
 # render_config <source> <out>: the config as infra renders it into nixie's ConfigMap
 render_config() {
   (cd "$repo" && SOURCE="$1" bun -e '
-    import { topology } from "@zgeoff/cloud-topology";
+    import { exposure, topology } from "@zgeoff/cloud-topology";
     import { buildNixieImpConfig } from "./infra/shared/build-nixie-imp-config.ts";
+    import { buildNixieSpendStopConfig } from "./infra/shared/build-nixie-spend-stop-config.ts";
     import { renderNixieConfig } from "./infra/shared/render-nixie-config.ts";
     const text = await Bun.file(process.env.SOURCE ?? "").text();
-    process.stdout.write(renderNixieConfig(text, buildNixieImpConfig(topology)));
+    process.stdout.write(renderNixieConfig(text, {
+      imp: buildNixieImpConfig(topology),
+      spendStop: buildNixieSpendStopConfig(topology, exposure),
+    }));
   ') > "$2"
 }
 

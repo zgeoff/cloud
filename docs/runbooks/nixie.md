@@ -11,21 +11,21 @@ secret the file ever held. Never print a decrypted value, and never put one on a
 
 ## What holds what
 
-| Where                                                | Holds                                                                                                              |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| vault `cloud`, item `nixie-age-host`                 | the age identity that the pod holds; its public half is in `deploy/nixie/.sops.yaml`                               |
-| vault `cloud`, item `nixie-age-recovery`             | the age identity that stays off the host; restores need only it                                                    |
-| vault `cloud`, item `nixie-deployment-key`           | the deployment key, 32 random bytes in base64                                                                      |
-| vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind every model profile; impd's model secrets hold copies of it                          |
-| vault `cloud`, item `nixie-definitions-deploy-key`   | git-sync's read-only deploy key for `zgeoff/nixie-definitions`                                                     |
-| vault `nixie`, item `nixie-definitions-export-token` | the token nixie opens skill pull requests in `zgeoff/nixie-definitions` with                                       |
-| vault `nixie`, item `nixie-prod-read-token`          | the API token that nixie answers only read procedures for; `config.yaml` lists its SHA-256                         |
-| vault `nixie`, item `nixie-prod-kubeconfig`          | a kubeconfig for the `nixie-verify` account, whose token lasts 90 days                                             |
-| vault `cloud`, item `nixie-restic`                   | the restic password of nixie's backup data repository                                                              |
-| vault `cloud`, item `nixie-key-restic`               | the restic password of nixie's backup key repository                                                               |
-| vault `cloud`, item `r2-nixie-backup`                | the R2 key, endpoint and bucket of both of nixie's backup repositories                                             |
-| `deploy/nixie/secrets.sops.yaml`                     | the deployment key, nixie's impd token, the definitions export token, the owner's settings and the Kagi search key |
-| impd                                                 | the token `nixie`, one model secret per profile and nixie's sandbox images                                         |
+| Where                                                | Holds                                                                                                                                                 |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| vault `cloud`, item `nixie-age-host`                 | the age identity that the pod holds; its public half is in `deploy/nixie/.sops.yaml`                                                                  |
+| vault `cloud`, item `nixie-age-recovery`             | the age identity that stays off the host; restores need only it                                                                                       |
+| vault `cloud`, item `nixie-deployment-key`           | the deployment key, 32 random bytes in base64                                                                                                         |
+| vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind every model profile; impd's model secrets hold copies of it                                                             |
+| vault `cloud`, item `nixie-definitions-deploy-key`   | git-sync's read-only deploy key for `zgeoff/nixie-definitions`                                                                                        |
+| vault `nixie`, item `nixie-definitions-export-token` | the token nixie opens skill pull requests in `zgeoff/nixie-definitions` with                                                                          |
+| vault `nixie`, item `nixie-prod-read-token`          | the API token that nixie answers only read procedures for; `config.yaml` lists its SHA-256                                                            |
+| vault `nixie`, item `nixie-prod-kubeconfig`          | a kubeconfig for the `nixie-verify` account, whose token lasts 90 days                                                                                |
+| vault `cloud`, item `nixie-restic`                   | the restic password of nixie's backup data repository                                                                                                 |
+| vault `cloud`, item `nixie-key-restic`               | the restic password of nixie's backup key repository                                                                                                  |
+| vault `cloud`, item `r2-nixie-backup`                | the R2 key, endpoint and bucket of both of nixie's backup repositories                                                                                |
+| `deploy/nixie/secrets.sops.yaml`                     | the deployment key, nixie's impd token, the definitions export token, the owner's settings, the model gateway's control token and the Kagi search key |
+| impd                                                 | the token `nixie`, one model secret per profile, sent to the model gateway, and nixie's sandbox images                                                |
 
 ## Set up the helpers
 
@@ -48,8 +48,9 @@ journal.
 ## Add nixie's model secrets to impd
 
 nixie reaches its models through impd's broker, which adds the model credential to each request a
-sandbox sends to `api.anthropic.com`. impd keeps one model secret for each profile that
-`config.yaml` lists, under the name that
+sandbox sends to `api.anthropic.com`, and sends the request to the
+[model gateway](./model-gateway.md) in place of that host. impd keeps one model secret for each
+profile that `config.yaml` lists, under the name that
 [nixie's names in impd](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/impd-names.md#model-secrets)
 defines. nixie derives the name from the profile, the header and the host, never from the
 credential, so the name stays the same when the credential changes. nixie's token cannot add a
@@ -73,7 +74,8 @@ Before the first deploy, and after a profile joins `config.yaml`, add the model 
    ```bash
    printf '%s\n' "$secret_names" | while IFS= read -r secret; do
      op read op://cloud/nixie-model-credential/credential | tr -d '\n' | host_imp secret add "$secret" \
-       --kind static --hosts api.anthropic.com --header authorization --scheme bearer
+       --kind static --hosts api.anthropic.com --header authorization --scheme bearer \
+       --upstream http://10.88.0.1:8789
    done
    ```
 
@@ -87,9 +89,9 @@ Before the first deploy, and after a profile joins `config.yaml`, add the model 
    host_imp secret ls < /dev/null | grep '^nixie-model-'
    ```
 
-   Expect each name with the host `api.anthropic.com`. When a profile lacks its secret, nixie cannot
-   create the sandbox that uses the profile, and the `imp_host` part of nixie's `/health/ready`
-   reports unready.
+   Expect each name with `api.anthropic.com -> http://10.88.0.1:8789`. When a profile lacks its
+   secret, nixie cannot create the sandbox that uses the profile, and the `imp_host` part of nixie's
+   `/health/ready` reports unready.
 
 ## Rotate the model credential
 
@@ -121,13 +123,14 @@ writes into its real memory.
 4. Set the names with step 1 of
    [Add nixie's model secrets to impd](#add-nixies-model-secrets-to-impd).
 
-5. Replace each secret's value. The kind, the host and the header stay the same, so each grant stays
-   valid:
+5. Replace each secret's value. The kind, the host, the header and the upstream stay the same, so
+   each grant stays valid:
 
    ```bash
    printf '%s\n' "$secret_names" | while IFS= read -r secret; do
      op read op://cloud/nixie-model-credential/credential | tr -d '\n' | host_imp secret add "$secret" \
-       --kind static --hosts api.anthropic.com --header authorization --scheme bearer --replace
+       --kind static --hosts api.anthropic.com --header authorization --scheme bearer \
+       --upstream http://10.88.0.1:8789 --replace
    done
    ```
 

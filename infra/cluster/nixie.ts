@@ -7,9 +7,10 @@ import type { NetworkPolicy } from '@pulumi/kubernetes/networking/v1';
 import { Role, RoleBinding } from '@pulumi/kubernetes/rbac/v1';
 import type { Output, Resource } from '@pulumi/pulumi';
 import { interpolate, secret } from '@pulumi/pulumi';
-import { topology } from '@zgeoff/cloud-topology';
+import { exposure, topology } from '@zgeoff/cloud-topology';
 import type { NixieInputs } from '../inputs/index.ts';
 import { buildNixieImpConfig } from '../shared/build-nixie-imp-config.ts';
+import { buildNixieSpendStopConfig } from '../shared/build-nixie-spend-stop-config.ts';
 import { createEgressAllow } from '../shared/create-egress-allow.ts';
 import { createNamespace } from '../shared/create-namespace.ts';
 import { egressAllows } from '../shared/egress-allows.ts';
@@ -62,10 +63,10 @@ export function createNixie(
     port: nixieAPIPort,
   });
 
-  const config = renderNixieConfig(
-    readFileSync(new URL('config.yaml', deployDir), 'utf8'),
-    buildNixieImpConfig(topology),
-  );
+  const config = renderNixieConfig(readFileSync(new URL('config.yaml', deployDir), 'utf8'), {
+    imp: buildNixieImpConfig(topology),
+    spendStop: buildNixieSpendStopConfig(topology, exposure),
+  });
 
   const sandboxImagesSecrets = createSecrets(cluster, namespace, {
     name: 'nixie-sandbox-images-secrets',
