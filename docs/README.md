@@ -80,6 +80,8 @@ call, the path of a change, the topology and the data.
 - [1Password Connect](./runbooks/onepassword-connect.md): set up, rotate or debug Connect for imps.
 - [nixie](./runbooks/nixie.md): add nixie's images and secrets to impd, change a secret, deploy,
   enrol a device, back up and restore, renew the certificate.
+- [The model gateway](./runbooks/model-gateway.md): set up the control token, read the status, raise
+  a period past its cap, clear the lost mark.
 - [nixie's backup](./runbooks/nixie-backup.md): back up nixie now, read the repositories, purge a
   forgotten item, test a restore.
 - [The files service](./runbooks/files.md): deploy files.geoff.cloud, upload a file, upgrade, revoke

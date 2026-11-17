@@ -38,6 +38,7 @@
         ./modules/cloud-host-firewall.nix
         ./modules/bridge-relays.nix
         ./modules/preview.nix
+        ./modules/model-gateway.nix
         ./modules/public-front.nix
         ./modules/tank-cloud.nix
         ./modules/imp-dataset-key.nix
@@ -107,6 +108,10 @@
       checks.x86_64-linux.geoffcloud-spend-cap = import ./checks/geoffcloud-spend-cap.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         inherit imp;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
+      checks.x86_64-linux.model-gateway = import ./checks/model-gateway.nix {
+        inherit nixpkgs imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
       checks.x86_64-linux.public-front = import ./checks/public-front.nix {

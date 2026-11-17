@@ -106,6 +106,26 @@
       "reason": "imp-host's broker sends each preview's model calls to the preview service's model route listener, which inet cloud_host admits from podman0's subnet only, so each call passes its preview's counting proxy"
     },
     {
+      "name": "model-gateway-model",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 8789,
+      "scope": "host",
+      "interface": "podman0",
+      "admission": true,
+      "reason": "imp-host's broker sends each nixie sandbox's model requests to the model gateway's model listener, which inet cloud_host admits from podman0's subnet only, so every request is counted against nixie's limits"
+    },
+    {
+      "name": "model-gateway-control-relay",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 8791,
+      "scope": "host",
+      "interface": "cni0",
+      "admission": true,
+      "reason": "nixie's pod dials the model gateway's control relay on the host's tailnet address, and inet cloud_host admits only pod addresses on cni0; the relay dials the control listener on the host's loopback, and the gateway refuses every call without its bearer token"
+    },
+    {
       "name": "grafana",
       "kind": "host-port",
       "protocol": "tcp",

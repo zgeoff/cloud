@@ -379,6 +379,10 @@ let
             tcp dport 8415 drop
             tcp dport 8418 iifname "cni0" ip saddr 10.42.0.0/16 ip daddr 100.69.47.33 accept
             tcp dport 8418 drop
+            tcp dport 8789 iifname "podman0" ip saddr 10.88.0.0/16 ip daddr 10.88.0.1 accept
+            tcp dport 8789 drop
+            tcp dport 8791 iifname "cni0" ip saddr 10.42.0.0/16 ip daddr 100.69.47.33 accept
+            tcp dport 8791 drop
             tcp dport 18081 iifname "podman0" ip saddr 10.88.0.0/16 ip daddr 10.88.0.1 accept
             tcp dport 18081 drop
             tcp dport 18082 iifname "podman0" ip saddr 10.88.0.0/16 ip daddr 10.88.0.1 accept
