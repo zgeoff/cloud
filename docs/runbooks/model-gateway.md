@@ -169,8 +169,26 @@ minute. Run this when no task works, and never send a test turn to production ni
 ## Roll back the spending stop
 
 - **nixie lost model access, with no pause:** revert the PR that set `spendStop`, merge it, and
-  dispatch its held run. When `nixie-0` shows `Terminating`, run `rebind_model_secrets` with no
-  argument, which removes the upstream.
+  dispatch its held run. Without `spendStop`, nixie keeps each sandbox it has and never grants it
+  again, so the rollback restores the grants that the rebind drops:
+  1. Before the rollout, save each sandbox's model grants:
+
+     ```bash
+     grants=$(host_imp secret ls --json < /dev/null \
+       | jq -r '.[] | select(.name | startswith("nixie-model-")) | .name as $secret | .imps[] | "\(.) \($secret)"')
+     ```
+
+  2. When `nixie-0` shows `Terminating`, run `rebind_model_secrets` with no argument, which removes
+     the upstream.
+  3. Grant each saved pair again, with no path filter, which only the gateway needs:
+
+     ```bash
+     printf '%s\n' "$grants" | while read -r imp secret; do
+       [ -n "$imp" ] && host_imp grant "$imp" "$secret" < /dev/null
+     done
+     ```
+
+     Expect `host_imp secret ls` to list each saved imp under its secret again.
 - **nixie came up paused with the cause `spending`:** fix the cause first. `unreachable` means nixie
   cannot reach the control relay: check the relay's socket, the firewall admission and nixie's
   network policy. A limit trip at the start means a limit or a zone that differs from the gateway's.
