@@ -61,6 +61,7 @@ test('it renders the conversation on Fable 5.2 with a 400k context and a 1-hour 
     roles: {
       conversation: 'fable-5-2',
       checker: 'sonnet-5-5-high',
+      worker: 'sonnet-5-5',
     },
     profiles: {
       'fable-5-2': { model: 'claude-fable-5-2', context_tokens: 400_000, cache_ttl: '1h' },

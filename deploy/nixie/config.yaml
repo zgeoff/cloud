@@ -114,6 +114,9 @@ models:
   roles:
     conversation: fable-5-2
     checker: sonnet-5-5-high
+    # the profile that runs a worker.run; it needs prices, because a worker run counts its cost
+    # against its dollar limit. The worker run limits keep nixie's defaults (10 minutes, $2)
+    worker: sonnet-5-5
   # the models a started task can choose in place of the task role's profile; the conversation sees
   # each name and its description
   selectable:

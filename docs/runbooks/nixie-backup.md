@@ -4,9 +4,10 @@ Use this runbook to back up nixie now, read its backup repositories, purge a for
 snapshots, and test a restore. [nixie](./nixie.md) covers the service itself and a real restore.
 
 nixie keeps its records in `nixie.db` and each record's key in `keys.db`, on its data volume. nixie
-writes a backup set, a copy of both databases, into the `backup` folder of that volume every hour,
-and at once after it forgets an item. Each set is a folder named by its sequence number, and nixie
-writes a file named `complete` into it last.
+writes a backup set, a copy of both databases, into the `backup` folder of that volume once per
+interval, `backup.interval_minutes` in `deploy/nixie/config.yaml` (1440, one day, in prod), and at
+once after it forgets an item. Each set is a folder named by its sequence number, and nixie writes a
+file named `complete` into it last.
 
 The `nixie-backup` CronJob runs every night at 04:00 Melbourne time. Each run uploads every complete
 set with restic, which encrypts it in the pod, to two repositories in R2:
@@ -50,8 +51,14 @@ gives the design of the sets, the receipts and the two repositories.
 
 ## Back up now
 
-Run the CronJob twice to back up the current data. The first run uploads the set that waits, which
-can be a day old. nixie then writes a fresh set, and the second run uploads it.
+A manual run publishes a set only when a staged set waits in the `backup` folder. nixie stages the
+next scheduled set one interval after the last one it staged, so at the prod interval of 1440 the
+next set can be up to a day away, and a second run soon after the first uploads nothing. The newest
+uploaded set is then the restore point; `nixie health` reports its age as `newest_set_age_seconds`.
+
+nixie also copies `nixie.db` to `nixie-schema-<version>.db` on its volume before it runs a
+migration, so an upgrade keeps a restore point from the moment it migrates. That copy never leaves
+the volume.
 
 1. Start a run:
 
@@ -72,8 +79,9 @@ can be a day old. nixie then writes a fresh set, and the second run uploads it.
    `sequence`, and no `backup.set_failed` line. Note the highest `sequence`, or 0 when no set
    waited.
 
-3. List the `backup` folder once a minute, until a set folder named with a higher sequence than step
-   2's holds `complete`. nixie writes that set within the hour:
+3. To upload the current data too, wait for the next scheduled set. List the `backup` folder until a
+   set folder named with a higher sequence than step 2's holds `complete`. nixie writes that set one
+   interval after the last set it staged:
 
    ```bash
    ssh root@geoffcloud k3s kubectl -n nixie exec nixie-0 -c nixie -- ls -R /data/backup
