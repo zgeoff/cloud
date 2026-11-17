@@ -161,5 +161,8 @@
     "typescript": "7.0.2",
     "zod": "4.6.7"
   },
+  "overrides": {
+    "@noslop/cli": "0.4.30"
+  },
   "packageManager": "bun@1.4.4"
 }
