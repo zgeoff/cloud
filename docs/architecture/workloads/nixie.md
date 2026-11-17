@@ -5,7 +5,11 @@ in front of it, and an imp for every model loop it runs. It runs in k3s from nix
 images, and it answers on the tailnet only, at one public name that points at the host's tailnet
 address. nixie reaches impd over the tailnet with a token limited to its own imps, so the host owner
 adds nixie's model credential to impd by hand before nixie starts. The prod apply adds each
-release's sandbox images to impd before nixie rolls, so the new pod finds them in place.
+release's sandbox images to impd before nixie rolls, so the new pod finds them in place. Every model
+request of nixie's sandboxes passes the [model gateway](../../runbooks/model-gateway.md) on the
+host, which counts a day and a month and refuses past nixie's limits, so nixie pauses at its
+spending stop instead of spending past it. nixie sets those limits through the gateway's control
+relay on the host's tailnet address, which its network policy lets the pod reach.
 [The tailnet](../network/tailnet.md) covers the grants on the route in and out, and
 [the nixie runbook](../../runbooks/nixie.md) gives the steps for a deploy, an upgrade and a
 rotation.

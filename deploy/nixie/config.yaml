@@ -2,8 +2,9 @@
 # (infra/nixie.ts). nixie reads it once at start, and refuses a bad value. A release that does not
 # know a key logs `config.unknown_key` and starts without it. The file holds no secret:
 # `deployment:<name>` names an entry in the sops file beside it. infra adds the `imp` section,
-# impd's URL and the host's addresses, from packages/topology
-# (infra/shared/build-nixie-imp-config.ts).
+# impd's URL and the host's addresses, and the `spendStop` section, the model gateway's addresses,
+# from packages/topology (infra/shared/build-nixie-imp-config.ts and
+# build-nixie-spend-stop-config.ts).
 server:
   data_dir: /data
   hostname: 0.0.0.0
@@ -162,6 +163,11 @@ models:
     taskRun:
       default: { dollars: 5 }
       max: { dollars: 25 }
+    # the spending stop's limits, nixie's defaults. The model gateway on the host caps the dollars
+    # and tokens at twice these (services.model-gateway in nixos/hosts/geoffcloud/configuration.nix);
+    # turnCap is the most today's turns can reach with a raise from the client
+    day: { dollars: 60, tokens: 80000000, turns: 1000, turnCap: 2000 }
+    month: { dollars: 600, tokens: 600000000, turns: 20000 }
 definitions:
   source:
     kind: path
