@@ -136,7 +136,9 @@ let
       title = "it runs the gateway as its own user on the rendered config, with the token as a credential, once the token exists";
       script =
         let
-          system = buildModuleSystem ../modules/model-gateway.nix (withNftables { services.model-gateway = settings; });
+          system = buildModuleSystem ../modules/model-gateway.nix (withNftables {
+            services.model-gateway = settings;
+          });
           service = system.config.systemd.services.model-gateway;
           configFile = system.config.services.model-gateway.configFile;
         in
@@ -233,7 +235,9 @@ let
       title = "it relays the pod address to the loopback control listener, and admits one source to each listener";
       script =
         let
-          system = buildModuleSystem ../modules/model-gateway.nix (withNftables { services.model-gateway = settings; });
+          system = buildModuleSystem ../modules/model-gateway.nix (withNftables {
+            services.model-gateway = settings;
+          });
           systemdPackage = system.config.systemd.package;
         in
         ''
