@@ -24,6 +24,8 @@ let
   previewLinkExposure = getHostPort "preview-link";
   previewWebhookExposure = getHostPort "preview-webhook";
   previewModelRouteExposure = getHostPort "preview-model-route";
+  modelGatewayModelExposure = getHostPort "model-gateway-model";
+  modelGatewayControlRelayExposure = getHostPort "model-gateway-control-relay";
   impdMCPListenerExposure = getHostPort "impd-mcp-listener";
   impdMCPRouteExposure = builtins.head (builtins.filter (entry: entry.name == "impd-mcp") exposure);
   impdMCPListenerPort = toString impdMCPListenerExposure.port;
@@ -695,6 +697,118 @@ in
     githubAppKeyFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-key";
     impTokenFile = "/var/lib/tank-cloud/host-secrets/preview/imp-token";
   };
+
+  # nixie's model gateway (docs/runbooks/model-gateway.md): every model request of
+  # production nixie passes it, through the impd model secrets' upstream, and it refuses past the
+  # day and month limits nixie sets, which the caps below bound. The control token sits on
+  # host-secrets, staged by the runbook; until it exists, the unit is skipped.
+  services.model-gateway =
+    let
+      # Anthropic's list prices, in dollars per million tokens, from the model pricing table of
+      # https://platform.claude.com/docs/en/about-claude/pricing (read 17 Nov 2026), the same
+      # prices deploy/nixie/config.yaml gives each profile
+      anthropic = model: prices: { inherit model prices; };
+      fable52 = {
+        input = 8;
+        cache_write = 10;
+        cache_write_1h = 16;
+        cached_input = 0.2;
+        output = 40;
+      };
+      fable51 = {
+        input = 10;
+        cache_write = 12.5;
+        cache_write_1h = 20;
+        cached_input = 0.25;
+        output = 50;
+      };
+      opus55 = {
+        input = 4;
+        cache_write = 5;
+        cache_write_1h = 8;
+        cached_input = 0.2;
+        output = 20;
+      };
+      # Opus 4.6 and Opus 4.5 share one price row
+      opus4 = {
+        input = 5;
+        cache_write = 6.25;
+        cache_write_1h = 10;
+        cached_input = 0.5;
+        output = 25;
+      };
+      sonnet55 = {
+        input = 2;
+        cache_write = 2.5;
+        cache_write_1h = 4;
+        cached_input = 0.1;
+        output = 10;
+      };
+      # Haiku 5.5 prices a whole request at the higher row once its prompt, cache reads and writes
+      # included, passes 100,000 tokens (the page's "Long context pricing")
+      haiku55 = {
+        input = 0.1;
+        cache_write = 0.125;
+        cache_write_1h = 0.2;
+        cached_input = 0.01;
+        output = 0.5;
+        long_prompt = {
+          over_tokens = 100000;
+          input = 0.5;
+          cache_write = 0.625;
+          cache_write_1h = 1;
+          cached_input = 0.05;
+          output = 2.5;
+        };
+      };
+    in
+    {
+      enable = true;
+      # nixie's time zone: deploy/nixie/config.yaml sets no time section, so nixie's default
+      zone = "Australia/Sydney";
+      # twice nixie's day and month dollar and token limits
+      caps = {
+        day = {
+          dollars = 120;
+          tokens = 160000000;
+        };
+        month = {
+          dollars = 1200;
+          tokens = 1200000000;
+        };
+      };
+      modelListen = {
+        interface = topology.podman.bridge;
+        address = topology.podman.bridgeAddress;
+        inherit (modelGatewayModelExposure) port;
+        allowedSubnet = topology.podman.subnet;
+      };
+      control = {
+        port = 8790;
+        tokenFile = "/var/lib/tank-cloud/host-secrets/model-gateway/control-token";
+      };
+      # nixie's pod dials the host's tailnet address, as the atc gateway's pod does for the daemon
+      controlRelay = {
+        inherit (modelGatewayControlRelayExposure) port interface;
+        address = topology.tailnet.nodes.geoffcloud.address;
+        allowedSubnet = k3sPodCIDR;
+      };
+      # one route per profile in deploy/nixie/config.yaml, keyed by the profile's ID, which nixie
+      # puts in each request's path
+      routes = {
+        fable-5-2 = anthropic "claude-fable-5-2" fable52;
+        fable-5-1 = anthropic "claude-fable-5-1" fable51;
+        opus-5-5 = anthropic "claude-opus-5-5" opus55;
+        opus-4-6 = anthropic "claude-opus-4-6" opus4;
+        opus-4-5 = anthropic "claude-opus-4-5" opus4;
+        sonnet-5-5 = anthropic "claude-sonnet-5-5" sonnet55;
+        # the checker's profile, which has no prices in nixie's config
+        sonnet-5-5-high = anthropic "claude-sonnet-5-5" sonnet55;
+        haiku-5-5 = anthropic "claude-haiku-5-5" haiku55;
+        # no role uses it, but nixie's config still lists it, and with no prices there
+        haiku-5-5-low = anthropic "claude-haiku-5-5" haiku55;
+      };
+    };
 
   services.k3s = {
     enable = true;

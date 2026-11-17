@@ -23,6 +23,12 @@ const hostDaemon = {
 // impd's HTTPS API, on imp's own node
 const impd = { address: topology.tailnet.nodes.imp.address, port: 443 };
 
+// the model gateway's control relay on the host's tailnet address, which nixie's spending stop calls
+const modelGatewayControl = {
+  address: topology.tailnet.nodes.geoffcloud.address,
+  port: getExposurePort(exposure, 'model-gateway-control-relay'),
+};
+
 const homePCDaemon = {
   address: topology.tailnet.nodes.homePC.address,
   port: topology.atc.daemonPort,
@@ -52,7 +58,7 @@ export const egressAllows = {
     name: 'nixie-egress',
     namespace: 'nixie',
     podLabels: podLabels.nixie,
-    destinations: [impd],
+    destinations: [impd, modelGatewayControl],
   },
   nixieSandboxImages: {
     name: 'nixie-sandbox-images-egress',
