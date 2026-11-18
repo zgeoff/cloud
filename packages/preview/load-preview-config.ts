@@ -58,7 +58,7 @@ export async function loadPreviewConfig(
       idleMs: requireInteger(env, 'PREVIEW_IDLE_MINUTES', '30') * 60_000,
       impDomain: requireValue(env, 'PREVIEW_IMP_DOMAIN'),
       impImage: requireValue(env, 'PREVIEW_IMP_IMAGE'),
-      impMemoryMib: requireInteger(env, 'PREVIEW_IMP_MEMORY_MIB', '2048'),
+      ...parseImpMemory(env),
       impGitHubSecret: env['PREVIEW_IMP_GITHUB_SECRET'] ?? null,
       impModelSecret: env['PREVIEW_IMP_MODEL_SECRET'] ?? null,
       buildTimeoutMs: requireInteger(env, 'PREVIEW_BUILD_TIMEOUT_SECONDS', '1800') * 1000,
@@ -128,6 +128,21 @@ function requireInteger(
   }
 
   return value;
+}
+
+// impd refuses a max below the boot size or past 4 times it, so the service fails at start instead
+// of at each imp's create
+function parseImpMemory(env: Readonly<Record<string, string | undefined>>) {
+  const impMemoryMib = requireInteger(env, 'PREVIEW_IMP_MEMORY_MIB', '1024');
+  const impMaxMemoryMib = requireInteger(env, 'PREVIEW_IMP_MAX_MEMORY_MIB', '2048');
+
+  if (impMaxMemoryMib < impMemoryMib || impMaxMemoryMib > impMemoryMib * 4) {
+    throw new Error(
+      `PREVIEW_IMP_MAX_MEMORY_MIB is ${impMaxMemoryMib}, not between PREVIEW_IMP_MEMORY_MIB (${impMemoryMib}) and 4 times it`,
+    );
+  }
+
+  return { impMemoryMib, impMaxMemoryMib };
 }
 
 function parseContractSettings(

@@ -9,13 +9,14 @@ function setupTest() {
   return { impd, client };
 }
 
-test('#createImp creates an imp outside every backup, with the HTTP port it names', async () => {
+test('#createImp creates an elastic imp outside every backup, with the memory and HTTP port it names', async () => {
   const ctx = setupTest();
 
   await ctx.client.createImp({
     name: 'pv-0a1b2c3d-7',
     image: 'base',
-    memoryMib: 2048,
+    memoryMib: 1024,
+    maxMemoryMib: 2048,
     httpPort: 3000,
   });
 
@@ -27,7 +28,8 @@ test('#createImp creates an imp outside every backup, with the HTTP port it name
     lastRequestAt: null,
     httpPort: 3000,
     image: 'base',
-    memoryMib: 2048,
+    memoryMib: 1024,
+    maxMemoryMib: 2048,
     backup: false,
     grants: [],
   });
@@ -39,7 +41,8 @@ test('#createImp creates the imp under the public egress policy, which keeps its
   await ctx.client.createImp({
     name: 'pv-0a1b2c3d-7',
     image: 'base',
-    memoryMib: 2048,
+    memoryMib: 1024,
+    maxMemoryMib: 2048,
     httpPort: 3000,
   });
 

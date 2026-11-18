@@ -17,7 +17,11 @@ export interface PreviewSettings {
   // impd's HTTPS domain, under which each imp answers at https://<name>.<domain>
   readonly impDomain: string;
   readonly impImage: string;
+
+  // each imp boots elastic at impMemoryMib and grows to impMaxMemoryMib under pressure, so it runs on
+  // the host's base pages; impd runs an imp of fixed memory on the huge-page pool
   readonly impMemoryMib: number;
+  readonly impMaxMemoryMib: number;
 
   // the impd secret the service grants each preview imp, so its clone goes through the broker;
   // null clones without a credential, which reaches public repositories only

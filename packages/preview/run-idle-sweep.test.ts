@@ -40,6 +40,7 @@ async function setupTest() {
       impDomain: 'imps.example.test',
       impImage: 'base',
       impMemoryMib: 2048,
+      impMaxMemoryMib: 2048,
       impGitHubSecret: 'gh',
       impModelSecret: null,
       healthTimeoutMs: 60_000,

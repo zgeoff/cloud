@@ -54,6 +54,7 @@ async function startImpInSlot(
       name: preview.imp,
       image: deps.settings.impImage,
       memoryMib: deps.settings.impMemoryMib,
+      maxMemoryMib: deps.settings.impMaxMemoryMib,
       httpPort: contract.port,
     });
   } else {
