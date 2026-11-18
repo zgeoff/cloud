@@ -119,9 +119,12 @@ models:
     # Each profile pins one provider endpoint with fallbacks off, so OpenRouter never bills another
     # provider's price: a standard tier, never a fast, priority or flex one, at full or fp8 precision
     # where the model has such an endpoint, with full recent uptime. The gateway route's providerPin
-    # names the same endpoint. A pin also matches the endpoints under it, such as another region,
-    # and an open-weight model's priority endpoint (OpenRouter's provider selection guide), so each
-    # price is the highest of the endpoints the pin matches, from
+    # names the same endpoint. For glm-5-3, kimi-k3-1-pro, mistral-large-4, inkling-2-small and
+    # deepseek-v4-1-flash, the pin is the fastest endpoint by measured output speed (3 streamed
+    # replies of 560 tokens each, 18 Nov 2026) among those within about 3x the cheapest one's price,
+    # with 1-day uptime of at least 99.5%. A pin also matches the endpoints under it, such as another
+    # region, and an open-weight model's priority endpoint (OpenRouter's provider selection guide),
+    # so each price is the highest of the endpoints the pin matches, from
     # https://openrouter.ai/api/v1/models/<model>/endpoints (read 18 Nov 2026). An endpoint that lists
     # no cache write price bills cache writes as input, and a Gemini cache write costs the input price
     # plus the listed storage price. The cap of 200,000 tokens is the window the
@@ -167,7 +170,7 @@ models:
           cache_write_1h: 5
           cached_input: 0.2
           output: 15
-    # Alibaba, at Moonshot AI's own price: Moonshot AI serves the model only at mxfp4 precision
+    # Fireworks, at Moonshot AI's own price: Moonshot AI serves the model only at mxfp4 precision
     kimi-k3-1-pro:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -176,7 +179,7 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
-      provider_pin: alibaba
+      provider_pin: fireworks
       context_tokens: 200000
       prices:
         input: 2
@@ -192,14 +195,14 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
-      provider_pin: novita/fp8
+      provider_pin: tenstorrent/fp8
       context_tokens: 200000
       prices:
-        input: 0.63
-        cache_write: 0.63
-        cache_write_1h: 0.63
-        cached_input: 0.117
-        output: 1.98
+        input: 0.6
+        cache_write: 0.6
+        cache_write_1h: 0.6
+        cached_input: 0.1
+        output: 2.5
     grok-4-7:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -279,14 +282,14 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
-      provider_pin: deepinfra/fp8
+      provider_pin: nebius/fp8
       context_tokens: 200000
       prices:
-        input: 0.147
-        cache_write: 0.147
-        cache_write_1h: 0.147
-        cached_input: 0.00441
-        output: 0.441
+        input: 0.12
+        cache_write: 0.12
+        cache_write_1h: 0.12
+        cached_input: 0.0024
+        output: 0.48
     gpt-6-2-astra:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
