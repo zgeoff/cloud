@@ -40,7 +40,7 @@ test('it merges a green bump and copies the decision to the summary', async () =
     files: [{ path: 'images/agent/Dockerfile' }, { path: 'scripts/release/release-pins.json' }],
     commits: [{ oid: '3333333', authors: [{ login: 'cloud-release-check[bot]' }] }],
     statusCheckRollup: [
-      buildMockGHCheckRun({ workflowName: 'CI', name: 'checks' }),
+      buildMockGHCheckRun({ workflowName: 'CI', name: 'pr / checks' }),
       buildMockGHCheckRun({ workflowName: 'agent image', name: 'check' }),
     ],
   });
@@ -87,7 +87,7 @@ test('it merges a relabelled bump while its own merge job runs on the head', asy
     files: [{ path: 'nixos/packages/atc.nix' }, { path: 'scripts/release/release-pins.json' }],
     commits: [{ oid: '7777777', authors: [{ login: 'cloud-release-check[bot]' }] }],
     statusCheckRollup: [
-      buildMockGHCheckRun({ workflowName: 'CI', name: 'checks' }),
+      buildMockGHCheckRun({ workflowName: 'CI', name: 'pr / checks' }),
       buildMockGHCheckRun({ workflowName: 'NixOS checks', name: 'nixos' }),
       buildMockGHCheckRun({
         workflowName: 'release bump merge',
@@ -137,7 +137,7 @@ test('it reads its own pull request with GH_TOKEN and merges it at its head with
     labels: [{ name: 'auto-merge' }],
     files: [{ path: 'scripts/release/release-pins.json' }],
     commits: [{ oid: '4444444', authors: [{ login: 'cloud-release-check[bot]' }] }],
-    statusCheckRollup: [buildMockGHCheckRun({ workflowName: 'CI', name: 'checks' })],
+    statusCheckRollup: [buildMockGHCheckRun({ workflowName: 'CI', name: 'pr / checks' })],
   });
 
   // a fork's pull request can have the same branch name, and gh lists it first here

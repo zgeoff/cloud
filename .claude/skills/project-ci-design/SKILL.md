@@ -31,7 +31,7 @@ metadata:
 
 ## The required check
 
-The `main` ruleset requires one check: the `checks` job in
+The `main` ruleset requires one check: `pr / checks`, the `checks` job in
 [`ci.yml`](../../../.github/workflows/ci.yml). It needs every other job, always runs, and passes only
 when each job passed or its gate skipped it.
 

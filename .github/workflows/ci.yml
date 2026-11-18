@@ -501,6 +501,8 @@ jobs:
   # or its gate skipped it. Once it is private, the other jobs skip and it runs every check as a
   # step, each gated as its job is. A green pull request run then records the trees it checked.
   checks:
+    # every zgeoff repo's main ruleset requires the same name
+    name: pr / checks
     needs:
       - decide
       - bun

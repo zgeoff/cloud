@@ -126,8 +126,8 @@ function findRequiredCheckHoldReason(pr: BumpPullRequest) {
   // CI's checks job holds every check, the lanes included, and the ruleset requires it, but it may
   // not have registered its check run yet
   const passedChecks = pr.checkRuns.some(
-    (run) => run.workflow === 'CI' && run.name === 'checks' && run.conclusion === 'SUCCESS',
+    (run) => run.workflow === 'CI' && run.name === 'pr / checks' && run.conclusion === 'SUCCESS',
   );
 
-  return passedChecks ? undefined : 'waiting for checks (CI)';
+  return passedChecks ? undefined : 'waiting for pr / checks (CI)';
 }
