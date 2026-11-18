@@ -6,6 +6,7 @@ interface ImpCreateOptions {
   readonly name: string;
   readonly image: string;
   readonly memoryMib: number;
+  readonly maxMemoryMib: number;
   readonly httpPort: number;
 }
 

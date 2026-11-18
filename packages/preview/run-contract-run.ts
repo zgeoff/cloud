@@ -224,6 +224,7 @@ async function createContractImp(
     name: imp.imp,
     image: deps.settings.impImage,
     memoryMib: deps.settings.impMemoryMib,
+    maxMemoryMib: deps.settings.impMaxMemoryMib,
     httpPort: 8080,
   });
 

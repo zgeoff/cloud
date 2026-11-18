@@ -42,6 +42,7 @@ async function setupTest() {
 
       impImage: 'base',
       impMemoryMib: 2048,
+      impMaxMemoryMib: 2048,
       impGitHubSecret: 'gh',
       impModelSecret: null,
       healthTimeoutMs: 60_000,
@@ -184,6 +185,7 @@ test('it keeps both previews running when two slots fit them', async () => {
       impDomain: 'imps.example.test',
       impImage: 'base',
       impMemoryMib: 2048,
+      impMaxMemoryMib: 2048,
       impGitHubSecret: 'gh',
       impModelSecret: null,
       healthTimeoutMs: 60_000,

@@ -36,7 +36,8 @@ test('it reads the settings from the environment and the secrets from the creden
       idleMs: 1_800_000,
       impDomain: 'imps.example.test',
       impImage: 'base',
-      impMemoryMib: 2048,
+      impMemoryMib: 1024,
+      impMaxMemoryMib: 2048,
       impGitHubSecret: 'gh',
       impModelSecret: 'preview-model',
       healthTimeoutMs: 600_000,
@@ -282,6 +283,60 @@ test('it rejects a slot count that is not a positive integer', () => {
       () => Promise.resolve('a-secret'),
     ),
   ).rejects.toThrowWithMessage(Error, 'PREVIEW_SLOTS is 0, not a positive integer');
+});
+
+test('it reads the boot and max memory of an elastic imp', async () => {
+  const config = await loadPreviewConfig(
+    {
+      CREDENTIALS_DIRECTORY: '/run/credentials/preview.service',
+      PREVIEW_REPOS: 'acme/greenhouse',
+      PREVIEW_BASE_URL: 'http://geoffcloud:8417',
+      PREVIEW_LINK_LISTEN: '100.64.0.10:8417',
+      PREVIEW_WEBHOOK_LISTEN: '100.64.0.10:8418',
+      PREVIEW_IMPD_URL: 'http://127.0.0.1:7070',
+      PREVIEW_IMP_DOMAIN: 'imps.example.test',
+      PREVIEW_IMP_IMAGE: 'base',
+      PREVIEW_IMP_MEMORY_MIB: '512',
+      PREVIEW_IMP_MAX_MEMORY_MIB: '1536',
+      PREVIEW_DATABASE: '/var/lib/preview/previews.sqlite',
+    },
+    (path) =>
+      Promise.resolve(
+        new Map([['/run/credentials/preview.service/github-app-key', stubAppKeyPEM]]).get(path) ??
+          'a-secret',
+      ),
+  );
+
+  expect([config.settings.impMemoryMib, config.settings.impMaxMemoryMib]).toStrictEqual([
+    512, 1536,
+  ]);
+});
+
+test.each([
+  ['below the boot memory', '512'],
+  ['past 4 times the boot memory', '4608'],
+])('it rejects a max memory %s', (_label, maxMemory) => {
+  expect(
+    loadPreviewConfig(
+      {
+        CREDENTIALS_DIRECTORY: '/run/credentials/preview.service',
+        PREVIEW_REPOS: 'acme/greenhouse',
+        PREVIEW_BASE_URL: 'http://geoffcloud:8417',
+        PREVIEW_LINK_LISTEN: '100.64.0.10:8417',
+        PREVIEW_WEBHOOK_LISTEN: '100.64.0.10:8418',
+        PREVIEW_IMPD_URL: 'http://127.0.0.1:7070',
+        PREVIEW_IMP_DOMAIN: 'imps.example.test',
+        PREVIEW_IMP_IMAGE: 'base',
+        PREVIEW_IMP_MEMORY_MIB: '1024',
+        PREVIEW_IMP_MAX_MEMORY_MIB: maxMemory,
+        PREVIEW_DATABASE: '/var/lib/preview/previews.sqlite',
+      },
+      () => Promise.resolve('a-secret'),
+    ),
+  ).rejects.toThrowWithMessage(
+    Error,
+    `PREVIEW_IMP_MAX_MEMORY_MIB is ${maxMemory}, not between PREVIEW_IMP_MEMORY_MIB (1024) and 4 times it`,
+  );
 });
 
 test('it rejects a listener without a port', () => {

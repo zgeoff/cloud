@@ -24,6 +24,9 @@ interface StubImp {
   httpPort: number;
   readonly image: string;
   readonly memoryMib: number;
+
+  // what an elastic imp may grow to; impd boots an imp created without it at fixed memory
+  readonly maxMemoryMib?: number;
   readonly backup: boolean;
   readonly grants: string[];
 }
@@ -237,6 +240,7 @@ function buildProcedureResponse(
       httpPort: Number(input['httpPort'] ?? 8080),
       image: String(input['image']),
       memoryMib: Number(input['memoryMib']),
+      ...(input['maxMemoryMib'] !== undefined && { maxMemoryMib: Number(input['maxMemoryMib']) }),
       backup: input['backup'] !== false,
       grants: [],
     };

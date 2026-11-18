@@ -39,7 +39,8 @@ async function setupTest() {
       idleMs: 1_800_000,
       impDomain: impd.impDomain,
       impImage: 'pv-base',
-      impMemoryMib: 4096,
+      impMemoryMib: 1024,
+      impMaxMemoryMib: 2048,
       impGitHubSecret: 'gh',
       impModelSecret: null,
       healthTimeoutMs: 600_000,
@@ -119,6 +120,34 @@ test('it runs the suite in a new imp with the model grant, posts success, and re
       headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     })?.phase,
   ).toBe('passed');
+});
+
+test('it runs the suite in an elastic imp of the memory the settings name', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  const memory: (readonly [number | undefined, number | undefined])[] = [];
+
+  ctx.impd.answerCommand = (command) => {
+    const imp = ctx.impd.imps.get(command.imp);
+
+    memory.push([imp?.memoryMib, imp?.maxMemoryMib]);
+
+    return { code: 0, stdout: ' 18 pass\n 0 fail\nRan 18 tests across 6 files.\n' };
+  };
+
+  await runContractRun(ctx.deps, {
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  expect(memory).toStrictEqual([[1024, 2048]]);
 });
 
 test("it runs the suite at the head commit under the guest's time limit, with the broker and the model placeholder", async () => {

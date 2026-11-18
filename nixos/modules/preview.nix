@@ -136,8 +136,20 @@ in
 
     impMemoryMib = lib.mkOption {
       type = lib.types.ints.positive;
+      default = 1024;
+      description = ''
+        Each preview imp's boot memory. The imp boots elastic, on base pages, so it stays off the
+        host's huge page pool.
+      '';
+    };
+
+    impMaxMemoryMib = lib.mkOption {
+      type = lib.types.ints.positive;
       default = 2048;
-      description = "Each preview imp's memory.";
+      description = ''
+        The memory each preview imp may grow to under pressure: at least impMemoryMib, and at most 4
+        times it.
+      '';
     };
 
     impGitHubSecret = lib.mkOption {
@@ -389,6 +401,7 @@ in
         PREVIEW_IMP_DOMAIN = cfg.impDomain;
         PREVIEW_IMP_IMAGE = cfg.impImage;
         PREVIEW_IMP_MEMORY_MIB = toString cfg.impMemoryMib;
+        PREVIEW_IMP_MAX_MEMORY_MIB = toString cfg.impMaxMemoryMib;
         PREVIEW_DATABASE = "/var/lib/preview/previews.sqlite";
         HOME = "/var/lib/preview";
         # Bun's transpiler cache would write under HOME on every start; the sources are few

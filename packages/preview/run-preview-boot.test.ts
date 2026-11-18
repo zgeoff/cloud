@@ -43,6 +43,7 @@ async function setupTest() {
 
       impImage: 'base',
       impMemoryMib: 2048,
+      impMaxMemoryMib: 2048,
       impGitHubSecret: 'gh',
       impModelSecret: null,
 
@@ -113,6 +114,7 @@ test('it creates the imp with the contract port and the grant, then builds and p
     httpPort: 3000,
     image: 'base',
     memoryMib: 2048,
+    maxMemoryMib: 2048,
     backup: false,
     grants: ['gh'],
   });

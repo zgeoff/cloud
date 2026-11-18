@@ -189,6 +189,10 @@ names.
 
 ## Slots and sleep
 
+Each preview imp and each contract run's imp boots elastic, at a boot size that grows to a max under
+pressure, both from the host module's settings. An elastic imp runs on base pages, so it stays off
+the host's huge page pool.
+
 The service runs at most a set number of previews at once, one by default, because each preview's
 imp holds memory from impd's budget while it runs. Before a preview boots or wakes, the service
 lists the running preview imps and puts the least recently used to sleep until the opening one fits.
