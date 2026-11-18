@@ -104,9 +104,7 @@ jobs:
           tool: wasm-tools@1.262.0
 
       - name: Export the zig and wasm-tools paths
-        run: |
-          echo "PEPYS_ZIG_BIN=$(command -v zig)" >> "$GITHUB_ENV"
-          echo "PEPYS_WASM_TOOLS_BIN=$(command -v wasm-tools)" >> "$GITHUB_ENV"
+        run: bun run --silent ci:export-pepys-tool-paths
 
       # gh downloads the host binary of the pinned release
       - name: Write the build context
