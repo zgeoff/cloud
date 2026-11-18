@@ -281,6 +281,7 @@ fi
 # and that claude applies it: `claude -p` sends a stand-in Messages API on loopback a system prompt
 # with no auto-memory section. The stand-in records each request body and answers 400, so no model
 # runs. The run gets its own HOME, so the login-state check and the secret scan never see its files.
+# Both read /dev/null, because bash reads this script from stdin.
 memory_dir=$(mktemp -d)
 mkdir "$memory_dir/home" "$memory_dir/work"
 # shellcheck disable=SC2016 # the script is Bun's, so bash expands nothing in it
@@ -297,7 +298,7 @@ bun -e '
     },
   });
   await Bun.write(`${dir}/port`, String(server.port));
-' "$memory_dir" &
+' "$memory_dir" < /dev/null &
 stand_in=$!
 for _ in $(seq 100); do
   [[ -s "$memory_dir/port" ]] && break
@@ -306,7 +307,7 @@ done
 (cd "$memory_dir/work" &&
   env -u CLAUDE_CODE_DISABLE_AUTO_MEMORY HOME="$memory_dir/home" CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
     ANTHROPIC_BASE_URL="http://127.0.0.1:$(cat "$memory_dir/port" 2> /dev/null)" ANTHROPIC_API_KEY=stand-in \
-    timeout 120 claude -p hi --max-turns 1 > /dev/null 2>&1)
+    timeout 120 claude -p hi --max-turns 1 < /dev/null > /dev/null 2>&1)
 kill "$stand_in" 2> /dev/null
 wait "$stand_in" 2> /dev/null
 # Claude Code's auto-memory section opens with this sentence
