@@ -320,11 +320,13 @@ in
     settings.IMP_WARM_CAP_MIB = "256";
     # the budget kept for nixie's sandboxes, which serve people waiting on a turn: its conversation
     # imp (2048 MiB), two system tasks (1024 MiB each) and four web fetches (512 MiB each). impd
-    # keeps it in each of its limits: the whole budget, the pool and the ordinary-page budget. The
-    # pool's other 14336 MiB hold 7 agent imps of 2048 MiB, as 5120 MiB would, so the last 1024 MiB
-    # costs no agent slot
+    # keeps it in the whole budget and in the pool, where the pool's other 14336 MiB hold 7 agent
+    # imps of 2048 MiB, as 5120 MiB would, so the last 1024 MiB costs no agent slot
     settings.IMP_PRIORITY_RAM_MIB = 6144;
     settings.IMP_PRIORITY_IMPS = "nixie-*";
+    # none of it kept in the ordinary-page budget: nixie's sandboxes run on the pool, and a kept
+    # 6144 MiB would fill that budget and refuse every elastic dev imp
+    settings.IMP_PRIORITY_ORDINARY_RAM_MIB = 0;
     # the name of this impd in each imp identity token that its broker signs. A service stores the
     # name beside the imp it names, so a change orphans those rows, and no other impd may use it.
     # An impd older than 6.12.0 does not read the setting
