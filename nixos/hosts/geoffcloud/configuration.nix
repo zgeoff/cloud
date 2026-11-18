@@ -275,8 +275,8 @@ in
       pool = "tank";
       arcMaxMiB = 3206;
     };
-    # the pool's 20480 MiB below, plus 6144 MiB on ordinary pages for elastic dev imps
-    ramBudgetMiB = 26624;
+    # the pool's 14336 MiB below, plus 6144 MiB on ordinary pages for elastic dev imps
+    ramBudgetMiB = 20480;
     hostFirewall = "none";
     tailscaleAuthKeyFile = "/var/lib/imp-host/secrets/tailscale-authkey";
     environmentFile = "/var/lib/imp-host/secrets/imp-host.env";
@@ -321,7 +321,7 @@ in
     settings.IMP_WARM_CAP_MIB = "256";
     # the budget kept for nixie's sandboxes, which serve people waiting on a turn: its conversation
     # imp (2048 MiB), two system tasks (1024 MiB each) and four web fetches (512 MiB each). impd
-    # keeps it in the whole budget and in the pool, where the pool's other 14336 MiB hold 7 agent
+    # keeps it in the whole budget and in the pool, where the pool's other 8192 MiB hold 4 agent
     # imps of 2048 MiB, as 5120 MiB would, so the last 1024 MiB costs no agent slot
     settings.IMP_PRIORITY_RAM_MIB = 6144;
     settings.IMP_PRIORITY_IMPS = "nixie-*";
@@ -347,13 +347,14 @@ in
     };
   };
 
-  # the pool of 2 MiB pages that impd's huge pages run on: 20480 MiB for the imps of fixed memory,
+  # the pool of 2 MiB pages that impd's huge pages run on: 14336 MiB for the imps of fixed memory,
   # set apart from ramBudgetMiB. The 6144 MiB of budget past the pool is impd's ordinary-page
-  # budget, where the elastic dev imps run; the larger budget lasts until the pool shrinks.
-  # systemd-sysctl reserves the pool early in boot, before memory fragments; no page is made on
-  # demand past it, because Firecracker maps the pool without a reservation and a page the kernel
-  # cannot make kills the guest
-  boot.kernel.sysctl."vm.nr_hugepages" = 10240;
+  # budget, where the elastic dev imps run: the host has no ordinary memory for a budget past
+  # 20480 MiB, so the pool gives up that part. systemd-sysctl reserves the pool early in boot,
+  # before memory fragments, and applies a smaller pool at the activation by freeing unused pages;
+  # no page is made on demand past it, because Firecracker maps the pool without a reservation and a
+  # page the kernel cannot make kills the guest
+  boot.kernel.sysctl."vm.nr_hugepages" = 7168;
 
   # the root disk's read-ahead at the kernel's default, in place of the 8 MiB the kernel derives
   # from what vda reports, at which Alloy's journal reads thrash its memory cgroup
