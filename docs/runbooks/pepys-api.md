@@ -14,6 +14,8 @@ and the sign-in pages to clients on the internet. The tailnet route carries the 
 - [Turn on the API's tailnet route](#turn-on-the-apis-tailnet-route) adds the tailnet route and
   checks it.
 - [Turn off the API's tailnet route](#turn-off-the-apis-tailnet-route) removes the tailnet route.
+- [Reach `/rpc` while the tailnet route is off](#reach-rpc-while-the-tailnet-route-is-off) gives a
+  port-forward to the API.
 
 [The API's public route](../architecture/workloads/pepys.md#the-apis-public-route) and
 [The API's tailnet route](../architecture/workloads/pepys.md#the-apis-tailnet-route) explain what
@@ -184,23 +186,14 @@ names a host: the key `tailnetHostname` in the `geoff-cloud:pepys` object of
 tailnet member run every query of the API. Get the owner's approval before you answer the held run
 in step 6.
 
-1. Check that [the exposure registry](../architecture/network/firewalls.md#the-exposure-registry),
-   `packages/topology/exposure.json`, has an entry of kind `tailnet-hostname` whose `hostname` is
-   `pepys-api.geoff.cloud`. To use another name, add an entry for that name first, then run
-   `bun run docs:exposure`, which writes the registry's reference table.
-2. Open a pull request that adds `tailnetHostname: pepys-api.geoff.cloud` to the `geoff-cloud:pepys`
+1. Open a pull request that adds `tailnetHostname: pepys-api.geoff.cloud` to the `geoff-cloud:pepys`
    object in `infra/Pulumi.prod.yaml`.
+2. Check that [the exposure registry](../architecture/network/firewalls.md#the-exposure-registry),
+   `packages/topology/exposure.json`, has an entry of kind `tailnet-hostname` whose `hostname` is
+   the name. When it has none, add the entry in the same pull request. Then run
+   `bun run docs:exposure`, which writes the registry's reference table.
 3. Run `bun run preview` from the repo root, as [First preview](./development.md#first-preview) sets
-   up. The preview fails with one of these errors when the program refuses the name:
-
-   | Error ends with                                                                | Fix                                           |
-   | ------------------------------------------------------------------------------ | --------------------------------------------- |
-   | `must name a host under geoff.cloud`                                           | Use a name under `geoff.cloud`.               |
-   | `must differ from "pepys.webhookHostname" and "pepys.apiHostname"`             | Use a name that no public route of pepys has. |
-   | `needs a tailnet-hostname entry for <name> in packages/topology/exposure.json` | Add the entry, as step 1 says.                |
-   | `needs stack config "nixie": the route goes through nixie's Traefik`           | Deploy [nixie](./nixie.md) first.             |
-
-   Expect no replace. Expect the preview to add these:
+   up. Expect no replace. Expect the preview to add these:
    - the certificate `pepys-api-tailnet`;
    - the Secret `pepys-api-tailnet-tls`;
    - the Ingress `pepys-api-tailnet`;
@@ -208,6 +201,16 @@ in step 6.
 
    Expect the preview to update the network policy `pepys-host` and nixie's Traefik release, which
    gains the namespace `pepys`.
+
+   The Pulumi program refuses a setting it cannot serve, and the preview then fails with one of
+   these errors:
+
+   | Error ends with                                                                | Fix                                           |
+   | ------------------------------------------------------------------------------ | --------------------------------------------- |
+   | `must name a host under geoff.cloud`                                           | Use a name under `geoff.cloud`.               |
+   | `must differ from "pepys.webhookHostname" and "pepys.apiHostname"`             | Use a name that no public route of pepys has. |
+   | `needs a tailnet-hostname entry for <name> in packages/topology/exposure.json` | Add the entry, as step 2 says.                |
+   | `needs stack config "nixie": the route goes through nixie's Traefik`           | [Deploy nixie](./nixie.md) first.             |
 
 4. Merge the pull request.
 5. Wait for the `Deploy prod` run of the merge. Expect it to hold, because the plan adds a DNS
@@ -220,16 +223,7 @@ in step 6.
 
 Run each command on a device on the tailnet.
 
-1. Check that the Ingress exists:
-
-   ```sh
-   ssh root@geoffcloud k3s kubectl -n pepys get ingress pepys-api-tailnet
-   ```
-
-   Expect one row with the class `nixie`, the host `pepys-api.geoff.cloud` and, as its address, the
-   tailnet address of `geoffcloud`.
-
-2. Check that the name resolves to the tailnet address of `geoffcloud`:
+1. Check that the name resolves to the tailnet address of the machine `geoffcloud`:
 
    ```sh
    getent hosts pepys-api.geoff.cloud
@@ -238,8 +232,17 @@ Run each command on a device on the tailnet.
 
    Expect the same address from both commands.
 
-3. Check that the API answers a query under `/rpc`. The query needs no stored row, so the
-   placeholder values work as written:
+2. Check that the Ingress exists:
+
+   ```sh
+   ssh root@geoffcloud k3s kubectl -n pepys get ingress pepys-api-tailnet
+   ```
+
+   Expect one row with the class `nixie`, the host `pepys-api.geoff.cloud` and the address of
+   step 1.
+
+3. Check that the API answers a query under `/rpc`. The query needs no stored row, so run the
+   command as written:
 
    ```sh
    curl -s -w '\n%{http_code}\n' -X POST -H 'content-type: application/json' \
@@ -258,19 +261,21 @@ Run each command on a device on the tailnet.
    curl -s -o /dev/null -w '%{http_code}\n' -X POST https://pepys-api.geoff.cloud/mcp
    ```
 
-   Expect `403`. While the public route is off, the API serves no `/mcp`, so skip this step.
+   Expect `403`.
 
 ## Turn off the API's tailnet route
 
 **CAUTION:** Each script and person that calls `/rpc` on the tailnet name fails after these steps.
-The boxxy server is not one of them: it calls the API's Service inside the cluster.
+[The boxxy server](../architecture/workloads/boxxy.md) is not one of them: it calls the API's
+Service inside the cluster.
 
 1. Open a pull request that deletes the `tailnetHostname` line from the `geoff-cloud:pepys` object
-   in `infra/Pulumi.prod.yaml`. Leave the registry's entry in place: the entry opens nothing while
-   the key is absent.
-2. Run `bun run preview`. Expect it to delete the four resources that step 3 of
-   [Turn on the API's tailnet route](#turn-on-the-apis-tailnet-route) lists, and to update the
-   network policy `pepys-host` and nixie's Traefik release.
+   in `infra/Pulumi.prod.yaml`. Leave the name's entry in
+   [the exposure registry](../architecture/network/firewalls.md#the-exposure-registry): the entry
+   opens nothing while the key is absent.
+2. Run `bun run preview`. Expect it to delete the certificate, the Secret, the Ingress and the DNS
+   record that are named `pepys-api-tailnet`, and to update the network policy `pepys-host` and
+   nixie's Traefik release.
 3. Merge the pull request.
 4. Wait for the `Deploy prod` run of the merge. Expect it to hold, because the plan deletes
    resources.
@@ -284,11 +289,13 @@ The boxxy server is not one of them: it calls the API's Service inside the clust
 
    Expect `Error from server (NotFound)`.
 
-With the route off, reach `/rpc` through a port-forward. Run this in one terminal, and leave it
-open:
+## Reach `/rpc` while the tailnet route is off
 
-```sh
-ssh -L 8081:localhost:8081 root@geoffcloud k3s kubectl -n pepys port-forward svc/pepys-host 8081
-```
+1. Run a port-forward in one terminal, and leave it open:
 
-Then call `http://localhost:8081/rpc/` in place of `https://pepys-api.geoff.cloud/rpc/`.
+   ```sh
+   ssh -L 8081:localhost:8081 root@geoffcloud k3s kubectl -n pepys port-forward svc/pepys-host 8081
+   ```
+
+2. In a second terminal, call `http://localhost:8081/rpc/` wherever a command calls
+   `https://pepys-api.geoff.cloud/rpc/`.
