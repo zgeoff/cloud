@@ -4,8 +4,8 @@
     "sum": "d59d53ce7da579fba9236c383cef995cd40ded69ca4344db131f0354313e860b"
   },
   "atc-daemon": {
-    "version": "7.17.0",
-    "sum": "d59d53ce7da579fba9236c383cef995cd40ded69ca4344db131f0354313e860b"
+    "version": "7.18.0",
+    "sum": "187a098b91fcfff9deaabd1f85c540bf6921217a9fbe155438029b95df4b33cf"
   },
   "atc-gateway": {
     "version": "7.17.0",

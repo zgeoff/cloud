@@ -88,8 +88,8 @@ call, the path of a change, the topology and the data.
   a token, back up, restore and check a restore.
 - [pepys: deploy and release](./runbooks/pepys.md): deploy pepys the first time, and bump its
   release.
-- [pepys: telemetry from sessions](./runbooks/pepys-telemetry.md): let Claude sessions send their
-  telemetry to pepys ingest, and rotate its token.
+- [pepys: telemetry from sessions](./runbooks/pepys-telemetry.md): let Claude and Codex sessions
+  send their telemetry to pepys ingest, and rotate its token.
 - [pepys: the API's public route and its clients](./runbooks/pepys-api.md): turn on the API's public
   route, enroll the owner's passkey, and add or remove an MCP client.
 - [pepys: the backup](./runbooks/pepys-backup.md): give the backup its Garage key, and back up now.

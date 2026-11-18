@@ -167,16 +167,16 @@ The target boots each imp from the [agent image](../../runbooks/agent-image.md),
 hooks run the image's own atc while it matches the daemon's release, so a spawn uploads no binary.
 The daemon offers Claude and Codex. A Claude session signs in through impd's credential broker with
 the same profiles as the home-pc daemon's `cloud` target: the Claude subscription, GitHub, Linear's
-MCP server and 1Password Connect. The cloud daemon adds the `pepys-telemetry` profile, so every
-Claude session sends its OpenTelemetry logs to pepys ingest through the broker
-([the telemetry path](./pepys.md#the-telemetry-path-from-a-session)). The profiles name impd's
-secrets, never their values, so a renamed or added profile changes the daemons' configs. The
+MCP server and 1Password Connect. The cloud daemon adds the `pepys-telemetry` profile to every
+entry, so each Claude and Codex session sends its OpenTelemetry logs to pepys ingest through the
+broker ([the telemetry path](./pepys.md#the-telemetry-path-from-a-session)). The profiles name
+impd's secrets, never their values, so a renamed or added profile changes the daemons' configs. The
 daemon's impd token lists each of those secrets as grantable, so the token, not the config, bounds
 what a session can reach. impd ties each entry of that list to the secret it named, so a secret made
 again under the same name needs a new grantable list on each daemon's token. A Codex session signs
 in with the ChatGPT subscription through the `codex` profile, whose `codex-chatgpt` secret impd
 renews. The cloud daemon's `boxxy` entry selects that profile too, so a build session's
-`codex review` runs on the same sign-in.
+`codex review` runs on the same sign-in, and sends its logs to pepys ingest as a Codex session does.
 
 The daemon also offers the `boxxy` agent for the boxxy server's worker sessions
 ([boxxy](./boxxy.md)). It is a Claude entry with the same profiles and variables as `claude`, and
@@ -194,9 +194,9 @@ design sessions never get the read-only token, and a review session cannot push.
 
 Two lists name every secret the daemon may grant. The profiles in the host's config name them, and
 the grantable list of the daemon's impd token (`scripts/atc-cloud-grantable.ts`) bounds them: `glm`,
-`claude-setup-token`, `github-imp-agents`, `linear-imp-agents`, `op-connect`, `pepys-telemetry` and
-`boxxy`. A new profile changes both, and the token's list changes by hand
-([the boxxy runbook](../../runbooks/boxxy.md#let-sessions-reach-the-server)).
+`claude-setup-token`, `github-imp-agents`, `linear-imp-agents`, `op-connect`, `pepys-telemetry`,
+`boxxy`, `boxxy-github-token` and `codex-chatgpt`. A new profile changes both, and the token's list
+changes by hand ([the boxxy runbook](../../runbooks/boxxy.md#let-sessions-reach-the-server)).
 
 The daemon's `principals` lists the OAuth clients of the gateway, the boxxy server's service token
 as `service:boxxy`, and atc's verify read client as `service:wringer-ro`
