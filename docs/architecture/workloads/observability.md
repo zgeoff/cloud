@@ -17,7 +17,9 @@ The stack runs in the `observability` namespace:
   kubelet's endpoints, so Prometheus keeps the control plane's series from the API server alone.
 - **Loki** stores logs on a filesystem volume as a single binary. Loki retains logs by time only,
   and local-path does not enforce the volume's request, so Loki's ingestion rate limit bounds its
-  disk use: the most it accepts over the time a log line stays on disk fits below that request.
+  disk use: the most it accepts over the time a log line stays on disk, compressed at a quarter of
+  its size, fits below that request. Loki's chunks compressed about 40:1 on the volume in November
+  2026, so the quarter leaves room for logs that repeat less.
 - **Alloy** runs on the node and ships every pod's logs and the host's systemd journal to Loki. It
   reads each container's log files on the node, and labels each line with the pod's namespace, pod
   and container. impd logs to the journal through its container's unit, so impd's logs reach Loki
