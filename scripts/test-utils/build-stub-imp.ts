@@ -65,7 +65,10 @@ const impCommands: readonly (readonly [string, ImpCommand])[] = [
   ['image build * --name *', (state, args) => runBuild(state, args[2] ?? '', args[4] ?? '')],
   ['image rm *', (state, args) => removeImage(state, args[2] ?? '')],
   ['image pin *', (state, args) => pinImage(state, args[2] ?? '')],
-  ['new * --image *', (state, args) => createImp(state, args[1] ?? '', args[3] ?? '')],
+  [
+    'new * --image * --memory * --max-memory *',
+    (state, args) => createImp(state, args[1] ?? '', args[3] ?? ''),
+  ],
   ['ls --json', (state) => ({ stdout: `${JSON.stringify(state.imps)}\n` })],
   ['rm *', (state, args) => removeImp(state, args[1] ?? '')],
 ];

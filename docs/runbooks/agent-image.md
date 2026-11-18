@@ -96,7 +96,8 @@ make the same image name.
 
 The script builds from a `git archive` of the commit, so the clone's working tree never reaches the
 image. It names the image `agent-<short sha>`, then boots the imp `agent-check-<short sha>` from it,
-runs that commit's `scripts/check-agent-image.ts` there, and removes the imp. Its last line is
+elastic at 1024 MiB and growing to 2048 MiB, so it stays off the host's huge page pool. It then runs
+that commit's `scripts/check-agent-image.ts` there, and removes the imp. Its last line is
 `agent-<short sha> <digest> check passed`; record that line on the PR. A passed check pins the image
 in impd, because a daemon's target boots it by name, and impd's image eviction would otherwise
 remove it while no imp uses it. A failed check removes the image, unless `--keep` keeps it for a

@@ -34,7 +34,17 @@ test('it runs the source’s check on a fresh imp, with a long timeout, and remo
   expect(passed).toBe(true);
 
   expect(stub.calls.map((call) => call.argv)).toStrictEqual([
-    ['impz', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234'],
+    [
+      'impz',
+      'new',
+      'agent-check-abc1234',
+      '--image',
+      'agent-abc1234',
+      '--memory',
+      '1024',
+      '--max-memory',
+      '2048',
+    ],
     ['bun', join(ctx.source, 'scripts/check-agent-image.ts'), '--imp', 'agent-check-abc1234'],
     ['impz', 'rm', 'agent-check-abc1234'],
   ]);

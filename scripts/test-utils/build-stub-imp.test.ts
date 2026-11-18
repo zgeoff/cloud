@@ -186,7 +186,17 @@ test('it creates an imp on an image and prints its name', async () => {
   const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
   const stub = buildStubRunner(imp.handler);
 
-  const result = await stub.run(['impz', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234']);
+  const result = await stub.run([
+    'impz',
+    'new',
+    'agent-check-abc1234',
+    '--image',
+    'agent-abc1234',
+    '--memory',
+    '1024',
+    '--max-memory',
+    '2048',
+  ]);
 
   expect(result.stdout.toString()).toBe('agent-check-abc1234\n');
   expect(imp.imps).toStrictEqual([{ name: 'agent-check-abc1234', image: 'agent-abc1234' }]);
@@ -196,7 +206,17 @@ test('it refuses an imp on a missing image', async () => {
   const imp = buildStubImp({ images: [] });
   const stub = buildStubRunner(imp.handler);
 
-  const result = await stub.run(['impz', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234']);
+  const result = await stub.run([
+    'impz',
+    'new',
+    'agent-check-abc1234',
+    '--image',
+    'agent-abc1234',
+    '--memory',
+    '1024',
+    '--max-memory',
+    '2048',
+  ]);
 
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toBe('impz: NOT_FOUND: image agent-abc1234 not found\n');
@@ -211,7 +231,17 @@ test('it refuses an imp under a taken name', async () => {
 
   const stub = buildStubRunner(imp.handler);
 
-  const result = await stub.run(['impz', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234']);
+  const result = await stub.run([
+    'impz',
+    'new',
+    'agent-check-abc1234',
+    '--image',
+    'agent-abc1234',
+    '--memory',
+    '1024',
+    '--max-memory',
+    '2048',
+  ]);
 
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toBe('impz: CONFLICT: imp agent-check-abc1234 already exists\n');

@@ -115,7 +115,16 @@ test.each([
         `agent-${short}`,
       ],
       ['image', 'ls', '--json'],
-      ['new', `agent-check-${short}`, '--image', `agent-${short}`],
+      [
+        'new',
+        `agent-check-${short}`,
+        '--image',
+        `agent-${short}`,
+        '--memory',
+        '1024',
+        '--max-memory',
+        '2048',
+      ],
       ['rm', `agent-check-${short}`],
       ['image', 'rm', `agent-${short}`],
     ]);

@@ -41,11 +41,18 @@ function printErrText(io: Readonly<ScriptIO>, text: string) {
   }
 }
 
+// elastic, as the harness imps boot, so the check runs on base pages and leaves the host's huge-page
+// pool, where impd runs each imp of fixed memory, to nixie's sandboxes
+const checkImpMemory = ['--memory', '1024', '--max-memory', '2048'] as const;
+
 // the check downloads gitleaks and sweeps the whole image, so it gets longer than a call's default
 const checkTimeoutMs = 1_800_000;
 
 async function runCheckOnImp(io: Readonly<ScriptIO>, target: Readonly<AgentImageCheck>) {
-  const created = await runOrExit(io, buildImpArgv(['new', target.check, '--image', target.image]));
+  const created = await runOrExit(
+    io,
+    buildImpArgv(['new', target.check, '--image', target.image, ...checkImpMemory]),
+  );
 
   printErrText(io, created.stdout.toString());
 
