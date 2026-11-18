@@ -15,9 +15,10 @@
 # impd 6.3.2 wakes a snapshot on the pages its guest ran on (pickWakeHugePages in zgeoff/impz
 # packages/daemon/src/imps/imps/pick-wake-huge-pages.ts), and gives guests on 4 KiB pages only the
 # RAM budget less the pool (buildBudgets in packages/daemon/src/imp-ops/governor/build-budgets.ts).
-# That share is 0 on a host whose pool is the whole budget, so impd's enforcement sleeps each such
-# guest at a time it picks, and a wake that the share refuses boots the imp cold onto the pool.
-# This script makes the same move once, in an order the operator picks.
+# When a pool change leaves that share short, impd's enforcement sleeps such guests at a time it
+# picks, and a wake that the share refuses boots a fixed-memory imp cold onto the pool. This script
+# makes the same move once, in an order the operator picks. It also stops each elastic imp, such as
+# a dev imp, which runs on 4 KiB pages and cannot boot onto the pool.
 # `impz stop` frees the imp's memory and its snapshot, and keeps its disk; the guest's processes
 # and sessions end. impd records the page size as `"hugePages": "2M"` in the imp's vm.json at each
 # cold boot and in each snapshot/meta.json it writes, under /var/lib/imp/imps/<id>/ in imp-host
