@@ -70,10 +70,10 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
    `zfs create` loads the key of a new encryption root, so the children need no `load-key`. The
    children inherit the encryption and the compression. LZ4 stores the blocks of zeros that ext4
    writes as holes. The zvol reserves its whole size on the pool, because ext4 on a sparse zvol gets
-   write errors when the pool fills. The zvol is 30 GiB. The cluster's PVCs request 41 GiB, more
-   than the zvol holds, and local-path enforces no request: the zvol fills by what the volumes
-   write. When `/var/lib/rancher` runs short of space, follow
-   [Grow the rancher zvol](#grow-the-rancher-zvol).
+   write errors when the pool fills. The zvol is 30 GiB. local-path, the cluster's storage
+   provisioner, does not enforce the size a PVC requests, so the PVCs can request more than the zvol
+   holds, and they request 41 GiB. The zvol fills only by what the volumes write. When
+   `/var/lib/rancher` runs short of space, follow [Grow the rancher zvol](#grow-the-rancher-zvol).
 
 4. Make the ext4 filesystem on the zvol:
 
@@ -150,8 +150,8 @@ Grow the zvol when `/var/lib/rancher` runs short of space. The grow needs no unm
 of k3s.
 
 Each GiB the zvol gains is a GiB that `tank/imp` loses, because the zvol reserves its whole size.
-impd evicts images by percent of `tank/imp`, so the last step checks the two percents against the
-smaller `tank/imp`.
+impd starts and stops its image eviction at two percents of `tank/imp`. In steps 5 and 6, you check
+both percents against the smaller `tank/imp`.
 
 Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
@@ -189,20 +189,25 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
    Expect the new size in the `Size` column.
 
-5. Read the space that `tank/imp` has now:
+5. Read the size of `tank/imp`:
 
    ```bash
    zfs list -o name,used,avail tank/imp
    ```
 
-   Add `USED` and `AVAIL`, and compare the sum with the size in the comment above
-   `settings.IMP_IMAGE_EVICT_HIGH_PERCENT` in `nixos/hosts/geoffcloud/configuration.nix`. When they
-   differ, correct each figure in the comment in a pull request.
+   Add `USED` and `AVAIL`. The sum is the size.
 
-   Then multiply the sum by 95 less `IMP_IMAGE_EVICT_HIGH_PERCENT`, in percent, for the space
-   between the high mark and impd's reserve of 5 %. When that space is under 20 GiB, a builder imp's
-   disk no longer fits at the high mark: lower `IMP_IMAGE_EVICT_HIGH_PERCENT` and
-   `IMP_IMAGE_EVICT_LOW_PERCENT` in the same pull request until it fits.
+6. Open the comment above `settings.IMP_IMAGE_EVICT_HIGH_PERCENT` in
+   `nixos/hosts/geoffcloud/configuration.nix`. The comment gives three figures: the size of
+   `tank/imp`, impd's disk reserve of 5 % of the size, and the space between the two percents.
+
+   When the size differs from the comment's, correct the three figures in a pull request.
+
+   Then take `IMP_IMAGE_EVICT_HIGH_PERCENT` from 95. That percent of the size is the space above
+   impd's reserve when eviction starts: at 80 and 162 GiB, 15 % is 24 GiB. The comment says that
+   space holds the 20 GiB disk of a builder imp. When the space is under 20 GiB, lower
+   `IMP_IMAGE_EVICT_HIGH_PERCENT` until it holds 20 GiB. Lower `IMP_IMAGE_EVICT_LOW_PERCENT` by the
+   same number of points, in the same pull request.
 
 ## If the key fails to load at boot
 
