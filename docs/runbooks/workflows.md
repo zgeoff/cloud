@@ -131,17 +131,18 @@ bash scripts/switch-geoffcloud.sh --stop-ordinary-page-imps  # switch in the hug
    `k3s.service`, because nixie can stay down for minutes after k3s restarts. In a planned k3s
    window, run the switch again with `--allow-k3s-restart`: it prints the same lines and goes on.
 8. With `--stop-ordinary-page-imps`, it stops each running or sleeping imp whose guest is on 4 KiB
-   pages with `impz stop`, so the imp boots cold on the pool at its next use. impd leaves guests on
-   4 KiB pages no budget once the pool is the whole budget, so it would sleep each one at a time it
-   picks and boot it cold on its next wake; the flag makes that move in a set order. Each imp keeps
-   its disk and loses its processes and sessions. The stop order is the names in `IMP_STOP_ORDER`,
-   then the other imps' names sorted, then the names in `IMP_STOP_LAST`.
-   `bash scripts/stop-ordinary-page-imps.sh --plan <host>` prints the order and stops nothing, and
-   `--check` fails naming each imp still on 4 KiB pages. It stops them after the last gate and
-   before the activation reserves the pool, so a pool that comes up short leaves no guest on
-   ordinary pages beside it. `impz stop` does not take an image builder, so a builder on 4 KiB pages
-   fails the switch before any stop: wait for its build to end, then switch again. Pass the flag
-   only in the pool's window that the owner approved.
+   pages with `impz stop`, so the imp boots cold on the pool at its next use. impd gives guests on
+   ordinary pages only the budget less the pool, so when a pool change leaves them short it sleeps
+   them at a time it picks and boots each fixed-memory imp cold on its next wake; the flag makes
+   that move in a set order. The flag also stops every elastic imp, the dev imps included, which
+   cannot run on the pool. Each imp keeps its disk and loses its processes and sessions. The stop
+   order is the names in `IMP_STOP_ORDER`, then the other imps' names sorted, then the names in
+   `IMP_STOP_LAST`. `bash scripts/stop-ordinary-page-imps.sh --plan <host>` prints the order and
+   stops nothing, and `--check` fails naming each imp still on 4 KiB pages. It stops them after the
+   last gate and before the activation reserves the pool, so a pool that comes up short leaves no
+   guest on ordinary pages beside it. `impz stop` does not take an image builder, so a builder that
+   runs on 4 KiB pages fails the switch before any stop: wait for its build to end, then switch
+   again. Pass the flag only in the pool's window that the owner approved.
 9. It sets the system profile to the built store path and runs its `switch-to-configuration switch`
    under `systemd-run`, as `nixos-rebuild` does. The flake is not evaluated again. Before the
    activation it appends the commit and the store path to `/var/lib/host-build-lag/switches` on the

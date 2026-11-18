@@ -68,7 +68,7 @@ let
       '';
     }
     {
-      title = "it keeps 6144 MiB of the impd budget for the imps whose names start with nixie-";
+      title = "it keeps 6144 MiB of the impd budget for the imps whose names start with nixie-, none of it past the pool";
       script = ''
         assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
         settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
@@ -76,6 +76,7 @@ let
 
         assert_files_equal - actual <<'EOF'
         IMP_PRIORITY_IMPS=nixie-*
+        IMP_PRIORITY_ORDINARY_RAM_MIB=0
         IMP_PRIORITY_RAM_MIB=6144
         EOF
       '';

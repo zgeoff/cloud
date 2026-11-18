@@ -10,7 +10,8 @@
 # those two failures by name. tailscaled-autoconnect is off: the VM's tailscaled has no node state,
 # so tailscale up would wait out its start timeout, where the host's node state on vda logs it in.
 # Its pool of 2 MiB hugetlb pages holds 64 pages, because the host's would take more than the VM's
-# memory; the check compares the host's own pool size with its literal.
+# memory; the check compares the host's own pool size, which the host sets apart from impd's RAM
+# budget, with its literal.
 #
 # The same boot checks that pool for imp guest memory: the boot reserves it whole with no pages on
 # demand, a mapping with Firecracker's hugetlb flags draws its pages from it and gives them back on
@@ -116,7 +117,7 @@ pkgs.testers.runNixOSTest {
         assert left == [], f"the root disk holds {left}"
 
 
-    with subtest("it sizes the host's pool of 2 MiB pages at the imps' 20 GiB RAM budget"):
+    with subtest("it sizes the host's pool of 2 MiB pages at 20 GiB for the imps of fixed memory"):
         host_pool = ${toString geoffcloud.config.boot.kernel.sysctl."vm.nr_hugepages"}
 
         assert host_pool == 10240, f"the host's pool holds {host_pool} pages"

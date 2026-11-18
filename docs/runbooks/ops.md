@@ -33,6 +33,10 @@ run in <checkout>/infra: op run --env-file=../.env -- pulumi cancel --stack prod
 
 Switches geoffcloud to the NixOS system of the checked-out `main`.
 
+> **CAUTION:** `--stop-ordinary-page-imps` stops every elastic imp, the dev imps included, because
+> each one runs on 4 KiB pages. The agent session in each dev imp ends. Pass it only when no dev imp
+> holds work in progress.
+
 ```bash
 bun run ops:switch-host                               # build, then switch
 bun run ops:switch-host -- --build-only               # build and print the system path
