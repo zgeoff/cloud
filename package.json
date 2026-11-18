@@ -118,6 +118,7 @@
     "ci:publish-files-image": "bash scripts/publish-files-image.sh",
     "ci:write-pepys-image-context": "bash scripts/write-pepys-image-context.sh",
     "ci:publish-pepys-image": "bash scripts/publish-pepys-image.sh",
+    "ci:export-pepys-tool-paths": "bun scripts/pepys-image/export-tool-paths.ts",
     "ci:write-boxxy-image-context": "bash scripts/write-boxxy-image-context.sh",
     "ci:publish-boxxy-image": "bash scripts/publish-boxxy-image.sh",
     "ci:pin-atc-gateway-images": "bun scripts/release/run-published-images-bump.ts atc-gateway-images",
