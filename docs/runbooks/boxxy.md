@@ -244,7 +244,7 @@ relay and the daemon's new config.
    switch that changes the daemon's config restarts it.
 
 [The pepys telemetry runbook](./pepys-telemetry.md#let-sessions-send-telemetry) covers the telemetry
-secret, which every Claude session uses.
+secret, which every Claude and Codex session uses.
 
 ## The service token at the atc gateway
 

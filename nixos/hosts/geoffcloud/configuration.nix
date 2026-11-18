@@ -492,24 +492,17 @@ in
       # value in its environment and fails on one its token can't read. They sit on the entry
       # because atc takes only the profile's own host as a profile URL.
       #
-      # The telemetry variables switch on Claude Code's OpenTelemetry export. A profile's variable
-      # may hold only the broker placeholder or an https origin of the profile's host, so the
-      # endpoint sits on the pepys-telemetry profile and the other three, plain values, sit in the
-      # entry's env (which may not repeat a variable that a selected profile sets). atc appends
-      # atc.session.id to OTEL_RESOURCE_ATTRIBUTES in every session it starts, so the entries set
-      # no resource attributes.
+      # No entry sets an OpenTelemetry variable: the pepys-telemetry profile's telemetry item sets
+      # up the export of each session that selects it, and atc refuses an entry that sets one of
+      # those variables beside it. atc appends atc.session.id to OTEL_RESOURCE_ATTRIBUTES in every
+      # session it starts, so the entries set no resource attributes.
       claudeAuth = {
         mcpServers.linear = {
           url = "https://mcp.linear.app/mcp";
           profile = "linear";
         };
       };
-      telemetryEnv = {
-        CLAUDE_CODE_ENABLE_TELEMETRY = "1";
-        OTEL_LOGS_EXPORTER = "otlp";
-        OTEL_EXPORTER_OTLP_PROTOCOL = "http/json";
-      };
-      claudeEnv = telemetryEnv // {
+      claudeEnv = {
         PR_EVIDENCE_URL = "https://${filesExposure.hostname}/api/files";
         PR_EVIDENCE_TOKEN_PATH = "imp/files-agent-token/credential";
       };
@@ -534,10 +527,15 @@ in
         url = impdLoopbackURL;
         tokenFile = "/run/credentials/atc-daemon.service/imp-token";
         impPrefix = "harness-";
-        # the agent image (docs/runbooks/agent-image.md) built from the commit that pins this
-        # daemon's atc release, so hooks run the image's atc and no spawn copies the daemon's in
+        # the agent image (docs/runbooks/agent-image.md). Hooks run the image's atc at guestATC
+        # while it prints the daemon's release; when the image ships another release, each new imp
+        # takes a copy of the daemon's binary (packages/atc.nix)
         image = "agent-6106be2d";
         guestATC = "/usr/local/bin/atc";
+        # a change to an agent's profiles in this file is the owner's, so a session made before
+        # the change moves to the new profiles at its next revive or restore, with no rebind by
+        # hand. atc still refuses when the change withdraws a grant the imp holds.
+        rebindChangedAuth = true;
       };
       defaultTarget = "geoffcloud";
       authProfiles = {
@@ -573,14 +571,16 @@ in
             OP_CONNECT_TOKEN = "broker-placeholder";
           };
         };
-        # Claude Code's telemetry to pepys ingest. The broker adds the bearer token and the imp
-        # identity token itself, so the session holds neither and sends no placeholder.
+        # The log records of a session's agents to pepys ingest. For the telemetry item, atc sets
+        # Claude Code's four OpenTelemetry variables and writes the log exporter into each Codex
+        # config.toml of the session, both with the profile's host. The broker adds the bearer token
+        # and the imp identity token itself, so the session holds neither and sends no placeholder.
         pepys-telemetry = {
           secret = "pepys-telemetry";
           host = pepysTelemetryHost;
           header = "authorization";
           scheme = "bearer";
-          env.OTEL_EXPORTER_OTLP_ENDPOINT = "https://${pepysTelemetryHost}";
+          telemetry.logs = true;
         };
         # the ChatGPT subscription sign-in that impd renews: a Codex session signs in with it, and a
         # boxxy session's `codex review` runs on it, so the build's second review needs no key in the
@@ -644,12 +644,13 @@ in
             "pepys-telemetry"
             "boxxy"
           ];
-          env = telemetryEnv;
         };
-        # a Codex session signs in with the ChatGPT subscription through the codex profile
+        # a Codex session signs in with the ChatGPT subscription through the codex profile, and
+        # sends its log records to pepys through the pepys-telemetry profile
         codex.auth.profiles = [
           "codex"
           "github"
+          "pepys-telemetry"
         ];
       };
       principals = {

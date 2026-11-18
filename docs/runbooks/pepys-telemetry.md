@@ -1,6 +1,6 @@
 # pepys: telemetry from sessions
 
-Let Claude sessions in imps send their OpenTelemetry logs to the ingest of
+Let Claude and Codex sessions in imps send their OpenTelemetry logs to the ingest of
 [pepys](../architecture/workloads/pepys.md), and rotate the token that ingest accepts.
 [Let sessions send telemetry](#let-sessions-send-telemetry) follows
 [the first deploy of pepys](./pepys.md#deploy-the-first-time), and runs once.
@@ -8,7 +8,7 @@ Let Claude sessions in imps send their OpenTelemetry logs to the ingest of
 
 ## The path and what holds the token
 
-A Claude session in an [imp](../architecture/host/imp.md) sends its OpenTelemetry logs to
+A Claude or Codex session in an [imp](../architecture/host/imp.md) sends its OpenTelemetry logs to
 `https://pepys.imp.internal`, a name that exists only inside impd's credential broker. impd runs in
 the Podman container `imp-host` on the machine `geoffcloud`. The broker adds the bearer token and an
 [imp identity token](../architecture/host/imp.md#how-impd-is-reached) to each request, and forwards
@@ -23,9 +23,14 @@ explains each hop.
 | impd, static secret `pepys-telemetry`           | the same token, which the broker adds only to requests for `pepys.imp.internal` |
 | the atc daemon's `pepys-telemetry` auth profile | the secret's name                                                               |
 
-The secret tells the broker to add the identity token as well. The auth profile sets the session's
-OpenTelemetry endpoint to `https://pepys.imp.internal`. `geoffcloud`'s NixOS configuration defines
-the profile and gives it to each Claude session, so no step here creates it.
+The secret tells the broker to add the identity token as well. The auth profile holds
+`telemetry.logs`, so atc points the log export of each session that selects the profile at
+`https://pepys.imp.internal`: Claude Code through four OpenTelemetry variables, and Codex through
+the `[otel]` section of its `config.toml`. `geoffcloud`'s NixOS configuration defines the profile
+and gives it to each agent, so no step here creates it. No agent entry or profile in that
+configuration sets `CLAUDE_CODE_ENABLE_TELEMETRY`, `OTEL_LOGS_EXPORTER`,
+`OTEL_EXPORTER_OTLP_PROTOCOL` or `OTEL_EXPORTER_OTLP_ENDPOINT`, because the daemon starts without an
+entry that sets one beside the profile.
 [The cloud daemon](../architecture/workloads/atc-gateway.md#the-cloud-daemon) covers the atc daemon
 and its auth profiles.
 
@@ -87,7 +92,8 @@ and its auth profiles.
    command when `atc-cloud` holds another list.
 
 7. Spawn a Claude session through the atc gateway, as
-   [the smoke spawn](./atc-gateway-smoke.md#run-the-smoke) does.
+   [the smoke spawn](./atc-gateway-smoke.md#run-the-smoke) does. To check Codex, spawn a session of
+   the `codex` agent the same way.
 8. Read ingest's log:
 
    ```sh
