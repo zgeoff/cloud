@@ -4,7 +4,7 @@
 # test-utils/build-stub-agent-image-bun.nix for the build script's run, and the stand-in sleep of
 # test-utils/build-stub-sleep.nix for its pauses, with 3 tries for impd. Each case runs on its own,
 # in a fresh directory, with its own origin, impd state, credentials and state directory, and the
-# script under env -i with a HOME and TMPDIR of its own, under scripts/test-utils/shell/run-cases.sh.
+# script under env -i with a HOME and TMPDIR of its own, under scripts/src/test-utils/shell/run-cases.sh.
 # Run: bun run test:nixos agent-image-build
 { nixpkgs, imp }:
 let

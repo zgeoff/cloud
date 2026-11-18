@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { requireFreeAgentImageNames } from './require-free-agent-image-names.ts';
-import { buildStubImp } from './test-utils/build-stub-imp.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubImp } from './src/test-utils/build-stub-imp.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 test('it passes names the imp host does not hold', async () => {
   const imp = buildStubImp({

@@ -14,9 +14,9 @@ set -euo pipefail
 # fixed, so the files the image reads through the read-only mount do not depend on the caller's
 # umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
 
 it_passes_the_bedrock_rule_pattern_in_secret_rules_json() {
   local image="$1" config="$2" status=0

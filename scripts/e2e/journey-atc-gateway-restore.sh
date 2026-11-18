@@ -10,26 +10,26 @@
 # starts a new gateway, which still knows the client. Each step needs the state the step
 # before it left, so the journey checks each step as it goes.
 #
-# The images come from scripts/test-utils/shell/with-fixture-images.sh, which builds them once
+# The images come from scripts/src/test-utils/shell/with-fixture-images.sh, which builds them once
 # per run under tags carrying a random per-run id, removes them after, and sets
 # FIXTURE_RUN, FIXTURE_GATEWAY_IMAGE and FIXTURE_BACKUP_IMAGE. The journey runs its own
 # containers on its own volumes, all named from that id, and removes them when it exits.
 # `bun run test:atc-gateway-fixture` runs it after the fixture tests; alone:
 #
-#   bash scripts/test-utils/shell/with-fixture-images.sh bash scripts/e2e/journey-atc-gateway-restore.sh
+#   bash scripts/src/test-utils/shell/with-fixture-images.sh bash scripts/e2e/journey-atc-gateway-restore.sh
 # shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
 # shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-utils/shell/start-gateway.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-utils/shell/wait-for-ready.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-utils/shell/run-backup.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-utils/shell/run-backup-shell.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-utils/shell/normalize-restic-output.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/start-gateway.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/wait-for-ready.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/run-backup.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/run-backup-shell.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/normalize-restic-output.sh"
 
 # A backup reads the live databases while the gateway runs; the restore goes into the
 # volume after the databases are wiped, and a new container finds the client again. The
@@ -128,8 +128,8 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # sets RESTIC_IMAGE, among the pins
 # shellcheck source=/dev/null
 source "$repo/images/atc-gateway/versions.env"
-: "${FIXTURE_RUN:?is unset: run this under scripts/test-utils/shell/with-fixture-images.sh}"
-: "${FIXTURE_GATEWAY_IMAGE:?is unset: run this under scripts/test-utils/shell/with-fixture-images.sh}"
-: "${FIXTURE_BACKUP_IMAGE:?is unset: run this under scripts/test-utils/shell/with-fixture-images.sh}"
+: "${FIXTURE_RUN:?is unset: run this under scripts/src/test-utils/shell/with-fixture-images.sh}"
+: "${FIXTURE_GATEWAY_IMAGE:?is unset: run this under scripts/src/test-utils/shell/with-fixture-images.sh}"
+: "${FIXTURE_BACKUP_IMAGE:?is unset: run this under scripts/src/test-utils/shell/with-fixture-images.sh}"
 # shellcheck disable=SC2153 # RESTIC_IMAGE comes from versions.env
 run_cases "$FIXTURE_GATEWAY_IMAGE" "$FIXTURE_BACKUP_IMAGE" "$RESTIC_IMAGE" "$FIXTURE_RUN"

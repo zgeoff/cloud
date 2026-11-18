@@ -2,9 +2,9 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { buildStubImp } from './src/test-utils/build-stub-imp.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 import { switchAgentImage } from './switch-agent-image.ts';
-import { buildStubImp } from './test-utils/build-stub-imp.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 
 async function setupTest() {
   const home = await mkdtemp(join(tmpdir(), 'switch-agent-image-'));

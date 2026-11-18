@@ -18,13 +18,13 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-utils/shell/wait-for.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-utils/shell/pick-port.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-utils/shell/has-metric.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-utils/shell/start-alloy.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-utils/shell/start-alertmanager.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-utils/shell/start-stub-discord-webhook.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/wait-for.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/pick-port.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/has-metric.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/start-alloy.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/start-alertmanager.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/start-stub-discord-webhook.sh"
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 prometheus_image='quay.io/prometheus/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e'

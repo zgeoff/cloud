@@ -17,10 +17,10 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/wait-for.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/has-metric.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/start-alloy.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/wait-for.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/has-metric.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/start-alloy.sh"
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 log_dir='shop_web-7f9c8d6b5-q4z2m_3b1f0c2e-5a7d-4c19-9e2b-0d6f8a1c4e73/web'

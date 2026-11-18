@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 import { installATCGatewayCredentials } from './install-atc-gateway-credentials.ts';
 import { readHostScript } from './read-host-script.ts';
-import { buildMockATCProfileSecrets } from './test-utils/build-mock-atc-profile-secrets.ts';
-import { buildMockCredentialsHostScenario } from './test-utils/build-mock-credentials-host-scenario.ts';
-import { buildStubCredentialTools } from './test-utils/build-stub-credential-tools.ts';
+import { buildMockATCProfileSecrets } from './src/test-utils/build-mock-atc-profile-secrets.ts';
+import { buildMockCredentialsHostScenario } from './src/test-utils/build-mock-credentials-host-scenario.ts';
+import { buildStubCredentialTools } from './src/test-utils/build-stub-credential-tools.ts';
 
 async function setupTest() {
   const out: string[] = [];

@@ -5,9 +5,9 @@ import { join } from 'node:path';
 import { resolveProgram } from '@zgeoff/rig/e2e';
 import { run, start } from '@zgeoff/testing/process';
 import { runProcess } from '../run-process.ts';
-import { createGitOrigin } from '../test-utils/create-git-origin.ts';
-import { createStubAgentImageCheck } from '../test-utils/create-stub-agent-image-check.ts';
-import { createStubImpCLI } from '../test-utils/create-stub-imp-cli.ts';
+import { createGitOrigin } from '../src/test-utils/create-git-origin.ts';
+import { createStubAgentImageCheck } from '../src/test-utils/create-stub-agent-image-check.ts';
+import { createStubImpCLI } from '../src/test-utils/create-stub-imp-cli.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'build-agent-image-'));

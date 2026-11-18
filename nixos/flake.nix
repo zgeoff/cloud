@@ -56,7 +56,7 @@
       # compares its firewall with the exposure registry (packages/topology/exposure.json), and
       # imp-pin compares the imp input's release with its imp-host image tag, and podman-network
       # compares its Podman default network with the topology. Every other
-      # check reads ../scripts/test-utils/shell (checks/test-utils/build-shell-lib-source.nix), so they
+      # check reads ../scripts/src/test-utils/shell (checks/test-utils/build-shell-lib-source.nix), so they
       # build only with the repo root as the flake's source (path:.?dir=nixos); the impd-restore
       # checks boot one VM each, from checks/test-utils/build-restore-rehearsal.nix, and need KVM.
       # impd-restore-reset tests that rehearsal's own reset. tank-cloud-unlock, tank-cloud-host-secrets

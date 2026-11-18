@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { getReleaseRecord } from '../test-utils/get-release-record.ts';
+import { getReleaseRecord } from '../src/test-utils/get-release-record.ts';
 import { collectPinValues } from './collect-pin-values.ts';
 
 test('it collects each pin line part by pin id and group', () => {

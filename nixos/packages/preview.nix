@@ -1,8 +1,9 @@
 # The preview service (packages/preview), run by nixpkgs' Bun from its TypeScript source, beside a
-# node_modules of its runtime dependencies. The test files, the MSW mocks and the stand-ins stay
-# out. The dependencies are the closure of the package's `dependencies` in the workspace's
-# bun.lock: each one's npm tarball, fetched at the locked version and checked against the lock's
-# sha512, and unpacked flat, so a version the lock nests under another package fails the build.
+# node_modules of its runtime dependencies. The test files and src/test-utils, which holds the MSW
+# mocks and the stand-ins, stay out. The dependencies are the closure of the package's
+# `dependencies` in the workspace's bun.lock: each one's npm tarball, fetched at the locked version
+# and checked against the lock's sha512, and unpacked flat, so a version the lock nests under
+# another package fails the build.
 {
   lib,
   bun,
@@ -17,12 +18,7 @@ let
     fileset =
       lib.fileset.difference
         (lib.fileset.fileFilter (file: file.hasExt "ts" && !(lib.hasSuffix ".test.ts" file.name)) root)
-        (
-          lib.fileset.unions [
-            (root + "/mocks")
-            (root + "/test-utils")
-          ]
-        );
+        (root + "/src/test-utils");
   };
 
   # bun.lock is JSON with trailing commas, which builtins.fromJSON refuses

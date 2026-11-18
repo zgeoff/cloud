@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for decide-nixos-checks.sh: against a real git repository in the case tree and a gh
-# stand-in (scripts/test-utils/shell/create-stub-gh.sh) that replays the green runs each case records,
+# stand-in (scripts/src/test-utils/shell/create-stub-gh.sh) that replays the green runs each case records,
 # as the lines the call's --jq filter prints ("<head sha> <run url>" per run), it writes
 # needed=true for a forced dispatch without asking gh, needed=false with the summary line for
 # a nightly run or a dispatch on a covered commit, needed=true for a nightly run on a commit no run
@@ -14,11 +14,11 @@
 set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-gh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/gh-nixos-pr-calls.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/gh-nixos-pr-calls.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-nixos-checks.sh"
 # the real bun, which each case links into its stand-ins' directory, because the script runs

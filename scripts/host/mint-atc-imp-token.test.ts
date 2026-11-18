@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildHostImpArgv } from '../imp-cli.ts';
 import { runProcess } from '../run-process.ts';
-import { createStubImpPodman } from '../test-utils/create-stub-imp-podman.ts';
+import { createStubImpPodman } from '../src/test-utils/create-stub-imp-podman.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'mint-atc-imp-token-'));

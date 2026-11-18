@@ -8,7 +8,7 @@
 #
 # What it assumes of op, which nixos/checks/test-utils-check.nix pins: install-imp-dns-token.sh
 # reads each value with exactly `op read --no-newline <reference>`. The error line follows the
-# text that 1Password users report for op 2, as scripts/test-utils/shell/create-stub-op-read.sh does; no
+# text that 1Password users report for op 2, as scripts/src/test-utils/shell/create-stub-op-read.sh does; no
 # real op runs in a test.
 { pkgs }:
 values:

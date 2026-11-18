@@ -7,10 +7,10 @@ import { join } from 'node:path';
 import { ExitError } from './exit-error.ts';
 import type { RunResult, Runner } from './run-process.ts';
 import { runProcess } from './run-process.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
+import { runGrandchildCommand } from './src/test-utils/run-grandchild-command.ts';
+import { waitForExit } from './src/test-utils/wait-for-exit.ts';
 import { subscribeToInterrupts } from './subscribe-to-interrupts.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
-import { runGrandchildCommand } from './test-utils/run-grandchild-command.ts';
-import { waitForExit } from './test-utils/wait-for-exit.ts';
 
 interface TestConfig {
   readonly run: Runner;

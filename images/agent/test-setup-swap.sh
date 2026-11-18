@@ -13,12 +13,12 @@
 set -euo pipefail
 umask 022
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/test-utils/shell/run-cases.sh
-source "$here/../../scripts/test-utils/shell/run-cases.sh"
-# shellcheck source=scripts/test-utils/shell/create-case-tree.sh
-source "$here/../../scripts/test-utils/shell/create-case-tree.sh"
-# shellcheck source=scripts/test-utils/shell/assert-status.sh
-source "$here/../../scripts/test-utils/shell/assert-status.sh"
+# shellcheck source=scripts/src/test-utils/shell/run-cases.sh
+source "$here/../../scripts/src/test-utils/shell/run-cases.sh"
+# shellcheck source=scripts/src/test-utils/shell/create-case-tree.sh
+source "$here/../../scripts/src/test-utils/shell/create-case-tree.sh"
+# shellcheck source=scripts/src/test-utils/shell/assert-status.sh
+source "$here/../../scripts/src/test-utils/shell/assert-status.sh"
 
 script="$here/sbin/setup-swap"
 

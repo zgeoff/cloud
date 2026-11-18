@@ -21,12 +21,12 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/assert-between.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-kubectl.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/wait-for.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-between.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-kubectl.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/wait-for.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/hold-prod-lock.sh"
 # the stored Lease with each time replaced by whether it has a Lease's MicroTime form

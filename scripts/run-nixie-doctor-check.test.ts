@@ -6,9 +6,9 @@ import { dirname, join } from 'node:path';
 import { findJSONField } from './find-json-field.ts';
 import { runNixieDoctorCheck } from './run-nixie-doctor-check.ts';
 import type { Runner } from './run-process.ts';
-import { buildStubKubectlToken } from './test-utils/build-stub-kubectl-token.ts';
-import { buildStubNixieContainer } from './test-utils/build-stub-nixie-container.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubKubectlToken } from './src/test-utils/build-stub-kubectl-token.ts';
+import { buildStubNixieContainer } from './src/test-utils/build-stub-nixie-container.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-nixie-doctor-check-'));

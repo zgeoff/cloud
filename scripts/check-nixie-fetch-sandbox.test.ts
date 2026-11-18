@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'bun:test';
 import { checkNixieFetchSandbox } from './check-nixie-fetch-sandbox.ts';
-import { buildStubGeoffcloud } from './test-utils/build-stub-geoffcloud.ts';
+import { buildStubGeoffcloud } from './src/test-utils/build-stub-geoffcloud.ts';
 
 test('it reads a public page from the sandbox, finds every internal address blocked, and removes the sandbox', async () => {
   const host = buildStubGeoffcloud({

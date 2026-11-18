@@ -3,7 +3,7 @@
 # email from 1Password, refuses values that do not look like either, and on the host writes
 # the token file and rewrites the env file, each atomically and mode 0400, keeping every
 # other env line. It touches no host and no 1Password vault: op and ssh are stand-ins from
-# scripts/test-utils/shell that log their argv as JSON lines, op reads the case's vault directory, and "the
+# scripts/src/test-utils/shell that log their argv as JSON lines, op reads the case's vault directory, and "the
 # host" is a directory in the case's tree, where the ssh stand-in runs the script's remote
 # command. Failures that real state can reach run on real state: a secrets directory the
 # script may not write, an env file that is not there, and ssh refused by a dead loopback
@@ -20,15 +20,15 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/assert-one-of-outputs.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-op-read.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-bash-ssh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-remote-tools.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/require-remote-tool-stubs.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/run-with-file-modes.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-one-of-outputs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-op-read.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-bash-ssh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-remote-tools.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/require-remote-tool-stubs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-with-file-modes.sh"
 
 it_installs_the_token_over_ssh_stdin_and_keeps_the_other_env_lines() {
   local status=0

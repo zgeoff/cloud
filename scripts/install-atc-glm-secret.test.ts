@@ -2,9 +2,9 @@ import { expect, test } from 'bun:test';
 import { installATCGLMSecret } from './install-atc-glm-secret.ts';
 import { loadATCCredentialsContext } from './load-atc-credentials-context.ts';
 import type { Runner } from './run-process.ts';
-import { buildMockCredentialsHostScenario } from './test-utils/build-mock-credentials-host-scenario.ts';
-import { buildMockImpSecret } from './test-utils/build-mock-imp-secret.ts';
-import { buildStubCredentialTools } from './test-utils/build-stub-credential-tools.ts';
+import { buildMockCredentialsHostScenario } from './src/test-utils/build-mock-credentials-host-scenario.ts';
+import { buildMockImpSecret } from './src/test-utils/build-mock-imp-secret.ts';
+import { buildStubCredentialTools } from './src/test-utils/build-stub-credential-tools.ts';
 
 interface SetupConfig {
   readonly run: Runner;

@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 import { installATCGitCloneToken } from './install-atc-git-clone-token.ts';
 import { readHostScript } from './read-host-script.ts';
-import { buildStubOp } from './test-utils/build-stub-op.ts';
-import type { StubAnswer, StubHandler } from './test-utils/build-stub-runner.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubOp } from './src/test-utils/build-stub-op.ts';
+import type { StubAnswer, StubHandler } from './src/test-utils/build-stub-runner.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 interface SetupConfig {
   // the host check's exit codes, one per call, in order

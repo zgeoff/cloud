@@ -6,9 +6,9 @@ import {
   loadHostImpJSON,
   loadImpJSON,
 } from './imp-cli.ts';
-import { buildMockCredentialsHostScenario } from './test-utils/build-mock-credentials-host-scenario.ts';
-import { buildStubCredentialsHost } from './test-utils/build-stub-credentials-host.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildMockCredentialsHostScenario } from './src/test-utils/build-mock-credentials-host-scenario.ts';
+import { buildStubCredentialsHost } from './src/test-utils/build-stub-credentials-host.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 test('#buildImpArgv puts imp’s CLI before the arguments', () => {
   expect(buildImpArgv(['image', 'rm', 'agent-abc1234'])).toStrictEqual([

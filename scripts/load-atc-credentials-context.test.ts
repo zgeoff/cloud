@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadATCCredentialsContext } from './load-atc-credentials-context.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'load-atc-credentials-context-'));

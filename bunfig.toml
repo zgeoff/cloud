@@ -70,7 +70,7 @@ minimumReleaseAgeExcludes = [
 preload = [
   "@zgeoff/bun-test-extended",
   "./infra/src/test-utils/pin-faker-seed.ts",
-  "./scripts/test-utils/register-mock-server.ts",
+  "./scripts/src/test-utils/register-mock-server.ts",
 ]
 # rig's ignore patterns replace this list in the unit run, so the ignore list in rig.config.ts names
 # these folders again

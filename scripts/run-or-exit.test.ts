@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { ExitError } from './exit-error.ts';
 import { runOrExit } from './run-or-exit.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 test('it returns the result of a command that succeeds and passes its stderr through', async () => {
   const stub = buildStubRunner(() => ({ stdout: 'listing\n', stderr: 'a warning\n' }));

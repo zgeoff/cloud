@@ -2,7 +2,7 @@
 # Test for check-hugetlb-pool.sh: it passes when the host reserved the whole hugetlb pool its system
 # configures and when the system configures none, and fails naming both counts when the pool is
 # short or a count is not a number. It stops with ssh's exit code when the host refuses the
-# connection. ssh is the NixOS host stand-in from scripts/test-utils/shell, which answers the pool query
+# connection. ssh is the NixOS host stand-in from scripts/src/test-utils/shell, which answers the pool query
 # from the case's STUB_HUGETLB_RESERVED and STUB_HUGETLB_CONFIGURED, and hands the refused case to
 # the real ssh on a dead loopback port. Each case runs the script under `env -i` and compares its
 # stdout, stderr and ssh call log.
@@ -12,12 +12,12 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-nixos-ssh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-remote-tools.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/require-remote-tool-stubs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-nixos-ssh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-remote-tools.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/require-remote-tool-stubs.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-hugetlb-pool.sh"
 # the one remote command the check runs, as the call log records it

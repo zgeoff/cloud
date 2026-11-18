@@ -2,7 +2,7 @@
 # Hermetic test for copy-impd-db.sh: it checks the label, then runs `copy-impd-db-host <label>`
 # on root@geoffcloud or the host IMPD_DB_HOST names, with nothing on ssh's stdin, and passes the
 # host's report and exit code through. It touches no host: ssh is a stand-in from
-# scripts/test-utils/shell that logs its argv as a JSON line and its stdin, and answers as the host
+# scripts/src/test-utils/shell that logs its argv as a JSON line and its stdin, and answers as the host
 # does without running the host's tool, which needs root, Podman and the imp-host container;
 # nixos/checks/impd-restore.nix runs that tool in the restore VM. One case hands ssh to the
 # real ssh, refused by a dead loopback port. Each case runs the script under `env -i` with
@@ -15,12 +15,12 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-impd-db-ssh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-remote-tools.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/require-remote-tool-stubs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-impd-db-ssh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-remote-tools.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/require-remote-tool-stubs.sh"
 
 it_sends_the_copy_to_geoffcloud_with_the_label_and_prints_the_hosts_report() {
   local status=0

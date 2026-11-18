@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { getReleaseRecord as getRecord } from '../test-utils/get-release-record.ts';
+import { getReleaseRecord as getRecord } from '../src/test-utils/get-release-record.ts';
 import { planPinEdits } from './plan-pin-edits.ts';
 
 test('it pins an atc release in the agent image, the daemon and the gateway', () => {

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { HttpResponse, http, passthrough } from 'msw';
-import { server } from './test-utils/node.ts';
+import { server } from './src/test-utils/node.ts';
 import { tryReadManifestDigest } from './try-read-manifest-digest.ts';
 
 test('it reads the digest a tag names, asking for an index or a manifest in either media type', async () => {

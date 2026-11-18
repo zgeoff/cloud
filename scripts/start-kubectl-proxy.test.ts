@@ -2,12 +2,17 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { join } from 'node:path';
 import { http, passthrough } from 'msw';
 import { spawnPiped } from './spawn-piped.ts';
+import { server } from './src/test-utils/node.ts';
 import { startKubectlProxy } from './start-kubectl-proxy.ts';
-import { server } from './test-utils/node.ts';
 
 test('it gives the URL that the proxy serves on', async () => {
   const started = await startKubectlProxy({
-    argv: ['bun', join(import.meta.dir, 'test-utils/run-stub-kubectl-proxy.ts'), '--mode', 'serve'],
+    argv: [
+      'bun',
+      join(import.meta.dir, 'src/test-utils/run-stub-kubectl-proxy.ts'),
+      '--mode',
+      'serve',
+    ],
     timeoutMs: 10_000,
     spawn: spawnPiped,
   });
@@ -31,7 +36,7 @@ test('it reports the error of a proxy that exits before it listens', async () =>
   const started = await startKubectlProxy({
     argv: [
       'bun',
-      join(import.meta.dir, 'test-utils/run-stub-kubectl-proxy.ts'),
+      join(import.meta.dir, 'src/test-utils/run-stub-kubectl-proxy.ts'),
       '--mode',
       'refuse',
       '--error',
@@ -50,7 +55,12 @@ test('it reports the error of a proxy that exits before it listens', async () =>
 
 test('it reports a proxy that prints no address in time', async () => {
   const started = await startKubectlProxy({
-    argv: ['bun', join(import.meta.dir, 'test-utils/run-stub-kubectl-proxy.ts'), '--mode', 'quiet'],
+    argv: [
+      'bun',
+      join(import.meta.dir, 'src/test-utils/run-stub-kubectl-proxy.ts'),
+      '--mode',
+      'quiet',
+    ],
     timeoutMs: 500,
     spawn: spawnPiped,
   });

@@ -21,10 +21,10 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/assert-equals.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/wait-for.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/assert-equals.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/wait-for.sh"
 
 it_serves_an_uploaded_PNG_inline_with_nosniff_and_the_sandbox_policy() {
   local image="$1" restic_image="$2" run="$3" port id

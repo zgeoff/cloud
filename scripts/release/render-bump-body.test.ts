@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { getReleaseRecord } from '../test-utils/get-release-record.ts';
+import { getReleaseRecord } from '../src/test-utils/get-release-record.ts';
 import { renderBumpBody } from './render-bump-body.ts';
 
 test('it says a bump that merges on its own does so once its checks pass', () => {

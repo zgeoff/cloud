@@ -3,7 +3,7 @@
 # caller's arguments and stdin, and passes the exit code through; `up` and `cancel-prod-lock`
 # first refuse while a Deploy prod run has not completed; --dry-run runs nothing. It touches no
 # host and no GitHub: ops.sh runs from a copy in the case tree, beside a stand-in for
-# switch-geoffcloud.sh, and gh, bun, op and ssh are stand-ins from scripts/test-utils/shell that log
+# switch-geoffcloud.sh, and gh, bun, op and ssh are stand-ins from scripts/src/test-utils/shell that log
 # their calls to one log. ssh runs a `bash -c` command in the case's host directory. Each case
 # runs ops.sh under `env -i` and compares its whole stdout, stderr and call log, with the case
 # tree's path masked, and its exact exit code. The last two cases read the real package.json and
@@ -15,14 +15,14 @@
 set -euo pipefail
 # fixed, so the modes the stand-ins get do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-gh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-bash-ssh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-scripted-command.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-remote-tools.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/require-remote-tool-stubs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-bash-ssh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-scripted-command.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-remote-tools.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/require-remote-tool-stubs.sh"
 
 it_switch_host_runs_switch_geoffcloud_with_its_flag_and_passes_its_failure_through() {
   local status=0

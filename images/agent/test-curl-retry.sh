@@ -3,7 +3,7 @@
 # takes: a transfer that stalls after its headers ends with curl's exit 28 and retries, rather than
 # holding the build until its timeout. Each case reads CURL_RETRY from the Dockerfile's ARG line and
 # runs the real curl with it, as a RUN step does, against the stalled download stand-in from
-# scripts/test-utils/shell. The case rewrites the values of the options' own --speed-time to 1 and
+# scripts/src/test-utils/shell. The case rewrites the values of the options' own --speed-time to 1 and
 # --retry to 1, so a stall ends in 1 s and the case waits for one retry rather than five. It adds no
 # option, because curl gives --speed-limit a default of 1 byte a second whenever --speed-time is
 # set, so an added --speed-time would end the stall without the Dockerfile's options. It runs curl
@@ -16,14 +16,14 @@
 set -euo pipefail
 umask 022
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/test-utils/shell/run-cases.sh
-source "$here/../../scripts/test-utils/shell/run-cases.sh"
-# shellcheck source=scripts/test-utils/shell/create-case-tree.sh
-source "$here/../../scripts/test-utils/shell/create-case-tree.sh"
-# shellcheck source=scripts/test-utils/shell/assert-status.sh
-source "$here/../../scripts/test-utils/shell/assert-status.sh"
-# shellcheck source=scripts/test-utils/shell/start-stub-stalled-download.sh
-source "$here/../../scripts/test-utils/shell/start-stub-stalled-download.sh"
+# shellcheck source=scripts/src/test-utils/shell/run-cases.sh
+source "$here/../../scripts/src/test-utils/shell/run-cases.sh"
+# shellcheck source=scripts/src/test-utils/shell/create-case-tree.sh
+source "$here/../../scripts/src/test-utils/shell/create-case-tree.sh"
+# shellcheck source=scripts/src/test-utils/shell/assert-status.sh
+source "$here/../../scripts/src/test-utils/shell/assert-status.sh"
+# shellcheck source=scripts/src/test-utils/shell/start-stub-stalled-download.sh
+source "$here/../../scripts/src/test-utils/shell/start-stub-stalled-download.sh"
 
 dockerfile="$here/Dockerfile"
 

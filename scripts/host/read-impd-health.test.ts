@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runProcess } from '../run-process.ts';
-import { startStubImpd } from '../test-utils/start-stub-impd.ts';
+import { startStubImpd } from '../src/test-utils/start-stub-impd.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'read-impd-health-'));

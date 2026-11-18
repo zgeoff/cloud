@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { loadATCCredentialsContext } from './load-atc-credentials-context.ts';
 import { runOp } from './run-op.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 test('it runs op with the service account token in its environment and the stdin it gets', async () => {
   const stub = buildStubRunner(() => ({ stdout: '{"id":"fixture-item-id"}\n' }));

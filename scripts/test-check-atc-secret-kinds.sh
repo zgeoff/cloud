@@ -2,12 +2,12 @@
 # Test for check-atc-secret-kinds.sh: it passes an impd whose stored secret kinds the atc pin
 # accepts, and refuses an impd that stores a kind atc lacks, naming each such kind. It refuses a
 # pin without a release version, a missing pin file, a source file without its kind list, and
-# stops on a failed source read with gh's exit code. gh is the stand-in from scripts/test-utils/shell,
+# stops on a failed source read with gh's exit code. gh is the stand-in from scripts/src/test-utils/shell,
 # which replays the answer each case records to the read of impd's secret-schema.ts and atc's
 # credential-broker.ts. Each case writes its own configuration.nix and atc.nix in the case tree,
 # runs the script under `env -i`, and compares its stdout, stderr and gh call log.
 #
-# The recordings in scripts/test-utils/shell/gh-recordings hold zgeoff/impz's
+# The recordings in scripts/src/test-utils/shell/gh-recordings hold zgeoff/impz's
 # packages/api/src/schemas/secret-schema.ts at v4.2.4 (five kinds) and v5.0.0 (`static` and
 # `oauth`), and zgeoff/atc's packages/plugin-api/src/credential-broker.ts at @zgeoff/atc@7.3.0
 # (without `static`) and @zgeoff/atc@7.3.1 (with it), read 2026-10-26.
@@ -17,13 +17,13 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-atc-secret-kinds.sh"
-recordings="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/gh-recordings" && pwd)"
+recordings="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/gh-recordings" && pwd)"
 digest=sha256:3b8e1f0c6a4d2e9f7b5c3a1d0e8f6b4c2a0d9e7f5b3c1a8d6e4f2b0c9a7d5e3f
 
 # setup_test <tree>: the home and temp folders the cases run with, and the gh stand-in, which

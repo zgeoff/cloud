@@ -4,7 +4,7 @@
 # whose folder holds no rootfs.ext4 or whose digest names no folder. The records take the shape of
 # impd's ImageSchema, with invented ids and digests in the forms that zgeoff/impz's guest-build.ts
 # (`imp-build-<hex>`) and template-service.ts (`imp-<uuid>`) write at v4.2.4 and v5.0.0. It stops with podman's exit code when imp-host is gone. ssh is
-# the NixOS host stand-in from scripts/test-utils/shell, which answers the image listing and the folder
+# the NixOS host stand-in from scripts/src/test-utils/shell, which answers the image listing and the folder
 # listing from the case's STUB_IMPD_IMAGES and STUB_IMPD_IMAGE_DIRS. Each case runs the script
 # under `env -i` and compares its stdout, stderr and ssh call log.
 #
@@ -13,12 +13,12 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-nixos-ssh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-remote-tools.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/require-remote-tool-stubs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-nixos-ssh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-remote-tools.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/require-remote-tool-stubs.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-impd-image-dirs.sh"
 # the two remote commands the check runs, as the call log records them

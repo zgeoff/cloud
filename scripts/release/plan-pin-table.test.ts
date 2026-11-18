@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { getReleaseRecord } from '../test-utils/get-release-record.ts';
+import { getReleaseRecord } from '../src/test-utils/get-release-record.ts';
 import { collectPinFiles } from './collect-pin-files.ts';
 import { planPinTable } from './plan-pin-table.ts';
 import { releaseRegistry } from './release-registry.ts';

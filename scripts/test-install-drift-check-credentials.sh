@@ -2,7 +2,7 @@
 # Hermetic test for install-drift-check-credentials.sh: it reads the drift check's nine values
 # from 1Password, refuses an empty value or one with a line break, and on the host writes the
 # credentials file atomically, mode 0400, in a directory of mode 0700 that it creates. It touches
-# no host and no 1Password vault: op and ssh are stand-ins from scripts/test-utils/shell that log their
+# no host and no 1Password vault: op and ssh are stand-ins from scripts/src/test-utils/shell that log their
 # argv as JSON lines, op reads the case's vault directory, and "the host" is a directory in the
 # case's tree, where the ssh stand-in runs the script's remote command. Failures that real state
 # can reach run on real state: a directory that is not a mount point and ssh refused by a dead
@@ -15,13 +15,13 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-op-read.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-bash-ssh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-remote-tools.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/require-remote-tool-stubs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-op-read.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-bash-ssh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-remote-tools.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/require-remote-tool-stubs.sh"
 
 it_installs_the_credentials_over_ssh_stdin_in_a_directory_it_creates() {
   local status=0

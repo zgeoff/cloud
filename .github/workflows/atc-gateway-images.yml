@@ -21,7 +21,7 @@ on:
       - infra/cluster/build-atc-gateway-spec.ts
       - infra/cluster/create-atc-gateway-backup-job.ts
       - infra/cluster/build-atc-gateway-backup-pod-spec.ts
-      - scripts/test-utils/shell/**
+      - scripts/src/test-utils/shell/**
       - .github/workflows/atc-gateway-images.yml
   workflow_dispatch:
     inputs:

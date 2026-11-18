@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
-import { buildStubReleaseDocker } from '../test-utils/build-stub-release-docker.ts';
-import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
-import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
-import { getReleaseRecord } from '../test-utils/get-release-record.ts';
-import { server } from '../test-utils/node.ts';
+import { buildStubReleaseDocker } from '../src/test-utils/build-stub-release-docker.ts';
+import { buildStubReleaseGH } from '../src/test-utils/build-stub-release-gh.ts';
+import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
+import { getReleaseRecord } from '../src/test-utils/get-release-record.ts';
+import { server } from '../src/test-utils/node.ts';
 import { readReleaseValues } from './read-release-values.ts';
 
 test('it reads an atc release SHA256SUMS for a sums source', async () => {

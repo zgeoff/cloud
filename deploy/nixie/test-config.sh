@@ -19,9 +19,9 @@
 # shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/assert-status.sh"
 
 cleanup='docker rm -f "$name" > /dev/null 2>&1 || true'
 

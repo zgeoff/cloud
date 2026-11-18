@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'bun:test';
-import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
-import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
-import { createCloudCheckout } from '../test-utils/create-cloud-checkout.ts';
+import { buildStubReleaseGH } from '../src/test-utils/build-stub-release-gh.ts';
+import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
+import { createCloudCheckout } from '../src/test-utils/create-cloud-checkout.ts';
 import { runReleasePin } from './run-release-pin.ts';
 
 function setupTest() {

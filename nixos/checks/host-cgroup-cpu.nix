@@ -3,7 +3,7 @@
 # sandbox against a cgroup tree that the case writes, since the sandbox has no /sys. One case
 # serves the written file through a real node-exporter's textfile collector on loopback. Each case
 # runs on its own, in a fresh directory, with its own tree and textfile directory, and the script
-# under env -i with a HOME and TMPDIR of its own, under scripts/test-utils/shell/run-cases.sh.
+# under env -i with a HOME and TMPDIR of its own, under scripts/src/test-utils/shell/run-cases.sh.
 # checks/host-cgroup-cpu-vm.nix runs the service against a real cgroup tree.
 # Run: bun run test:nixos host-cgroup-cpu
 { nixpkgs, imp }:

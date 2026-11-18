@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { checkGatewayHost } from './check-gateway-host.ts';
-import { buildStubReadinessHost } from './test-utils/build-stub-readiness-host.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubReadinessHost } from './src/test-utils/build-stub-readiness-host.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 test('it passes a Ready node with enough memory and a ready tunnel', async () => {
   const stub = buildStubRunner(

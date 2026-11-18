@@ -2,10 +2,10 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildMockGHCheckRun } from '../test-utils/build-mock-gh-check-run.ts';
-import { buildMockGHPRView } from '../test-utils/build-mock-gh-pr-view.ts';
-import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
-import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
+import { buildMockGHCheckRun } from '../src/test-utils/build-mock-gh-check-run.ts';
+import { buildMockGHPRView } from '../src/test-utils/build-mock-gh-pr-view.ts';
+import { buildStubReleaseGH } from '../src/test-utils/build-stub-release-gh.ts';
+import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
 import { runReleaseBumpMerge } from './run-release-bump-merge.ts';
 
 async function setupTest() {

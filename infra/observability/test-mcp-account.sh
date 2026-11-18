@@ -13,11 +13,11 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/wait-for.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/assert-equals.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/pick-port.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/wait-for.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/assert-equals.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/pick-port.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/create-case-tree.sh"
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 grafana_image='docker.io/grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572'

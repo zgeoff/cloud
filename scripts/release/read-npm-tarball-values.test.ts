@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
-import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
-import { getReleaseRecord } from '../test-utils/get-release-record.ts';
-import { server } from '../test-utils/node.ts';
+import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
+import { getReleaseRecord } from '../src/test-utils/get-release-record.ts';
+import { server } from '../src/test-utils/node.ts';
 import { readNPMTarballValues } from './read-npm-tarball-values.ts';
 
 test('it fails without a tarball read when npm lacks the version', async () => {

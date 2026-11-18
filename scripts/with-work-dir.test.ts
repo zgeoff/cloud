@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 import { withWorkDir } from './with-work-dir.ts';
 
 test('it runs the body in a fresh directory under the temp directory and removes it after', async () => {

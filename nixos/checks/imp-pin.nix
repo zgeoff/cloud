@@ -2,7 +2,7 @@
 # lib/collect-imp-pin-mismatches.nix, and fails with every mismatch, so a bump of the module
 # without the image, or of the image without the module, fails here instead of reaching the host.
 # The release is the version in the pinned imp source's package.json. The cases first test the
-# comparison, each on its own pair, in a fresh directory, under scripts/test-utils/shell/run-cases.sh.
+# comparison, each on its own pair, in a fresh directory, under scripts/src/test-utils/shell/run-cases.sh.
 # Run: bun run test:nixos imp-pin
 {
   nixpkgs,

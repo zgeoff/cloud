@@ -1,10 +1,10 @@
 import { expect, mock, test } from 'bun:test';
-import { buildRealProgramHandler } from '../test-utils/build-real-program-handler.ts';
-import { buildStubReleaseDocker } from '../test-utils/build-stub-release-docker.ts';
-import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
-import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
-import { createCloudCheckout } from '../test-utils/create-cloud-checkout.ts';
-import { createRestoreJobFiles } from '../test-utils/create-restore-job-files.ts';
+import { buildRealProgramHandler } from '../src/test-utils/build-real-program-handler.ts';
+import { buildStubReleaseDocker } from '../src/test-utils/build-stub-release-docker.ts';
+import { buildStubReleaseGH } from '../src/test-utils/build-stub-release-gh.ts';
+import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
+import { createCloudCheckout } from '../src/test-utils/create-cloud-checkout.ts';
+import { createRestoreJobFiles } from '../src/test-utils/create-restore-job-files.ts';
 import { runPublishedImagesBump } from './run-published-images-bump.ts';
 
 function setupTest() {

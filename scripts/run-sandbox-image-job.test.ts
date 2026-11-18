@@ -3,9 +3,9 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runSandboxImageJob } from './run-sandbox-image-job.ts';
-import { buildStubClock } from './test-utils/build-stub-clock.ts';
-import { buildStubKubectlJob } from './test-utils/build-stub-kubectl-job.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubClock } from './src/test-utils/build-stub-clock.ts';
+import { buildStubKubectlJob } from './src/test-utils/build-stub-kubectl-job.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 async function setupTest() {
   const tempRoot = await mkdtemp(join(tmpdir(), 'sandbox-image-job-'));

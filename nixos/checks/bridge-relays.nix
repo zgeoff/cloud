@@ -2,7 +2,7 @@
 # flake's pinned imp input), and checks the socket and the services each relay adds, the ports they
 # admit in inet cloud_host and open on imp-host's bridge, and the assertion of each. Each case evaluates
 # its own config through test-utils/build-module-system.nix and runs on its own, in a fresh
-# directory, under scripts/test-utils/shell/run-cases.sh, which reports each case and fails the check
+# directory, under scripts/src/test-utils/shell/run-cases.sh, which reports each case and fails the check
 # when any case fails.
 # Run: bun run test:nixos bridge-relays
 { nixpkgs, imp }:

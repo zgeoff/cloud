@@ -21,7 +21,7 @@
 # /dev/kvm (or KVM_DEVICE, which the script's own test sets) is readable and writable, the script
 # builds every other check it was asked for and then fails, naming those checks. Each such check itself fails if QEMU still falls
 # back to emulation. A container for each check evaluates it to its derivation, and one more
-# builds those derivations from the store. The checks read scripts/test-utils/shell beside nixos/, so
+# builds those derivations from the store. The checks read scripts/src/test-utils/shell beside nixos/, so
 # the evaluation's flake source is the repo root (path:.?dir=nixos), not nixos/ alone. The source
 # is a snapshot of the working tree's tracked and unignored files, so a local edit is tested before
 # it is committed and nothing ignored, such as node_modules or .worktrees, is copied. The Docker
