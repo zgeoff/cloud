@@ -322,12 +322,16 @@ in
     # the budget kept for nixie's sandboxes, which serve people waiting on a turn: the most nixie
     # has run at once is 6, a conversation (512 MiB) and five of at most 512 MiB each. impd keeps
     # it in the whole budget and in the pool, where the pool's other 3072 MiB hold one imp of fixed
-    # memory at impd's default 2048 MiB, such as an image build
+    # memory at impd's default 2048 MiB
     settings.IMP_PRIORITY_RAM_MIB = 3072;
     settings.IMP_PRIORITY_IMPS = "nixie-*";
     # none of it kept in the ordinary-page budget: nixie's sandboxes run on the pool, and a kept
     # 3072 MiB there would only take room from the elastic agent imps
     settings.IMP_PRIORITY_ORDINARY_RAM_MIB = 0;
+    # image builders boot elastic on ordinary pages, off the pool: 1024 MiB at boot, growing to
+    # 2048 MiB, which fits the 14336 MiB of the budget past the pool. impd admits a builder at its max
+    settings.IMP_BUILD_MEMORY_MIB = 1024;
+    settings.IMP_BUILD_MAX_MEMORY_MIB = 2048;
     # the name of this impd in each imp identity token that its broker signs. A service stores the
     # name beside the imp it names, so a change orphans those rows, and no other impd may use it.
     # An impd older than 6.12.0 does not read the setting

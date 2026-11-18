@@ -82,6 +82,19 @@ let
       '';
     }
     {
+      title = "it boots impd's image builders elastic, at 1024 MiB and growing to 2048 MiB";
+      script = ''
+        assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
+        settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
+        grep -E '^IMP_BUILD_(MAX_)?MEMORY_MIB=' "$settings" | sort > actual
+
+        assert_files_equal - actual <<'EOF'
+        IMP_BUILD_MAX_MEMORY_MIB=2048
+        IMP_BUILD_MEMORY_MIB=1024
+        EOF
+      '';
+    }
+    {
       title = "it names impd geoffcloud as the issuer of its imp identity tokens";
       script = ''
         assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
