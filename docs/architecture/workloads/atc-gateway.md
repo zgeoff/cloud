@@ -165,13 +165,17 @@ falls back to running a session on the host itself.
 
 The target boots each imp from the [agent image](../../runbooks/agent-image.md), and the session
 hooks run the image's own atc while it matches the daemon's release, so a spawn uploads no binary.
-When the image ships another release, the daemon copies its own binary into each new imp. The daemon
-offers Claude and Codex. A Claude session signs in through impd's credential broker with the same
-profiles as the home-pc daemon's `cloud` target: the Claude subscription, GitHub, Linear's MCP
-server and 1Password Connect. The cloud daemon adds the `pepys-telemetry` profile to every entry, so
-each Claude and Codex session sends its OpenTelemetry logs to pepys ingest through the broker
-([the telemetry path](./pepys.md#the-telemetry-path-from-a-session)). The profiles name impd's
-secrets, never their values, so a renamed or added profile changes the daemons' configs. The
+When the image ships another release, the daemon copies its own binary into each new imp. The target
+sets `rebindChangedAuth`, so a session made before a change to its agent's profiles moves to the new
+profiles at its next revive or restore. atc still refuses when the change withdraws a grant the imp
+holds, or when the imp also runs a session of another agent.
+
+The daemon offers Claude and Codex. A Claude session signs in through impd's credential broker with
+the same profiles as the home-pc daemon's `cloud` target: the Claude subscription, GitHub, Linear's
+MCP server and 1Password Connect. The cloud daemon adds the `pepys-telemetry` profile to every
+entry, so each Claude and Codex session sends its OpenTelemetry logs to pepys ingest through the
+broker ([the telemetry path](./pepys.md#the-telemetry-path-from-a-session)). The profiles name
+impd's secrets, never their values, so a renamed or added profile changes the daemons' configs. The
 daemon's impd token lists each of those secrets as grantable, so the token, not the config, bounds
 what a session can reach. impd ties each entry of that list to the secret it named, so a secret made
 again under the same name needs a new grantable list on each daemon's token. A Codex session signs
