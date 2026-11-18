@@ -838,19 +838,19 @@ in
             output = 15;
           };
         };
-        kimi-k3-1-pro = openrouter "moonshotai/kimi-k3.1-pro" "alibaba" {
+        kimi-k3-1-pro = openrouter "moonshotai/kimi-k3.1-pro" "fireworks" {
           input = 2;
           cache_write = 2;
           cache_write_1h = 2;
           cached_input = 0.2;
           output = 10;
         };
-        glm-5-3 = openrouter "z-ai/glm-5.3" "novita/fp8" {
-          input = 0.63;
-          cache_write = 0.63;
-          cache_write_1h = 0.63;
-          cached_input = 0.117;
-          output = 1.98;
+        glm-5-3 = openrouter "z-ai/glm-5.3" "tenstorrent/fp8" {
+          input = 0.6;
+          cache_write = 0.6;
+          cache_write_1h = 0.6;
+          cached_input = 0.1;
+          output = 2.5;
         };
         grok-4-7 = openrouter "x-ai/grok-4.7" "xai" {
           input = 2.2;
@@ -888,12 +888,12 @@ in
           cached_input = 0.03;
           output = 1;
         };
-        deepseek-v4-1-flash = openrouter "deepseek/deepseek-v4.1-flash-1017" "deepinfra/fp8" {
-          input = 0.147;
-          cache_write = 0.147;
-          cache_write_1h = 0.147;
-          cached_input = 0.00441;
-          output = 0.441;
+        deepseek-v4-1-flash = openrouter "deepseek/deepseek-v4.1-flash-1017" "nebius/fp8" {
+          input = 0.12;
+          cache_write = 0.12;
+          cache_write_1h = 0.12;
+          cached_input = 0.0024;
+          output = 0.48;
         };
         gpt-6-2-astra = openrouter "openai/gpt-6.2-astra" "openai" {
           input = 8;
