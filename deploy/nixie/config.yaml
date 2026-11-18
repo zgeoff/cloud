@@ -13,10 +13,10 @@ server:
 models:
   profiles:
     # A profile's ID names its model and, when a role needs another effort, that effort. Each profile
-    # needs its own model secret in impd, whose name hashes the ID (docs/runbooks/nixie.md). A
-    # selectable model's profile needs prices, in dollars per million tokens, from the Claude API
-    # pricing page. Each profile names its harness, the loop that runs its turns, with no default;
-    # agent-sdk is the only harness nixie runs.
+    # needs its own model secret in impd, whose name hashes the ID and the base URL's host
+    # (docs/runbooks/nixie.md). A selectable model's profile needs prices, in dollars per million
+    # tokens, from the Claude API pricing page for a Claude model. Each profile names its harness,
+    # the loop that runs its turns, with no default; agent-sdk is the only harness nixie runs.
     #
     # the conversation's profile, also selectable for a task
     fable-5-2:
@@ -112,6 +112,218 @@ models:
       effort: medium
       harness: agent-sdk
       prices: { input: 10, cache_write: 12.5, cache_write_1h: 20, cached_input: 0.25, output: 50 }
+    # Models outside Claude, through OpenRouter's Messages endpoint. The model gateway's route of
+    # each profile sends to https://openrouter.ai/api, since nixie refuses a base URL with a path
+    # while spendStop is set. Each profile's model secret holds the OpenRouter key from vault cloud,
+    # item nixie-openrouter-credential, for the host openrouter.ai (docs/runbooks/nixie.md).
+    # OpenRouter sends a request to any of a model's providers, and they bill at different prices,
+    # so each price is the highest of the model's endpoints on https://openrouter.ai/models (read
+    # 17 Nov 2026): a count never falls below the bill. A provider that lists no cache write price
+    # bills cache writes as input. The cap of 200,000 tokens is the window the Claude CLI assumes for
+    # a model outside its catalog. gryphe/mythomax-l2-13b stays out: its 8,192-token window is below
+    # the 100,000-token floor of context_tokens, and it has no tool calls.
+    gemini-4-carbon:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: google/gemini-4-carbon
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices: { input: 3.6, cache_write: 3.6, cache_write_1h: 3.6, cached_input: 0.18, output: 18 }
+    gpt-6-1-sol:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: openai/gpt-6.1-sol
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices:
+        input: 12
+        cache_write: 15
+        cache_write_1h: 15
+        cached_input: 0.6
+        output: 60
+        long_prompt:
+          over_tokens: 272000
+          input: 24
+          cache_write: 30
+          cache_write_1h: 30
+          cached_input: 1.2
+          output: 90
+    kimi-k3-1-pro:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: moonshotai/kimi-k3.1-pro
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices: { input: 4, cache_write: 4, cache_write_1h: 4, cached_input: 0.27, output: 20 }
+    glm-5-3:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: z-ai/glm-5.3
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices: { input: 2.1, cache_write: 2.1, cache_write_1h: 2.1, cached_input: 0.4, output: 6.6 }
+    grok-4-7:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: x-ai/grok-4.7
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices:
+        input: 4
+        cache_write: 4
+        cache_write_1h: 4
+        cached_input: 1
+        output: 12
+        long_prompt:
+          over_tokens: 200000
+          input: 8
+          cache_write: 8
+          cache_write_1h: 8
+          cached_input: 2
+          output: 24
+    qwen4-max:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: qwen/qwen4-max
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices:
+        {
+          input: 1.425,
+          cache_write: 1.78125,
+          cache_write_1h: 1.78125,
+          cached_input: 0.07125,
+          output: 4.275,
+        }
+    mistral-large-4:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: mistralai/mistral-large-4-0
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices:
+        { input: 0.77, cache_write: 0.77, cache_write_1h: 0.77, cached_input: 0.077, output: 2.31 }
+    inkling-2-small:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: thinkingmachines/inkling-2-small
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices: { input: 0.3, cache_write: 0.3, cache_write_1h: 0.3, cached_input: 0.06, output: 1 }
+    deepseek-v4-1-flash:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: deepseek/deepseek-v4.1-flash-1017
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices: { input: 0.6, cache_write: 0.6, cache_write_1h: 0.6, cached_input: 0.03, output: 2.4 }
+    gpt-6-astra:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: openai/gpt-6-astra
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices:
+        input: 60
+        cache_write: 75
+        cache_write_1h: 75
+        cached_input: 6
+        output: 300
+        long_prompt:
+          over_tokens: 272000
+          input: 120
+          cache_write: 150
+          cache_write_1h: 150
+          cached_input: 12
+          output: 450
+    gemini-4-hydrogen:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: google/gemini-4-hydrogen
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices:
+        { input: 2.7, cache_write: 2.7, cache_write_1h: 2.7, cached_input: 0.135, output: 13.5 }
+    muse-wonder:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: meta/muse-wonder
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices: { input: 4, cache_write: 4, cache_write_1h: 4, cached_input: 0.2, output: 20 }
+    hy4:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: tencent/hy4
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices:
+        {
+          input: 0.417,
+          cache_write: 0.417,
+          cache_write_1h: 0.417,
+          cached_input: 0.021,
+          output: 1.2505,
+        }
+    pareto-26-10:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: unbiased/pareto-26.10
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices: { input: 0.8, cache_write: 0.8, cache_write_1h: 0.8, cached_input: 0.03, output: 3.2 }
+    aion-3-5:
+      base_url: https://openrouter.ai
+      credential: deployment:openrouter
+      auth_header: bearer
+      model: aion-labs/aion-3.5
+      effort: medium
+      harness: agent-sdk
+      outside_claude: true
+      context_tokens: 200000
+      prices: { input: 3, cache_write: 3, cache_write_1h: 3, cached_input: 0.75, output: 6 }
   roles:
     conversation: fable-5-2
     checker: sonnet-5-5-high
@@ -149,14 +361,90 @@ models:
     fable-5-1:
       profile: fable-5-1
       description:
-        Claude Fable 5.1, released August 2026. The Fable before 5.2, and the most expensive model
-        here. Talk with it to hear how the earlier Fable sees something.
+        Claude Fable 5.1, released August 2026. The Fable before 5.2, and one of the most expensive
+        models here. Talk with it to hear how the earlier Fable sees something.
     fable-5-2:
       profile: fable-5-2
       description:
-        Claude Fable 5.2, released November 2026. Anthropic's newest Fable, and the second most
-        expensive model here. For a hard question, or a conversation that deserves the deepest
+        Claude Fable 5.2, released November 2026. Anthropic's newest Fable, and one of the most
+        expensive models here. For a hard question, or a conversation that deserves the deepest
         thought.
+    gemini-4-carbon:
+      profile: gemini-4-carbon
+      description:
+        Google's Gemini 4 Carbon, released November 2026, through OpenRouter. A frontier Gemini for
+        coding, agentic work and complex reasoning.
+    gpt-6-1-sol:
+      profile: gpt-6-1-sol
+      description:
+        OpenAI's GPT-6.1 Sol, released September 2026, through OpenRouter. The tier below GPT-6
+        Astra, suited to agentic coding and document-heavy professional work.
+    kimi-k3-1-pro:
+      profile: kimi-k3-1-pro
+      description:
+        Moonshot AI's Kimi K3.1 Pro, released October 2026, through OpenRouter. An open-weight
+        reasoning model built for long-horizon coding.
+    glm-5-3:
+      profile: glm-5-3
+      description:
+        Z.ai's GLM-5.3, released August 2026, through OpenRouter. A large reasoning model for
+        complex software engineering and long agent tasks.
+    grok-4-7:
+      profile: grok-4-7
+      description:
+        SpaceXAI's Grok 4.7, released September 2026, through OpenRouter. A flagship for coding and
+        knowledge work, strong at long software tasks and checking its own work.
+    qwen4-max:
+      profile: qwen4-max
+      description:
+        Alibaba's Qwen4 Max, released November 2026, through OpenRouter. The flagship of the Qwen4
+        series, with reasoning on by default.
+    mistral-large-4:
+      profile: mistral-large-4
+      description:
+        Mistral AI's Mistral Large 4, released October 2026, through OpenRouter. A frontier model
+        for reasoning, coding and agentic work.
+    inkling-2-small:
+      profile: inkling-2-small
+      description:
+        Thinking Machines Lab's Inkling 2 Small, released November 2026, through OpenRouter. A
+        small, cheap open-weight reasoning model.
+    deepseek-v4-1-flash:
+      profile: deepseek-v4-1-flash
+      description:
+        DeepSeek V4.1 Flash, the 17 October 2026 snapshot, through OpenRouter. A fast, almost free
+        mixture-of-experts model.
+    gpt-6-astra:
+      profile: gpt-6-astra
+      description:
+        OpenAI's GPT-6 Astra, released September 2026, through OpenRouter. OpenAI's flagship for
+        demanding analysis, software engineering and deep research, and the most expensive model
+        here.
+    gemini-4-hydrogen:
+      profile: gemini-4-hydrogen
+      description:
+        Google's Gemini 4 Hydrogen, released November 2026, through OpenRouter. The quicker, cheaper
+        Gemini 4 for agentic work and coding.
+    muse-wonder:
+      profile: muse-wonder
+      description:
+        Meta's Muse Wonder, released October 2026, through OpenRouter. A frontier reasoning model
+        for complex personal and professional tasks.
+    hy4:
+      profile: hy4
+      description:
+        Tencent's Hy4, released November 2026, through OpenRouter. Strong at agentic, long-horizon
+        productivity tasks.
+    pareto-26-10:
+      profile: pareto-26-10
+      description:
+        Unbiased's Pareto 26.10, released October 2026, through OpenRouter. A composite model for
+        research, coding and agentic work.
+    aion-3-5:
+      profile: aion-3-5
+      description:
+        AionLabs' Aion 3.5, released September 2026, through OpenRouter. A roleplay and storytelling
+        system built on GLM, for fiction and character voices.
   # a started task's dollar limits; nixie's defaults are $2 and $10, which Fable 5.1 spends in a few
   # turns. The turn limits keep nixie's defaults of 25 and 100
   limits:

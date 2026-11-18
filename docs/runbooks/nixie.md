@@ -16,7 +16,8 @@ secret the file ever held. Never print a decrypted value, and never put one on a
 | vault `cloud`, item `nixie-age-host`                 | the age identity that the pod holds; its public half is in `deploy/nixie/.sops.yaml`                                                                  |
 | vault `cloud`, item `nixie-age-recovery`             | the age identity that stays off the host; restores need only it                                                                                       |
 | vault `cloud`, item `nixie-deployment-key`           | the deployment key, 32 random bytes in base64                                                                                                         |
-| vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind every model profile; impd's model secrets hold copies of it                                                             |
+| vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind every profile on `api.anthropic.com`; impd's model secrets hold copies of it                                            |
+| vault `cloud`, item `nixie-openrouter-credential`    | the OpenRouter key behind every profile on `openrouter.ai`; impd's model secrets hold copies of it                                                    |
 | vault `cloud`, item `nixie-definitions-deploy-key`   | git-sync's read-only deploy key for `zgeoff/nixie-definitions`                                                                                        |
 | vault `nixie`, item `nixie-definitions-export-token` | the token nixie opens skill pull requests in `zgeoff/nixie-definitions` with                                                                          |
 | vault `nixie`, item `nixie-prod-read-token`          | the API token that nixie answers only read procedures for; `config.yaml` lists its SHA-256                                                            |
@@ -48,9 +49,10 @@ journal.
 ## Add nixie's model secrets to impd
 
 nixie reaches its models through impd's broker, which adds the model credential to each request a
-sandbox sends to `api.anthropic.com`, and sends the request to the
-[model gateway](./model-gateway.md) in place of that host. impd keeps one model secret for each
-profile that `config.yaml` lists, under the name that
+sandbox sends to a profile's model host, `api.anthropic.com` or `openrouter.ai`, and sends the
+request to the [model gateway](./model-gateway.md) in place of that host. Each host has its own
+credential in vault `cloud`. impd keeps one model secret for each profile that `config.yaml` lists,
+under the name that
 [nixie's names in impd](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/impd-names.md#model-secrets)
 defines. nixie derives the name from the profile, the header and the host, never from the
 credential, so the name stays the same when the credential changes. nixie's token cannot add a
@@ -58,23 +60,34 @@ secret, so `host_imp` adds each one as impd's root user inside imp-host.
 
 Before the first deploy, and after a profile joins `config.yaml`, add the model secrets:
 
-1. Set the names, one per line in `secret_names` for the loops, and comma-separated in `secrets` for
-   [nixie's token](#mint-nixies-impd-token):
+1. Set each secret's name, host and credential item, one secret per line in `model_secrets`; the
+   names, one per line in `secret_names` for the loops; and the names comma-separated in `secrets`
+   for [nixie's token](#mint-nixies-impd-token):
 
    ```bash
-   secret_names=$(bun -e 'const c = Bun.YAML.parse(await Bun.file("deploy/nixie/config.yaml").text()); for (const id of Object.keys(c.models.profiles)) console.log(id)' \
-     | while IFS= read -r profile; do
-         printf '%s\nbearer\napi.anthropic.com' "$profile" | sha256sum | cut -c1-19 | sed 's/^/nixie-model-/'
+   model_secrets=$(bun -e 'const c = Bun.YAML.parse(await Bun.file("deploy/nixie/config.yaml").text()); for (const [id, p] of Object.entries(c.models.profiles)) console.log(id, p.auth_header, new URL(p.base_url).hostname)' \
+     | while read -r profile header host; do
+         case "$host" in
+           api.anthropic.com) item=nixie-model-credential ;;
+           openrouter.ai) item=nixie-openrouter-credential ;;
+           *) echo "no credential item for $host" >&2; continue ;;
+         esac
+         printf '%s\n%s\n%s' "$profile" "$header" "$host" | sha256sum | cut -c1-19 \
+           | sed "s/^/nixie-model-/; s/\$/ $host $item/"
        done)
+   secret_names=$(printf '%s\n' "$model_secrets" | cut -d' ' -f1)
    secrets=$(printf '%s\n' "$secret_names" | paste -sd, -)
    ```
+
+   Expect no `no credential item` line. A profile on another host needs its own item, and a case for
+   it here.
 
 2. Add each secret that impd lacks:
 
    ```bash
-   printf '%s\n' "$secret_names" | while IFS= read -r secret; do
-     op read op://cloud/nixie-model-credential/credential | tr -d '\n' | host_imp secret add "$secret" \
-       --kind static --hosts api.anthropic.com --header authorization --scheme bearer \
+   printf '%s\n' "$model_secrets" | while read -r secret host item; do
+     op read "op://cloud/$item/credential" | tr -d '\n' | host_imp secret add "$secret" \
+       --kind static --hosts "$host" --header authorization --scheme bearer \
        --upstream http://10.88.0.1:8789
    done
    ```
@@ -89,15 +102,17 @@ Before the first deploy, and after a profile joins `config.yaml`, add the model 
    host_imp secret ls < /dev/null | grep '^nixie-model-'
    ```
 
-   Expect each name with `api.anthropic.com -> http://10.88.0.1:8789`. When a profile lacks its
-   secret, nixie cannot create the sandbox that uses the profile, and the `imp_host` part of nixie's
-   `/health/ready` reports unready.
+   Expect each name with its host, `api.anthropic.com` or `openrouter.ai`, then
+   `-> http://10.88.0.1:8789`. When a profile lacks its secret, nixie cannot create the sandbox that
+   uses the profile, and the `imp_host` part of nixie's `/health/ready` reports unready.
 
 ## Rotate the model credential
 
 nixie's secrets file holds no model credential, so a rotation replaces each model secret's value in
 impd under the same name. The names, nixie's token and every grant stay as they are, and the
-rotation needs no PR, no deploy and no restart.
+rotation needs no PR, no deploy and no restart. The steps below rotate the Claude setup token. To
+rotate the OpenRouter key, run them with the item `nixie-openrouter-credential` and the host
+`openrouter.ai` in place of `nixie-model-credential` and `api.anthropic.com`.
 
 **CAUTION:** A wrong value fails every model call of production nixie until the next replace.
 Compare digests before the replace. Never send a test turn to production nixie, because the turn
@@ -123,11 +138,11 @@ writes into its real memory.
 4. Set the names with step 1 of
    [Add nixie's model secrets to impd](#add-nixies-model-secrets-to-impd).
 
-5. Replace each secret's value. The kind, the host, the header and the upstream stay the same, so
-   each grant stays valid:
+5. Replace the value of each secret on `api.anthropic.com`. The kind, the host, the header and the
+   upstream stay the same, so each grant stays valid:
 
    ```bash
-   printf '%s\n' "$secret_names" | while IFS= read -r secret; do
+   printf '%s\n' "$model_secrets" | awk '$2 == "api.anthropic.com" { print $1 }' | while IFS= read -r secret; do
      op read op://cloud/nixie-model-credential/credential | tr -d '\n' | host_imp secret add "$secret" \
        --kind static --hosts api.anthropic.com --header authorization --scheme bearer \
        --upstream http://10.88.0.1:8789 --replace

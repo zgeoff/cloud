@@ -131,15 +131,15 @@ it, so the token's list is set again after it
 **CAUTION:** Model calls fail from the rebind until the new pod grants its sandboxes again, about a
 minute. Run this when no task works, and never send a test turn to production nixie.
 
-1. Set the helpers and `secret_names` and `secrets`, as
+1. Set the helpers and `model_secrets` and `secrets`, as
    [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) step 1 does.
 2. Write the rebind as a function, to run at the right moment:
 
    ```bash
    rebind_model_secrets() { # $1: the upstream, or empty for none
-     printf '%s\n' "$secret_names" | while IFS= read -r secret; do
-       op read op://cloud/nixie-model-credential/credential | tr -d '\n' | host_imp secret add "$secret" \
-         --kind static --hosts api.anthropic.com --header authorization --scheme bearer \
+     printf '%s\n' "$model_secrets" | while read -r secret host item; do
+       op read "op://cloud/$item/credential" | tr -d '\n' | host_imp secret add "$secret" \
+         --kind static --hosts "$host" --header authorization --scheme bearer \
          ${1:+--upstream "$1"} --replace --rebind
      done
      host_imp token set nixie --grantable "$secrets" < /dev/null
@@ -160,8 +160,8 @@ minute. Run this when no task works, and never send a test turn to production ni
 5. When `nixie-0` shows `Terminating`, run `rebind_model_secrets http://10.88.0.1:8789`. Expect a
    table row for each secret, then the token's row.
 6. Check, once the new pod is ready:
-   - `host_imp secret ls < /dev/null | grep '^nixie-model-'` shows each secret with
-     `api.anthropic.com -> http://10.88.0.1:8789`;
+   - `host_imp secret ls < /dev/null | grep '^nixie-model-'` shows each secret with its host, then
+     `-> http://10.88.0.1:8789`;
    - [the status](#read-the-status) shows the limits nixie set and `"tripped": null`;
    - nixie's log holds no `spend.stop_tripped` and no `spend.limits_unsent` after its first poll;
    - the status's `spent` rises as nixie works.
@@ -217,6 +217,26 @@ they differ. Rotate both in one window:
 3. Set nixie's copy, as [change a secret](./nixie.md#change-a-secret) does for the key
    `["settings"]["gateway-control"]`, and merge its PR. nixie stays paused as `unreachable` from
    step 2 until its new pod starts, and the stop clears on its own.
+
+## Add a model profile
+
+The gateway sends a request only on a route whose ID equals the profile's ID, and prices it with the
+route's table. A profile with no route gets a 404 on every call.
+
+1. In one PR, add the profile to `deploy/nixie/config.yaml` and a route to `services.model-gateway`,
+   with the same ID, model and prices. A model outside Claude goes through OpenRouter: its base URL
+   is `https://openrouter.ai`, with no path, and its route's upstream is
+   `https://openrouter.ai/api`.
+2. Before the merge, add the profile's model secret and set nixie's token, as
+   [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) describes.
+3. After the merge, switch the host with `bun run ops:switch-host`, so the gateway has the route,
+   then dispatch the held `Deploy prod` run for the config. The new config restarts the unit, and a
+   reply still open past its stop wait sets the lost mark, so switch while no task works.
+
+**CAUTION:** A successful reply whose usage the gateway cannot read sets the lost mark, which stops
+every model call of nixie. Before you add a model from a new provider, send it one plain and one
+streamed request through a local gateway on the release binary, and check that the store's count
+rose and holds no `lost`.
 
 ## Failures
 

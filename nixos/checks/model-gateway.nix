@@ -342,7 +342,7 @@ let
         '';
     }
     {
-      title = "it renders the geoffcloud config with the nixie zone, the caps, a loopback control listener and a route at list prices per nixie profile";
+      title = "it renders the geoffcloud config with the nixie zone, the caps, a loopback control listener and a priced route per nixie profile";
       script =
         let
           fable52 = {
@@ -399,6 +399,11 @@ let
             inherit model prices;
             upstream = "https://api.anthropic.com";
           };
+          # the highest price of each model's OpenRouter endpoints, as the host config gives it
+          openrouterRoute = model: prices: {
+            inherit model prices;
+            upstream = "https://openrouter.ai/api";
+          };
         in
         ''
           jq -S . > expected <<'EOF'
@@ -438,6 +443,135 @@ let
               sonnet-5-5-high = route "claude-sonnet-5-5" sonnet55;
               haiku-5-5 = route "claude-haiku-5-5" haiku55;
               haiku-5-5-low = route "claude-haiku-5-5" haiku55;
+              gemini-4-carbon = openrouterRoute "google/gemini-4-carbon" {
+                input = 3.6;
+                cache_write = 3.6;
+                cache_write_1h = 3.6;
+                cached_input = 0.18;
+                output = 18;
+              };
+              gpt-6-1-sol = openrouterRoute "openai/gpt-6.1-sol" {
+                input = 12;
+                cache_write = 15;
+                cache_write_1h = 15;
+                cached_input = 0.6;
+                output = 60;
+                long_prompt = {
+                  over_tokens = 272000;
+                  input = 24;
+                  cache_write = 30;
+                  cache_write_1h = 30;
+                  cached_input = 1.2;
+                  output = 90;
+                };
+              };
+              kimi-k3-1-pro = openrouterRoute "moonshotai/kimi-k3.1-pro" {
+                input = 4;
+                cache_write = 4;
+                cache_write_1h = 4;
+                cached_input = 0.27;
+                output = 20;
+              };
+              glm-5-3 = openrouterRoute "z-ai/glm-5.3" {
+                input = 2.1;
+                cache_write = 2.1;
+                cache_write_1h = 2.1;
+                cached_input = 0.4;
+                output = 6.6;
+              };
+              grok-4-7 = openrouterRoute "x-ai/grok-4.7" {
+                input = 4;
+                cache_write = 4;
+                cache_write_1h = 4;
+                cached_input = 1;
+                output = 12;
+                long_prompt = {
+                  over_tokens = 200000;
+                  input = 8;
+                  cache_write = 8;
+                  cache_write_1h = 8;
+                  cached_input = 2;
+                  output = 24;
+                };
+              };
+              qwen4-max = openrouterRoute "qwen/qwen4-max" {
+                input = 1.425;
+                cache_write = 1.78125;
+                cache_write_1h = 1.78125;
+                cached_input = 0.07125;
+                output = 4.275;
+              };
+              mistral-large-4 = openrouterRoute "mistralai/mistral-large-4-0" {
+                input = 0.77;
+                cache_write = 0.77;
+                cache_write_1h = 0.77;
+                cached_input = 0.077;
+                output = 2.31;
+              };
+              inkling-2-small = openrouterRoute "thinkingmachines/inkling-2-small" {
+                input = 0.3;
+                cache_write = 0.3;
+                cache_write_1h = 0.3;
+                cached_input = 0.06;
+                output = 1;
+              };
+              deepseek-v4-1-flash = openrouterRoute "deepseek/deepseek-v4.1-flash-1017" {
+                input = 0.6;
+                cache_write = 0.6;
+                cache_write_1h = 0.6;
+                cached_input = 0.03;
+                output = 2.4;
+              };
+              gpt-6-astra = openrouterRoute "openai/gpt-6-astra" {
+                input = 60;
+                cache_write = 75;
+                cache_write_1h = 75;
+                cached_input = 6;
+                output = 300;
+                long_prompt = {
+                  over_tokens = 272000;
+                  input = 120;
+                  cache_write = 150;
+                  cache_write_1h = 150;
+                  cached_input = 12;
+                  output = 450;
+                };
+              };
+              gemini-4-hydrogen = openrouterRoute "google/gemini-4-hydrogen" {
+                input = 2.7;
+                cache_write = 2.7;
+                cache_write_1h = 2.7;
+                cached_input = 0.135;
+                output = 13.5;
+              };
+              muse-wonder = openrouterRoute "meta/muse-wonder" {
+                input = 4;
+                cache_write = 4;
+                cache_write_1h = 4;
+                cached_input = 0.2;
+                output = 20;
+              };
+              hy4 = openrouterRoute "tencent/hy4" {
+                input = 0.417;
+                cache_write = 0.417;
+                cache_write_1h = 0.417;
+                cached_input = 0.021;
+                output = 1.2505;
+              };
+              pareto-26-10 = openrouterRoute "unbiased/pareto-26.10" {
+                input = 0.8;
+                cache_write = 0.8;
+                cache_write_1h = 0.8;
+                cached_input = 0.03;
+                output = 3.2;
+              };
+              aion-3-5 = openrouterRoute "aion-labs/aion-3.5" {
+                input = 3;
+                cache_write = 3;
+                cache_write_1h = 3;
+                cached_input = 0.75;
+                output = 6;
+              };
             };
           }}
           EOF
