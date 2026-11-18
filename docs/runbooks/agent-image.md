@@ -38,7 +38,7 @@ creates `~/.codex`).
 | `/usr/local/bin/chromium`             | the Chrome start script that `BUN_CHROME_PATH` names      |
 | `/etc/imp/services.d/overcommit.json` | the boot service that sets `vm.overcommit_memory=1`       |
 | `/etc/imp/services.d/swap.json`       | the boot service that runs `/usr/local/sbin/setup-swap`   |
-| `/etc/claude-code/managed-settings.d` | the SessionStart hook that installs a checkout's packages |
+| `/etc/claude-code/managed-settings.d` | the SessionStart package install, and auto memory off     |
 
 Each image is named `agent-<short sha>`, after the zgeoff/cloud commit on `main` it builds from. So
 each build gets a new imp image name, and the image that ran before stays on the host for a

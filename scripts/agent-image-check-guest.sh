@@ -271,6 +271,53 @@ if [[ "$(jq -c '[.hooks.SessionStart[].hooks[] | [.type, .command]]' "$session_s
 else
   fail session-start "$session_start is missing or does not run /usr/local/sbin/install-checkout-packages"
 fi
+# the managed setting that turns Claude Code's auto memory off for every session
+auto_memory=/etc/claude-code/managed-settings.d/disable-auto-memory.json
+if [[ "$(jq -c .autoMemoryEnabled "$auto_memory" 2> /dev/null)" == false ]]; then
+  pass auto-memory-file "$auto_memory"
+else
+  fail auto-memory-file "$auto_memory is missing or does not set autoMemoryEnabled to false"
+fi
+# and that claude applies it: `claude -p` sends a stand-in Messages API on loopback a system prompt
+# with no auto-memory section. The stand-in records each request body and answers 400, so no model
+# runs. The run gets its own HOME, so the login-state check and the secret scan never see its files.
+memory_dir=$(mktemp -d)
+mkdir "$memory_dir/home" "$memory_dir/work"
+# shellcheck disable=SC2016 # the script is Bun's, so bash expands nothing in it
+bun -e '
+  const dir = process.argv[1];
+  let count = 0;
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    async fetch(request) {
+      await Bun.write(`${dir}/request-${count++}`, await request.text());
+      const error = { type: "invalid_request_error", message: "stand-in" };
+      return Response.json({ type: "error", error }, { status: 400 });
+    },
+  });
+  await Bun.write(`${dir}/port`, String(server.port));
+' "$memory_dir" &
+stand_in=$!
+for _ in $(seq 100); do
+  [[ -s "$memory_dir/port" ]] && break
+  sleep 0.1
+done
+(cd "$memory_dir/work" &&
+  env -u CLAUDE_CODE_DISABLE_AUTO_MEMORY HOME="$memory_dir/home" CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
+    ANTHROPIC_BASE_URL="http://127.0.0.1:$(cat "$memory_dir/port" 2> /dev/null)" ANTHROPIC_API_KEY=stand-in \
+    timeout 120 claude -p hi --max-turns 1 > /dev/null 2>&1)
+kill "$stand_in" 2> /dev/null
+wait "$stand_in" 2> /dev/null
+# Claude Code's auto-memory section opens with this sentence
+if ! grep -qs '"system"' "$memory_dir"/request-*; then
+  fail auto-memory "claude -p sent the stand-in API no request with a system prompt"
+elif grep -qs 'You have a persistent file-based memory' "$memory_dir"/request-*; then
+  fail auto-memory "claude -p's system prompt offers auto memory"
+else
+  pass auto-memory "claude -p's system prompt offers no auto memory"
+fi
+rm -rf "$memory_dir"
 if [[ "${DISABLE_UPDATES:-}" == 1 ]]; then
   pass DISABLE_UPDATES "1"
 else

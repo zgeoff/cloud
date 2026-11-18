@@ -213,6 +213,11 @@ COPY sbin/install-checkout-packages /usr/local/sbin/install-checkout-packages
 COPY claude-code/managed-settings.d/install-checkout-packages.json \
      /etc/claude-code/managed-settings.d/install-checkout-packages.json
 
+# Auto memory off for every session: a session writes nothing to Claude Code's own memory folder,
+# and its system prompt offers no memory. Managed settings sit above every other settings level.
+COPY claude-code/managed-settings.d/disable-auto-memory.json \
+     /etc/claude-code/managed-settings.d/disable-auto-memory.json
+
 # Go from the GitHub release of actions/go-versions, because the host's path to
 # go.dev's download CDN can run at tens of KB/s. That release repacks go.dev's
 # linux-amd64 tarball without its go/ folder and adds the Actions installer
