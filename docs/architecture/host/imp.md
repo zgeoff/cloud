@@ -66,24 +66,24 @@ make room
 ([imp's priority imps](https://github.com/zgeoff/impz/blob/main/docs/architecture/lifecycle/ram-governor.md#priority-imps)).
 The host's `configuration.nix` sets the kept size beside the sandboxes it covers. impd keeps that
 memory in the whole budget and in the huge page pool, where the sandboxes run, and keeps none in the
-budget past the pool, so the elastic dev imps can use all of that part.
+budget past the pool, so the elastic agent imps can use all of that part.
 
 impd runs every imp of fixed memory on huge pages, and restores and wakes it through a page handler
 ([imp's huge pages](https://github.com/zgeoff/impz/blob/main/docs/architecture/lifecycle/huge-pages.md)).
 A guest on huge pages takes one fault on the host where a guest on base pages takes 512, which is
 most of a template restore's time on this nested host. An elastic imp runs on base pages: the dev
-imps are elastic.
+imps and the harness imps are elastic.
 
 The host reserves a fixed huge page pool early in boot, and the kernel makes no huge page past it.
 `configuration.nix` sets the pool's size apart from impd's memory budget, and the budget is larger
-than the pool. impd gives guests on base pages only the budget less the pool, so the dev imps run in
-that part of the budget. A switch that lowers the pool frees its unused pages on the running host,
-with no reboot. Each page in the pool is lost to the host's ordinary memory while the pool holds it,
-whether imps use it or not. Firecracker maps the pool without a reservation, so a guest that faults
-past an empty pool dies of SIGBUS. impd admits a boot or a wake only into free pool pages, and a
-pool made on demand would fail when memory fragments, so the pool is fixed. A fixed-memory imp whose
-snapshot is on base pages wakes there when that part of the budget has room, and otherwise boots
-cold onto the pool.
+than the pool. impd gives guests on base pages only the budget less the pool, so the agent imps run
+in that part of the budget. A switch that lowers the pool frees its unused pages on the running
+host, with no reboot. Each page in the pool is lost to the host's ordinary memory while the pool
+holds it, whether imps use it or not. Firecracker maps the pool without a reservation, so a guest
+that faults past an empty pool dies of SIGBUS. impd admits a boot or a wake only into free pool
+pages, and a pool made on demand would fail when memory fragments, so the pool is fixed. A
+fixed-memory imp whose snapshot is on base pages wakes there when that part of the budget has room,
+and otherwise boots cold onto the pool.
 
 The imps yield CPU to the cluster rather than hold a cap. Rootful Podman starts its containers,
 imp-host the only one, in `machine.slice`, whose CPU weight of 10 sits below the weight of
