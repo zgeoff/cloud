@@ -51,16 +51,16 @@ gives the design of the sets, the receipts and the two repositories.
 
 ## Back up now
 
-A manual run publishes a set only when a staged set waits in the `backup` folder. nixie stages the
-next scheduled set one interval after the last one it staged, so at the prod interval of 1440 the
-next set can be up to a day away, and a second run soon after the first uploads nothing. The newest
-uploaded set is then the restore point; `nixie health` reports its age as `newest_set_age_seconds`.
+A run uploads only the sets that wait in the `backup` folder. `nixie stage-backup` asks the running
+nixie to stage a set of its current data at once, so a run right after it ships that data off the
+host. Run it before a deploy whose release adds a migration. The newest uploaded set is the restore
+point; `nixie health` reports its age as `newest_set_age_seconds`.
 
 nixie also copies `nixie.db` to `nixie-schema-<version>.db` on its volume before it runs a
 migration, so an upgrade keeps a restore point from the moment it migrates. That copy never leaves
 the volume.
 
-1. Start a run:
+1. Ship any set that already waits, because nixie stages no other set while one does. Start a run:
 
    ```bash
    job=nixie-backup-manual-$(date +%s)
@@ -76,21 +76,29 @@ the volume.
    ```
 
    Expect one `"event":"backup.set_published"` line for each set the run uploads, with the set's
-   `sequence`, and no `backup.set_failed` line. Note the highest `sequence`, or 0 when no set
-   waited.
+   `sequence`, and no `backup.set_failed` line. A run with no set waiting prints no such line.
 
-3. To upload the current data too, wait for the next scheduled set. List the `backup` folder until a
-   set folder named with a higher sequence than step 2's holds `complete`. nixie writes that set one
-   interval after the last set it staged:
+3. Stage a set now:
 
    ```bash
-   ssh root@geoffcloud k3s kubectl -n nixie exec nixie-0 -c nixie -- ls -R /data/backup
+   ssh root@geoffcloud k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie stage-backup
    ```
 
-   Expect a folder such as `000000000042`, with `complete`, `keys.db`, `manifest.json` and
-   `nixie.db` in it.
+   Expect `nixie staged backup set <sequence> (<kind>); the backup job's next run ships it`, and
+   exit 0. The command exits 1 with one of these reasons, and stages nothing:
+
+   | Reason                                                                                                                | Fix                                                     |
+   | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+   | `a backup set waits for the backup job, so nixie stages no other set`                                                 | run steps 1 and 2, then step 3 again                    |
+   | `nixie has not started its backups yet; try again in a moment`                                                        | nixie has just started: run step 3 again after a minute |
+   | `backups are off in nixie's configuration, so nixie stages no set`                                                    | set `backup` in `deploy/nixie/config.yaml`              |
+   | `` nixie is paused after a restore and stages no backup set until you read `nixie recovery` and run `nixie resume` `` | read `nixie recovery`, then run `nixie resume`          |
 
 4. Run steps 1 and 2 again. Expect a `backup.set_published` line with the sequence of step 3.
+
+The data repository keeps one snapshot per hour of the last 24 hours, so when steps 1 and 4 both
+upload a set within one clock hour, step 4's run forgets the older set's data snapshot. The newer
+set holds the current data, so nothing is lost.
 
 ## Read the repositories from a workstation
 
