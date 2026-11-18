@@ -51,5 +51,12 @@ export function buildMockATCProfileSecrets(): Record<string, unknown>[] {
         ],
       }),
     },
+    {
+      ...buildMockImpSecret({
+        name: 'codex-chatgpt',
+        kind: 'oauth',
+        rules: [{ host: 'chatgpt.com', header: 'authorization', scheme: 'bearer' }],
+      }),
+    },
   ];
 }
