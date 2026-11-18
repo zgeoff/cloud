@@ -135,10 +135,10 @@ The workflow merges a pull request labelled `auto-merge` only when the release c
 and wrote every commit on it, it changes no file outside its dependency's pins, and every GitHub
 Actions check on its head has passed. The merge workflow's own check runs do not count: a run that
 the label starts puts its check run on the head while it decides. A commit anyone else pushes to the
-branch therefore holds the pull request for a person. CI's `checks` job must also have passed,
-because it holds every check, the agent image check and the fixtures included, and it can register
-its check run after the label event. The merge uses the app's token, so the push to `main` starts
-its workflows.
+branch therefore holds the pull request for a person. CI's `pr / checks` check must also have
+passed, because it holds every check, the agent image check and the fixtures included, and it can
+register its check run after the label event. The merge uses the app's token, so the push to `main`
+starts its workflows.
 
 ## Review a bump
 

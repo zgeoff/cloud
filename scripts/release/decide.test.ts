@@ -21,7 +21,7 @@ test('it merges a green atc bump at its head', () => {
       },
     ],
     checkRuns: [
-      { workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
       { workflow: 'release bump merge', name: 'merge', status: 'COMPLETED', conclusion: 'SKIPPED' },
     ],
   });
@@ -50,7 +50,9 @@ test('it merges an imp bump that no nixos checks run covers', () => {
         authorLogins: ['cloud-release-check[bot]'],
       },
     ],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
   });
 
   expect(
@@ -71,7 +73,9 @@ test('it merges a nixie bump once CI passed', () => {
         authorLogins: ['cloud-release-check[bot]'],
       },
     ],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
   });
 
   expect(
@@ -96,7 +100,9 @@ test('it merges a gateway image bump once CI passed', () => {
         authorLogins: ['cloud-release-check[bot]'],
       },
     ],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
   });
 
   expect(
@@ -129,7 +135,9 @@ test('it holds a gateway image bump that changes the image pins file', () => {
         authorLogins: ['cloud-release-check[bot]'],
       },
     ],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
   });
 
   expect(
@@ -159,7 +167,7 @@ test('it merges an auto-mode bump that changes only the agent image', () => {
       },
     ],
     checkRuns: [
-      { workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
       { workflow: 'release bump merge', name: 'merge', status: 'COMPLETED', conclusion: 'NEUTRAL' },
     ],
   });
@@ -182,7 +190,9 @@ test('it holds a bump that does not update the pin table', () => {
         authorLogins: ['cloud-release-check[bot]'],
       },
     ],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
   });
 
   expect(
@@ -225,7 +235,9 @@ test('it holds a pull request that another author opened', () => {
         authorLogins: ['cloud-release-check[bot]'],
       },
     ],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
   });
 
   expect(
@@ -250,7 +262,9 @@ test('it holds a pull request from another repository', () => {
         authorLogins: ['cloud-release-check[bot]'],
       },
     ],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
   });
 
   expect(
@@ -278,7 +292,9 @@ test('it holds a pull request with a commit that another author pushed', () => {
         authorLogins: ['cloud-release-check[bot]', 'someone'],
       },
     ],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
   });
 
   expect(
@@ -297,7 +313,9 @@ test('it holds a pull request without a commit', () => {
     labels: ['update:patch', 'auto-merge'],
     files: ['images/agent/Dockerfile', 'scripts/release/release-pins.json'],
     commits: [],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
   });
 
   expect(
@@ -321,7 +339,9 @@ test('it holds a pull request labelled needs-review beside auto-merge', () => {
         authorLogins: ['cloud-release-check[bot]'],
       },
     ],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
   });
 
   expect(
@@ -345,7 +365,9 @@ test('it holds a pull request without the auto-merge label', () => {
         authorLogins: ['cloud-release-check[bot]'],
       },
     ],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
   });
 
   expect(
@@ -369,7 +391,9 @@ test('it holds an auto-mode bump that changes a file outside the agent image', (
         authorLogins: ['cloud-release-check[bot]'],
       },
     ],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
   });
 
   expect(
@@ -393,7 +417,9 @@ test('it names every file outside the pins in sorted order', () => {
         authorLogins: ['cloud-release-check[bot]'],
       },
     ],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
   });
 
   expect(
@@ -419,14 +445,14 @@ test('it holds a pull request while a check is pending', () => {
       },
     ],
     checkRuns: [
-      { workflow: 'CI', name: 'checks', status: 'IN_PROGRESS', conclusion: null },
+      { workflow: 'CI', name: 'pr / checks', status: 'IN_PROGRESS', conclusion: null },
       { workflow: 'CI', name: 'auto-merge', status: 'QUEUED', conclusion: null },
     ],
   });
 
   expect(
     decide({ branch: 'release-check/atc', appLogin: 'app/cloud-release-check', pr }),
-  ).toStrictEqual({ action: 'hold', number: 7, reason: 'waiting for checks, auto-merge' });
+  ).toStrictEqual({ action: 'hold', number: 7, reason: 'waiting for pr / checks, auto-merge' });
 });
 
 test('it holds a pull request whose check failed and names it', () => {
@@ -441,12 +467,14 @@ test('it holds a pull request whose check failed and names it', () => {
         authorLogins: ['cloud-release-check[bot]'],
       },
     ],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'FAILURE' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'FAILURE' },
+    ],
   });
 
   expect(
     decide({ branch: 'release-check/atc', appLogin: 'app/cloud-release-check', pr }),
-  ).toStrictEqual({ action: 'hold', number: 7, reason: 'checks (FAILURE) did not pass' });
+  ).toStrictEqual({ action: 'hold', number: 7, reason: 'pr / checks (FAILURE) did not pass' });
 });
 
 test('it waits for checks before CI registers its check', () => {
@@ -466,7 +494,7 @@ test('it waits for checks before CI registers its check', () => {
 
   expect(
     decide({ branch: 'release-check/nixie', appLogin: 'app/cloud-release-check', pr }),
-  ).toStrictEqual({ action: 'hold', number: 7, reason: 'waiting for checks (CI)' });
+  ).toStrictEqual({ action: 'hold', number: 7, reason: 'waiting for pr / checks (CI)' });
 });
 
 test('it waits for a required check that was skipped', () => {
@@ -481,12 +509,14 @@ test('it waits for a required check that was skipped', () => {
         authorLogins: ['cloud-release-check[bot]'],
       },
     ],
-    checkRuns: [{ workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SKIPPED' }],
+    checkRuns: [
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SKIPPED' },
+    ],
   });
 
   expect(
     decide({ branch: 'release-check/nixie', appLogin: 'app/cloud-release-check', pr }),
-  ).toStrictEqual({ action: 'hold', number: 7, reason: 'waiting for checks (CI)' });
+  ).toStrictEqual({ action: 'hold', number: 7, reason: 'waiting for pr / checks (CI)' });
 });
 
 test('it holds a bump that changes nixos/ while the NixOS checks run after CI passed', () => {
@@ -507,7 +537,7 @@ test('it holds a bump that changes nixos/ while the NixOS checks run after CI pa
       },
     ],
     checkRuns: [
-      { workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
       { workflow: 'NixOS checks', name: 'nixos', status: 'IN_PROGRESS', conclusion: null },
       { workflow: 'release bump merge', name: 'merge', status: 'IN_PROGRESS', conclusion: null },
     ],
@@ -536,7 +566,7 @@ test('it holds a bump that changes nixos/ while CI runs after the NixOS checks p
       },
     ],
     checkRuns: [
-      { workflow: 'CI', name: 'checks', status: 'IN_PROGRESS', conclusion: null },
+      { workflow: 'CI', name: 'pr / checks', status: 'IN_PROGRESS', conclusion: null },
       { workflow: 'NixOS checks', name: 'nixos', status: 'COMPLETED', conclusion: 'SUCCESS' },
       { workflow: 'release bump merge', name: 'merge', status: 'IN_PROGRESS', conclusion: null },
     ],
@@ -544,7 +574,7 @@ test('it holds a bump that changes nixos/ while CI runs after the NixOS checks p
 
   expect(
     decide({ branch: 'release-check/atc', appLogin: 'app/cloud-release-check', pr }),
-  ).toStrictEqual({ action: 'hold', number: 12, reason: 'waiting for checks' });
+  ).toStrictEqual({ action: 'hold', number: 12, reason: 'waiting for pr / checks' });
 });
 
 test('it merges a bump that changes nixos/ once both CI and the NixOS checks passed', () => {
@@ -566,7 +596,7 @@ test('it merges a bump that changes nixos/ once both CI and the NixOS checks pas
       },
     ],
     checkRuns: [
-      { workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
       { workflow: 'NixOS checks', name: 'nixos', status: 'COMPLETED', conclusion: 'SUCCESS' },
       { workflow: 'release bump merge', name: 'merge', status: 'IN_PROGRESS', conclusion: null },
     ],
@@ -595,7 +625,7 @@ test('it merges a green bump while its own merge job runs', () => {
       },
     ],
     checkRuns: [
-      { workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
       { workflow: 'release bump merge', name: 'merge', status: 'IN_PROGRESS', conclusion: null },
     ],
   });
@@ -623,7 +653,7 @@ test('it merges a green bump whose earlier merge job failed', () => {
       },
     ],
     checkRuns: [
-      { workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
       { workflow: 'release bump merge', name: 'merge', status: 'COMPLETED', conclusion: 'FAILURE' },
     ],
   });
@@ -650,7 +680,7 @@ test('it holds a bump while a merge job of another workflow runs', () => {
       },
     ],
     checkRuns: [
-      { workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'CI', name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
       { workflow: 'example deploy', name: 'merge', status: 'IN_PROGRESS', conclusion: null },
     ],
   });
