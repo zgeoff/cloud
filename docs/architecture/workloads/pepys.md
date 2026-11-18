@@ -173,7 +173,9 @@ namespace, so Traefik gains no permission. `pepys.tailnetHostname` turns on thes
 device, so each of those devices reads every query. While the public route is on, the API answers
 `/mcp` and the OAuth paths only for the public name in `Host`, so they answer 403 on the tailnet
 name. While it is off, the API serves `/rpc` alone. Traefik serves no route for the public name, so
-a tailnet request that names it gets Traefik's 404 and never reaches a sign-in page.
+a tailnet request that names it gets Traefik's 404 and never reaches a sign-in page. To turn the
+route on, check it or turn it off, follow
+[the API runbook](../../runbooks/pepys-api.md#turn-on-the-apis-tailnet-route).
 
 ### The telemetry path from a session
 

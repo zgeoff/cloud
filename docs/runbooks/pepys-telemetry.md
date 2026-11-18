@@ -94,9 +94,90 @@ and its auth profiles.
    ssh root@geoffcloud k3s kubectl -n pepys logs -l app=pepys-ingest --tail=50
    ```
 
-   Expect `ingest listening on 0.0.0.0:8080`. Ingest never logs an export that it stores, so the log
-   shows only that ingest runs. The pepys API's query `telemetry_session_model_requests` returns the
-   model requests that pepys stored for one session.
+   Expect `ingest listening on 0.0.0.0:8080`. Ingest logs no line for an export that it refuses, and
+   none for an export whose every record it keeps. It logs one warning,
+   `the source telemetry dropped log records`, for each export that it accepts and drops a record
+   from.
+
+9. Wait until the session has answered the `prompt` that the spawn of step 7 gave it:
+   `atc_sessions_list` then shows the session's `state` as `done`. Then read the model requests that
+   pepys stored for the session, from a device on the tailnet:
+
+   ```sh
+   curl -s -X POST -H 'content-type: application/json' \
+     -d '{"json":{"session":"telemetry:session:<session_id>","issuer":"geoffcloud","subject":"<imp_id>"}}' \
+     https://pepys-api.geoff.cloud/rpc/telemetry_session_model_requests
+   ```
+
+   - `<session_id>` is the atc session's ID, which the spawn of step 7 returned as `id`.
+   - `<imp_id>` is the ID of the imp that runs the session: `host.id` of the session in the answer
+     of `atc_sessions_list`, or the `id` beside the imp's name in `impz ls --json` in `imp-host`.
+     atc names the imp `harness-` plus the first 20 hex digits of the session ID.
+   - `geoffcloud` is the issuer name of the imp host, the name of its file in
+     `deploy/pepys/imp-issuers/`.
+
+   The command uses [the API's tailnet route](./pepys-api.md#turn-on-the-apis-tailnet-route). While
+   that route is off,
+   [reach `/rpc` through a port-forward](./pepys-api.md#reach-rpc-while-the-tailnet-route-is-off).
+
+   Expect one object for each model request, oldest first, in this form:
+
+   ```json
+   {
+     "json": [
+       {
+         "id": "telemetry:model_request:claude_code.api_request:<request_id>",
+         "product": "claude_code",
+         "model": "<model>",
+         "input_tokens": 2,
+         "cache_read_tokens": 12589,
+         "cache_creation_tokens": 17627,
+         "output_tokens": 160,
+         "cost_usd": 0.1467418,
+         "at": "2026-11-18T09:28:28.436Z"
+       }
+     ]
+   }
+   ```
+
+   A Codex session's rows have the `product` `codex` and a null `cost_usd`.
+
+### When the query returns an empty list
+
+The API answers `{"json":[]}` when no stored row matches all three values, so the session may still
+have sent telemetry. Check these, in order, and run the query again after each fix:
+
+1. Check the `session` value. It must be the whole entity ID, `telemetry:session:<session_id>`. The
+   API answers `{"json":[]}` for the bare session ID.
+2. Check the `subject` value. It must be the imp's `id`. The API answers `{"json":[]}` for the imp's
+   name.
+3. Check that `atc_sessions_list` shows the session's `state` as `done`. A session that answered no
+   prompt made no model request.
+4. Read ingest's log with the command of step 8 of
+   [Let sessions send telemetry](#let-sessions-send-telemetry), for the warning
+   `the source telemetry dropped log records`. Ingest writes it once for each export that it accepts
+   and drops one record or more from, and also when it drops every record. The warning's `detail`
+   counts the dropped records by reason, such as `unknown-product`. Ingest never stores a dropped
+   record, so the query never returns its model request.
+5. Read the secret's row:
+
+   ```sh
+   ssh root@geoffcloud podman exec imp-host impz secret ls < /dev/null
+   ```
+
+   Expect the row `pepys-telemetry` to show
+   `pepys.imp.internal -> http://10.88.0.1:18083 (identity)`, and to end with the names of the imps
+   that hold a grant of the secret, the session's imp among them.
+   - When the session's imp is missing, the atc daemon gave the session no grant. Do step 6 of
+     [Let sessions send telemetry](#let-sessions-send-telemetry), then spawn a new session.
+   - When `(identity)` is missing, the broker adds no identity token, and ingest answers 401 to each
+     export and logs nothing. Add the secret again as step 5 of
+     [Let sessions send telemetry](#let-sessions-send-telemetry) says for a change to `--identity`.
+     That step drops each imp's grant of the secret, so spawn a new session afterwards.
+
+6. When the API still answers `{"json":[]}`, [rotate the token](#rotate-the-token). Ingest also
+   answers 401 to a wrong bearer token, and no command compares impd's copy of the token with the
+   copy in ingest's Secret.
 
 ## Rotate the token
 
