@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { Output, isSecret, output } from '@pulumi/pulumi';
 import invariant from 'tiny-invariant';
-import { resolveOutput } from '../test-utils/resolve-output.ts';
+import { resolveOutput } from '../src/test-utils/resolve-output.ts';
 import { buildHealthCheckBindings } from './build-health-check-bindings.ts';
 
 test('it binds the state bucket, the targets as JSON and the alert webhook when one is set', () => {

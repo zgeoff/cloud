@@ -7,9 +7,9 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { createFilesService } from './create-files-service.ts';
 import { createUploadStore } from './create-upload-store.ts';
-import { buildMockUpload } from './test-utils/build-mock-upload.ts';
-import { buildStubFullVolumeWrite } from './test-utils/build-stub-full-volume-write.ts';
-import { buildUploadRequest } from './test-utils/build-upload-request.ts';
+import { buildMockUpload } from './src/test-utils/build-mock-upload.ts';
+import { buildStubFullVolumeWrite } from './src/test-utils/build-stub-full-volume-write.ts';
+import { buildUploadRequest } from './src/test-utils/build-upload-request.ts';
 
 async function setupTest() {
   const dataDir = await mkdtemp(join(tmpdir(), 'files-service-'));

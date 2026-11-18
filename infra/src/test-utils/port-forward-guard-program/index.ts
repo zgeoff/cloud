@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { Chart } from '@pulumi/kubernetes/helm/v4';
 import { Role } from '@pulumi/kubernetes/rbac/v1';
 import { z } from 'zod';
-import { createClusterProvider } from '../../cluster/index.ts';
+import { createClusterProvider } from '../../../cluster/index.ts';
 
 const caseDir = process.env['GUARD_CASE_DIR'];
 

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
-import { buildMockTunnelRoute } from '../test-utils/build-mock-tunnel-route.ts';
+import { buildMockTunnelRoute } from '../src/test-utils/build-mock-tunnel-route.ts';
 import { buildPepysAPIRoutes } from './build-pepys-api-routes.ts';
 import { buildTunnelIngresses } from './build-tunnel-ingresses.ts';
 

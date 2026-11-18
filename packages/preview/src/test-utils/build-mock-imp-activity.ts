@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import type { ImpActivity } from '../plan-slot-evictions.ts';
+import type { ImpActivity } from '../../plan-slot-evictions.ts';
 
 export function buildMockImpActivity(overrides: Partial<ImpActivity> = {}): ImpActivity {
   return {

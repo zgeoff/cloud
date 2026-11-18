@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { join } from 'node:path';
 import { http, passthrough } from 'msw';
-import { server } from '../mocks/node.ts';
+import { server } from './node.ts';
 
 test('it prints the serving line with the port it listens on', async () => {
   const subprocess = Bun.spawn(

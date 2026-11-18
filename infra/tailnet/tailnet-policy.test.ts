@@ -1,6 +1,6 @@
 /* oxlint-disable zgeoff/no-abbreviated-names -- Tailscale's policy file names a grant's sources src */
 import { expect, test } from 'bun:test';
-import { buildStubTailnetFilter } from '../test-utils/build-stub-tailnet-filter.ts';
+import { buildStubTailnetFilter } from '../src/test-utils/build-stub-tailnet-filter.ts';
 import { tailnetPolicy } from './tailnet-policy.ts';
 
 // Acl replaces the whole tailnet file, so the whole policy is the contract: a lost

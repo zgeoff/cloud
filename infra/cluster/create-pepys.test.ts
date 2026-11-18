@@ -1,8 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { output, runtime } from '@pulumi/pulumi';
 import type { PepysInputs } from '../inputs/index.ts';
-import { buildStubResourceMocks } from '../test-utils/build-stub-resource-mocks.ts';
-import { resolveOutput } from '../test-utils/resolve-output.ts';
+import { buildStubResourceMocks } from '../src/test-utils/build-stub-resource-mocks.ts';
+import { resolveOutput } from '../src/test-utils/resolve-output.ts';
 import { createClusterProvider } from './create-cluster-provider.ts';
 import { createPepys } from './create-pepys.ts';
 

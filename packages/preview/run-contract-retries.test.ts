@@ -6,11 +6,11 @@ import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
-import { githubAPIURL } from './mocks/github-api-url.ts';
-import { stubApp } from './mocks/github-app.ts';
-import { commitStatuses } from './mocks/github-state.ts';
 import { runContractRetries } from './run-contract-retries.ts';
-import { startStubImpd } from './test-utils/start-stub-impd.ts';
+import { githubAPIURL } from './src/test-utils/github-api-url.ts';
+import { stubApp } from './src/test-utils/github-app.ts';
+import { commitStatuses } from './src/test-utils/github-state.ts';
+import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
 
 async function setupTest() {

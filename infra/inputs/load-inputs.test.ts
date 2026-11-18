@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { Output } from '@pulumi/pulumi';
 import invariant from 'tiny-invariant';
-import { buildStubConfig } from '../test-utils/build-stub-config.ts';
+import { buildStubConfig } from '../src/test-utils/build-stub-config.ts';
 import { loadInputs } from './load-inputs.ts';
 
 test('it returns the account ID, hostOnTailnet off and no alert URL or cluster for a bare stack', () => {

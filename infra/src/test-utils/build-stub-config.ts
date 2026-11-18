@@ -1,5 +1,5 @@
 import { RunError, secret } from '@pulumi/pulumi';
-import type { StackConfig } from '../inputs/types.ts';
+import type { StackConfig } from '../../inputs/types.ts';
 
 export function buildStubConfig(values: Readonly<Record<string, string>>): StackConfig {
   return {

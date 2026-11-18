@@ -9,16 +9,16 @@ import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { makeWebhookHandler } from './make-webhook-handler.ts';
-import { githubAPIURL } from './mocks/github-api-url.ts';
-import { stubApp } from './mocks/github-app.ts';
+import { githubAPIURL } from './src/test-utils/github-api-url.ts';
+import { stubApp } from './src/test-utils/github-app.ts';
 import {
   commitStatuses,
   composeFiles,
   installationTokens,
   issueComments,
   pullRequestFiles,
-} from './mocks/github-state.ts';
-import { startStubImpd } from './test-utils/start-stub-impd.ts';
+} from './src/test-utils/github-state.ts';
+import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
 
 async function setupTest() {

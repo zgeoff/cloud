@@ -4,11 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { http, passthrough } from 'msw';
 import { createPreviewStore } from './create-preview-store.ts';
-import { stubApp } from './mocks/github-app.ts';
-import { server as mockServer } from './mocks/node.ts';
+import { stubApp } from './src/test-utils/github-app.ts';
+import { server as mockServer } from './src/test-utils/node.ts';
+import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
+import { waitForCondition } from './src/test-utils/wait-for-condition.ts';
 import { startPreviewService } from './start-preview-service.ts';
-import { startStubImpd } from './test-utils/start-stub-impd.ts';
-import { waitForCondition } from './test-utils/wait-for-condition.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'preview-service-'));
@@ -18,7 +18,10 @@ async function setupTest() {
   // the listeners and each proxy take loopback ports, so every loopback port passes through
   mockServer.use(http.all(/^http:\/\/127\.0\.0\.1:\d+\//u, () => passthrough()));
 
-  return { directory, stubPath: join(import.meta.dir, 'test-utils', 'run-stub-counting-proxy.ts') };
+  return {
+    directory,
+    stubPath: join(import.meta.dir, 'src', 'test-utils', 'run-stub-counting-proxy.ts'),
+  };
 }
 
 test('it puts every imp impd lists under the public egress policy when it starts', async () => {

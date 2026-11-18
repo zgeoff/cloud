@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import { buildImpdClient } from '../build-impd-client.ts';
-import { server } from '../mocks/node.ts';
+import { buildImpdClient } from '../../build-impd-client.ts';
 import { createImpdRefusalHandler } from './create-impd-refusal-handler.ts';
+import { server } from './node.ts';
 import { startStubImpd } from './start-stub-impd.ts';
 
 function setupTest() {

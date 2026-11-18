@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import type { ATCGatewayConfig, ATCGatewayDaemon } from '../inputs/types.ts';
+import type { ATCGatewayConfig, ATCGatewayDaemon } from '../../inputs/types.ts';
 import { buildMockATCGatewayDaemon } from './build-mock-atc-gateway-daemon.ts';
 
 // stateDir's and trustForwardedFrom's absence is behaviour (the gateway takes $HOME's state dir,

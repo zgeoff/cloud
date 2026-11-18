@@ -1,4 +1,4 @@
-import type { ATCGatewayConfig, StackConfig } from '../inputs/types.ts';
+import type { ATCGatewayConfig, StackConfig } from '../../inputs/types.ts';
 import { buildMockATCGatewayConfig } from './build-mock-atc-gateway-config.ts';
 import { buildStubConfig } from './build-stub-config.ts';
 

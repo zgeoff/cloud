@@ -3,7 +3,7 @@ import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/pro
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
-import { server } from '../mocks/node.ts';
+import { server } from '../test-utils/node.ts';
 import { tryReadManifestDigest } from '../try-read-manifest-digest.ts';
 import { runDecideGatewayPublish } from './run-decide-gateway-publish.ts';
 

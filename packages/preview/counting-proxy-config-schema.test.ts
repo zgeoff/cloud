@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { countingProxyConfigSchema } from './counting-proxy-config-schema.ts';
-import { collectSchemaFields } from './test-utils/collect-schema-fields.ts';
+import { collectSchemaFields } from './src/test-utils/collect-schema-fields.ts';
 
 test('it reads a proxy config with one route for an imp', () => {
   const config = {
@@ -121,7 +121,7 @@ test('it refuses a long-prompt price that nixie counting proxy does not know', (
 
 test('it reads the config that nixie counting proxy accepts, field for field', async () => {
   const text = await Bun.file(
-    join(import.meta.dir, 'test-utils', 'nixie-counting-proxy-config.yaml'),
+    join(import.meta.dir, 'src', 'test-utils', 'nixie-counting-proxy-config.yaml'),
   ).text();
 
   const parsed = countingProxyConfigSchema.safeParse(Bun.YAML.parse(text));

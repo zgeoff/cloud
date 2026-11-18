@@ -1,9 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { join } from 'node:path';
 import { http, passthrough } from 'msw';
-import { server } from './mocks/node.ts';
 import { spawnPiped } from './spawn-piped.ts';
 import { startKubectlProxy } from './start-kubectl-proxy.ts';
+import { server } from './test-utils/node.ts';
 
 test('it gives the URL that the proxy serves on', async () => {
   const started = await startKubectlProxy({

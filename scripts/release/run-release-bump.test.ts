@@ -1,6 +1,5 @@
 import { expect, mock, test } from 'bun:test';
 import { join } from 'node:path';
-import { server } from '../mocks/node.ts';
 import { buildRealProgramHandler } from '../test-utils/build-real-program-handler.ts';
 import { buildStubBunInstall } from '../test-utils/build-stub-bun-install.ts';
 import { buildStubNPMRegistry } from '../test-utils/build-stub-npm-registry.ts';
@@ -10,6 +9,7 @@ import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
 import { createCloudCheckout } from '../test-utils/create-cloud-checkout.ts';
 import { createNPMTarball } from '../test-utils/create-npm-tarball.ts';
 import { createRestoreJobFiles } from '../test-utils/create-restore-job-files.ts';
+import { server } from '../test-utils/node.ts';
 import { runReleaseBump } from './run-release-bump.ts';
 
 async function setupTest() {

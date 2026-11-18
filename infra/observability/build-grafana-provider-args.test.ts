@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { isSecret, output } from '@pulumi/pulumi';
-import { resolveOutput } from '../test-utils/resolve-output.ts';
+import { resolveOutput } from '../src/test-utils/resolve-output.ts';
 import { buildGrafanaProviderArgs } from './build-grafana-provider-args.ts';
 
 test('it signs in to Grafana at the URL as admin with the admin password', async () => {

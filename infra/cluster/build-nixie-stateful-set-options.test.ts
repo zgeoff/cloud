@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { Command } from '@pulumi/command/local';
 import { output, runtime } from '@pulumi/pulumi';
-import { buildStubResourceMocks } from '../test-utils/build-stub-resource-mocks.ts';
+import { buildStubResourceMocks } from '../src/test-utils/build-stub-resource-mocks.ts';
 import { buildNixieStatefulSetOptions } from './build-nixie-stateful-set-options.ts';
 import { createClusterProvider } from './create-cluster-provider.ts';
 

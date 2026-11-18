@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { buildMockATCGatewayDaemon } from '../test-utils/build-mock-atc-gateway-daemon.ts';
+import { buildMockATCGatewayDaemon } from '../src/test-utils/build-mock-atc-gateway-daemon.ts';
 import { buildATCDaemonEndpoints } from './build-atc-daemon-endpoints.ts';
 
 test("it gives each of the gateway's daemons, by name, with its address and alert severity", () => {

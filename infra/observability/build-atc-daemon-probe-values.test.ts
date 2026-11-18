@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { buildMockATCDaemonEndpoint } from '../test-utils/build-mock-atc-daemon-endpoint.ts';
+import { buildMockATCDaemonEndpoint } from '../src/test-utils/build-mock-atc-daemon-endpoint.ts';
 import { buildATCDaemonProbeValues } from './build-atc-daemon-probe-values.ts';
 
 test("it probes each daemon's address with a TCP connect from the pod its egress allow selects, keeping geoffcloud's original target name", () => {

@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'bun:test';
 import { HttpResponse, http, passthrough } from 'msw';
 import { checkNixieAPI } from './check-nixie-api.ts';
-import { server } from './mocks/node.ts';
+import { server } from './test-utils/node.ts';
 import { startStubNixieAPI } from './test-utils/start-stub-nixie-api.ts';
 
 function setupTest() {

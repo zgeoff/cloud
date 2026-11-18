@@ -3,7 +3,7 @@
 // kernel, and the proxy.started log line first on stdout. A request echoes back as JSON instead of
 // a model reply, and a request to /exit ends the process, as a crash would.
 import { parseArgs } from 'node:util';
-import { countingProxyConfigSchema } from '../counting-proxy-config-schema.ts';
+import { countingProxyConfigSchema } from '../../counting-proxy-config-schema.ts';
 
 const args = parseArgs({ options: { config: { type: 'string' } } });
 

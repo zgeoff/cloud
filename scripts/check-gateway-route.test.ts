@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { checkGatewayRoute } from './check-gateway-route.ts';
-import { server } from './mocks/node.ts';
 import { buildStubGetent } from './test-utils/build-stub-getent.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { server } from './test-utils/node.ts';
 
 test('it passes the route when its metadata answers 200', async () => {
   const stub = buildStubRunner(buildStubGetent({ 'atc.geoff.cloud': '104.21.32.1' }));

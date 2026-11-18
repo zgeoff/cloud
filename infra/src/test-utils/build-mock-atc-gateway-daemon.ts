@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import type { ATCGatewayDaemon } from '../inputs/types.ts';
+import type { ATCGatewayDaemon } from '../../inputs/types.ts';
 
 export function buildMockATCGatewayDaemon(
   overrides: Partial<ATCGatewayDaemon> = {},

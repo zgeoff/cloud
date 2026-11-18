@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { isSecret, runtime } from '@pulumi/pulumi';
-import { resolveOutput } from '../test-utils/resolve-output.ts';
+import { resolveOutput } from '../src/test-utils/resolve-output.ts';
 import { createSidecarTunnel } from './create-sidecar-tunnel.ts';
 
 test("it returns the tunnel's connector token as a secret", async () => {

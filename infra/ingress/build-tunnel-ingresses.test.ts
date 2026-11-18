@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
-import { buildMockTunnelRoute } from '../test-utils/build-mock-tunnel-route.ts';
+import { buildMockTunnelRoute } from '../src/test-utils/build-mock-tunnel-route.ts';
 import { buildTunnelIngresses } from './build-tunnel-ingresses.ts';
 
 test("it sends the atc gateway's hostname to its service, with the 404 catch-all last", () => {

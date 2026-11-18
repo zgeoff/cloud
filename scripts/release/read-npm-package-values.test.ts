@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
-import { server } from '../mocks/node.ts';
 import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
 import { getReleaseRecord } from '../test-utils/get-release-record.ts';
+import { server } from '../test-utils/node.ts';
 import { readNPMPackageValues } from './read-npm-package-values.ts';
 
 test('it fails when npm lacks the version', async () => {

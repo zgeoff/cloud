@@ -3,6 +3,6 @@
 # root preload never loads here
 preload = [
   "@zgeoff/bun-test-extended",
-  "./test-utils/pin-faker-seed.ts",
-  "./mocks/register-mock-server.ts",
+  "./src/test-utils/pin-faker-seed.ts",
+  "./src/test-utils/register-mock-server.ts",
 ]

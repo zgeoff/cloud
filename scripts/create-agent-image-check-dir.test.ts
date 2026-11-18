@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
 import { createAgentImageCheckDir } from './create-agent-image-check-dir.ts';
-import { server } from './mocks/node.ts';
 import { buildRealProgramHandler } from './test-utils/build-real-program-handler.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { server } from './test-utils/node.ts';
 import { startStubGitleaksRelease } from './test-utils/start-stub-gitleaks-release.ts';
 
 async function setupTest() {

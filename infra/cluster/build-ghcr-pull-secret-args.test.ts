@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { Output, isSecret, output, secret } from '@pulumi/pulumi';
-import { resolveOutput } from '../test-utils/resolve-output.ts';
+import { resolveOutput } from '../src/test-utils/resolve-output.ts';
 import { buildGHCRPullSecretArgs } from './build-ghcr-pull-secret-args.ts';
 
 test('it names the Secret ghcr-pull in the namespace it is given, as a dockerconfigjson', () => {

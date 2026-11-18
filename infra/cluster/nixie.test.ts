@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { output, runtime } from '@pulumi/pulumi';
 import { z } from 'zod';
-import { buildStubResourceMocks } from '../test-utils/build-stub-resource-mocks.ts';
+import { buildStubResourceMocks } from '../src/test-utils/build-stub-resource-mocks.ts';
 import { createClusterProvider } from './create-cluster-provider.ts';
 import { createNixie } from './nixie.ts';
 

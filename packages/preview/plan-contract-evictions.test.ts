@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { planContractEvictions } from './plan-contract-evictions.ts';
-import { buildMockImpActivity } from './test-utils/build-mock-imp-activity.ts';
+import { buildMockImpActivity } from './src/test-utils/build-mock-imp-activity.ts';
 
 test('it sleeps nothing when a slot is free', () => {
   const imps = [

@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
 import { checkImagePins } from './check-image-pins.ts';
-import { server } from './mocks/node.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { server } from './test-utils/node.ts';
 
 async function setupTest() {
   const root = await mkdtemp(join(tmpdir(), 'check-image-pins-'));

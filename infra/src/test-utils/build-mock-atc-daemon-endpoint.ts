@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import type { ATCDaemonEndpoint } from '../inputs/types.ts';
+import type { ATCDaemonEndpoint } from '../../inputs/types.ts';
 import { buildMockATCGatewayDaemon } from './build-mock-atc-gateway-daemon.ts';
 
 export function buildMockATCDaemonEndpoint(

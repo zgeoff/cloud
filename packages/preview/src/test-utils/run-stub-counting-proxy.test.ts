@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { http, passthrough } from 'msw';
 import { z } from 'zod';
-import { server as mockServer } from '../mocks/node.ts';
+import { server as mockServer } from './node.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'stub-counting-proxy-'));

@@ -1,4 +1,4 @@
-import type { Environment } from '../inputs/types.ts';
+import type { Environment } from '../../inputs/types.ts';
 
 // the variables the gateway's inputs need: a daemon's token and the pull credential
 export function buildMockATCGatewayEnvironment(overrides: Environment = {}): Environment {
