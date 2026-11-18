@@ -283,7 +283,7 @@ in
     backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
     # pinned by digest: the module's default names only its release's tag, which a later push
     # could move
-    image = "ghcr.io/zgeoff/imp-host:7.4.0@sha256:f5f02b78076f6fbb979b0e28487a965a86b03e836ba40d6004125a32557a1d60";
+    image = "ghcr.io/zgeoff/imp-host:7.5.0@sha256:969afe762662c6831434f3de153821032bf5d1c09a2624b6ed07352a16149cbb";
     # the module's default ("imp") is taken in the tailnet
     settings.IMP_TAILSCALE_HOSTNAME = topology.tailnet.nodes.imp.hostname;
     # HTTPS on the tailnet only (imp#16): imps at <name>.imps.geoff.cloud, impd's API at
@@ -322,12 +322,16 @@ in
     # the budget kept for nixie's sandboxes, which serve people waiting on a turn: the most nixie
     # has run at once is 6, a conversation (512 MiB) and five of at most 512 MiB each. impd keeps
     # it in the whole budget and in the pool, where the pool's other 3072 MiB hold one imp of fixed
-    # memory at impd's default 2048 MiB, such as an image build
+    # memory at impd's default 2048 MiB
     settings.IMP_PRIORITY_RAM_MIB = 3072;
     settings.IMP_PRIORITY_IMPS = "nixie-*";
     # none of it kept in the ordinary-page budget: nixie's sandboxes run on the pool, and a kept
     # 3072 MiB there would only take room from the elastic agent imps
     settings.IMP_PRIORITY_ORDINARY_RAM_MIB = 0;
+    # image builders boot elastic on ordinary pages, off the pool: 1024 MiB at boot, growing to
+    # 2048 MiB, which fits the 14336 MiB of the budget past the pool. impd admits a builder at its max
+    settings.IMP_BUILD_MEMORY_MIB = 1024;
+    settings.IMP_BUILD_MAX_MEMORY_MIB = 2048;
     # the name of this impd in each imp identity token that its broker signs. A service stores the
     # name beside the imp it names, so a change orphans those rows, and no other impd may use it.
     # An impd older than 6.12.0 does not read the setting
@@ -720,7 +724,7 @@ in
     contractRepos = [ "zgeoff/nixie" ];
     contractModelSecret = "preview-model";
     # the imp-base release that images/agent/Dockerfile builds on; the imp release pin moves both
-    impRegistryImage = "ghcr.io/zgeoff/imp-base:7.4.0@sha256:ea802c7f3332011a83301eaf4026e1b4b35d0afea56073cac1a5a13b27ac0b69";
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:7.5.0@sha256:4c847454db7dcc7ada6c75a81edb8b04dc104b578f842fe4a1823e84fd389160";
     webhookSecretFile = "/var/lib/tank-cloud/host-secrets/preview/webhook-secret";
     githubAppClientIDFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-client-id";
     githubAppKeyFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-key";
