@@ -18,11 +18,12 @@ export const lokiValues = {
     limits_config: {
       retention_period: '720h',
 
-      // bounds the volume's disk use
-      ingestion_rate_mb: 0.004,
+      // bounds the volume's disk use, at about twice the busiest hour Alloy read from pod logs in
+      // November 2026 (7.8 KB/s), so the usual load never waits behind 429s
+      ingestion_rate_mb: 0.016,
 
       // lets one push carry a restart's backlog instead of waiting out 429s at that rate
-      ingestion_burst_size_mb: 32,
+      ingestion_burst_size_mb: 64,
     },
     compactor: { retention_enabled: true, delete_request_store: 'filesystem' },
   },
