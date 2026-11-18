@@ -150,12 +150,20 @@ Grow the zvol when `/var/lib/rancher` runs short of space. The grow needs no unm
 of k3s.
 
 Each GiB the zvol gains is a GiB that `tank/imp` loses, because the zvol reserves its whole size.
-impd starts and stops its image eviction at two percents of `tank/imp`. In steps 5 and 6, you check
+impd starts and stops its image eviction at two percents of `tank/imp`. In steps 6 and 7, you check
 both percents against the smaller `tank/imp`.
 
 Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
-1. Check that the pool has the space for the growth:
+1. Read the current size of the zvol:
+
+   ```bash
+   zfs get -H -o value volsize tank/cloud/rancher
+   ```
+
+   Expect one size, such as `30G`. The growth is the new size less this size.
+
+2. Check that the pool has the space for the growth:
 
    ```bash
    zfs list -o name,used,avail tank
@@ -164,13 +172,17 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
    Expect an `AVAIL` larger than the growth. Never read the space from `FREE` in `zpool list`:
    `FREE` is higher, because it counts space that reservations and ZFS's slop already hold.
 
-2. Set the new size, where `<size>` is the whole new size, such as `40G`:
+3. Set the new size, where `<size>` is the whole new size, such as `40G`:
+
+   **CAUTION:** A `<size>` smaller than the size that step 1 printed cuts the end off the ext4
+   filesystem and destroys data. The zvol only grows. Check that `<size>` is larger than the current
+   size before you run the command.
 
    ```bash
    zfs set volsize=<size> tank/cloud/rancher
    ```
 
-3. Check that the reservation followed the size:
+4. Check that the reservation followed the size:
 
    ```bash
    zfs get -H -o property,value volsize,refreservation tank/cloud/rancher
@@ -180,7 +192,7 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
    `refreservation` of `none` or of the old size leaves the growth with no reserved space: set it
    with `zfs set refreservation=auto tank/cloud/rancher`.
 
-4. Grow the ext4 filesystem to the zvol's size:
+5. Grow the ext4 filesystem to the zvol's size:
 
    ```bash
    resize2fs /dev/zvol/tank/cloud/rancher
@@ -189,7 +201,7 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
    Expect the new size in the `Size` column.
 
-5. Read the size of `tank/imp`:
+6. Read the size of `tank/imp`:
 
    ```bash
    zfs list -o name,used,avail tank/imp
@@ -197,7 +209,7 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
    Add `USED` and `AVAIL`. The sum is the size.
 
-6. Open the comment above `settings.IMP_IMAGE_EVICT_HIGH_PERCENT` in
+7. Open the comment above `settings.IMP_IMAGE_EVICT_HIGH_PERCENT` in
    `nixos/hosts/geoffcloud/configuration.nix`. The comment gives three figures: the size of
    `tank/imp`, impd's disk reserve of 5 % of the size, and the space between the two percents.
 
