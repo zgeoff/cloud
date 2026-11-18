@@ -226,7 +226,9 @@ route's table. A profile with no route gets a 404 on every call.
 1. In one PR, add the profile to `deploy/nixie/config.yaml` and a route to `services.model-gateway`,
    with the same ID, model and prices. A model outside Claude goes through OpenRouter: its base URL
    is `https://openrouter.ai`, with no path, and its route's upstream is
-   `https://openrouter.ai/api`.
+   `https://openrouter.ai/api`. Pin it to one provider endpoint: the profile's `provider_pin` and
+   the route's `providerPin` name the same endpoint tag, such as `novita/fp8`, and the prices are
+   that endpoint's own.
 2. Before the merge, add the profile's model secret and set nixie's token, as
    [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) describes.
 3. After the merge, switch the host with `bun run ops:switch-host`, so the gateway has the route,
