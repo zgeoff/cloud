@@ -19,7 +19,8 @@ test('it runs one s2-lite on the facts bucket in Garage, replaced before its suc
     env: [
       { name: 'AWS_ENDPOINT_URL_S3', value: 'http://pepys-garage.pepys.svc.cluster.local:3900' },
       { name: 'AWS_REGION', value: 'garage' },
-      { name: 'RUST_LOG', value: 'info' },
+      { name: 'RUST_LOG', value: 'warn,s2_lite=info' },
+      { name: 'NO_COLOR', value: '1' },
     ],
     envFrom: [{ secretRef: { name: envSecret } }],
   });
