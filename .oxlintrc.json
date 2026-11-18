@@ -125,7 +125,7 @@
   },
   // the pepys deployment installs on its own, so the repo's type-aware lint cannot resolve its
   // imports; its image job type-checks it
-  "ignorePatterns": ["sdk/**", "provider/**", ".claude/**", "deploy/pepys/*.ts"],
+  "ignorePatterns": ["sdk/**", "provider/**", ".claude/**", ".agents/**", "deploy/pepys/*.ts"],
   "overrides": [
     {
       "files": ["infra/**/*.ts", "workers/**/*.ts"],
