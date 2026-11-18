@@ -7,9 +7,9 @@
   fetchurl,
 }:
 let
-  version = "0.80.0";
+  version = "0.80.1";
   # sha256sum of the release's model-gateway-linux-x64, which matches the asset's GitHub digest
-  sha256 = "77b375e3c84c43a95ff84963b00b12e0f603ddb821cc574461c9ffa3a47ea2b6";
+  sha256 = "a2ce471f24a1707bc7cd8516e040350afbb6ed071ef8f75d960c9fb857243d27";
 in
 stdenv.mkDerivation {
   pname = "model-gateway";
