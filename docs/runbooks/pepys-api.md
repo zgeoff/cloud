@@ -272,9 +272,9 @@ Service inside the cluster.
    in `infra/Pulumi.prod.yaml`. Leave the name's entry in
    [the exposure registry](../architecture/network/firewalls.md#the-exposure-registry): the entry
    opens nothing while the key is absent.
-2. Run `bun run preview`. Expect it to delete the certificate, the Secret, the Ingress and the DNS
-   record that are named `pepys-api-tailnet`, and to update the network policy `pepys-host` and
-   nixie's Traefik release.
+2. Run `bun run preview`. Expect it to delete the certificate, the Ingress and the DNS record named
+   `pepys-api-tailnet`, and the Secret `pepys-api-tailnet-tls`. Expect it to update the network
+   policy `pepys-host` and nixie's Traefik release.
 3. Merge the pull request.
 4. Wait for the `Deploy prod` run of the merge. Expect it to hold: the plan deletes resources.
 5. Answer the held run once its plan matches the preview, as

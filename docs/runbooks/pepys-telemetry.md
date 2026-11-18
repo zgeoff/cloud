@@ -94,8 +94,10 @@ and its auth profiles.
    ssh root@geoffcloud k3s kubectl -n pepys logs -l app=pepys-ingest --tail=50
    ```
 
-   Expect `ingest listening on 0.0.0.0:8080`. Ingest logs no line for an export, whether it stores
-   the export or refuses it, so the log shows only that ingest runs.
+   Expect `ingest listening on 0.0.0.0:8080`. Ingest logs no line for an export that it refuses, and
+   none for an export whose every record it keeps. It logs one warning,
+   `the source telemetry dropped log records`, for each export that it accepts and drops a record
+   from.
 
 9. Wait until the session has answered the `prompt` that the spawn of step 7 gave it:
    `atc_sessions_list` then shows the session's `state` as `done`. Then read the model requests that
@@ -153,10 +155,10 @@ have sent telemetry. Check these, in order, and run the query again after each f
    prompt made no model request.
 4. Read ingest's log with the command of step 8 of
    [Let sessions send telemetry](#let-sessions-send-telemetry), for the warning
-   `the source telemetry dropped log records`. Ingest writes it when it accepts an export and stores
-   only part of it. The warning's `detail` counts the dropped records by reason, such as
-   `unknown-product`. Ingest never stores a dropped record, so the query never returns its model
-   request.
+   `the source telemetry dropped log records`. Ingest writes it once for each export that it accepts
+   and drops one record or more from, and also when it drops every record. The warning's `detail`
+   counts the dropped records by reason, such as `unknown-product`. Ingest never stores a dropped
+   record, so the query never returns its model request.
 5. Read the secret's row:
 
    ```sh
