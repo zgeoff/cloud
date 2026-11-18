@@ -1,7 +1,7 @@
 # Rules for the boxxy image test alone: the server refuses to start without a rules folder, so the
 # test mounts this one at /rules. The live rules are in the rules repository, and nothing deploys
 # this file. Keep it loadable by the @boxxy/server release that package.json pins: the review runs
-# on `boxxy-review`, which the test's spawn.reviewAgents lists.
+# on `boxxy-review`, which the test's spawn.agents scopes to the review phase.
 version: 1
 concepts: [pool@2, defer@1, expedite@1] # pool@2 adds the filter field `designMode`
 
