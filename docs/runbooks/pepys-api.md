@@ -213,8 +213,7 @@ in step 6.
    | `needs stack config "nixie": the route goes through nixie's Traefik`           | [Deploy nixie](./nixie.md) first.             |
 
 4. Merge the pull request.
-5. Wait for the `Deploy prod` run of the merge. Expect it to hold, because the plan adds a DNS
-   record.
+5. Wait for the `Deploy prod` run of the merge. Expect it to hold: the plan adds a DNS record.
 6. Answer the held run once its plan matches the preview, as
    [Answer a held run](./prod-apply.md#answer-a-held-run) says.
 7. [Check the tailnet route](#check-the-tailnet-route).
@@ -277,8 +276,7 @@ Service inside the cluster.
    record that are named `pepys-api-tailnet`, and to update the network policy `pepys-host` and
    nixie's Traefik release.
 3. Merge the pull request.
-4. Wait for the `Deploy prod` run of the merge. Expect it to hold, because the plan deletes
-   resources.
+4. Wait for the `Deploy prod` run of the merge. Expect it to hold: the plan deletes resources.
 5. Answer the held run once its plan matches the preview, as
    [Answer a held run](./prod-apply.md#answer-a-held-run) says.
 6. Check that the Ingress is gone:
