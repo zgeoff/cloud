@@ -9,7 +9,7 @@
 # `impz stop` does not take a builder. It stops with ssh's exit code when the host refuses the
 # connection. The imps take the id, name, state and kind fields of impd's ImpSchema (zgeoff/impz
 # packages/api/src/schemas/imp-schema.ts at v6.3.2), with invented values. ssh is the NixOS host
-# stand-in from test-support/shell, which answers the imp listing and the page-size loop from the
+# stand-in from scripts/test-utils/shell, which answers the imp listing and the page-size loop from the
 # case's STUB_IMPD_IMPS and STUB_IMPD_IMP_PAGES. Each case runs the script under `env -i` and
 # compares its stdout, stderr and ssh call log.
 #
@@ -18,12 +18,12 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-nixos-ssh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-remote-tools.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool-stubs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-nixos-ssh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/create-stub-remote-tools.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/test-utils/shell/require-remote-tool-stubs.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/stop-ordinary-page-imps.sh"
 # the two remote commands every mode runs, as the call log records them

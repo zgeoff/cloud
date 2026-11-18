@@ -5,7 +5,7 @@
 # each evaluates its own config through test-utils/build-module-system.nix, with
 # inet cloud_host's module and imp's module for their options, or extends geoffcloud's, compares
 # it with its own entries, and runs on its own, in a fresh directory, under
-# test-support/shell/run-cases.sh.
+# scripts/test-utils/shell/run-cases.sh.
 # Run: bun run test:nixos exposure
 {
   nixpkgs,

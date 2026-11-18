@@ -22,13 +22,13 @@ metadata:
 
 | Fact          | Where                                                                                                                                                                                                                                                                                                                   |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Test commands | [`rig.config.ts`](../../../rig.config.ts) holds each test command's file suffix and per-test timeout. `bun run test:e2e` runs the journeys in `e2e/`, which `bun run test` leaves out                                                                                                                                   |
-| Test utils    | the `test-utils/` folder of the package, such as [`infra/test-utils/`](../../../infra/test-utils/) or [`scripts/test-utils/`](../../../scripts/test-utils/); [`test-support/shell/`](../../../test-support/shell/) for a shell suite; [`nixos/checks/test-utils/`](../../../nixos/checks/test-utils/) for a NixOS check |
+| Test commands | [`rig.config.ts`](../../../rig.config.ts) holds each test command's file suffix and per-test timeout. `bun run test:e2e` runs the journeys in `scripts/e2e/` through `rig e2e`, which builds each program that `rig.config.ts` declares first, and `bun run test` leaves them out                                                                                                                                   |
+| Test utils    | the `src/test-utils/` folder of the package, such as [`infra/src/test-utils/`](../../../infra/src/test-utils/) or [`scripts/test-utils/`](../../../scripts/test-utils/), which has no `src/`; [`scripts/test-utils/shell/`](../../../scripts/test-utils/shell/) for a shell suite; [`nixos/checks/test-utils/`](../../../nixos/checks/test-utils/) for a NixOS check |
 
 ## Departures
 
 - Test a shell script with a `test-<name>.sh` suite beside it, which runs its cases through
-  [`run_cases`](../../../test-support/shell/run-cases.sh). [Shell testing](../testing/references/shell.md)
+  [`run_cases`](../../../scripts/test-utils/shell/run-cases.sh). [Shell testing](../testing/references/shell.md)
   asks for a `<name>.test.ts` file instead. The NixOS checks run shell suites inside their VMs,
   through the helpers that [Shell suites](#shell-suites) lists. A TypeScript harness beside the
   shell one would leave cloud with two.
@@ -66,18 +66,18 @@ only.
   reaches the real host.
 - In a suite whose script can call any of those five, put a stand-in for all five in the case's
   `bin` folder, through
-  [`create_stub_remote_tools`](../../../test-support/shell/create-stub-remote-tools.sh) for the ones
+  [`create_stub_remote_tools`](../../../scripts/test-utils/shell/create-stub-remote-tools.sh) for the ones
   no other stand-in covers. Then call
-  [`require_remote_tool_stubs`](../../../test-support/shell/require-remote-tool-stubs.sh) in
+  [`require_remote_tool_stubs`](../../../scripts/test-utils/shell/require-remote-tool-stubs.sh) in
   `setup_test`, which fails the case when a call would fall through to `/usr/bin`.
 - Hand a call to the real tool only for a loopback destination. In each ssh stand-in, include the
-  lines that [`print_ssh_pass_through`](../../../test-support/shell/print-ssh-pass-through.sh)
+  lines that [`print_ssh_pass_through`](../../../scripts/test-utils/shell/print-ssh-pass-through.sh)
   prints. Hand docker only a `unix://` socket inside the case tree, the temporary folder that
   `create_case_tree` makes for each case.
 - Produce a failure from real state on loopback when real state can produce it, such as a dead port
   (`127.0.0.1:1`) or a missing socket.
 - Run a read or write that a file mode should refuse through
-  [`run_with_file_modes`](../../../test-support/shell/run-with-file-modes.sh). Root ignores file
+  [`run_with_file_modes`](../../../scripts/test-utils/shell/run-with-file-modes.sh). Root ignores file
   modes, and the imp agent sessions run as root.
 - Stand in for `getent hosts` and for curl to a URL that isn't loopback. In the `getent` stand-in's
   own test, call the real `getent` with `-s files`, which reads the hosts file and never asks DNS.
@@ -90,9 +90,9 @@ only.
 
 - Put the logic of a module that creates resources in an exported `build*`, `require*`, `find*` or
   `to*` function in its own file, and test that function.
-- Pass [`buildStubConfig`](../../../infra/test-utils/build-stub-config.ts) where the code takes a
+- Pass [`buildStubConfig`](../../../infra/src/test-utils/build-stub-config.ts) where the code takes a
   Pulumi `Config`. Only `index.ts` builds `Config` and reads the environment.
-- Read an `Output` with [`resolveOutput`](../../../infra/test-utils/resolve-output.ts). Assert its
+- Read an `Output` with [`resolveOutput`](../../../infra/src/test-utils/resolve-output.ts). Assert its
   secrecy in its own assertion, with Pulumi's `isSecret`.
 - Pass an `Output` input by reference, with `output('<value>')`, and put the same object in the expected
   literal, so `toStrictEqual` fails when a builder rebuilds it.
@@ -108,10 +108,10 @@ only.
 - Test the worker through
   [`makeScheduledHandler`](../../../workers/health-check/make-scheduled-handler.ts). Pass it an
   object whose `log` records each message, and never replace the global console.
-- Use [`buildStubR2Bucket`](../../../workers/health-check/test-utils/build-stub-r2-bucket.ts) for the
+- Use [`buildStubR2Bucket`](../../../workers/health-check/src/test-utils/build-stub-r2-bucket.ts) for the
   bucket.
 - Seed probe targets and read sent alerts through the stores in
-  [`mocks/`](../../../workers/health-check/mocks/). The preload in the worker's
+  [`src/test-utils/`](../../../workers/health-check/src/test-utils/). The preload in the worker's
   [`bunfig.toml`](../../../workers/health-check/bunfig.toml) fails a test on any request that
   matches no MSW handler. The worker turns a failed probe into a "down" status, so without that preload an
   unmatched request would pass as a probe result.
@@ -144,15 +144,15 @@ in `scripts/host/`.
 - Write one `setup_test` per suite, which wires the stand-ins every case needs and holds no scenario
   data.
 - Make each case's temporary folder with one
-  [`create_case_tree`](../../../test-support/shell/create-case-tree.sh) call, and pass the case's
+  [`create_case_tree`](../../../scripts/test-utils/shell/create-case-tree.sh) call, and pass the case's
   cleanup to it. The call sets the case's one EXIT trap, so never set a second trap.
 - Run the script under test with `env -i` and an explicit `PATH`, `HOME` and `TMPDIR` in the case
   tree. Start each suite with `umask 022`.
 - Compare the whole stdout, the whole stderr and the stand-in call log, with `diff` against a
   heredoc or with the `assert_*` helpers. Check the exact exit code with
-  [`assert_status`](../../../test-support/shell/assert-status.sh).
-- Poll with `wait_for` from [`wait-for.sh`](../../../test-support/shell/wait-for.sh), and step time
-  with [`create_stub_clock`](../../../test-support/shell/create-stub-clock.sh).
+  [`assert_status`](../../../scripts/test-utils/shell/assert-status.sh).
+- Poll with `wait_for` from [`wait-for.sh`](../../../scripts/test-utils/shell/wait-for.sh), and step time
+  with [`create_stub_clock`](../../../scripts/test-utils/shell/create-stub-clock.sh).
 
 In a suite that a NixOS check runs, source only the helpers that `build-shell-lib-source.nix`
 selects: `run_cases`, the `assert_*` helpers and `wait_for`. `create_case_tree` and `assert_status`
@@ -160,23 +160,23 @@ are not among them.
 
 ## Shell stand-ins
 
-- Put each script that writes or starts a stand-in in `test-support/shell/`, with its own
+- Put each script that writes or starts a stand-in in `scripts/test-utils/shell/`, with its own
   `test-<file>.sh`, never inline in a suite.
   Name it `create-stub-<thing>.sh` when it writes an executable, and `start-stub-<thing>.sh` when it
   runs a process.
 - Make a tool stand-in log its argv as one JSON line, match the real tool's exit codes and messages,
   and end with `*) echo "unexpected: $*" >&2; exit 97`. When the real output differs between CI's
   version and a developer's, check both through
-  [`assert_one_of_outputs`](../../../test-support/shell/assert-one-of-outputs.sh).
-- Stand in for gh only through [`create-stub-gh.sh`](../../../test-support/shell/create-stub-gh.sh). Write
+  [`assert_one_of_outputs`](../../../scripts/test-utils/shell/assert-one-of-outputs.sh).
+- Stand in for gh only through [`create-stub-gh.sh`](../../../scripts/test-utils/shell/create-stub-gh.sh). Write
   each response in the case, for the exact argv the script sends, and cite its source. Put a long
-  body that several suites replay in [`gh-recordings/`](../../../test-support/shell/gh-recordings/).
+  body that several suites replay in [`gh-recordings/`](../../../scripts/test-utils/shell/gh-recordings/).
 - When you check a stand-in against docs instead of the real tool, as
-  [`create-stub-op.sh`](../../../test-support/shell/create-stub-op.sh) is, record the pages, the tool
+  [`create-stub-op.sh`](../../../scripts/test-utils/shell/create-stub-op.sh) is, record the pages, the tool
   version and the date in its header.
 - When a `test:scripts` suite needs a tool that a developer's host may lack, check for it before
   `run_cases`. Print `skip` and exit 0, or exit 1 when `CI` is set. Never skip a Docker suite.
 - Run a Docker suite under
-  [`with-fixture-images.sh`](../../../test-support/shell/with-fixture-images.sh). Put `$FIXTURE_RUN`
+  [`with-fixture-images.sh`](../../../scripts/test-utils/shell/with-fixture-images.sh). Put `$FIXTURE_RUN`
   in every container and volume name, and remove the containers before the volumes. Run each image
   with the user and security settings that production gives it.

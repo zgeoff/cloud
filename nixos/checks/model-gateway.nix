@@ -4,7 +4,7 @@
 # (test-utils/run-stub-model-api.py, started by test-utils/start-stub-server.sh) in the build
 # sandbox: the config moves only the model listener, the store, the override and the token file
 # into the case's directory, and points each route at the stand-in. Each case runs on its own, in
-# a fresh directory, under test-support/shell/run-cases.sh.
+# a fresh directory, under scripts/test-utils/shell/run-cases.sh.
 # Run: bun run test:nixos model-gateway
 {
   nixpkgs,

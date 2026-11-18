@@ -9,7 +9,7 @@
 # Stand-ins, from test-utils, beside the rehearsal's own: a sleep that records each pause and
 # returns at once (build-stub-sleep.nix), so the wait for imp-host's container is counted, not
 # waited out. Each subtest writes its own database, secret, copy and COPY-INFO, so every
-# subtest stands alone. It needs KVM, and it reads test-support/shell beside nixos/, so it builds
+# subtest stands alone. It needs KVM, and it reads scripts/test-utils/shell beside nixos/, so it builds
 # only from the repo root: run `bun run test:nixos impd-restore-saved-failures`.
 { nixpkgs, imp }:
 let

@@ -1,7 +1,7 @@
 # Reads the settings file that geoffcloud's imp-host unit hands impd, the file the imp module writes
 # from services.imp.settings and its env script exports as IMP_SETTINGS, and checks the settings the
 # host sets there, with the userfaultfd device that its huge pages need. Each case runs in a fresh
-# directory, under test-support/shell/run-cases.sh.
+# directory, under scripts/test-utils/shell/run-cases.sh.
 # Run: bun run test:nixos impd-settings
 {
   nixpkgs,

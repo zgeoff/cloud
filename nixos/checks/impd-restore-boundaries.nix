@@ -7,7 +7,7 @@
 # Stand-ins, from test-utils, beside the rehearsal's own: a systemctl that cannot read one
 # unit's state (build-stub-systemctl.nix), and a cmp that finds one comparison different
 # (build-stub-cmp.nix). Each subtest writes its own database, secret, copy and COPY-INFO, so
-# every subtest stands alone. It needs KVM, and it reads test-support/shell beside nixos/, so it
+# every subtest stands alone. It needs KVM, and it reads scripts/test-utils/shell beside nixos/, so it
 # builds only from the repo root: run `bun run test:nixos impd-restore-boundaries`.
 { nixpkgs, imp }:
 let

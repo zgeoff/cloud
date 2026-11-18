@@ -12,7 +12,7 @@ These rules add to [NixOS testing](../../testing/references/nixos.md) for the ch
 
 - When a check starts to read a file outside `nixos/`, add the file's path to the `nixos` gate of
   [`gates.yml`](../../../../.github/gates.yml). Otherwise a change to that file starts no run of
-  the checks. For a shell helper from `test-support/shell/`, add it to
+  the checks. For a shell helper from `scripts/test-utils/shell/`, add it to
   [`build-shell-lib-source.nix`](../../../../nixos/checks/test-utils/build-shell-lib-source.nix)
   too.
 - Render a module check's cases through

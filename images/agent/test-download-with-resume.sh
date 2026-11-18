@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for the agent image's build step sbin/download-with-resume, run with the real curl against
-# the stand-ins from test-support/shell: a download whose every connection stays under the speed
+# the stand-ins from scripts/test-utils/shell: a download whose every connection stays under the speed
 # floor finishes, because each attempt resumes where the one before ended, and a download that
 # adds no bytes fails after 5 attempts with curl's status. The cases pass the Dockerfile's speed
 # floor with a --speed-time of 1, so an attempt ends in about 1 s, and put create_stub_clock's
@@ -13,18 +13,18 @@
 set -euo pipefail
 umask 022
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=test-support/shell/run-cases.sh
-source "$here/../../test-support/shell/run-cases.sh"
-# shellcheck source=test-support/shell/create-case-tree.sh
-source "$here/../../test-support/shell/create-case-tree.sh"
-# shellcheck source=test-support/shell/assert-equals.sh
-source "$here/../../test-support/shell/assert-equals.sh"
-# shellcheck source=test-support/shell/assert-status.sh
-source "$here/../../test-support/shell/assert-status.sh"
-# shellcheck source=test-support/shell/create-stub-clock.sh
-source "$here/../../test-support/shell/create-stub-clock.sh"
-# shellcheck source=test-support/shell/start-stub-slow-download.sh
-source "$here/../../test-support/shell/start-stub-slow-download.sh"
+# shellcheck source=scripts/test-utils/shell/run-cases.sh
+source "$here/../../scripts/test-utils/shell/run-cases.sh"
+# shellcheck source=scripts/test-utils/shell/create-case-tree.sh
+source "$here/../../scripts/test-utils/shell/create-case-tree.sh"
+# shellcheck source=scripts/test-utils/shell/assert-equals.sh
+source "$here/../../scripts/test-utils/shell/assert-equals.sh"
+# shellcheck source=scripts/test-utils/shell/assert-status.sh
+source "$here/../../scripts/test-utils/shell/assert-status.sh"
+# shellcheck source=scripts/test-utils/shell/create-stub-clock.sh
+source "$here/../../scripts/test-utils/shell/create-stub-clock.sh"
+# shellcheck source=scripts/test-utils/shell/start-stub-slow-download.sh
+source "$here/../../scripts/test-utils/shell/start-stub-slow-download.sh"
 
 step="$here/sbin/download-with-resume"
 

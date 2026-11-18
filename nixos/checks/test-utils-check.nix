@@ -1,4 +1,4 @@
-# Tests the checks' shared test utilities: the shell helpers in test-support/shell that the checks
+# Tests the checks' shared test utilities: the shell helpers in scripts/test-utils/shell that the checks
 # source (run-cases.sh and the assert_* helpers, by their own suites), and the Nix helpers and
 # stand-ins in nixos/checks/test-utils. The checks that use them build this first, so a broken
 # utility fails every check that relies on it instead of passing silently. The shell suites run

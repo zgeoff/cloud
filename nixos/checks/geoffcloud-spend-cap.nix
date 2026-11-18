@@ -3,7 +3,7 @@
 # API (test-utils/run-stub-model-api.py, started by test-utils/start-stub-server.sh) in the build
 # sandbox, and checks the count that one reply adds to the proxy's store. Each case runs on its
 # own, in a fresh directory, with its own stand-in, proxy and store, under
-# test-support/shell/run-cases.sh.
+# scripts/test-utils/shell/run-cases.sh.
 # Run: bun run test:nixos geoffcloud-spend-cap
 {
   pkgs,

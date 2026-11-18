@@ -27,14 +27,14 @@ set -euo pipefail
 umask 022
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../.." && pwd)"
-# shellcheck source=test-support/shell/run-cases.sh
-source "$repo/test-support/shell/run-cases.sh"
-# shellcheck source=test-support/shell/create-case-tree.sh
-source "$repo/test-support/shell/create-case-tree.sh"
-# shellcheck source=test-support/shell/assert-status.sh
-source "$repo/test-support/shell/assert-status.sh"
-# shellcheck source=test-support/shell/create-stub-apt-suite.sh
-source "$repo/test-support/shell/create-stub-apt-suite.sh"
+# shellcheck source=scripts/test-utils/shell/run-cases.sh
+source "$repo/scripts/test-utils/shell/run-cases.sh"
+# shellcheck source=scripts/test-utils/shell/create-case-tree.sh
+source "$repo/scripts/test-utils/shell/create-case-tree.sh"
+# shellcheck source=scripts/test-utils/shell/assert-status.sh
+source "$repo/scripts/test-utils/shell/assert-status.sh"
+# shellcheck source=scripts/test-utils/shell/create-stub-apt-suite.sh
+source "$repo/scripts/test-utils/shell/create-stub-apt-suite.sh"
 
 if ! command -v dpkg-deb > /dev/null; then
   echo "test-install-ubuntu-packages: dpkg-deb is not on PATH, and every case needs it" >&2
@@ -51,7 +51,7 @@ it_installs_a_pin_that_the_live_archive_replaced_as_the_snapshot_holds_it() {
   done
   create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-2
   create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
-  docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
+  docker exec "$container" bash -c 'source /repo/scripts/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
   docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
@@ -83,7 +83,7 @@ it_resolves_an_unpinned_dependency_as_the_snapshot_holds_it_when_the_live_archiv
     cloud-stub=1.0-1/cloud-stub-lib cloud-stub-lib=2.0-2
   create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" \
     cloud-stub=1.0-1/cloud-stub-lib cloud-stub-lib=2.0-1
-  docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
+  docker exec "$container" bash -c 'source /repo/scripts/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
   docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
@@ -112,7 +112,7 @@ it_fetches_a_file_from_the_live_archive_first() {
   done
   create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-1
   create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
-  docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
+  docker exec "$container" bash -c 'source /repo/scripts/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
   docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
@@ -141,7 +141,7 @@ it_fetches_a_file_from_the_snapshot_when_the_live_archive_fails_to_serve_it() {
   create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-1
   create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
   echo '503 all /ubuntu/pool/main/cloud-stub_1.0-1_all.deb' > "$tree/faults"
-  docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
+  docker exec "$container" bash -c 'source /repo/scripts/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
   docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
@@ -174,7 +174,7 @@ it_fetches_a_list_again_after_a_wait_when_the_snapshot_fails_to_serve_it_at_firs
   create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
   echo "503 2 /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages" \
     > "$tree/faults"
-  docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
+  docker exec "$container" bash -c 'source /repo/scripts/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
   docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
@@ -220,7 +220,7 @@ it_fetches_a_file_again_after_a_wait_when_the_snapshot_fails_to_serve_it_at_firs
   create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-2
   create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
   echo '503 1 /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb' > "$tree/faults"
-  docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
+  docker exec "$container" bash -c 'source /repo/scripts/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
   docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
@@ -259,7 +259,7 @@ it_fails_with_apt_s_error_when_the_snapshot_keeps_failing_a_list() {
   create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
   echo "503 all /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages" \
     > "$tree/faults"
-  docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
+  docker exec "$container" bash -c 'source /repo/scripts/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
   docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
@@ -308,7 +308,7 @@ it_leaves_the_image_s_own_apt_sources_and_no_pin() {
   done
   create_stub_apt_suite "$tree/archive/ubuntu" "$codename"
   create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename" cloud-stub=1.0-1
-  docker exec "$container" bash -c 'source /repo/test-support/shell/start-stub-apt-archive.sh &&
+  docker exec "$container" bash -c 'source /repo/scripts/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
   docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
@@ -364,7 +364,7 @@ setup_test() {
     -v "$repo:/repo:ro" -v "$tree:/case:ro" --entrypoint sleep "$image" infinity > /dev/null
   docker exec "$container" bash -c '
     set -e
-    source /repo/test-support/shell/create-stub-clock.sh
+    source /repo/scripts/test-utils/shell/create-stub-clock.sh
     mkdir /run/clock && create_stub_clock /run/clock
     rm /etc/apt/sources.list.d/docker.list
     mkdir /run/stub && ln -s /case/archive /run/stub/root && ln -s /case/faults /run/stub/faults

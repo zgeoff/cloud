@@ -5,9 +5,9 @@
 #
 # No case reaches the internet: the state is a local backend in the store, the random provider's
 # plugin sits in the state directory as a download leaves it, and kubectl is
-# test-support/shell/create-stub-kubectl.sh, whose store under /run/stub-kube holds the prod lock.
+# scripts/test-utils/shell/create-stub-kubectl.sh, whose store under /run/stub-kube holds the prod lock.
 # The check runs the module's tree with one change: its stack file holds the fixture's salt, which
-# matches the fixture's passphrase. Discord is test-support/shell/start-stub-discord-webhook.sh on loopback.
+# matches the fixture's passphrase. Discord is scripts/test-utils/shell/start-stub-discord-webhook.sh on loopback.
 # It needs KVM: run `bun run test:nixos drift-check-vm`.
 { nixpkgs }:
 let
@@ -16,18 +16,18 @@ let
   # the Discord stand-in and the wait it sources, apart from the shared helpers of
   # test-utils/build-shell-lib-source.nix, which every other check reads
   stubDiscord = lib.fileset.toSource {
-    root = ../../test-support/shell;
+    root = ../../scripts/test-utils/shell;
     fileset = lib.fileset.unions [
-      ../../test-support/shell/start-stub-discord-webhook.sh
-      ../../test-support/shell/wait-for.sh
+      ../../scripts/test-utils/shell/start-stub-discord-webhook.sh
+      ../../scripts/test-utils/shell/wait-for.sh
     ];
   };
   # the kubectl stand-in, with the tools it runs on its PATH, since the unit's PATH has no flock
   stubKubectl =
     let
       source = lib.fileset.toSource {
-        root = ../../test-support/shell;
-        fileset = ../../test-support/shell/create-stub-kubectl.sh;
+        root = ../../scripts/test-utils/shell;
+        fileset = ../../scripts/test-utils/shell/create-stub-kubectl.sh;
       };
     in
     pkgs.runCommand "stub-kubectl" { nativeBuildInputs = [ pkgs.makeWrapper ]; } ''

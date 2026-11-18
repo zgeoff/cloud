@@ -9,7 +9,7 @@
 # Stand-ins, from test-utils, beside the rehearsal's own: a sqlite3 that also holds the
 # restore's mount busy (build-stub-sqlite3.nix), and one whose integrity_check gives the real
 # report on a damaged index (build-stub-integrity-sqlite3.nix). Each subtest writes its own database, secret,
-# copy and COPY-INFO, so every subtest stands alone. It needs KVM, and it reads test-support/shell
+# copy and COPY-INFO, so every subtest stands alone. It needs KVM, and it reads scripts/test-utils/shell
 # beside nixos/, so it builds only from the repo root: run `bun run test:nixos impd-restore`.
 { nixpkgs, imp }:
 let

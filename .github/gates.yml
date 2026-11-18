@@ -95,21 +95,21 @@ gates:
       - scripts/alert-scheduled-drift.sh
       - scripts/hold-prod-lock.sh
       - scripts/hold-host-prod-lock.sh
-      - test-support/shell/run-cases.sh
-      - test-support/shell/test-run-cases.sh
-      - test-support/shell/assert-equals.sh
-      - test-support/shell/test-assert-equals.sh
-      - test-support/shell/assert-not-equals.sh
-      - test-support/shell/test-assert-not-equals.sh
-      - test-support/shell/assert-files-equal.sh
-      - test-support/shell/test-assert-files-equal.sh
-      - test-support/shell/assert-between.sh
-      - test-support/shell/test-assert-between.sh
-      - test-support/shell/assert-missing.sh
-      - test-support/shell/test-assert-missing.sh
-      - test-support/shell/wait-for.sh
-      - test-support/shell/start-stub-discord-webhook.sh
-      - test-support/shell/create-stub-kubectl.sh
+      - scripts/test-utils/shell/run-cases.sh
+      - scripts/test-utils/shell/test-run-cases.sh
+      - scripts/test-utils/shell/assert-equals.sh
+      - scripts/test-utils/shell/test-assert-equals.sh
+      - scripts/test-utils/shell/assert-not-equals.sh
+      - scripts/test-utils/shell/test-assert-not-equals.sh
+      - scripts/test-utils/shell/assert-files-equal.sh
+      - scripts/test-utils/shell/test-assert-files-equal.sh
+      - scripts/test-utils/shell/assert-between.sh
+      - scripts/test-utils/shell/test-assert-between.sh
+      - scripts/test-utils/shell/assert-missing.sh
+      - scripts/test-utils/shell/test-assert-missing.sh
+      - scripts/test-utils/shell/wait-for.sh
+      - scripts/test-utils/shell/start-stub-discord-webhook.sh
+      - scripts/test-utils/shell/create-stub-kubectl.sh
       - scripts/run-nixos-checks.sh
       - scripts/nix-image.sh
       - scripts/open-kvm.sh
@@ -147,7 +147,7 @@ gates:
       - images/agent/**
       - scripts/*agent-image*
       - .bun-version
-      - test-support/shell/*-stub-apt-*
+      - scripts/test-utils/shell/*-stub-apt-*
       - .github/workflows/ci.yml
 
   atc-gateway:
@@ -157,11 +157,11 @@ gates:
       - scripts/fetch-atc-release.sh
       - scripts/publish-atc-gateway-images.sh
       - scripts/run-shell-suites.sh
-      - e2e/test-atc-gateway-restore.sh
+      - scripts/e2e/journey-atc-gateway-restore.sh
       - infra/cluster/build-atc-gateway-spec.ts
       - infra/cluster/create-atc-gateway-backup-job.ts
       - infra/cluster/build-atc-gateway-backup-pod-spec.ts
-      - test-support/shell/**
+      - scripts/test-utils/shell/**
       - .github/workflows/ci.yml
 
   files-image:
@@ -173,7 +173,7 @@ gates:
       - scripts/write-files-image-context.sh
       - scripts/publish-files-image.sh
       - scripts/run-shell-suites.sh
-      - test-support/shell/**
+      - scripts/test-utils/shell/**
       - bun.lock
       - .bun-version
       - .github/workflows/ci.yml
@@ -192,7 +192,7 @@ gates:
       - images/pepys/**
       - images/atc-gateway/versions.env
       - scripts/run-shell-suites.sh
-      - test-support/shell/**
+      - scripts/test-utils/shell/**
   boxxy-image:
     skipped: Nothing the boxxy image builds from changed, so its image test did not run.
     paths:
@@ -202,7 +202,7 @@ gates:
       - scripts/write-boxxy-image-context.sh
       - scripts/publish-boxxy-image.sh
       - scripts/run-shell-suites.sh
-      - test-support/shell/**
+      - scripts/test-utils/shell/**
       - bun.lock
       - .bun-version
       - .github/workflows/ci.yml
@@ -212,10 +212,10 @@ gates:
     paths:
       - deploy/files/backup/**
       - scripts/run-shell-suites.sh
-      - test-support/shell/run-cases.sh
-      - test-support/shell/run-backup.sh
-      - test-support/shell/run-backup-shell.sh
-      - test-support/shell/normalize-restic-output.sh
+      - scripts/test-utils/shell/run-cases.sh
+      - scripts/test-utils/shell/run-backup.sh
+      - scripts/test-utils/shell/run-backup-shell.sh
+      - scripts/test-utils/shell/normalize-restic-output.sh
       - infra/Pulumi.prod.yaml
       - .bun-version
       - package.json
@@ -226,11 +226,11 @@ gates:
     paths:
       - deploy/nixie/backup/**
       - scripts/run-shell-suites.sh
-      - test-support/shell/run-cases.sh
-      - test-support/shell/create-case-tree.sh
-      - test-support/shell/assert-status.sh
-      - test-support/shell/normalize-restic-output.sh
-      - test-support/shell/create-stub-racing-restic.sh
+      - scripts/test-utils/shell/run-cases.sh
+      - scripts/test-utils/shell/create-case-tree.sh
+      - scripts/test-utils/shell/assert-status.sh
+      - scripts/test-utils/shell/normalize-restic-output.sh
+      - scripts/test-utils/shell/create-stub-racing-restic.sh
       - infra/Pulumi.prod.yaml
       - .bun-version
       - package.json
@@ -252,9 +252,9 @@ gates:
       - packages/topology/**
       - infra/Pulumi.prod.yaml
       - scripts/run-shell-suites.sh
-      - test-support/shell/run-cases.sh
-      - test-support/shell/create-case-tree.sh
-      - test-support/shell/assert-status.sh
+      - scripts/test-utils/shell/run-cases.sh
+      - scripts/test-utils/shell/create-case-tree.sh
+      - scripts/test-utils/shell/assert-status.sh
       - bun.lock
       - .bun-version
       - package.json
@@ -270,8 +270,8 @@ gates:
       - infra/**
       - packages/topology/**
       - workers/health-check/**
-      - e2e/test-atc-sign-in-alert-journey.sh
-      - test-support/shell/**
+      - scripts/e2e/journey-atc-sign-in-alerts.sh
+      - scripts/test-utils/shell/**
       - scripts/run-shell-suites.sh
       - bun.lock
       - .bun-version

@@ -14,9 +14,9 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/wait-for.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/assert-equals.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/wait-for.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/assert-equals.sh"
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 blackbox_image='quay.io/prometheus/blackbox-exporter:v0.28.0@sha256:e753ff9f3fc458d02cca5eddab5a77e1c175eee484a8925ac7d524f04366c2fc'

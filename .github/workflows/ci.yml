@@ -196,7 +196,7 @@ jobs:
       # bash, git, jq, openssl, curl, python3, coreutils, dpkg-deb and gh, all on ubuntu-latest's
       # image; CI=true there, so the apt stand-in's suite fails rather than skip without dpkg-deb;
       # the ubuntu-24.04 image 20260927.320.1 readme lists GitHub CLI 2.101.0, which the GitHub
-      # API stand-in's real-gh case (test-support/shell/test-start-stub-github-api.sh) runs
+      # API stand-in's real-gh case (scripts/test-utils/shell/test-start-stub-github-api.sh) runs
       - name: Test Scripts
         if: needs.decide.outputs.reused != 'true' && (needs.decide.outputs.full != 'false')
         run: bun run test:scripts

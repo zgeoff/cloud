@@ -30,7 +30,7 @@
         "scripts/build-agent-image.ts",
         "scripts/test-utils/run-stub-kubectl-proxy.ts"
       ],
-      "project": ["deploy/boxxy/**/*.ts", "scripts/**/*.ts", "e2e/**/*.ts"]
+      "project": ["deploy/boxxy/**/*.ts", "scripts/**/*.ts", "scripts/e2e/**/*.ts"]
     }
   },
   "ignoreDependencies": [

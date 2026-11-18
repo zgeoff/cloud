@@ -25,7 +25,7 @@ on:
       - scripts/check-pepys-routes.ts
       - scripts/build-pepys-route-table.ts
       - scripts/run-shell-suites.sh
-      - test-support/shell/**
+      - scripts/test-utils/shell/**
       - .bun-version
       - .github/workflows/pepys-image.yml
 

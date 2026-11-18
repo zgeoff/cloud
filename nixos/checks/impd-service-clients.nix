@@ -2,7 +2,7 @@
 # settings that name them, the restart it asks of imp-host, and each assertion that refuses a client list impd's parser would
 # refuse. Each case evaluates its own config, beside imp's module, through
 # test-utils/build-module-system.nix, and runs in
-# a fresh directory under test-support/shell/run-cases.sh.
+# a fresh directory under scripts/test-utils/shell/run-cases.sh.
 # Run: bun run test:nixos impd-service-clients
 { nixpkgs, imp }:
 let

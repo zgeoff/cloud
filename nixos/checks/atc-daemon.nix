@@ -3,7 +3,7 @@
 # config.json that geoffcloud's own config links instead. Each other case evaluates its own config
 # through test-utils/build-module-system.nix, most as buildDaemonSystem's valid config with the
 # options the case sets. Each runs on its own, in a fresh directory, under
-# test-support/shell/run-cases.sh, which reports each case and fails the check when any case fails.
+# scripts/test-utils/shell/run-cases.sh, which reports each case and fails the check when any case fails.
 # No case starts atc, so a token file that atc refuses at start passes here: atc-daemon-vm starts
 # the daemon as the host does.
 # Run: bun run test:nixos atc-daemon

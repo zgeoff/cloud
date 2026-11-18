@@ -19,9 +19,9 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/assert-equals.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/assert-equals.sh"
 
 # run_probe <image> <program> <path>...: runs <program> with the pods' container security
 run_probe() {

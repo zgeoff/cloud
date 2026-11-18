@@ -16,7 +16,7 @@ on:
       - scripts/write-files-image-context.sh
       - scripts/publish-files-image.sh
       - scripts/run-shell-suites.sh
-      - test-support/shell/**
+      - scripts/test-utils/shell/**
       - bun.lock
       - .bun-version
       - .github/workflows/files-image.yml

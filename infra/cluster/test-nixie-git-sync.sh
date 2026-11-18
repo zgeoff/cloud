@@ -14,10 +14,10 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/wait-for.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/assert-equals.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/has-metric.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/wait-for.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/assert-equals.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/has-metric.sh"
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 run_id="$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')"

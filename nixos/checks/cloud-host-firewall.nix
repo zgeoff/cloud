@@ -2,7 +2,7 @@
 # it renders and the module's assertions, then pins geoffcloud's own table whole and checks its
 # syntax with nft. Each module case evaluates its own config through
 # test-utils/build-module-system.nix. Each case runs on its own, in a fresh directory, under
-# test-support/shell/run-cases.sh, which reports each case and fails the check when any case
+# scripts/test-utils/shell/run-cases.sh, which reports each case and fails the check when any case
 # fails.
 # Run: bun run test:nixos cloud-host-firewall
 {

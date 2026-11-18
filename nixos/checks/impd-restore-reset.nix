@@ -15,7 +15,7 @@
 # which is the test's signal to kill the script; the reset then ends the stand-in as it ends any
 # holder. The last two take the reset's own steps up to a point where an earlier reset could have
 # stopped: tank/imp destroyed and not yet made again, and every system profile link removed. It
-# needs KVM, and it reads test-support/shell beside nixos/, so it builds only from the repo root: run
+# needs KVM, and it reads scripts/test-utils/shell beside nixos/, so it builds only from the repo root: run
 # `bun run test:nixos impd-restore-reset`.
 { nixpkgs, imp }:
 let

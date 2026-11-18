@@ -26,11 +26,11 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/assert-equals.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/wait-for.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/assert-equals.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-utils/shell/wait-for.sh"
 
 it_answers_healthz_on_the_owner_port_and_opens_its_store_on_the_volume() {
   local image="$1" restic_image="$2" run="$3" body
