@@ -15,10 +15,9 @@ let
   root = ../../packages/preview;
   modules = lib.fileset.toSource {
     inherit root;
-    fileset =
-      lib.fileset.difference
-        (lib.fileset.fileFilter (file: file.hasExt "ts" && !(lib.hasSuffix ".test.ts" file.name)) root)
-        (root + "/src/test-utils");
+    fileset = lib.fileset.difference (lib.fileset.fileFilter (
+      file: file.hasExt "ts" && !(lib.hasSuffix ".test.ts" file.name)
+    ) root) (root + "/src/test-utils");
   };
 
   # bun.lock is JSON with trailing commas, which builtins.fromJSON refuses
