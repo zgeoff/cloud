@@ -12,7 +12,7 @@
         "@commitlint/cli": "21.2.4",
         "@faker-js/faker": "10.6.0",
         "@heynixie/contract": "0.83.1",
-        "@impz/client": "7.4.0",
+        "@impz/client": "7.5.0",
         "@maschwenk/tsrslint": "0.1.6",
         "@mswjs/interceptors": "0.45.11",
         "@orpc/client": "1.16.2",
@@ -80,7 +80,7 @@
     "packages/preview": {
       "name": "@zgeoff/cloud-preview",
       "dependencies": {
-        "@impz/client": "7.4.0",
+        "@impz/client": "7.5.0",
         "@zgeoff/std": "0.4.3",
         "ts-pattern": "5.9.2",
         "xstate": "5.33.4",
@@ -277,7 +277,7 @@
 
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
 
-    "@impz/client": ["@impz/client@7.4.0", "", { "dependencies": { "@orpc/client": "^1.16.1", "@orpc/contract": "^1.16.1", "p-retry": "^8.0.1", "ts-pattern": "^5.9.2", "zod": "^4.6.7" }, "peerDependencies": { "@opentelemetry/api": ">=1.9.0" }, "optionalPeers": ["@opentelemetry/api"] }, "sha512-o6UXa4aqLTpgWi3C1inhv9wiqe/o+MQi++Pr9VSR2M8+EtOXCD3i/JH/rzcigZDzHp/ijwk+ei8kKfSS6KG0RQ=="],
+    "@impz/client": ["@impz/client@7.5.0", "", { "dependencies": { "@orpc/client": "^1.16.1", "@orpc/contract": "^1.16.1", "p-retry": "^8.0.1", "ts-pattern": "^5.9.2", "zod": "^4.6.7" }, "peerDependencies": { "@opentelemetry/api": ">=1.9.0" }, "optionalPeers": ["@opentelemetry/api"] }, "sha512-v4bj/jz/+3cD4WCRuwe2hAHdeOyBoNyuj+3KRdtpAUOWtUZgiMGQgJ3Pu2O3haDLfUyShnlU/wWdSnxVjh9C6w=="],
 
     "@inquirer/ansi": ["@inquirer/ansi@2.0.10", "", {}, "sha512-dwrc+1aqVZpHNkNDswXGtn1typ+Pxpo5FHZRyBw1le7onEJUkPUkYOY1FIFC1LvFMYUqqLuWBwElhAmencL7MQ=="],
 
