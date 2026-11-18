@@ -78,11 +78,12 @@ The host reserves a fixed huge page pool early in boot, and the kernel makes no 
 `configuration.nix` sets the pool's size apart from impd's memory budget, and the budget is larger
 than the pool. impd gives guests on base pages only the budget less the pool, so the dev imps run in
 that part of the budget. A switch that lowers the pool frees its unused pages on the running host,
-with no reboot. The pool memory leaves the host's ordinary memory for good, whether imps use it or
-not. Firecracker maps the pool without a reservation, so a guest that faults past an empty pool dies
-of SIGBUS. impd admits a boot or a wake only into free pool pages, and a pool made on demand would
-fail when memory fragments, so the pool is fixed. A fixed-memory imp whose snapshot is on base pages
-wakes there when that part of the budget has room, and otherwise boots cold onto the pool.
+with no reboot. Each page in the pool is lost to the host's ordinary memory while the pool holds it,
+whether imps use it or not. Firecracker maps the pool without a reservation, so a guest that faults
+past an empty pool dies of SIGBUS. impd admits a boot or a wake only into free pool pages, and a
+pool made on demand would fail when memory fragments, so the pool is fixed. A fixed-memory imp whose
+snapshot is on base pages wakes there when that part of the budget has room, and otherwise boots
+cold onto the pool.
 
 The imps yield CPU to the cluster rather than hold a cap. Rootful Podman starts its containers,
 imp-host the only one, in `machine.slice`, whose CPU weight of 10 sits below the weight of
