@@ -58,6 +58,12 @@ let
         default = "https://api.anthropic.com";
         description = "The model API's origin, which the gateway sends the route's requests to.";
       };
+      providerPin = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "novita/fp8";
+        description = "The OpenRouter provider that the profile's provider_pin names; the gateway refuses any other provider field. null for none.";
+      };
       prices = lib.mkOption {
         type = lib.types.submodule {
           options = priceRateOptions // {
@@ -83,11 +89,14 @@ let
     };
   };
 
-  # the gateway's config schema takes no null for an absent long_prompt
-  renderRoute = route: {
-    inherit (route) model upstream;
-    prices = lib.filterAttrs (_: rates: rates != null) route.prices;
-  };
+  # the gateway's config schema takes no null for an absent long_prompt or providerPin
+  renderRoute =
+    route:
+    {
+      inherit (route) model upstream;
+      prices = lib.filterAttrs (_: rates: rates != null) route.prices;
+    }
+    // lib.optionalAttrs (route.providerPin != null) { inherit (route) providerPin; };
 
   # YAML is a superset of JSON, and the gateway parses its config with Bun.YAML
   configFile = pkgs.writeText "model-gateway.yaml" (

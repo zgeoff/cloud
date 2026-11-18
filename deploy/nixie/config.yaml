@@ -116,12 +116,18 @@ models:
     # each profile sends to https://openrouter.ai/api, since nixie refuses a base URL with a path
     # while spendStop is set. Each profile's model secret holds the OpenRouter key from vault cloud,
     # item nixie-openrouter-credential, for the host openrouter.ai (docs/runbooks/nixie.md).
-    # OpenRouter sends a request to any of a model's providers, and they bill at different prices,
-    # so each price is the highest of the model's endpoints on https://openrouter.ai/models (read
-    # 17 Nov 2026): a count never falls below the bill. A provider that lists no cache write price
-    # bills cache writes as input. The cap of 200,000 tokens is the window the Claude CLI assumes for
-    # a model outside its catalog. gryphe/mythomax-l2-13b stays out: its 8,192-token window is below
-    # the 100,000-token floor of context_tokens, and it has no tool calls.
+    # Each profile pins one provider endpoint with fallbacks off, so OpenRouter never bills another
+    # provider's price: a standard tier, never a fast, priority or flex one, at full or fp8 precision
+    # where the model has such an endpoint, with full recent uptime. The gateway route's providerPin
+    # names the same endpoint. A pin also matches the endpoints under it, such as another region,
+    # and an open-weight model's priority endpoint (OpenRouter's provider selection guide), so each
+    # price is the highest of the endpoints the pin matches, from
+    # https://openrouter.ai/api/v1/models/<model>/endpoints (read 18 Nov 2026). An endpoint that lists
+    # no cache write price bills cache writes as input, and a Gemini cache write costs the input price
+    # plus the listed storage price. The cap of 200,000 tokens is the window the
+    # Claude CLI assumes for a model outside its catalog. gryphe/mythomax-l2-13b stays out: its
+    # 8,192-token window is below the 100,000-token floor of context_tokens, and it has no tool calls.
+    # Google AI Studio, at the same price as Vertex's global endpoint, which ran below full uptime
     gemini-4-carbon:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -130,30 +136,38 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: google-ai-studio
       context_tokens: 200000
-      prices: { input: 3.6, cache_write: 3.6, cache_write_1h: 3.6, cached_input: 0.18, output: 18 }
-    gpt-6-1-sol:
+      prices:
+        input: 2
+        cache_write: 2.1875
+        cache_write_1h: 2.1875
+        cached_input: 0.1
+        output: 10
+    gpt-6-2-sol:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
       auth_header: bearer
-      model: openai/gpt-6.1-sol
+      model: openai/gpt-6.2-sol
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: openai
       context_tokens: 200000
       prices:
-        input: 12
-        cache_write: 15
-        cache_write_1h: 15
-        cached_input: 0.6
-        output: 60
+        input: 2
+        cache_write: 2.5
+        cache_write_1h: 2.5
+        cached_input: 0.1
+        output: 10
         long_prompt:
           over_tokens: 272000
-          input: 24
-          cache_write: 30
-          cache_write_1h: 30
-          cached_input: 1.2
-          output: 90
+          input: 4
+          cache_write: 5
+          cache_write_1h: 5
+          cached_input: 0.2
+          output: 15
+    # Alibaba, at Moonshot AI's own price: Moonshot AI serves the model only at mxfp4 precision
     kimi-k3-1-pro:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -162,8 +176,14 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: alibaba
       context_tokens: 200000
-      prices: { input: 4, cache_write: 4, cache_write_1h: 4, cached_input: 0.27, output: 20 }
+      prices:
+        input: 2
+        cache_write: 2
+        cache_write_1h: 2
+        cached_input: 0.2
+        output: 10
     glm-5-3:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -172,8 +192,14 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: novita/fp8
       context_tokens: 200000
-      prices: { input: 2.1, cache_write: 2.1, cache_write_1h: 2.1, cached_input: 0.4, output: 6.6 }
+      prices:
+        input: 0.63
+        cache_write: 0.63
+        cache_write_1h: 0.63
+        cached_input: 0.117
+        output: 1.98
     grok-4-7:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -182,20 +208,21 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: xai
       context_tokens: 200000
       prices:
-        input: 4
-        cache_write: 4
-        cache_write_1h: 4
-        cached_input: 1
-        output: 12
+        input: 2.2
+        cache_write: 2.2
+        cache_write_1h: 2.2
+        cached_input: 0.55
+        output: 6.6
         long_prompt:
           over_tokens: 200000
-          input: 8
-          cache_write: 8
-          cache_write_1h: 8
-          cached_input: 2
-          output: 24
+          input: 4.4
+          cache_write: 4.4
+          cache_write_1h: 4.4
+          cached_input: 1.1
+          output: 13.2
     qwen4-max:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -204,15 +231,14 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: alibaba
       context_tokens: 200000
       prices:
-        {
-          input: 1.425,
-          cache_write: 1.78125,
-          cache_write_1h: 1.78125,
-          cached_input: 0.07125,
-          output: 4.275,
-        }
+        input: 1.425
+        cache_write: 1.78125
+        cache_write_1h: 1.78125
+        cached_input: 0.07125
+        output: 4.275
     mistral-large-4:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -221,9 +247,14 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: mistral/zdr
       context_tokens: 200000
       prices:
-        { input: 0.77, cache_write: 0.77, cache_write_1h: 0.77, cached_input: 0.077, output: 2.31 }
+        input: 0.7
+        cache_write: 0.7
+        cache_write_1h: 0.7
+        cached_input: 0.07
+        output: 2.1
     inkling-2-small:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -232,8 +263,14 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: together
       context_tokens: 200000
-      prices: { input: 0.3, cache_write: 0.3, cache_write_1h: 0.3, cached_input: 0.06, output: 1 }
+      prices:
+        input: 0.3
+        cache_write: 0.3
+        cache_write_1h: 0.3
+        cached_input: 0.03
+        output: 1
     deepseek-v4-1-flash:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -242,30 +279,37 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: deepinfra/fp8
       context_tokens: 200000
-      prices: { input: 0.6, cache_write: 0.6, cache_write_1h: 0.6, cached_input: 0.03, output: 2.4 }
-    gpt-6-astra:
+      prices:
+        input: 0.147
+        cache_write: 0.147
+        cache_write_1h: 0.147
+        cached_input: 0.00441
+        output: 0.441
+    gpt-6-2-astra:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
       auth_header: bearer
-      model: openai/gpt-6-astra
+      model: openai/gpt-6.2-astra
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: openai
       context_tokens: 200000
       prices:
-        input: 60
-        cache_write: 75
-        cache_write_1h: 75
-        cached_input: 6
-        output: 300
+        input: 8
+        cache_write: 10
+        cache_write_1h: 10
+        cached_input: 0.4
+        output: 40
         long_prompt:
           over_tokens: 272000
-          input: 120
-          cache_write: 150
-          cache_write_1h: 150
-          cached_input: 12
-          output: 450
+          input: 16
+          cache_write: 20
+          cache_write_1h: 20
+          cached_input: 0.8
+          output: 60
     gemini-4-hydrogen:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -274,9 +318,14 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: google-ai-studio
       context_tokens: 200000
       prices:
-        { input: 2.7, cache_write: 2.7, cache_write_1h: 2.7, cached_input: 0.135, output: 13.5 }
+        input: 1.5
+        cache_write: 1.583333
+        cache_write_1h: 1.583333
+        cached_input: 0.075
+        output: 7.5
     muse-wonder:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -285,8 +334,15 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: meta
       context_tokens: 200000
-      prices: { input: 4, cache_write: 4, cache_write_1h: 4, cached_input: 0.2, output: 20 }
+      prices:
+        input: 4
+        cache_write: 4
+        cache_write_1h: 4
+        cached_input: 0.2
+        output: 20
+    # Tencent's fp4 endpoint is the model's only one
     hy4:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -295,15 +351,14 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: tencent/fp4
       context_tokens: 200000
       prices:
-        {
-          input: 0.417,
-          cache_write: 0.417,
-          cache_write_1h: 0.417,
-          cached_input: 0.021,
-          output: 1.2505,
-        }
+        input: 0.417
+        cache_write: 0.417
+        cache_write_1h: 0.417
+        cached_input: 0.021
+        output: 1.2505
     pareto-26-10:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -312,8 +367,14 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: unbiased
       context_tokens: 200000
-      prices: { input: 0.8, cache_write: 0.8, cache_write_1h: 0.8, cached_input: 0.03, output: 3.2 }
+      prices:
+        input: 0.8
+        cache_write: 0.8
+        cache_write_1h: 0.8
+        cached_input: 0.03
+        output: 3.2
     aion-3-5:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -322,8 +383,14 @@ models:
       effort: medium
       harness: agent-sdk
       outside_claude: true
+      provider_pin: aion-labs
       context_tokens: 200000
-      prices: { input: 3, cache_write: 3, cache_write_1h: 3, cached_input: 0.75, output: 6 }
+      prices:
+        input: 3
+        cache_write: 3
+        cache_write_1h: 3
+        cached_input: 0.75
+        output: 6
   roles:
     conversation: fable-5-2
     checker: sonnet-5-5-high
@@ -374,11 +441,11 @@ models:
       description:
         Google's Gemini 4 Carbon, released November 2026, through OpenRouter. A frontier Gemini for
         coding, agentic work and complex reasoning.
-    gpt-6-1-sol:
-      profile: gpt-6-1-sol
+    gpt-6-2-sol:
+      profile: gpt-6-2-sol
       description:
-        OpenAI's GPT-6.1 Sol, released September 2026, through OpenRouter. The tier below GPT-6
-        Astra, suited to agentic coding and document-heavy professional work.
+        OpenAI's GPT-6.2 Sol, released November 2026, through OpenRouter. The efficient, versatile
+        tier below GPT-6.2 Astra, for everyday work.
     kimi-k3-1-pro:
       profile: kimi-k3-1-pro
       description:
@@ -414,12 +481,11 @@ models:
       description:
         DeepSeek V4.1 Flash, the 17 October 2026 snapshot, through OpenRouter. A fast, almost free
         mixture-of-experts model.
-    gpt-6-astra:
-      profile: gpt-6-astra
+    gpt-6-2-astra:
+      profile: gpt-6-2-astra
       description:
-        OpenAI's GPT-6 Astra, released September 2026, through OpenRouter. OpenAI's flagship for
-        demanding analysis, software engineering and deep research, and the most expensive model
-        here.
+        OpenAI's GPT-6.2 Astra, released November 2026, through OpenRouter. OpenAI's flagship for
+        the hardest engineering, professional and scientific work.
     gemini-4-hydrogen:
       profile: gemini-4-hydrogen
       description:
