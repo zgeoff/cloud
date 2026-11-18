@@ -64,7 +64,9 @@ waits on each nixie turn and an agent imp does not. impd refuses an agent imp's 
 would take the kept memory, while a nixie sandbox can use the whole budget and sleeps agent imps to
 make room
 ([imp's priority imps](https://github.com/zgeoff/impz/blob/main/docs/architecture/lifecycle/ram-governor.md#priority-imps)).
-The host's `configuration.nix` sets the kept size beside the sandboxes it covers.
+The host's `configuration.nix` sets the kept size beside the sandboxes it covers. impd keeps that
+memory in the whole budget and in the huge page pool, where the sandboxes run, and keeps none in the
+budget past the pool, so the elastic dev imps can use all of that part.
 
 impd runs every imp of fixed memory on huge pages, and restores and wakes it through a page handler
 ([imp's huge pages](https://github.com/zgeoff/impz/blob/main/docs/architecture/lifecycle/huge-pages.md)).
