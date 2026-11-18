@@ -29,6 +29,8 @@ test('it runs one single-node Garage as nonroot that creates the facts bucket, w
     env: [
       { name: 'GARAGE_CONFIG_FILE', value: '/etc/garage/garage.toml' },
       { name: 'GARAGE_DEFAULT_BUCKET', value: 'facts' },
+      { name: 'RUST_LOG', value: 'warn,garage::server=info' },
+      { name: 'NO_COLOR', value: '1' },
     ],
     envFrom: [{ secretRef: { name: envSecret } }],
     securityContext: {

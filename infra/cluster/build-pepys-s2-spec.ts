@@ -34,7 +34,11 @@ export function buildPepysS2Spec(inputs: PepysS2SpecInputs) {
             env: [
               { name: 'AWS_ENDPOINT_URL_S3', value: pepysWorkloads.garage.url },
               { name: 'AWS_REGION', value: 'garage' },
-              { name: 'RUST_LOG', value: 'info' },
+
+              // warnings and errors only, except s2-lite's own start and stop lines: at info,
+              // tower_http logs every request. NO_COLOR keeps ANSI codes out of the log lines.
+              { name: 'RUST_LOG', value: 'warn,s2_lite=info' },
+              { name: 'NO_COLOR', value: '1' },
             ],
             envFrom: [{ secretRef: { name: inputs.envSecret } }],
             readinessProbe: {

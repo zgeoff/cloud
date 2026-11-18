@@ -46,6 +46,12 @@ export function buildPepysGarageSpec(inputs: PepysGarageSpecInputs) {
             env: [
               { name: 'GARAGE_CONFIG_FILE', value: '/etc/garage/garage.toml' },
               { name: 'GARAGE_DEFAULT_BUCKET', value: pepysWorkloads.s2.bucket },
+
+              // warnings and errors only, except the start and stop lines of garage::server: at
+              // info, Garage logs every request and each block it resyncs. NO_COLOR keeps ANSI
+              // codes out of the log lines.
+              { name: 'RUST_LOG', value: 'warn,garage::server=info' },
+              { name: 'NO_COLOR', value: '1' },
             ],
             envFrom: [{ secretRef: { name: inputs.envSecret } }],
             readinessProbe: {
