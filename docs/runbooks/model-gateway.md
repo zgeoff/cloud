@@ -105,10 +105,12 @@ for the cause, and check the provider's usage page, before you clear the mark.
 
 1. Stop the unit, so no reply writes the store during the edit:
    `ssh root@geoffcloud systemctl stop model-gateway < /dev/null`.
-2. Remove the field, keeping the file's owner and mode:
+2. Remove the field, keeping the file's owner and mode. The host has no `jq` of its own, so the
+   command runs it through `nix run`. The gateway writes the store as mode 0644 inside its 0700
+   state directory:
 
    ```bash
-   ssh root@geoffcloud 'cd /var/lib/model-gateway && jq "del(.lost)" store.json > store.json.new && chown model-gateway:model-gateway store.json.new && chmod 0600 store.json.new && mv store.json.new store.json' < /dev/null
+   ssh root@geoffcloud 'cd /var/lib/model-gateway && nix run nixpkgs#jq -- -c "del(.lost)" store.json > store.json.new && chown model-gateway:model-gateway store.json.new && chmod 0644 store.json.new && mv store.json.new store.json' < /dev/null
    ```
 
 3. Start the unit: `ssh root@geoffcloud systemctl start model-gateway < /dev/null`, and read the
