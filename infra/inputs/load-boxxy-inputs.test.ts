@@ -61,11 +61,15 @@ function setupTest() {
   const stackValues = { boxxy: JSON.stringify(boxxy), boxxySpawnRepos: JSON.stringify(repos) };
   const stackConfig = buildStubConfig(stackValues);
 
-  // the review gate's part: review agents with the github section, and the noslop App's keys
+  // the review gate's part: a review agent with the github section, and the noslop App's keys
   const review = {
     boxxy: {
       ...boxxy,
-      spawn: { ...boxxy.spawn, reviewAgents: ['review-agent-for-tests'] },
+      spawn: {
+        ...boxxy.spawn,
+        agents: { 'review-agent-for-tests': { phases: ['review'] } },
+        phases: { review: { requireScopedAgent: true } },
+      },
       github: { baseUrl: 'https://api.github.com' },
     },
     env: {
@@ -507,7 +511,8 @@ test("it keeps the review agents and marks each of the noslop App's keys secret"
 
   expect(inputs.boxxy.config.spawn).toStrictEqual({
     target: 'target-for-tests',
-    reviewAgents: ['review-agent-for-tests'],
+    agents: { 'review-agent-for-tests': { phases: ['review'] } },
+    phases: { review: { requireScopedAgent: true } },
   });
 
   expect(secretKeys).toStrictEqual([true, true, true]);
@@ -518,7 +523,7 @@ test.each([
   'NOSLOP_GITHUB_APP_ID',
   'NOSLOP_GITHUB_APP_PRIVATE_KEY',
   'NOSLOP_GITHUB_APP_INSTALLATION_ID',
-] as const)('it refuses the review agents without %s', (variable) => {
+] as const)('it refuses a review agent without %s', (variable) => {
   const fixture = setupTest();
   const review = fixture.review;
   const stackValues = fixture.stackValues;
@@ -532,11 +537,11 @@ test.each([
 
   expect(() => loadBoxxyInputs(stackConfig, env, undefined)).toThrowWithMessage(
     Error,
-    `${variable} is unset; the boxxy server posts each review as the noslop App with it while stack config "boxxy.spawn.reviewAgents" lists an agent`,
+    `${variable} is unset; the boxxy server posts each review as the noslop App with it while stack config "boxxy.spawn.agents" scopes an agent to the review phase`,
   );
 });
 
-test('it refuses the review agents without the github section', () => {
+test('it refuses a review agent without the github section', () => {
   const fixture = setupTest();
   const review = fixture.review;
   const stackValues = fixture.stackValues;
@@ -545,15 +550,23 @@ test('it refuses the review agents without the github section', () => {
 
   expect(() => loadBoxxyInputs(stackConfig, review.env, undefined)).toThrowWithMessage(
     Error,
-    'stack config "boxxy.spawn.reviewAgents" needs stack config "boxxy.github": the review gate reads the pull request\'s changes through it',
+    'stack config "boxxy.spawn.agents" scopes an agent to the review phase, which needs stack config "boxxy.github": the review gate reads the pull request\'s changes through it',
   );
 });
 
-test("it adds none of the noslop App's keys while no review agent is listed", () => {
+test("it adds none of the noslop App's keys while no agent is scoped to the review phase", () => {
   const fixture = setupTest();
   const review = fixture.review;
   const stackValues = fixture.stackValues;
-  const boxxy = { ...review.boxxy, spawn: { ...review.boxxy.spawn, reviewAgents: [] } };
+
+  const boxxy = {
+    ...review.boxxy,
+    spawn: {
+      ...review.boxxy.spawn,
+      agents: { 'live-agent-for-tests': { phases: ['live'], repos: ['example/app'] } },
+    },
+  };
+
   const stackConfig = buildStubConfig({ ...stackValues, boxxy: JSON.stringify(boxxy) });
   const inputs = loadBoxxyInputs(stackConfig, review.env, undefined);
 

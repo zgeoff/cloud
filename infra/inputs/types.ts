@@ -156,9 +156,15 @@ export interface BoxxyConfig {
   readonly spawn: {
     readonly target: string;
 
-    // the atc agents whose broker profile holds the read-only clone token: only a review recipe
-    // may name one, and with one the server runs its review gate
-    readonly reviewAgents?: readonly string[];
+    // the atc agents whose broker profile holds a credential, each with the phases it may run and,
+    // when set, the only repos it may run in; the server refuses any other spawn of the agent
+    readonly agents?: Readonly<
+      Record<string, { readonly phases: readonly string[]; readonly repos?: readonly string[] }>
+    >;
+
+    // by phase: with requireScopedAgent, every recipe that can run the phase names an agent that
+    // agents scopes to it
+    readonly phases?: Readonly<Record<string, { readonly requireScopedAgent?: boolean }>>;
   };
 
   // with it, the server sends its facts to pepys and reads its two reports there; the cluster sets

@@ -46,6 +46,13 @@ const serviceClientDigests = z
     'each service client needs a digest of its own',
   );
 
+const agentScope = z.strictObject({
+  phases: z.array(name).min(1),
+  repos: z.array(name).exactOptional(),
+});
+
+const phasePolicy = z.strictObject({ requireScopedAgent: z.boolean().exactOptional() });
+
 // the image reaches its own check below, which names what the field must hold
 const boxxyConfigSchema = z.strictObject({
   image: z.string().optional(),
@@ -54,9 +61,12 @@ const boxxyConfigSchema = z.strictObject({
   spawn: z.strictObject({
     target: name,
 
-    // the atc agents whose broker profile holds the read-only clone token; with one, the server
-    // runs its review gate, which needs the noslop App's keys and the github section
-    reviewAgents: z.array(name).optional(),
+    // the atc agents whose broker profile holds a credential, each with the phases and repos it may
+    // run; an agent scoped to the review phase needs the noslop App's keys and the github section
+    agents: z.record(name, agentScope).optional(),
+
+    // by phase: its spawn policy, such as review's requireScopedAgent
+    phases: z.record(name, phasePolicy).optional(),
   }),
 
   // the environment whose deploy the stage times count; the cluster sets pepys's addresses
@@ -126,9 +136,8 @@ export function loadBoxxyInputs(
         atc: config.atc,
         spawn: {
           target: config.spawn.target,
-          ...(config.spawn.reviewAgents === undefined
-            ? {}
-            : { reviewAgents: config.spawn.reviewAgents }),
+          ...(config.spawn.agents === undefined ? {} : { agents: config.spawn.agents }),
+          ...(config.spawn.phases === undefined ? {} : { phases: config.spawn.phases }),
         },
         ...(config.pepys === undefined ? {} : { pepys: config.pepys }),
         ...(config.github === undefined ? {} : { github: config.github }),
@@ -235,22 +244,22 @@ function isRSAPrivateKey(pem: string): boolean {
 }
 
 const reviewAppNeed =
-  'the boxxy server posts each review as the noslop App with it while stack config "boxxy.spawn.reviewAgents" lists an agent';
+  'the boxxy server posts each review as the noslop App with it while stack config "boxxy.spawn.agents" scopes an agent to the review phase';
 
 // The noslop App's keys, which only the server's pod holds: the review gate checks and posts each
-// review session's result with them. A server with review agents and no keys or no github section
+// review session's result with them. A server with a review agent and no keys or no github section
 // rejects every review close-out, so the deploy refuses that pairing.
 function findReviewApp(
   config: z.infer<typeof boxxyConfigSchema>,
   env: Environment,
 ): NonNullable<BoxxyInputs['secrets']['reviewApp']> | undefined {
-  if ((config.spawn.reviewAgents ?? []).length === 0) {
+  if (!hasReviewAgent(config.spawn.agents ?? {})) {
     return undefined;
   }
 
   if (config.github === undefined) {
     throw new Error(
-      'stack config "boxxy.spawn.reviewAgents" needs stack config "boxxy.github": the review gate reads the pull request\'s changes through it',
+      'stack config "boxxy.spawn.agents" scopes an agent to the review phase, which needs stack config "boxxy.github": the review gate reads the pull request\'s changes through it',
     );
   }
 
@@ -261,6 +270,10 @@ function findReviewApp(
       requireVariable(env, 'NOSLOP_GITHUB_APP_INSTALLATION_ID', reviewAppNeed),
     ),
   };
+}
+
+function hasReviewAgent(agents: Readonly<Record<string, { readonly phases: readonly string[] }>>) {
+  return Object.values(agents).some((agent) => agent.phases.includes('review'));
 }
 
 function findBackup(

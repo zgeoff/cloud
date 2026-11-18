@@ -173,12 +173,16 @@ test('it writes the pepys section it is given and the GitHub root of the config'
   ).toMatchObject({ pepys, github: { baseUrl: 'https://api.github.com' } });
 });
 
-test('it lists the review agents in the spawn section beside the repos', () => {
+test('it puts the agent scopes and phase policies in the spawn section beside the repos', () => {
   const fixture = setupTest();
 
   const config = {
     ...fixture.config,
-    spawn: { target: 'target-for-tests', reviewAgents: ['review-agent-for-tests'] },
+    spawn: {
+      target: 'target-for-tests',
+      agents: { 'review-agent-for-tests': { phases: ['review'] } },
+      phases: { review: { requireScopedAgent: true } },
+    },
   };
 
   expect(
@@ -197,7 +201,8 @@ test('it lists the review agents in the spawn section beside the repos', () => {
     spawn: {
       target: 'target-for-tests',
       repos: fixture.repos,
-      reviewAgents: ['review-agent-for-tests'],
+      agents: { 'review-agent-for-tests': { phases: ['review'] } },
+      phases: { review: { requireScopedAgent: true } },
     },
   });
 });

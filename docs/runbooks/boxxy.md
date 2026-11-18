@@ -373,9 +373,18 @@ close-out, and each item holds at review after two sessions.
    NOSLOP_GITHUB_APP_INSTALLATION_ID=op://cloud/noslop-github-app/installation-id
    ```
 
-5. In the same PR as an image pin of `@boxxy/server` 0.2.4 or later, add
-   `reviewAgents: [boxxy-review]` to `spawn` in the `boxxy` object of `infra/Pulumi.prod.yaml`. An
-   older server refuses the field.
+5. In the same PR as an image pin of `@boxxy/server` 0.3.0 or later, add these fields to `spawn` in
+   the `boxxy` object of `infra/Pulumi.prod.yaml`. An older server refuses them.
+
+   ```yaml
+   agents:
+     boxxy-review:
+       phases: [review]
+   phases:
+     review:
+       requireScopedAgent: true
+   ```
+
 6. Run `bun run preview`. Expect it to replace the Secret `boxxy-tokens` and the ConfigMap
    `boxxy-config`, and to update the StatefulSet.
 7. Merge it. After the deploy, a review round leaves noslop's check run at the pull request's head,
