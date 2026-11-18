@@ -1,15 +1,25 @@
-# pepys: the API's public route and its clients
+# pepys: the API's routes and its clients
 
-Open the API of [pepys](../architecture/workloads/pepys.md) to MCP clients on the internet, sign a
-client in to it, and end a client's access.
-[Turn on the API's public route](#turn-on-the-apis-public-route) adds the route to a deployment that
-has none. [Sign a client in to the API](#sign-a-client-in-to-the-api) enrolls the owner's passkey
-and adds an MCP client, and [End a client's access](#end-a-clients-access) removes one.
-[Add a service client](#add-a-service-client) lets a client with no person present sign in with a
-secret. [The API's public route](../architecture/workloads/pepys.md#the-apis-public-route) explains
-what the route is made of, and
-[the pepys API's route boundary](../architecture/network/public-ingress.md#the-pepys-apis-route-boundary)
-lists what each path checks.
+The API of [pepys](../architecture/workloads/pepys.md) has two routes. The public route carries MCP
+and the sign-in pages to clients on the internet. The tailnet route carries the typed queries under
+`/rpc` to devices on the tailnet. Use the procedure for your task:
+
+- [Turn on the API's public route](#turn-on-the-apis-public-route) adds the public route to a
+  deployment that has none.
+- [Sign a client in to the API](#sign-a-client-in-to-the-api) enrolls the owner's passkey and adds
+  an MCP client.
+- [Add a service client](#add-a-service-client) lets a client with no person present sign in with a
+  secret.
+- [End a client's access](#end-a-clients-access) removes a client.
+- [Turn on the API's tailnet route](#turn-on-the-apis-tailnet-route) adds the tailnet route and
+  checks it.
+- [Turn off the API's tailnet route](#turn-off-the-apis-tailnet-route) removes the tailnet route.
+
+[The API's public route](../architecture/workloads/pepys.md#the-apis-public-route) and
+[The API's tailnet route](../architecture/workloads/pepys.md#the-apis-tailnet-route) explain what
+each route is made of.
+[The pepys API's route boundary](../architecture/network/public-ingress.md#the-pepys-apis-route-boundary)
+lists what each path of the public route checks.
 
 ## Turn on the API's public route
 
@@ -161,3 +171,124 @@ Each command below runs in the container `api` of the pod `pepys-host-0`, as the
    ssh root@geoffcloud k3s kubectl -n pepys exec pepys-host-0 -c api -- /usr/local/bin/pepys-api grants --revoke=<grant_id>
    ssh root@geoffcloud k3s kubectl -n pepys exec pepys-host-0 -c api -- /usr/local/bin/pepys-api clients remove <client_id>
    ```
+
+## Turn on the API's tailnet route
+
+The route is on while [stack config](./workflows.md#change-stack-config) `pepys.tailnetHostname`
+names a host: the key `tailnetHostname` in the `geoff-cloud:pepys` object of
+`infra/Pulumi.prod.yaml`. These steps use the name `pepys-api.geoff.cloud`. The Traefik of
+[nixie](../architecture/workloads/nixie.md) serves the route, so the route needs stack config
+`nixie`.
+
+**CAUTION:** The API never checks a credential on `/rpc`. These steps let each device of each
+tailnet member run every query of the API. Get the owner's approval before you answer the held run
+in step 6.
+
+1. Check that [the exposure registry](../architecture/network/firewalls.md#the-exposure-registry),
+   `packages/topology/exposure.json`, has an entry of kind `tailnet-hostname` whose `hostname` is
+   `pepys-api.geoff.cloud`. To use another name, add an entry for that name first, then run
+   `bun run docs:exposure`, which writes the registry's reference table.
+2. Open a pull request that adds `tailnetHostname: pepys-api.geoff.cloud` to the `geoff-cloud:pepys`
+   object in `infra/Pulumi.prod.yaml`.
+3. Run `bun run preview` from the repo root, as [First preview](./development.md#first-preview) sets
+   up. The preview fails with one of these errors when the program refuses the name:
+
+   | Error ends with                                                                | Fix                                           |
+   | ------------------------------------------------------------------------------ | --------------------------------------------- |
+   | `must name a host under geoff.cloud`                                           | Use a name under `geoff.cloud`.               |
+   | `must differ from "pepys.webhookHostname" and "pepys.apiHostname"`             | Use a name that no public route of pepys has. |
+   | `needs a tailnet-hostname entry for <name> in packages/topology/exposure.json` | Add the entry, as step 1 says.                |
+   | `needs stack config "nixie": the route goes through nixie's Traefik`           | Deploy [nixie](./nixie.md) first.             |
+
+   Expect no replace. Expect the preview to add these:
+   - the certificate `pepys-api-tailnet`;
+   - the Secret `pepys-api-tailnet-tls`;
+   - the Ingress `pepys-api-tailnet`;
+   - the DNS record `pepys-api-tailnet`.
+
+   Expect the preview to update the network policy `pepys-host` and nixie's Traefik release, which
+   gains the namespace `pepys`.
+
+4. Merge the pull request.
+5. Wait for the `Deploy prod` run of the merge. Expect it to hold, because the plan adds a DNS
+   record.
+6. Answer the held run once its plan matches the preview, as
+   [Answer a held run](./prod-apply.md#answer-a-held-run) says.
+7. [Check the tailnet route](#check-the-tailnet-route).
+
+### Check the tailnet route
+
+Run each command on a device on the tailnet.
+
+1. Check that the Ingress exists:
+
+   ```sh
+   ssh root@geoffcloud k3s kubectl -n pepys get ingress pepys-api-tailnet
+   ```
+
+   Expect one row with the class `nixie`, the host `pepys-api.geoff.cloud` and, as its address, the
+   tailnet address of `geoffcloud`.
+
+2. Check that the name resolves to the tailnet address of `geoffcloud`:
+
+   ```sh
+   getent hosts pepys-api.geoff.cloud
+   tailscale ip -4 geoffcloud
+   ```
+
+   Expect the same address from both commands.
+
+3. Check that the API answers a query under `/rpc`. The query needs no stored row, so the
+   placeholder values work as written:
+
+   ```sh
+   curl -s -w '\n%{http_code}\n' -X POST -H 'content-type: application/json' \
+     -d '{"json":{"session":"telemetry:session:none","issuer":"none","subject":"none"}}' \
+     https://pepys-api.geoff.cloud/rpc/telemetry_session_model_requests
+   ```
+
+   Expect `{"json":[]}`, then `200`. Only the API gives this answer: Traefik answers
+   `404 page not found` for a name it serves no route for, and curl fails on the certificate when
+   the certificate is not the name's.
+
+4. While [the public route](#turn-on-the-apis-public-route) is on, check that the tailnet name keeps
+   `/mcp` closed:
+
+   ```sh
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST https://pepys-api.geoff.cloud/mcp
+   ```
+
+   Expect `403`. While the public route is off, the API serves no `/mcp`, so skip this step.
+
+## Turn off the API's tailnet route
+
+**CAUTION:** Each script and person that calls `/rpc` on the tailnet name fails after these steps.
+The boxxy server is not one of them: it calls the API's Service inside the cluster.
+
+1. Open a pull request that deletes the `tailnetHostname` line from the `geoff-cloud:pepys` object
+   in `infra/Pulumi.prod.yaml`. Leave the registry's entry in place: the entry opens nothing while
+   the key is absent.
+2. Run `bun run preview`. Expect it to delete the four resources that step 3 of
+   [Turn on the API's tailnet route](#turn-on-the-apis-tailnet-route) lists, and to update the
+   network policy `pepys-host` and nixie's Traefik release.
+3. Merge the pull request.
+4. Wait for the `Deploy prod` run of the merge. Expect it to hold, because the plan deletes
+   resources.
+5. Answer the held run once its plan matches the preview, as
+   [Answer a held run](./prod-apply.md#answer-a-held-run) says.
+6. Check that the Ingress is gone:
+
+   ```sh
+   ssh root@geoffcloud k3s kubectl -n pepys get ingress pepys-api-tailnet
+   ```
+
+   Expect `Error from server (NotFound)`.
+
+With the route off, reach `/rpc` through a port-forward. Run this in one terminal, and leave it
+open:
+
+```sh
+ssh -L 8081:localhost:8081 root@geoffcloud k3s kubectl -n pepys port-forward svc/pepys-host 8081
+```
+
+Then call `http://localhost:8081/rpc/` in place of `https://pepys-api.geoff.cloud/rpc/`.
