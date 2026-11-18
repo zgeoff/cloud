@@ -173,8 +173,10 @@ Claude session sends its OpenTelemetry logs to pepys ingest through the broker
 secrets, never their values, so a renamed or added profile changes the daemons' configs. The
 daemon's impd token lists each of those secrets as grantable, so the token, not the config, bounds
 what a session can reach. impd ties each entry of that list to the secret it named, so a secret made
-again under the same name needs a new grantable list on each daemon's token. A Codex session has no
-brokered sign-in.
+again under the same name needs a new grantable list on each daemon's token. A Codex session signs
+in with the ChatGPT subscription through the `codex` profile, whose `codex-chatgpt` secret impd
+renews. The cloud daemon's `boxxy` entry selects that profile too, so a build session's
+`codex review` runs on the same sign-in.
 
 The daemon also offers the `boxxy` agent for the boxxy server's worker sessions
 ([boxxy](./boxxy.md)). It is a Claude entry with the same profiles and variables as `claude`, and

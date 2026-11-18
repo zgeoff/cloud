@@ -78,6 +78,14 @@ test('it builds a default credentials host scenario', () => {
         imps: [],
         createdAt: '2026-10-07T12:00:00.000Z',
       },
+      {
+        name: 'codex-chatgpt',
+        kind: 'oauth',
+        rules: [{ host: 'chatgpt.com', header: 'authorization', scheme: 'bearer' }],
+        env: [],
+        imps: [],
+        createdAt: '2026-10-07T12:00:00.000Z',
+      },
     ],
     tokens: [
       {
@@ -94,6 +102,7 @@ test('it builds a default credentials host scenario', () => {
           'pepys-telemetry',
           'boxxy',
           'boxxy-github-token',
+          'codex-chatgpt',
         ],
         createdAt: '2026-10-07T12:00:00.000Z',
       },
@@ -124,6 +133,6 @@ test('it builds fresh state on each call, so one test’s changes never reach an
 
   first.files['extra'] = { content: '', mode: '600' };
 
-  expect(second.secrets).toHaveLength(8);
+  expect(second.secrets).toHaveLength(9);
   expect(Object.keys(second.files)).toStrictEqual(['gateway-token', 'imp-token']);
 });

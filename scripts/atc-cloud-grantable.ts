@@ -8,4 +8,5 @@ export const atcCloudGrantable: readonly string[] = [
   'pepys-telemetry',
   'boxxy',
   'boxxy-github-token',
+  'codex-chatgpt',
 ];

@@ -16,6 +16,7 @@ test('it builds a default imp token', () => {
       'pepys-telemetry',
       'boxxy',
       'boxxy-github-token',
+      'codex-chatgpt',
     ],
     createdAt: '2026-10-07T12:00:00.000Z',
   });

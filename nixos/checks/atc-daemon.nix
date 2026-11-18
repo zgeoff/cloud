@@ -482,7 +482,7 @@ let
         '';
     }
     {
-      title = "it links geoffcloud a config.json whose target names the agent image and its atc, whose claude and boxxy sign in through the broker profiles and send telemetry to pepys, whose boxxy loads the hook plug-in and the boxxy profile and commits as the owner, whose boxxy-review loads the plug-in and takes the read-only clone token as its one GitHub profile, whose boxxy service client may use the target, and which gets the pr-evidence file host address and the token path with no op:// prefix";
+      title = "it links geoffcloud a config.json whose target names the agent image and its atc, whose claude and boxxy sign in through the broker profiles and send telemetry to pepys, whose boxxy loads the hook plug-in, the boxxy profile and the codex sign-in and commits as the owner, whose codex signs in through the ChatGPT subscription, whose boxxy-review loads the plug-in and takes the read-only clone token as its one GitHub profile, whose boxxy service client may use the target, and which gets the pr-evidence file host address and the token path with no op:// prefix";
       script = ''
         jq -S . > expected <<'EOF'
         {
@@ -491,7 +491,7 @@ let
               "args": ["--plugin-dir", "/opt/boxxy/hook-plugin"],
               "auth": {
                 "mcpServers": { "linear": { "profile": "linear", "url": "https://mcp.linear.app/mcp" } },
-                "profiles": ["claude", "github", "linear", "op-connect", "pepys-telemetry", "boxxy"]
+                "profiles": ["claude", "github", "linear", "op-connect", "pepys-telemetry", "boxxy", "codex"]
               },
               "env": {
                 "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
@@ -529,7 +529,7 @@ let
                 "PR_EVIDENCE_URL": "https://files.geoff.cloud/api/files"
               }
             },
-            "codex": {}
+            "codex": { "auth": { "profiles": ["codex", "github"] } }
           },
           "authProfiles": {
             "boxxy": {
@@ -544,6 +544,13 @@ let
               "host": "api.anthropic.com",
               "scheme": "bearer",
               "secret": "claude-setup-token"
+            },
+            "codex": {
+              "header": "authorization",
+              "host": "chatgpt.com",
+              "kind": "oauth",
+              "scheme": "bearer",
+              "secret": "codex-chatgpt"
             },
             "github": { "kind": "github", "secret": "github-imp-agents" },
             "github-review": { "kind": "github", "secret": "boxxy-github-token" },

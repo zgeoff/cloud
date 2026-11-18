@@ -233,7 +233,7 @@ relay and the daemon's new config.
 
    ```sh
    ssh root@geoffcloud podman exec imp-host impz token set atc-cloud \
-     --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy,boxxy-github-token \
+     --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect,pepys-telemetry,boxxy,boxxy-github-token,codex-chatgpt \
      < /dev/null
    ```
 

@@ -575,6 +575,16 @@ in
           scheme = "bearer";
           env.OTEL_EXPORTER_OTLP_ENDPOINT = "https://${pepysTelemetryHost}";
         };
+        # the ChatGPT subscription sign-in that impd renews: a Codex session signs in with it, and a
+        # boxxy session's `codex review` runs on it, so the build's second review needs no key in the
+        # imp (atc docs/guides/configuration/codex-subscription.md)
+        codex = {
+          secret = "codex-chatgpt";
+          kind = "oauth";
+          host = "chatgpt.com";
+          header = "authorization";
+          scheme = "bearer";
+        };
         # the boxxy server's worker listener, through the host's relay. The broker adds the worker
         # token and the imp identity token; the boxxy CLI in the session reads BOXXY_URL.
         boxxy = {
@@ -600,7 +610,10 @@ in
           kind = "claude";
           args = boxxyPluginArgs;
           auth = claudeAuth // {
-            profiles = claudeProfiles ++ [ "boxxy" ];
+            profiles = claudeProfiles ++ [
+              "boxxy"
+              "codex"
+            ];
           };
           # a worker image has no git config, so a build session's commit fails without these:
           # the session commits as the owner's GitHub login
@@ -626,9 +639,11 @@ in
           ];
           env = telemetryEnv;
         };
-        # atc refuses a Codex auth without an oauth profile for chatgpt.com, which this daemon
-        # does not have, so Codex runs with no brokered sign-in
-        codex = { };
+        # a Codex session signs in with the ChatGPT subscription through the codex profile
+        codex.auth.profiles = [
+          "codex"
+          "github"
+        ];
       };
       principals = {
         # ChatGPT's connector, added 2026-10-04
