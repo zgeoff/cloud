@@ -82,7 +82,7 @@ let
       '';
     }
     {
-      title = "it boots impd's image builders elastic, at 1024 MiB and growing to 2048 MiB";
+      title = "it boots the image builders of impd elastic, at 1024 MiB and growing to 2048 MiB";
       script = ''
         assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
         settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
