@@ -26,6 +26,10 @@ test('it keeps the imps that one call creates for the next call, and logs each a
     'agent-check-abc1234',
     '--image',
     'agent-abc1234',
+    '--memory',
+    '1024',
+    '--max-memory',
+    '2048',
   ]);
 
   const listed = await runProcess([join(imp.bin, 'impz'), 'ls', '--json']);
@@ -41,7 +45,16 @@ test('it keeps the imps that one call creates for the next call, and logs each a
   const state = await imp.readState();
 
   expect(calls).toStrictEqual([
-    ['new', 'agent-check-abc1234', '--image', 'agent-abc1234'],
+    [
+      'new',
+      'agent-check-abc1234',
+      '--image',
+      'agent-abc1234',
+      '--memory',
+      '1024',
+      '--max-memory',
+      '2048',
+    ],
     ['ls', '--json'],
   ]);
 

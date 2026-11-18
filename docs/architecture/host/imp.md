@@ -72,7 +72,7 @@ impd runs every imp of fixed memory on huge pages, and restores and wakes it thr
 ([imp's huge pages](https://github.com/zgeoff/impz/blob/main/docs/architecture/lifecycle/huge-pages.md)).
 A guest on huge pages takes one fault on the host where a guest on base pages takes 512, which is
 most of a template restore's time on this nested host. An elastic imp runs on base pages: the dev
-imps and the harness imps are elastic.
+imps, the harness imps and the agent image check's imp are elastic.
 
 The host reserves a fixed huge page pool early in boot, and the kernel makes no huge page past it.
 `configuration.nix` sets the pool's size apart from impd's memory budget, and the budget is larger
