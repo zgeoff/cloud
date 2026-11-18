@@ -33,6 +33,10 @@ run in <checkout>/infra: op run --env-file=../.env -- pulumi cancel --stack prod
 
 Switches geoffcloud to the NixOS system of the checked-out `main`.
 
+> **CAUTION:** `--stop-ordinary-page-imps` stops every elastic imp, the dev imps included, because
+> each one runs on 4 KiB pages. The agent session in each dev imp ends. Pass it only when no dev imp
+> holds work in progress.
+
 ```bash
 bun run ops:switch-host                               # build, then switch
 bun run ops:switch-host -- --build-only               # build and print the system path
@@ -54,10 +58,6 @@ bun run ops:switch-host -- --stop-ordinary-page-imps  # switch in the hugetlb po
 - Pass `--allow-k3s-restart` only in a planned k3s window that the owner approved.
 - Pass `--stop-ordinary-page-imps` only in the hugetlb pool's window that the owner approved: it
   stops each imp on 4 KiB pages, which ends its processes and sessions and keeps its disk.
-
-> **CAUTION:** `--stop-ordinary-page-imps` stops every elastic imp, the dev imps included, because
-> each one runs on 4 KiB pages. The agent session in each dev imp ends. Pass it only when no dev imp
-> holds work in progress.
 
 ## `bun run ops:deploy-prod`
 
