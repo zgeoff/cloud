@@ -531,6 +531,10 @@ in
         # takes a copy of the daemon's binary (packages/atc.nix)
         image = "agent-6106be2d";
         guestATC = "/usr/local/bin/atc";
+        # a change to an agent's profiles in this file is the owner's, so a session made before
+        # the change moves to the new profiles at its next revive or restore, with no rebind by
+        # hand. atc still refuses when the change withdraws a grant the imp holds.
+        rebindChangedAuth = true;
       };
       defaultTarget = "geoffcloud";
       authProfiles = {
