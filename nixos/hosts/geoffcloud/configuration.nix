@@ -529,7 +529,7 @@ in
         impPrefix = "harness-";
         # the agent image (docs/runbooks/agent-image.md) built from the commit that pins this
         # daemon's atc release, so hooks run the image's atc and no spawn copies the daemon's in
-        image = "agent-ca62cc54";
+        image = "agent-6106be2d";
         guestATC = "/usr/local/bin/atc";
       };
       defaultTarget = "geoffcloud";
