@@ -26,6 +26,15 @@ async function setupTest() {
 
   const program = await resolveProgram('build-agent-image');
 
+  // start and run add to this process's environment; the build gets only repo.env, TMPDIR and the
+  // case's own variables, so a GIT_DIR from a git hook cannot reach it
+  const readBuildEnv = (env: Readonly<Record<string, string>>) => ({
+    ...Object.fromEntries(Object.keys(process.env).map((name) => [name, undefined])),
+    ...repo.env,
+    TMPDIR: temporary,
+    ...env,
+  });
+
   return {
     directory,
     repo,
@@ -36,7 +45,7 @@ async function setupTest() {
       const child = await start(program.command, {
         args,
         cwd: join(directory, 'clone'),
-        env: { ...repo.env, TMPDIR: temporary, ...env },
+        env: readBuildEnv(env),
       });
 
       onTestFinished(() => child.stop('SIGKILL'));
@@ -47,7 +56,7 @@ async function setupTest() {
       run(program.command, {
         args,
         cwd: join(directory, 'clone'),
-        env: { ...repo.env, TMPDIR: temporary, ...env },
+        env: readBuildEnv(env),
         timeoutMs: 10_000,
       }),
   };
