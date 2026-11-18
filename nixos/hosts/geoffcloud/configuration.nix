@@ -526,8 +526,9 @@ in
         url = impdLoopbackURL;
         tokenFile = "/run/credentials/atc-daemon.service/imp-token";
         impPrefix = "harness-";
-        # the agent image (docs/runbooks/agent-image.md) built from the commit that pins this
-        # daemon's atc release, so hooks run the image's atc and no spawn copies the daemon's in
+        # the agent image (docs/runbooks/agent-image.md). Hooks run the image's atc at guestATC
+        # while it prints the daemon's release; when the image ships another release, each new imp
+        # takes a copy of the daemon's binary (packages/atc.nix)
         image = "agent-6106be2d";
         guestATC = "/usr/local/bin/atc";
       };
