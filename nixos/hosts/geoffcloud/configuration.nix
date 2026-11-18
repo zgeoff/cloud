@@ -275,7 +275,7 @@ in
       pool = "tank";
       arcMaxMiB = 3206;
     };
-    # the pool's 14336 MiB below, plus 6144 MiB on ordinary pages for elastic dev imps
+    # the pool's 6144 MiB below, plus 14336 MiB on ordinary pages for the elastic agent imps
     ramBudgetMiB = 20480;
     hostFirewall = "none";
     tailscaleAuthKeyFile = "/var/lib/imp-host/secrets/tailscale-authkey";
@@ -319,14 +319,14 @@ in
     # the most data a slept imp's memory file may hold for impd to warm it into the page cache after
     # the sleep. A warm of an agent imp's file, about 1.8 GiB, would push most of the ZFS ARC out
     settings.IMP_WARM_CAP_MIB = "256";
-    # the budget kept for nixie's sandboxes, which serve people waiting on a turn: its conversation
-    # imp (2048 MiB), two system tasks (1024 MiB each) and four web fetches (512 MiB each). impd
-    # keeps it in the whole budget and in the pool, where the pool's other 8192 MiB hold 4 agent
-    # imps of 2048 MiB, as 5120 MiB would, so the last 1024 MiB costs no agent slot
-    settings.IMP_PRIORITY_RAM_MIB = 6144;
+    # the budget kept for nixie's sandboxes, which serve people waiting on a turn: the most nixie
+    # has run at once is 6, a conversation (512 MiB) and five of at most 512 MiB each. impd keeps
+    # it in the whole budget and in the pool, where the pool's other 3072 MiB hold one imp of fixed
+    # memory at impd's default 2048 MiB, such as an image build
+    settings.IMP_PRIORITY_RAM_MIB = 3072;
     settings.IMP_PRIORITY_IMPS = "nixie-*";
     # none of it kept in the ordinary-page budget: nixie's sandboxes run on the pool, and a kept
-    # 6144 MiB would fill that budget and refuse every elastic dev imp
+    # 3072 MiB there would only take room from the elastic agent imps
     settings.IMP_PRIORITY_ORDINARY_RAM_MIB = 0;
     # the name of this impd in each imp identity token that its broker signs. A service stores the
     # name beside the imp it names, so a change orphans those rows, and no other impd may use it.
@@ -347,14 +347,14 @@ in
     };
   };
 
-  # the pool of 2 MiB pages that impd's huge pages run on: 14336 MiB for the imps of fixed memory,
-  # set apart from ramBudgetMiB. The 6144 MiB of budget past the pool is impd's ordinary-page
-  # budget, where the elastic dev imps run: the host has no ordinary memory for a budget past
-  # 20480 MiB, so the pool gives up that part. systemd-sysctl reserves the pool early in boot,
+  # the pool of 2 MiB pages that impd's huge pages run on: 6144 MiB for the imps of fixed memory,
+  # nixie's sandboxes and one more, set apart from ramBudgetMiB. The 14336 MiB of budget past the
+  # pool is impd's ordinary-page budget, where the elastic agent imps run: the host has no ordinary
+  # memory for a budget past 20480 MiB, so the pool gives up that part. systemd-sysctl reserves the pool early in boot,
   # before memory fragments, and applies a smaller pool at the activation by freeing unused pages;
   # no page is made on demand past it, because Firecracker maps the pool without a reservation and a
   # page the kernel cannot make kills the guest
-  boot.kernel.sysctl."vm.nr_hugepages" = 7168;
+  boot.kernel.sysctl."vm.nr_hugepages" = 3072;
 
   # the root disk's read-ahead at the kernel's default, in place of the 8 MiB the kernel derives
   # from what vda reports, at which Alloy's journal reads thrash its memory cgroup
@@ -533,6 +533,11 @@ in
         # takes a copy of the daemon's binary (packages/atc.nix)
         image = "agent-6106be2d";
         guestATC = "/usr/local/bin/atc";
+        # each new harness imp boots elastic at 1024 MiB on ordinary pages and grows to 2048 MiB
+        # under pressure, so the agents leave the huge page pool to nixie's sandboxes. A session
+        # made before the change keeps its imp's memory
+        memoryMib = 1024;
+        maxMemoryMib = 2048;
         # a change to an agent's profiles in this file is the owner's, so a session made before
         # the change moves to the new profiles at its next revive or restore, with no rebind by
         # hand. atc still refuses when the change withdraws a grant the imp holds.
