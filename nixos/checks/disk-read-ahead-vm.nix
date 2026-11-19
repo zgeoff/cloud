@@ -1,8 +1,8 @@
 # services.disk-read-ahead on a booted VM with three virtio disks: the module sets vda's read-ahead
 # by its kernel name, and vdb's by a link an earlier udev rule makes, as ZFS's rule makes the
-# rancher zvol's on geoffcloud. It sets both through the kernel's own sysfs, after a device event
-# and after a start of its unit, as a switch starts it. It skips a listed disk that is absent, and
-# leaves vdc's read-ahead alone.
+# rancher zvol's on geoffcloud. It sets both through the kernel's own sysfs, after an add or change
+# event of the disk and after a start of its unit, as a switch starts it. It skips a listed disk
+# that is absent, and leaves vdc's read-ahead alone.
 # It needs KVM: run `bun run test:nixos disk-read-ahead-vm`.
 { nixpkgs }:
 let
@@ -60,13 +60,15 @@ pkgs.testers.runNixOSTest {
         assert read_ahead("vdb") == "128", f"vdb's read-ahead is {read_ahead('vdb')!r} KiB"
 
 
-    for disk in ["vda", "vdb"]:
-        with subtest(f"it sets {disk}'s read-ahead again after a change event of the disk"):
-            machine.succeed(f"echo 8192 > /sys/block/{disk}/queue/read_ahead_kb")
+    # an add event is how the rancher zvol gets its value: it appears after the unit has run
+    for action in ["add", "change"]:
+        for disk in ["vda", "vdb"]:
+            with subtest(f"it sets {disk}'s read-ahead again after the disk's {action} event"):
+                machine.succeed(f"echo 8192 > /sys/block/{disk}/queue/read_ahead_kb")
 
-            machine.succeed(f"udevadm trigger --action=change --settle /sys/block/{disk}")
+                machine.succeed(f"udevadm trigger --action={action} --settle /sys/block/{disk}")
 
-            assert read_ahead(disk) == "128", f"{disk}'s read-ahead is {read_ahead(disk)!r} KiB after the change event"
+                assert read_ahead(disk) == "128", f"{disk}'s read-ahead is {read_ahead(disk)!r} KiB after the {action} event"
 
 
     with subtest("it sets both disks' read-ahead again when its unit starts again, as a switch starts it"):
