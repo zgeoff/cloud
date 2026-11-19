@@ -1,7 +1,6 @@
 import { verify } from 'node:crypto';
 import { HttpResponse, http } from 'msw';
 import { z } from 'zod';
-import { githubAPIURL } from './github-api-url.ts';
 import {
   commitStatuses,
   composeFiles,
@@ -9,7 +8,8 @@ import {
   issueComments,
   pullRequestFiles,
   uninstalledRepos,
-} from './issue-comments.ts';
+} from './constants.ts';
+import { githubAPIURL } from './github-api-url.ts';
 import {
   stubApp,
   stubAppLogin,

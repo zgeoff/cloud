@@ -1,6 +1,5 @@
 import { expect, test } from 'bun:test';
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { githubAPIURL } from './github-api-url.ts';
 import {
   commitStatuses,
   composeFiles,
@@ -8,7 +7,8 @@ import {
   issueComments,
   pullRequestFiles,
   uninstalledRepos,
-} from './issue-comments.ts';
+} from './constants.ts';
+import { githubAPIURL } from './github-api-url.ts';
 import { stubApp } from './stub-app.ts';
 
 test('it answers the App with its slug for a JWT signed with its key', async () => {

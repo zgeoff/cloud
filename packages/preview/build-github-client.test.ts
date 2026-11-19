@@ -2,7 +2,6 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { verify } from 'node:crypto';
 import { HttpResponse, http } from 'msw';
 import { buildGitHubClient, previewCommentMarker } from './build-github-client.ts';
-import { githubAPIURL } from './src/test-utils/github-api-url.ts';
 import {
   commitStatuses,
   composeFiles,
@@ -10,7 +9,8 @@ import {
   issueComments,
   pullRequestFiles,
   uninstalledRepos,
-} from './src/test-utils/issue-comments.ts';
+} from './src/test-utils/constants.ts';
+import { githubAPIURL } from './src/test-utils/github-api-url.ts';
 import { server } from './src/test-utils/server.ts';
 import { stubApp, stubAppPublicKey } from './src/test-utils/stub-app.ts';
 
