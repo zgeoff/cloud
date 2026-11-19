@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
-import { buildAlloyValues } from './alloy-values.ts';
+import { buildAlloyValues } from './build-alloy-values.ts';
 import { buildPodLogPositionsSeedScript } from './build-pod-log-positions-seed-script.ts';
 
 test("it runs Alloy's config from the ConfigMap it names, without the chart creating one, from saved positions seeded or repaired in the entry point before each start, and lets Prometheus scrape it", () => {

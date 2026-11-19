@@ -64,7 +64,7 @@ test.each([
   ['nixie-backup', ['deploy/files/backup/backup.sh', 'infra/index.ts'], false],
   ['nixie-config', ['deploy/nixie/config.yaml'], true],
   ['nixie-config', ['infra/Pulumi.prod.yaml'], true],
-  ['nixie-config', ['infra/cluster/nixie.ts'], true],
+  ['nixie-config', ['infra/cluster/create-nixie.ts'], true],
   ['nixie-config', ['bun.lock'], true],
   ['nixie-config', ['deploy/nixie/backup/restore.sh', 'infra/index.ts'], false],
   ['alert-rules', ['infra/observability/build-alert-rules.ts'], true],

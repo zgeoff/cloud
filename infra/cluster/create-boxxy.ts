@@ -10,11 +10,11 @@ import { createNamespace } from '../shared/create-namespace.ts';
 import { readGitSyncImage } from '../shared/read-git-sync-image.ts';
 import { readPepysRouteTable } from '../shared/read-pepys-route-table.ts';
 import { buildBoxxyNetworkPolicySpec } from './build-boxxy-network-policy-spec.ts';
-import { buildBoxxyPepysAddresses } from './build-boxxy-pepys-addresses.ts';
 import {
   buildBoxxyOwnerServiceSpec,
   buildBoxxyWorkerServiceSpec,
-} from './build-boxxy-service-specs.ts';
+} from './build-boxxy-owner-service-spec.ts';
+import { buildBoxxyPepysAddresses } from './build-boxxy-pepys-addresses.ts';
 import { buildBoxxyServiceTokenFile } from './build-boxxy-service-token-file.ts';
 import {
   atcTokenKey,

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Test for the Alloy chart as the repo configures it: the pinned Helm renders the chart that
-# alloy-chart.ts pins with the values alloy-values.ts builds, as Pulumi's Chart does. One case checks
-# that the chart creates no ConfigMap and mounts Alloy's config from the ConfigMap the values name,
-# which Pulumi creates and names itself. The other checks the Alloy container's command, which seeds
-# or repairs Alloy's read positions before Alloy starts, and its volumes.
+# alloy-chart.ts pins with the values build-alloy-values.ts builds, as Pulumi's Chart does. One case
+# checks that the chart creates no ConfigMap and mounts Alloy's config from the ConfigMap the values
+# name, which Pulumi creates and names itself. The other checks the Alloy container's command, which
+# seeds or repairs Alloy's read positions before Alloy starts, and its volumes.
 #
 #   bash scripts/run-shell-suites.sh alert-rules
 #   CASE='ConfigMap' bash infra/observability/test-alloy-chart.sh
@@ -48,7 +48,7 @@ setup_test() {
   done
   (cd "$repo" && run_in_case "$tree" bun -e "
     import { alloyChart } from './infra/observability/alloy-chart.ts';
-    import { buildAlloyValues } from './infra/observability/alloy-values.ts';
+    import { buildAlloyValues } from './infra/observability/build-alloy-values.ts';
     const tree = process.env.TREE ?? '';
     await Bun.write(tree + '/chart.json', JSON.stringify(alloyChart));
     await Bun.write(tree + '/values.json', JSON.stringify(buildAlloyValues('alloy-config-1a2b3c4d')));
@@ -105,10 +105,10 @@ it_renders_the_alloy_container_with_the_entry_script_before_the_charts_run_argum
 
   assert_equals 0 "$status" 'helm template exit'
   diff /dev/null "$tree/err"
-  # the Alloy container's command against the one alloy-values.ts builds, its first arguments, any
-  # init container, and each pod volume the entry script reads or writes with its host path
+  # the Alloy container's command against the one build-alloy-values.ts builds, its first arguments,
+  # any init container, and each pod volume the entry script reads or writes with its host path
   (cd "$repo" && run_in_case "$tree" bun -e "
-    import { buildAlloyValues } from './infra/observability/alloy-values.ts';
+    import { buildAlloyValues } from './infra/observability/build-alloy-values.ts';
     const tree = process.env.TREE ?? '';
     const pod = Bun.YAML.parse(await Bun.file(tree + '/daemonset.yaml').text()).spec.template.spec;
     const alloy = pod.containers.find((container) => container.name === 'alloy');

@@ -1,5 +1,5 @@
 import type { Output } from '@pulumi/pulumi';
-import type { ATCGatewayOutputs } from './atc-gateway.ts';
+import type { ATCGatewayOutputs } from './create-atc-gateway.ts';
 
 export interface ATCGatewayRoute {
   readonly hostname: string;

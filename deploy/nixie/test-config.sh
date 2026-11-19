@@ -2,7 +2,7 @@
 # Checks deploy/nixie/config.yaml with the validation of the nixie image that the stack config pins
 # as nixie.image, run locally with Docker. It touches no cluster and no cloud account.
 #
-# It renders the config as the nixie ConfigMap holds it (infra/cluster/nixie.ts), mounts it at
+# It renders the config as the nixie ConfigMap holds it (infra/cluster/create-nixie.ts), mounts it at
 # nixie's default config path, and runs the image's `health` command with nixie's uid, a read-only
 # root, no capabilities and no network. `health` loads the config through the same validation that
 # `serve` runs at start, then asks the server for its health. No server runs, so a config that
