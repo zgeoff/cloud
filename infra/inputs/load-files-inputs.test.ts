@@ -8,11 +8,7 @@ import { loadFilesInputs } from './load-files-inputs.ts';
 
 test('it returns nothing while the stack config leaves files out', () => {
   expect(
-    loadFilesInputs(
-      buildStubConfig({}),
-      { FILES_AGENT_TOKEN: 'agent-token-for-tests', FILES_OWNER_TOKEN: 'owner-token-for-tests' },
-      undefined,
-    ),
+    loadFilesInputs(buildStubConfig({}), { FILES_OWNER_TOKEN: 'owner-token-for-tests' }, undefined),
   ).toStrictEqual({});
 });
 
@@ -22,6 +18,9 @@ test('it returns the pinned image, the host name, the pull credential and the to
       image:
         'ghcr.io/zgeoff/cloud-files:0123456@sha256:3333333333333333333333333333333333333333333333333333333333333333',
       hostname: 'files.geoff.cloud',
+      agentTokenDigests: {
+        nixie: '1111111111111111111111111111111111111111111111111111111111111111',
+      },
     }),
   });
 
@@ -29,7 +28,6 @@ test('it returns the pinned image, the host name, the pull credential and the to
     loadFilesInputs(
       stackConfig,
       {
-        FILES_AGENT_TOKEN: 'agent-token-for-tests',
         FILES_OWNER_TOKEN: 'owner-token-for-tests',
         GHCR_PULL_USERNAME: 'octo-puller',
         GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
@@ -56,59 +54,41 @@ test('it returns the pinned image, the host name, the pull credential and the to
 });
 
 test.each([
-  ['agent', 'agent-token-for-tests'],
-  ['owner', 'owner-token-for-tests'],
-] as const)(
-  'it marks the %s token hash secret and carries the hex SHA-256 of the token',
-  async (role, token) => {
-    const inputs = loadFilesInputs(
-      buildStubConfig({
-        files: JSON.stringify({
-          image:
-            'ghcr.io/zgeoff/cloud-files:0123456@sha256:3333333333333333333333333333333333333333333333333333333333333333',
-          hostname: 'files.geoff.cloud',
-        }),
+  ['agent', 'the named digest', '1111111111111111111111111111111111111111111111111111111111111111'],
+  [
+    'owner',
+    'the hex SHA-256 of the token',
+    createHash('sha256').update('owner-token-for-tests').digest('hex'),
+  ],
+] as const)('it marks the %s token hash secret and carries %s', async (role, _label, expected) => {
+  const inputs = loadFilesInputs(
+    buildStubConfig({
+      files: JSON.stringify({
+        image:
+          'ghcr.io/zgeoff/cloud-files:0123456@sha256:3333333333333333333333333333333333333333333333333333333333333333',
+        hostname: 'files.geoff.cloud',
+        agentTokenDigests: {
+          nixie: '1111111111111111111111111111111111111111111111111111111111111111',
+        },
       }),
-      {
-        FILES_AGENT_TOKEN: 'agent-token-for-tests',
-        FILES_OWNER_TOKEN: 'owner-token-for-tests',
-        GHCR_PULL_USERNAME: 'octo-puller',
-        GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
-      },
-      undefined,
-    );
+    }),
+    {
+      FILES_OWNER_TOKEN: 'owner-token-for-tests',
+      GHCR_PULL_USERNAME: 'octo-puller',
+      GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
+    },
+    undefined,
+  );
 
-    invariant(inputs.files);
+  invariant(inputs.files);
 
-    const hash = inputs.files.tokenHashes[role];
+  const hash = inputs.files.tokenHashes[role];
 
-    const secretHash = await isSecret(hash);
-    const value = await resolveOutput(hash);
+  const secretHash = await isSecret(hash);
+  const value = await resolveOutput(hash);
 
-    expect(secretHash).toBeTrue();
-    expect(value).toBe(createHash('sha256').update(token).digest('hex'));
-  },
-);
-
-test('it refuses one token for both roles', () => {
-  expect(() =>
-    loadFilesInputs(
-      buildStubConfig({
-        files: JSON.stringify({
-          image:
-            'ghcr.io/zgeoff/cloud-files:0123456@sha256:3333333333333333333333333333333333333333333333333333333333333333',
-          hostname: 'files.geoff.cloud',
-        }),
-      }),
-      {
-        FILES_AGENT_TOKEN: 'one-token-for-tests',
-        FILES_OWNER_TOKEN: 'one-token-for-tests',
-        GHCR_PULL_USERNAME: 'octo-puller',
-        GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
-      },
-      undefined,
-    ),
-  ).toThrowWithMessage(Error, 'FILES_OWNER_TOKEN must differ from every agent token');
+  expect(secretHash).toBeTrue();
+  expect(value).toBe(expected);
 });
 
 test('it refuses a missing owner token', () => {
@@ -119,10 +99,12 @@ test('it refuses a missing owner token', () => {
           image:
             'ghcr.io/zgeoff/cloud-files:0123456@sha256:3333333333333333333333333333333333333333333333333333333333333333',
           hostname: 'files.geoff.cloud',
+          agentTokenDigests: {
+            nixie: '1111111111111111111111111111111111111111111111111111111111111111',
+          },
         }),
       }),
       {
-        FILES_AGENT_TOKEN: 'agent-token-for-tests',
         GHCR_PULL_USERNAME: 'octo-puller',
         GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
       },
@@ -141,9 +123,12 @@ test('it refuses an image without a digest', () => {
         files: JSON.stringify({
           image: 'ghcr.io/zgeoff/cloud-files:0123456',
           hostname: 'files.geoff.cloud',
+          agentTokenDigests: {
+            nixie: '1111111111111111111111111111111111111111111111111111111111111111',
+          },
         }),
       }),
-      { FILES_AGENT_TOKEN: 'agent-token-for-tests', FILES_OWNER_TOKEN: 'owner-token-for-tests' },
+      { FILES_OWNER_TOKEN: 'owner-token-for-tests' },
       undefined,
     ),
   ).toThrowWithMessage(Error, 'stack config "files.image" must name an image by tag and digest');
@@ -153,7 +138,7 @@ test('it refuses an image that is not a string', () => {
   expect(() =>
     loadFilesInputs(
       buildStubConfig({ files: JSON.stringify({ image: 42, hostname: 'files.geoff.cloud' }) }),
-      { FILES_AGENT_TOKEN: 'agent-token-for-tests', FILES_OWNER_TOKEN: 'owner-token-for-tests' },
+      { FILES_OWNER_TOKEN: 'owner-token-for-tests' },
       undefined,
     ),
   ).toThrowWithMessage(
@@ -172,7 +157,7 @@ test('it refuses a host name outside geoff.cloud', () => {
           hostname: 'files.example.com',
         }),
       }),
-      { FILES_AGENT_TOKEN: 'agent-token-for-tests', FILES_OWNER_TOKEN: 'owner-token-for-tests' },
+      { FILES_OWNER_TOKEN: 'owner-token-for-tests' },
       undefined,
     ),
   ).toThrowWithMessage(Error, 'stack config "files.hostname" must name a host under geoff.cloud');
@@ -185,10 +170,12 @@ test('it adds the backup in the backup image when every backup variable is set',
         image:
           'ghcr.io/zgeoff/cloud-files:0123456@sha256:3333333333333333333333333333333333333333333333333333333333333333',
         hostname: 'files.geoff.cloud',
+        agentTokenDigests: {
+          nixie: '1111111111111111111111111111111111111111111111111111111111111111',
+        },
       }),
     }),
     {
-      FILES_AGENT_TOKEN: 'agent-token-for-tests',
       FILES_OWNER_TOKEN: 'owner-token-for-tests',
       GHCR_PULL_USERNAME: 'octo-puller',
       GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
@@ -227,10 +214,12 @@ test('it refuses the backup variables without a backup image', () => {
           image:
             'ghcr.io/zgeoff/cloud-files:0123456@sha256:3333333333333333333333333333333333333333333333333333333333333333',
           hostname: 'files.geoff.cloud',
+          agentTokenDigests: {
+            nixie: '1111111111111111111111111111111111111111111111111111111111111111',
+          },
         }),
       }),
       {
-        FILES_AGENT_TOKEN: 'agent-token-for-tests',
         FILES_OWNER_TOKEN: 'owner-token-for-tests',
         GHCR_PULL_USERNAME: 'octo-puller',
         GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
@@ -249,17 +238,12 @@ test('it refuses the backup variables without a backup image', () => {
 });
 
 test.each([
+  ['each named digest', {}],
   [
-    'the shared token and each named digest',
+    'only the named digests while FILES_AGENT_TOKEN is still set',
     { FILES_AGENT_TOKEN: 'agent-token-for-tests' },
-    [
-      createHash('sha256').update('agent-token-for-tests').digest('hex'),
-      '1'.repeat(64),
-      '2'.repeat(64),
-    ],
   ],
-  ['only the named digests while FILES_AGENT_TOKEN is unset', {}, ['1'.repeat(64), '2'.repeat(64)]],
-])('it gives the service %s, split by commas', async (_label, agentEnv, expected) => {
+])('it gives the service %s, split by commas', async (_label, agentEnv) => {
   const agentTokenDigests = { nixie: '1'.repeat(64), pepys: '2'.repeat(64) };
 
   const inputs = loadFilesInputs(
@@ -284,7 +268,7 @@ test.each([
 
   const value = await resolveOutput(inputs.files.tokenHashes.agent);
 
-  expect(value).toBe(expected.join(','));
+  expect(value).toBe(`${'1'.repeat(64)},${'2'.repeat(64)}`);
 });
 
 test('it refuses a files service with no agent token', () => {
@@ -307,7 +291,7 @@ test('it refuses a files service with no agent token', () => {
     ),
   ).toThrowWithMessage(
     Error,
-    'the files service needs an agent token: set FILES_AGENT_TOKEN or stack config "files.agentTokenDigests"',
+    'the files service needs an agent token: name its digest in stack config "files.agentTokenDigests"',
   );
 });
 

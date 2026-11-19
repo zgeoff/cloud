@@ -182,6 +182,9 @@ test("it runs the files service's backup in the gateway's backup image", () => {
         image:
           'ghcr.io/zgeoff/cloud-files:0123456@sha256:3333333333333333333333333333333333333333333333333333333333333333',
         hostname: 'files.geoff.cloud',
+        agentTokenDigests: {
+          nixie: '1111111111111111111111111111111111111111111111111111111111111111',
+        },
       }),
     }),
     {
@@ -190,7 +193,6 @@ test("it runs the files service's backup in the gateway's backup image", () => {
       ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
       GHCR_PULL_USERNAME: 'octo-puller',
       GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
-      FILES_AGENT_TOKEN: 'agent-token-for-tests',
       FILES_OWNER_TOKEN: 'owner-token-for-tests',
       FILES_RESTIC_PASSWORD: 'p'.repeat(32),
       FILES_R2_ACCESS_KEY_ID: 'a'.repeat(32),
