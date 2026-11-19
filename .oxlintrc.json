@@ -8,7 +8,7 @@
   "rules": {
     "zgeoff/function-verb": "error",
 
-    "zgeoff/file-named-for-export": ["error", { "pending": ["."] }],
+    "zgeoff/file-named-for-export": "error",
 
     // the import boundaries: no relative import into another workspace package, and the direction
     // between infra's groups
