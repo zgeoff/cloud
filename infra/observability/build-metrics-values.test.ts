@@ -2,11 +2,11 @@ import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildMetricsValues } from './build-metrics-values.ts';
 
-test("it disables the chart's TargetDown, drops the kubelet's copy of the control plane's series, picks up every monitor and rule, and serves Grafana on its node port from a database on a retained volume that one pod at a time holds, with a claim that never takes its volume's name", () => {
+test("it disables the chart's TargetDown and NodeMemoryMajorPagesFaults, drops the kubelet's copy of the control plane's series, picks up every monitor and rule, and serves Grafana on its node port from a database on a retained volume that one pod at a time holds, with a claim that never takes its volume's name", () => {
   const password = output('grafana-admin-password');
 
   expect(buildMetricsValues({ password, nodePort: 30_300 })).toStrictEqual({
-    defaultRules: { disabled: { TargetDown: true } },
+    defaultRules: { disabled: { TargetDown: true, NodeMemoryMajorPagesFaults: true } },
     kubeEtcd: { enabled: false },
     kubeControllerManager: { enabled: false },
     kubeScheduler: { enabled: false },

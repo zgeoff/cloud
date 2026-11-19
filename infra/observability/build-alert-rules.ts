@@ -129,6 +129,24 @@ const oomKilledRule: AlertRule = {
   },
 };
 
+// The chart's rule fires on the fault rate alone, and each imp wake takes a burst of faults that
+// the ZFS cache serves, so this one needs a memory or IO stall beside the faults. The chart's 15m
+// hold would miss a 12-minute memory stall.
+const majorPageFaultsRule: AlertRule = {
+  alert: 'NodeMemoryMajorPagesFaults',
+  expr: [
+    'rate(node_vmstat_pgmajfault{job="node-exporter"}[5m]) > 500 and on (instance)',
+    '(rate(node_pressure_memory_waiting_seconds_total{job="node-exporter"}[5m]) > 0.1',
+    'or rate(node_pressure_io_stalled_seconds_total{job="node-exporter"}[5m]) > 0.1)',
+  ].join(' '),
+  for: '5m',
+  labels: { severity: 'warning' },
+  annotations: {
+    summary:
+      'geoffcloud takes {{ $value | humanize }} major page faults a second while memory or IO stalls its tasks.',
+  },
+};
+
 export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRuleGroup[] {
   const atcRules = (inputs.atcDaemons ?? []).map((daemon) => buildATCDaemonRule(daemon));
 
@@ -156,6 +174,7 @@ export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRul
         ...nixieRules,
         ...boxxyRules,
         oomKilledRule,
+        majorPageFaultsRule,
       ],
     },
     buildATCSignInRules(),

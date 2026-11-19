@@ -2,8 +2,9 @@
 # Test for the kube-prometheus-stack chart as the repo configures it: the pinned Helm renders the
 # chart that metrics-chart.ts pins with the values build-metrics-values.ts builds, as Pulumi's Chart
 # does. One case checks the Grafana Deployment's rollout strategy, which server-side apply merges
-# into the live Deployment's: the apply owns only the strategy fields that the chart renders. The
-# other checks the spec of Grafana's volume claim, whose every change makes Pulumi replace it.
+# into the live Deployment's: the apply owns only the strategy fields that the chart renders. One
+# checks the spec of Grafana's volume claim, whose every change makes Pulumi replace it. One checks
+# that the chart's node-exporter rules leave out the major page faults rule that the repo replaces.
 #
 #   bash scripts/run-shell-suites.sh alert-rules
 #   CASE='strategy' bash infra/observability/test-metrics-chart.sh
@@ -99,6 +100,32 @@ it_renders_the_grafana_claim_on_the_retaining_class_with_no_volume_name() {
   ")
   diff - "$tree/claim.json" << 'EOF'
 {"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"1Gi"}},"storageClassName":"local-path-retain"}
+EOF
+}
+
+it_renders_the_node_exporter_alerts_with_no_major_page_faults_rule() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  run_helm "$tree" template kube-prometheus-stack "/work/chart/$(ls "$tree/chart")" \
+    --namespace observability -f /work/values.json \
+    --show-only templates/prometheus/rules-1.14/node-exporter.yaml > "$tree/rules.yaml" 2> "$tree/err" || status=$?
+
+  assert_equals 0 "$status" 'helm template exit'
+  diff /dev/null "$tree/err"
+  (cd "$repo" && run_in_case "$tree" bun -e "
+    const tree = process.env.TREE ?? '';
+    const rule = Bun.YAML.parse(await Bun.file(tree + '/rules.yaml').text());
+    const alerts = rule.spec.groups.flatMap((group) => group.rules.flatMap((r) => r.alert ?? []));
+    const kept = ['NodeMemoryMajorPagesFaults', 'NodeMemoryHighUtilization'].map((name) => name + ' ' + alerts.includes(name));
+    await Bun.write(tree + '/alerts.txt', kept.join('\n') + '\n');
+  ")
+  # build-alert-rules.ts builds the NodeMemoryMajorPagesFaults that replaces the chart's, and the
+  # chart's other node alerts stay
+  diff - "$tree/alerts.txt" << 'EOF'
+NodeMemoryMajorPagesFaults false
+NodeMemoryHighUtilization true
 EOF
 }
 
