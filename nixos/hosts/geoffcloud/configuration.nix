@@ -985,7 +985,7 @@ in
         # OpenAI's API ones for the model, from https://developers.openai.com/api/docs/models/gpt-6-luna
         # (read 19 Nov 2026), so the count and the stop cap the credits that use past the plan spends;
         # OpenAI has no 1-hour cache write, so cache_write_1h is the cache write price
-        codex-plan = {
+        gpt-6-luna = {
           api = "openai-responses";
           upstream = "https://chatgpt.com/backend-api/codex";
           model = "gpt-6-luna";
@@ -1007,8 +1007,8 @@ in
             };
           };
           login = {
-            file = "/var/lib/model-gateway/chatgpt-login-codex-plan.json";
-            routeKeyFile = "/var/lib/tank-cloud/host-secrets/model-gateway/codex-plan-route-key";
+            file = "/var/lib/model-gateway/chatgpt-login-gpt-6-luna.json";
+            routeKeyFile = "/var/lib/tank-cloud/host-secrets/model-gateway/gpt-6-luna-route-key";
           };
         };
       };

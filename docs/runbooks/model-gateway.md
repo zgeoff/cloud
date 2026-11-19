@@ -26,9 +26,9 @@ outside a host switch.
 | `/var/lib/model-gateway/store.json`                                          | the counts, the limits nixie set, each sandbox's count, the lost mark        |
 | `/var/lib/model-gateway/override.json`                                       | the limit past a cap that `model-gateway raise` wrote, when one exists       |
 | `services.model-gateway` in `nixos/hosts/geoffcloud/configuration.nix`       | the zone, the caps and one priced route per nixie model profile              |
-| vault `cloud`, item `model-gateway-codex-plan-route-key`, field `credential` | the route key of the plan route `codex-plan`, 64 hex characters              |
-| `/var/lib/tank-cloud/host-secrets/model-gateway/codex-plan-route-key`        | the same key on the host, mode 0400 root, which the unit loads               |
-| `/var/lib/model-gateway/chatgpt-login-codex-plan.json`                       | the ChatGPT plan login of `codex-plan`, mode 0600, which the gateway rotates |
+| vault `cloud`, item `model-gateway-gpt-6-luna-route-key`, field `credential` | the route key of the plan route `gpt-6-luna`, 64 hex characters              |
+| `/var/lib/tank-cloud/host-secrets/model-gateway/gpt-6-luna-route-key`        | the same key on the host, mode 0400 root, which the unit loads               |
+| `/var/lib/model-gateway/chatgpt-login-gpt-6-luna.json`                       | the ChatGPT plan login of `gpt-6-luna`, mode 0600, which the gateway rotates |
 
 The unit runs as the user `model-gateway`, which owns `/var/lib/model-gateway` with mode 0700.
 
@@ -247,7 +247,7 @@ rose and holds no `lost`.
 
 ## Add the ChatGPT plan route
 
-The route `codex-plan` runs nixie's Codex tasks on the owner's ChatGPT plan. The gateway holds the
+The route `gpt-6-luna` runs nixie's Codex tasks on the owner's ChatGPT plan. The gateway holds the
 plan login, refreshes it and sets its access token on each request, so neither nixie nor a sandbox
 holds a plan token.
 [nixie's plan login runbook](https://github.com/zgeoff/nixie/blob/main/docs/runbooks/chatgpt-plan-login.md)
@@ -262,7 +262,7 @@ the switch.
 1. Create the item from a random key, which never reaches a command line or the screen:
 
    ```bash
-   openssl rand -hex 32 | jq -R '{title: "model-gateway-codex-plan-route-key", category: "API_CREDENTIAL",
+   openssl rand -hex 32 | jq -R '{title: "model-gateway-gpt-6-luna-route-key", category: "API_CREDENTIAL",
      fields: [{id: "credential", label: "credential", type: "CONCEALED", value: .}]}' \
      | op item create --vault cloud - > /dev/null
    ```
@@ -270,8 +270,8 @@ the switch.
 2. Install the key on the host, on SSH's standard input:
 
    ```bash
-   op read op://cloud/model-gateway-codex-plan-route-key/credential | tr -d '\n' | ssh root@geoffcloud \
-     'install -d -m 0700 /var/lib/tank-cloud/host-secrets/model-gateway && (umask 377 && cat > /var/lib/tank-cloud/host-secrets/model-gateway/codex-plan-route-key) && test -s /var/lib/tank-cloud/host-secrets/model-gateway/codex-plan-route-key && echo ok'
+   op read op://cloud/model-gateway-gpt-6-luna-route-key/credential | tr -d '\n' | ssh root@geoffcloud \
+     'install -d -m 0700 /var/lib/tank-cloud/host-secrets/model-gateway && (umask 377 && cat > /var/lib/tank-cloud/host-secrets/model-gateway/gpt-6-luna-route-key) && test -s /var/lib/tank-cloud/host-secrets/model-gateway/gpt-6-luna-route-key && echo ok'
    ```
 
    Expect `ok`. Compare the first 8 hex of each copy's SHA-256, as step 3 of
@@ -282,12 +282,12 @@ the switch.
    then:
 
    ```bash
-   op read op://cloud/model-gateway-codex-plan-route-key/credential | tr -d '\n' \
-     | host_imp secret add nixie-model-e276a191ad63f5fa751 --kind static --hosts chatgpt.com \
+   op read op://cloud/model-gateway-gpt-6-luna-route-key/credential | tr -d '\n' \
+     | host_imp secret add nixie-model-ec71464646636f257fb --kind static --hosts chatgpt.com \
        --header authorization --scheme bearer --upstream http://10.88.0.1:8789
    ```
 
-   Expect a table row for the name. nixie derives the name from the profile `codex-plan`, the header
+   Expect a table row for the name. nixie derives the name from the profile `gpt-6-luna`, the header
    `bearer` and the host `chatgpt.com`.
 
 4. Point nixie's token at the list that holds the new name. `--grantable` takes the whole list, and
@@ -323,7 +323,7 @@ the switch.
    EOF
    ```
 
-   Expect `codex-plan` with `"status": "active"` and the plan type. `needs_login` means the route
+   Expect `gpt-6-luna` with `"status": "active"` and the plan type. `needs_login` means the route
    has no login file, or OpenAI refused its refresh: sign the route in, as nixie's runbook's "Sign
    the route in" does, with the config path from `systemctl show -P ExecStart model-gateway` and the
    command run as `runuser -u model-gateway --`.

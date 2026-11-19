@@ -70,7 +70,7 @@ Before the first deploy, and after a profile joins `config.yaml`, add the model 
          case "$host" in
            api.anthropic.com) item=nixie-model-credential ;;
            openrouter.ai) item=nixie-openrouter-credential ;;
-           chatgpt.com) item=model-gateway-codex-plan-route-key ;;
+           chatgpt.com) item=model-gateway-gpt-6-luna-route-key ;;
            *) echo "no credential item for $host" >&2; continue ;;
          esac
          printf '%s\n%s\n%s' "$profile" "$header" "$host" | sha256sum | cut -c1-19 \

@@ -96,7 +96,7 @@ let
             options = {
               file = lib.mkOption {
                 type = lib.types.str;
-                example = "/var/lib/model-gateway/chatgpt-login-codex-plan.json";
+                example = "/var/lib/model-gateway/chatgpt-login-gpt-6-luna.json";
                 description = "The plan login file, which `model-gateway chatgpt-login` writes and the gateway rotates; it lives in the unit's StateDirectory, the one place the unit may write.";
               };
               routeKeyFile = lib.mkOption {
