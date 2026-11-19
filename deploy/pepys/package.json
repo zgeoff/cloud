@@ -7,7 +7,7 @@
     "typecheck": "tsrs --fast -p tsconfig.json"
   },
   "dependencies": {
-    "@boxxy/pepys": "0.2.10",
+    "@boxxy/pepys": "0.3.1",
     "@pepys/api": "0.4.4",
     "@pepys/cli": "0.4.4",
     "@pepys/ingest": "0.4.4",
