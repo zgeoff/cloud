@@ -14,6 +14,12 @@
 #   cloud_host drops every packet to an admitted port that no admission names, the loopback's own
 #   included.
 #
+# A plan route (nixie's docs/architecture/policy/model-gateway.md, "The plan route") holds a
+# ChatGPT plan login: the gateway refreshes it and sets the access token on each request. Its login
+# file lives in the StateDirectory, and its route key, which impd's model secret for the route also
+# holds, reaches the unit as a credential like the control token. The unit needs every route key
+# file to start.
+#
 # The store and the override file live in the unit's StateDirectory. `model-gateway raise` writes
 # the override as the unit's user (the runbook's command), or the gateway could not read it. The
 # unit starts only once the token file exists, so a switch before it is staged skips the unit.
@@ -26,7 +32,11 @@
 let
   cfg = config.services.model-gateway;
   stateDirectory = "/var/lib/model-gateway";
-  tokenCredential = "/run/credentials/model-gateway.service/control-token";
+  credentialsDirectory = "/run/credentials/model-gateway.service";
+  tokenCredential = "${credentialsDirectory}/control-token";
+  # each plan route's key reaches the unit as the credential <route>-route-key
+  routeKeyCredential = id: "${id}-route-key";
+  loginRoutes = lib.filterAttrs (_: route: route.login != null) cfg.routes;
 
   priceRateOptions = lib.genAttrs [ "input" "cache_write" "cache_write_1h" "cached_input" "output" ] (
     price:
@@ -64,6 +74,41 @@ let
         example = "novita/fp8";
         description = "The OpenRouter provider that the profile's provider_pin names; the gateway refuses any other provider field. null for none.";
       };
+      api = lib.mkOption {
+        type = lib.types.nullOr (
+          lib.types.enum [
+            "anthropic-messages"
+            "openai-responses"
+          ]
+        );
+        default = null;
+        description = "The model API the route speaks; null for the gateway's default, anthropic-messages.";
+      };
+      maxOutputTokens = lib.mkOption {
+        type = lib.types.nullOr lib.types.ints.positive;
+        default = null;
+        example = 128000;
+        description = "The model's largest output, which the gateway assumes for a request that sets no max_output_tokens; an openai-responses route needs it. null for none.";
+      };
+      login = lib.mkOption {
+        type = lib.types.nullOr (
+          lib.types.submodule {
+            options = {
+              file = lib.mkOption {
+                type = lib.types.str;
+                example = "/var/lib/model-gateway/chatgpt-login-codex-plan.json";
+                description = "The plan login file, which `model-gateway chatgpt-login` writes and the gateway rotates; it lives in the unit's StateDirectory, the one place the unit may write.";
+              };
+              routeKeyFile = lib.mkOption {
+                type = lib.types.str;
+                description = "A root-only file holding the route key, one line, which the unit loads as the credential <route>-route-key; impd's model secret for the route holds the same key.";
+              };
+            };
+          }
+        );
+        default = null;
+        description = "The ChatGPT plan login the route holds, which makes it a plan route; null for none.";
+      };
       prices = lib.mkOption {
         type = lib.types.submodule {
           options = priceRateOptions // {
@@ -89,14 +134,23 @@ let
     };
   };
 
-  # the gateway's config schema takes no null for an absent long_prompt or providerPin
+  # the gateway's config schema is strict and takes no null for an absent key, so each optional key
+  # renders only when set
   renderRoute =
-    route:
+    id: route:
     {
       inherit (route) model upstream;
       prices = lib.filterAttrs (_: rates: rates != null) route.prices;
     }
-    // lib.optionalAttrs (route.providerPin != null) { inherit (route) providerPin; };
+    // lib.optionalAttrs (route.providerPin != null) { inherit (route) providerPin; }
+    // lib.optionalAttrs (route.api != null) { inherit (route) api; }
+    // lib.optionalAttrs (route.maxOutputTokens != null) { inherit (route) maxOutputTokens; }
+    // lib.optionalAttrs (route.login != null) {
+      login = {
+        inherit (route.login) file;
+        routeKeyFile = "${credentialsDirectory}/${routeKeyCredential id}";
+      };
+    };
 
   # YAML is a superset of JSON, and the gateway parses its config with Bun.YAML
   configFile = pkgs.writeText "model-gateway.yaml" (
@@ -117,7 +171,7 @@ let
       };
       countBySandbox = true;
       override = "${stateDirectory}/override.json";
-      routes = lib.mapAttrs (_: renderRoute) cfg.routes;
+      routes = lib.mapAttrs renderRoute cfg.routes;
     }
   );
 
@@ -228,6 +282,16 @@ in
         message = "services.model-gateway.controlRelay.port must differ from control.port: cloud_host drops the loopback's packets to an admitted port.";
       }
       {
+        assertion = lib.all (route: route.api == "openai-responses") (lib.attrValues loginRoutes);
+        message = "services.model-gateway.routes: a route with a login speaks openai-responses, the API of ChatGPT's Codex backend.";
+      }
+      {
+        assertion = lib.all (route: lib.hasPrefix "${stateDirectory}/" route.login.file) (
+          lib.attrValues loginRoutes
+        );
+        message = "services.model-gateway.routes: a login file lives in ${stateDirectory}, the only folder the unit may write, because each refresh rewrites it.";
+      }
+      {
         assertion = !(config.services.imp.ipv6.enable or false);
         message = "the model gateway's listener assumes imp-host on ${cfg.modelListen.interface}; services.imp.ipv6.enable moves it to br-imphost";
       }
@@ -280,7 +344,13 @@ in
         Group = "model-gateway";
         StateDirectory = "model-gateway";
         StateDirectoryMode = "0700";
-        LoadCredential = [ "control-token:${cfg.control.tokenFile}" ];
+        # a missing route key file fails the unit's start, as a missing token would
+        LoadCredential = [
+          "control-token:${cfg.control.tokenFile}"
+        ]
+        ++ lib.mapAttrsToList (
+          id: route: "${routeKeyCredential id}:${route.login.routeKeyFile}"
+        ) loginRoutes;
         # the bridge address appears only once imp-host runs, so a failed bind retries
         Restart = "always";
         RestartSec = 5;

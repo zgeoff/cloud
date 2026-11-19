@@ -978,6 +978,38 @@ in
           cached_input = 0.75;
           output = 6;
         };
+        # the Codex tasks' plan route (docs/runbooks/model-gateway.md#add-the-chatgpt-plan-route):
+        # the gateway holds the owner's ChatGPT plan login and sets its access token on each request,
+        # so neither nixie nor a sandbox holds a plan token. The prices and the largest output are
+        # OpenAI's API ones for the model, from https://developers.openai.com/api/docs/models/gpt-6-luna
+        # (read 19 Nov 2026), so the count and the stop cap the credits that use past the plan spends;
+        # OpenAI has no 1-hour cache write, so cache_write_1h is the cache write price
+        codex-plan = {
+          api = "openai-responses";
+          upstream = "https://chatgpt.com/backend-api/codex";
+          model = "gpt-6-luna";
+          maxOutputTokens = 128000;
+          prices = {
+            input = 0.1;
+            cache_write = 0.125;
+            cache_write_1h = 0.125;
+            cached_input = 0.01;
+            output = 0.5;
+            # past 272K input tokens, a whole request costs 2x the input and cache rates, 1.5x output
+            long_prompt = {
+              over_tokens = 272000;
+              input = 0.2;
+              cache_write = 0.25;
+              cache_write_1h = 0.25;
+              cached_input = 0.02;
+              output = 0.75;
+            };
+          };
+          login = {
+            file = "/var/lib/model-gateway/chatgpt-login-codex-plan.json";
+            routeKeyFile = "/var/lib/tank-cloud/host-secrets/model-gateway/codex-plan-route-key";
+          };
+        };
       };
     };
 
