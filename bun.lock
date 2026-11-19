@@ -47,7 +47,7 @@
         "@pulumi/cloudflare": "6.24.0",
         "@pulumi/command": "1.3.0",
         "@pulumi/kubernetes": "4.34.3",
-        "@pulumi/pulumi": "3.275.0",
+        "@pulumi/pulumi": "3.276.0",
         "@pulumi/random": "4.21.6",
         "@pulumi/tailscale": "0.29.4",
         "@pulumi/tls": "5.6.3",
@@ -104,7 +104,7 @@
       "name": "@zgeoff/pulumi-onidel",
       "version": "0.1.0",
       "dependencies": {
-        "@pulumi/pulumi": "3.275.0",
+        "@pulumi/pulumi": "3.276.0",
       },
       "devDependencies": {
         "@types/node": "26.6.6",
@@ -635,7 +635,7 @@
 
     "@pulumi/kubernetes": ["@pulumi/kubernetes@4.34.3", "", { "dependencies": { "@pulumi/pulumi": "^3.142.0", "glob": "^12.0.0", "shell-quote": "^1.6.1" } }, "sha512-BNEqCTYWe8n6ZFHXafoTMcQoG9Z6PDDjXujKNrtKlr2SGDjdJTSSxCJWUlmFpsO/FCNC4g4wEeGTGnKmLYOthg=="],
 
-    "@pulumi/pulumi": ["@pulumi/pulumi@3.275.0", "", { "dependencies": { "@grpc/grpc-js": "^1.10.1", "@logdna/tail-file": "^2.0.6", "@opentelemetry/api": "~1.9", "@opentelemetry/core": "^2.9", "@opentelemetry/exporter-trace-otlp-grpc": "^0.220", "@opentelemetry/exporter-zipkin": "^2.9", "@opentelemetry/instrumentation": "^0.220", "@opentelemetry/instrumentation-grpc": "^0.220", "@opentelemetry/resources": "^2.9", "@opentelemetry/sdk-trace-base": "^2.9", "@opentelemetry/sdk-trace-node": "^2.9", "@opentelemetry/semantic-conventions": "^1.42", "@types/google-protobuf": "^3.15.5", "@types/semver": "^7.5.6", "execa": "^5.1.0", "google-protobuf": "^3.21.4", "ini": "^2.0.0", "js-yaml": "^4.3.2", "minimist": "^1.2.6", "normalize-package-data": "^6.0.0", "require-from-string": "^2.0.1", "semver": "^7.5.2", "source-map-support": "^0.5.6", "upath": "^1.1.0" }, "peerDependencies": { "ts-node": ">= 7.0.1 < 12", "typescript": ">= 3.8.3 < 7" }, "optionalPeers": ["ts-node", "typescript"] }, "sha512-f1UxmY+B989v+epc+bSPNcoX9hcgbaNTeNEw+RlchUOdGJIYVR3SYwf0vMLozRfyR4GqpKJa3bF2ghV/GHJDqA=="],
+    "@pulumi/pulumi": ["@pulumi/pulumi@3.276.0", "", { "dependencies": { "@grpc/grpc-js": "^1.10.1", "@logdna/tail-file": "^2.0.6", "@opentelemetry/api": "~1.9", "@opentelemetry/core": "^2.9", "@opentelemetry/exporter-trace-otlp-grpc": "^0.220", "@opentelemetry/exporter-zipkin": "^2.9", "@opentelemetry/instrumentation": "^0.220", "@opentelemetry/instrumentation-grpc": "^0.220", "@opentelemetry/resources": "^2.9", "@opentelemetry/sdk-trace-base": "^2.9", "@opentelemetry/sdk-trace-node": "^2.9", "@opentelemetry/semantic-conventions": "^1.42", "@types/google-protobuf": "^3.15.5", "@types/semver": "^7.5.6", "execa": "^5.1.0", "google-protobuf": "^3.21.4", "ini": "^2.0.0", "js-yaml": "^4.3.2", "minimist": "^1.2.6", "normalize-package-data": "^6.0.0", "require-from-string": "^2.0.1", "semver": "^7.5.2", "source-map-support": "^0.5.6", "upath": "^1.1.0" }, "peerDependencies": { "ts-node": ">= 7.0.1 < 12", "typescript": ">= 3.8.3 < 7" }, "optionalPeers": ["ts-node", "typescript"] }, "sha512-8ThwjehdLmmSpcoCtQG/9uxXx5duAsFm1OeMZOEzj9b/V3VdST6baKu51K4HnSTwqRHgH84NDhM2AwAKapTtXQ=="],
 
     "@pulumi/random": ["@pulumi/random@4.21.6", "", { "dependencies": { "@pulumi/pulumi": "^3.142.0" } }, "sha512-HsWUATAcKxceBcvNzPIdkC7sXyWWiGZmd/y4eZKF5nSAwCgpOPReZ+LLFbkl2bvKGHc3nNX5vIM84YU2dpSD1Q=="],
 
