@@ -16,7 +16,7 @@ models:
     # needs its own model secret in impd, whose name hashes the ID and the base URL's host
     # (docs/runbooks/nixie.md). A selectable model's profile needs prices, in dollars per million
     # tokens, from the Claude API pricing page for a Claude model. Each profile names its harness,
-    # the loop that runs its turns, with no default: agent-sdk, or codex for codex-plan below.
+    # the loop that runs its turns, with no default: agent-sdk, or codex for gpt-6-luna below.
     #
     # the conversation's profile, also selectable for a task
     fable-5-2:
@@ -400,10 +400,10 @@ models:
     # request. Its model secret in impd holds the route key, not a model credential
     # (docs/runbooks/model-gateway.md#add-the-chatgpt-plan-route). The prices equal the route's:
     # OpenAI's API prices for the model, which the spending stop counts.
-    codex-plan:
+    gpt-6-luna:
       harness: codex
       base_url: https://chatgpt.com
-      credential: deployment:codex-plan
+      credential: deployment:gpt-6-luna
       chatgpt_login: true
       model: gpt-6-luna
       effort: medium
@@ -540,8 +540,8 @@ models:
       description:
         AionLabs' Aion 3.5, released September 2026, through OpenRouter. A roleplay and storytelling
         system built on GLM, for fiction and character voices.
-    codex-plan:
-      profile: codex-plan
+    gpt-6-luna:
+      profile: gpt-6-luna
       description:
         OpenAI's GPT-6 Luna in Codex, on the owner's ChatGPT plan. A coding agent for work in code
         and files.

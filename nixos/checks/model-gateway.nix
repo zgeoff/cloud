@@ -656,7 +656,7 @@ let
                 output = 6;
               };
               # the plan route, whose key the unit loads as a credential
-              codex-plan = {
+              gpt-6-luna = {
                 api = "openai-responses";
                 upstream = "https://chatgpt.com/backend-api/codex";
                 model = "gpt-6-luna";
@@ -677,8 +677,8 @@ let
                   };
                 };
                 login = {
-                  file = "/var/lib/model-gateway/chatgpt-login-codex-plan.json";
-                  routeKeyFile = "/run/credentials/model-gateway.service/codex-plan-route-key";
+                  file = "/var/lib/model-gateway/chatgpt-login-gpt-6-luna.json";
+                  routeKeyFile = "/run/credentials/model-gateway.service/gpt-6-luna-route-key";
                 };
               };
             };
@@ -766,14 +766,14 @@ let
         printf 'Authorization: Bearer %s\n' fixture-route-key > route-key-header
 
         curl -s -o logins -w '%{http_code}' -H @auth-header "$control/chatgpt-logins" > logins-status
-        curl -s -o wrong-key -w '%{http_code}' -X POST "http://127.0.0.1:$gateway_port/nixie-0a1b2c/codex-plan/responses" \
+        curl -s -o wrong-key -w '%{http_code}' -X POST "http://127.0.0.1:$gateway_port/nixie-0a1b2c/gpt-6-luna/responses" \
           -H @wrong-key-header -H 'content-type: application/json' -d "$plan_request" > wrong-key-status
-        curl -s -o no-login -w '%{http_code}' -X POST "http://127.0.0.1:$gateway_port/nixie-0a1b2c/codex-plan/responses" \
+        curl -s -o no-login -w '%{http_code}' -X POST "http://127.0.0.1:$gateway_port/nixie-0a1b2c/gpt-6-luna/responses" \
           -H @route-key-header -H 'content-type: application/json' -d "$plan_request" > no-login-status
 
         assert_equals 200 "$(cat logins-status)" "the logins' code"
-        assert_equals '["codex-plan"]' "$(jq -c keys logins)" "the plan routes"
-        assert_equals '{"status":"needs_login","reason":null}' "$(jq -c '.["codex-plan"] | {status, reason}' logins)" "the plan route's login"
+        assert_equals '["gpt-6-luna"]' "$(jq -c keys logins)" "the plan routes"
+        assert_equals '{"status":"needs_login","reason":null}' "$(jq -c '.["gpt-6-luna"] | {status, reason}' logins)" "the plan route's login"
         assert_equals 403 "$(cat wrong-key-status)" "the code for another key"
         assert_equals 401 "$(cat no-login-status)" "the code with no login"
         assert_files_equal /dev/null requests
