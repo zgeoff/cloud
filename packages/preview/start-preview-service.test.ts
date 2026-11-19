@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { http, passthrough } from 'msw';
 import { createPreviewStore } from './create-preview-store.ts';
-import { stubApp } from './src/test-utils/github-app.ts';
-import { server as mockServer } from './src/test-utils/node.ts';
+import { server as mockServer } from './src/test-utils/server.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
+import { stubApp } from './src/test-utils/stub-app.ts';
 import { waitForCondition } from './src/test-utils/wait-for-condition.ts';
 import { startPreviewService } from './start-preview-service.ts';
 

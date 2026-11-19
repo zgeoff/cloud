@@ -7,10 +7,10 @@ import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { makeLinkHandler } from './make-link-handler.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
+import { composeFiles } from './src/test-utils/constants.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
-import { stubApp } from './src/test-utils/github-app.ts';
-import { composeFiles } from './src/test-utils/github-state.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
+import { stubApp } from './src/test-utils/stub-app.ts';
 import type { PreviewDeps } from './types.ts';
 
 async function setupTest() {

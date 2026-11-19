@@ -1,6 +1,6 @@
 import { afterAll, afterEach } from 'bun:test';
-import { server } from './node.ts';
 import { sentAlerts } from './sent-alerts.ts';
+import { server } from './server.ts';
 import { targetStatuses } from './target-statuses.ts';
 
 // The worker turns a failed probe into "unreachable", so an unhandled probe could still

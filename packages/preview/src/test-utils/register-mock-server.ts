@@ -6,8 +6,8 @@ import {
   issueComments,
   pullRequestFiles,
   uninstalledRepos,
-} from './github-state.ts';
-import { server } from './node.ts';
+} from './constants.ts';
+import { server } from './server.ts';
 
 // A webhook answers 204 whatever GitHub said, so an unhandled request could still pass its test.
 // Each unhandled request is recorded, and the test that sent it fails.

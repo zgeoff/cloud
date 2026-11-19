@@ -1,7 +1,5 @@
 import { expect, test } from 'bun:test';
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { githubAPIURL } from './github-api-url.ts';
-import { stubApp } from './github-app.ts';
 import {
   commitStatuses,
   composeFiles,
@@ -9,7 +7,9 @@ import {
   issueComments,
   pullRequestFiles,
   uninstalledRepos,
-} from './github-state.ts';
+} from './constants.ts';
+import { githubAPIURL } from './github-api-url.ts';
+import { stubApp } from './stub-app.ts';
 
 test('it answers the App with its slug for a JWT signed with its key', async () => {
   const nowSeconds = Math.floor(Date.now() / 1000);

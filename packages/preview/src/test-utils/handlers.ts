@@ -1,14 +1,6 @@
 import { verify } from 'node:crypto';
 import { HttpResponse, http } from 'msw';
 import { z } from 'zod';
-import { githubAPIURL } from './github-api-url.ts';
-import {
-  stubApp,
-  stubAppLogin,
-  stubAppPublicKey,
-  stubAppSlug,
-  stubInstallations,
-} from './github-app.ts';
 import {
   commitStatuses,
   composeFiles,
@@ -16,7 +8,15 @@ import {
   issueComments,
   pullRequestFiles,
   uninstalledRepos,
-} from './github-state.ts';
+} from './constants.ts';
+import { githubAPIURL } from './github-api-url.ts';
+import {
+  stubApp,
+  stubAppLogin,
+  stubAppPublicKey,
+  stubAppSlug,
+  stubInstallations,
+} from './stub-app.ts';
 
 const commentRequestSchema = z.object({ body: z.string() });
 

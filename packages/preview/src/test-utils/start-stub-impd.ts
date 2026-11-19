@@ -5,7 +5,7 @@ import { match } from 'ts-pattern';
 import { z } from 'zod';
 import type { StubApp } from './build-stub-proxy-response.ts';
 import { buildStubProxyResponse } from './build-stub-proxy-response.ts';
-import { server as mockServer } from './node.ts';
+import { server as mockServer } from './server.ts';
 
 // impd's API on loopback, as zgeoff/impz v2.3.0 serves @impz/client 2.3.0: oRPC procedures
 // with each Date in `meta`, and /exec opened by a single-use exec.ticket or the bearer token. Tests
