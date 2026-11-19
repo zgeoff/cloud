@@ -1,9 +1,9 @@
 # nixie's deployment configuration, mounted read-only at /etc/nixie/config.yaml from a ConfigMap
-# (infra/nixie.ts). nixie reads it once at start, and refuses a bad value. A release that does not
-# know a key logs `config.unknown_key` and starts without it. The file holds no secret:
-# `deployment:<name>` names an entry in the sops file beside it. infra adds the `imp` section,
-# impd's URL and the host's addresses, and the `spendStop` section, the model gateway's addresses,
-# from packages/topology (infra/shared/build-nixie-imp-config.ts and
+# (infra/cluster/create-nixie.ts). nixie reads it once at start, and refuses a bad value. A release
+# that does not know a key logs `config.unknown_key` and starts without it. The file holds no
+# secret: `deployment:<name>` names an entry in the sops file beside it. infra adds the `imp`
+# section, impd's URL and the host's addresses, and the `spendStop` section, the model gateway's
+# addresses, from packages/topology (infra/shared/build-nixie-imp-config.ts and
 # build-nixie-spend-stop-config.ts).
 server:
   data_dir: /data
