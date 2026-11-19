@@ -509,7 +509,7 @@ in
       };
       claudeEnv = {
         PR_EVIDENCE_URL = "https://${filesExposure.hostname}/api/files";
-        PR_EVIDENCE_TOKEN_PATH = "imp/files-agent-token/credential";
+        PR_EVIDENCE_TOKEN_PATH = "imp/files-upload-token/credential";
       };
       # the plug-in folder in the agent image that a boxxy session's hooks run from
       boxxyPluginArgs = [

@@ -498,7 +498,7 @@ let
                 "GIT_AUTHOR_NAME": "zgeoff",
                 "GIT_COMMITTER_EMAIL": "3013783+zgeoff@users.noreply.github.com",
                 "GIT_COMMITTER_NAME": "zgeoff",
-                "PR_EVIDENCE_TOKEN_PATH": "imp/files-agent-token/credential",
+                "PR_EVIDENCE_TOKEN_PATH": "imp/files-upload-token/credential",
                 "PR_EVIDENCE_URL": "https://files.geoff.cloud/api/files"
               },
               "kind": "claude"
@@ -514,7 +514,7 @@ let
                 "profiles": ["claude", "github", "linear", "op-connect", "pepys-telemetry"]
               },
               "env": {
-                "PR_EVIDENCE_TOKEN_PATH": "imp/files-agent-token/credential",
+                "PR_EVIDENCE_TOKEN_PATH": "imp/files-upload-token/credential",
                 "PR_EVIDENCE_URL": "https://files.geoff.cloud/api/files"
               }
             },
