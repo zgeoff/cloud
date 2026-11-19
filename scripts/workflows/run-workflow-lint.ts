@@ -22,7 +22,7 @@ export interface RunWorkflowLintOptions {
 
 const callerPath = '.github/workflows/repo-sync.yml';
 const lintFolder = 'packages/chex/src';
-const lintPath = `${lintFolder}/run-workflows-check.ts`;
+const lintPath = `${lintFolder}/workflows/run-workflows-check.ts`;
 
 export async function runWorkflowLint(options: Readonly<RunWorkflowLintOptions>): Promise<number> {
   const caller = await options.readText(join(options.root, callerPath));
