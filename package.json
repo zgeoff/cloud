@@ -146,7 +146,7 @@
     "@zgeoff/cloud-preview": "workspace:*",
     "@zgeoff/cloud-topology": "workspace:*",
     "@zgeoff/diet": "0.2.3",
-    "@zgeoff/format-codemod": "0.3.5",
+    "@zgeoff/format-codemod": "0.3.6",
     "@zgeoff/oxlint-config": "0.10.10",
     "@zgeoff/rig": "0.2.5",
     "@zgeoff/testing": "0.3.1",
