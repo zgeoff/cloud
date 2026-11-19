@@ -2,27 +2,30 @@
 
 The files service runs `files.geoff.cloud`, the file drop for agents' PR screenshots and the owner's
 own files. It runs as the `files` StatefulSet in k3s, on a retained local-path volume that holds the
-files and their SQLite metadata. Two role tokens, `agent` and `owner`, gate every write; the cluster
-holds only their SHA-256 hashes. The `files-backup` CronJob backs the volume up every night with
-restic to a `files` repository in R2. Setting the stack config `files` approves the deploy, and
-leaving it unset keeps the service out of the cluster.
+files and their SQLite metadata. Role tokens gate every write: one `owner` token, and an `agent`
+token for each repo's agents. The cluster holds only their SHA-256 hashes. The `files-backup`
+CronJob backs the volume up every night with restic to a `files` repository in R2. Setting the stack
+config `files` approves the deploy, and leaving it unset keeps the service out of the cluster.
 
 ## What holds what
 
 | Item in the `cloud` vault | Holds                                                    | Read by            |
 | ------------------------- | -------------------------------------------------------- | ------------------ |
-| `files-agent-token`       | the `agent` token, which every agent shares              | Pulumi, agents     |
+| `files-agent-token`       | the `agent` token that every agent shared before         | Pulumi, agents     |
 | `files-owner-token`       | the `owner` token                                        | Pulumi, the owner  |
 | `files-restic`            | the restic repository's password                         | Pulumi, the backup |
 | `r2-files-backup`         | the R2 key, endpoint and bucket of the restic repository | Pulumi, the backup |
 
 The prod apply job reads the same items from the `cloud-deploy` vault, so each item has a copy there
-under the same name. Agents read their copy of the agent token from the `imp` vault on an imp, and
-from the `zgeoff` vault on a workstation. On an imp, the atc daemon's `claude` entry sets two
-variables in each Claude session: `PR_EVIDENCE_URL`, the service's `/api/files` address, and
-`PR_EVIDENCE_TOKEN_PATH`, the `imp` copy's `<vault>/<item>/<field>` path. The path has no `op://`
-prefix, because `op run` resolves every `op://` value in its environment and fails on one its token
-can't read.
+under the same name.
+
+Each repo's agents have an agent token of their own, in the item `files-upload-token` in the repo's
+own vault, such as `nixie`. Agents on an imp use the copy in the `imp` vault. The cloud repo holds
+no copy of these tokens: stack config `files.agentTokenDigests` names each one with its SHA-256
+digest. On an imp, the atc daemon's `claude` entry sets two variables in each Claude session:
+`PR_EVIDENCE_URL`, the service's `/api/files` address, and `PR_EVIDENCE_TOKEN_PATH`, the `imp`
+token's `<vault>/<item>/<field>` path. The path has no `op://` prefix, because `op run` resolves
+every `op://` value in its environment and fails on one its token can't read.
 
 ## Deploy the first time
 
@@ -92,6 +95,29 @@ curl -sS --oauth2-bearer "$FILES_TOKEN" -F file=@shot.png -F expires=7d "$PR_EVI
 Expect a JSON body with the file's `url`. `expires` takes `7d` (the default), `30d`, a date such as
 `2026-12-01`, or `never` with the owner token.
 
+## Add an agent token
+
+1. Mint the token and write it to the repo's vault, with a token that can write that vault. Print
+   only the digest:
+
+   ```bash
+   token="$(openssl rand -hex 32)"
+   op item create --vault <vault> --category 'API Credential' --title files-upload-token "credential=$token" > /dev/null
+   printf %s "$token" | sha256sum | cut -d' ' -f1
+   unset token
+   ```
+
+2. In a PR, add the digest under a name for the repo to `files.agentTokenDigests` in
+   `infra/Pulumi.prod.yaml`:
+
+   ```yaml
+   geoff-cloud:files:
+     agentTokenDigests:
+       nixie: <digest>
+   ```
+
+3. Merge it. `Deploy prod` replaces the hash Secret `files-tokens` and rolls `files-0`.
+
 ## Upgrade the service
 
 1. Merge the change. The `files image` workflow publishes the new commit's image.
@@ -99,6 +125,9 @@ Expect a JSON body with the file's `url`. `expires` takes `7d` (the default), `3
 3. Merge it. `Deploy prod` rolls `files-0`; the service is down for the restart.
 
 ## Revoke a token
+
+To revoke a repo's agent token, remove its entry from `files.agentTokenDigests` in a PR and merge
+it, then remove the item from the repo's vault. To revoke the owner token or the shared agent token:
 
 1. Mint a new value with `openssl rand -hex 32`, and put it in the item in `cloud` and in each copy:
    `cloud-deploy`, and for the agent token `imp` and `zgeoff`.

@@ -129,7 +129,8 @@ export interface FilesInputs {
 
   readonly pullCredential: GHCRPullCredential;
 
-  // the SHA-256 of each role token, as hex; the cluster never holds a token
+  // the SHA-256 of each role token, as hex, the agent hashes split by commas; the cluster never
+  // holds a token
   readonly tokenHashes: {
     readonly agent: Output<string>;
     readonly owner: Output<string>;

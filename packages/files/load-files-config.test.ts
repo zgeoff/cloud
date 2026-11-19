@@ -14,7 +14,7 @@ test('it loads every value, with the hashes in lowercase', () => {
     port: 9090,
     dataDir: '/data',
     publicURL: 'https://files.example.com',
-    tokenHashes: { agent: 'a'.repeat(64), owner: 'b'.repeat(64) },
+    tokenHashes: { agent: ['a'.repeat(64)], owner: 'b'.repeat(64) },
   });
 });
 
@@ -46,18 +46,57 @@ test.each([
   expect(() => loadFilesConfig(env)).toThrowWithMessage(Error, message);
 });
 
-test('it refuses a token hash that is not 64 hex characters', () => {
+test('it loads several agent token hashes split by commas', () => {
+  expect(
+    loadFilesConfig({
+      FILES_DATA_DIR: '/data',
+      FILES_PUBLIC_URL: 'https://files.example.com',
+      FILES_AGENT_TOKEN_SHA256: `${'a'.repeat(64)}, ${'C'.repeat(64)},${'d'.repeat(64)}`,
+      FILES_OWNER_TOKEN_SHA256: 'b'.repeat(64),
+    }).tokenHashes.agent,
+  ).toStrictEqual(['a'.repeat(64), 'c'.repeat(64), 'd'.repeat(64)]);
+});
+
+test.each([['plain-agent-token'], [`${'a'.repeat(64)},`], [`${'a'.repeat(64)},plain-agent-token`]])(
+  'it refuses the agent token hashes %s',
+  (value) => {
+    expect(() =>
+      loadFilesConfig({
+        FILES_DATA_DIR: '/data',
+        FILES_PUBLIC_URL: 'https://files.example.com',
+        FILES_AGENT_TOKEN_SHA256: value,
+        FILES_OWNER_TOKEN_SHA256: 'b'.repeat(64),
+      }),
+    ).toThrowWithMessage(
+      Error,
+      'FILES_AGENT_TOKEN_SHA256 must hold SHA-256 digests as 64 hex characters, split by commas',
+    );
+  },
+);
+
+test('it refuses an owner token hash that is not 64 hex characters', () => {
   expect(() =>
     loadFilesConfig({
       FILES_DATA_DIR: '/data',
       FILES_PUBLIC_URL: 'https://files.example.com',
-      FILES_AGENT_TOKEN_SHA256: 'plain-agent-token',
-      FILES_OWNER_TOKEN_SHA256: 'b'.repeat(64),
+      FILES_AGENT_TOKEN_SHA256: 'a'.repeat(64),
+      FILES_OWNER_TOKEN_SHA256: 'plain-owner-token',
     }),
   ).toThrowWithMessage(
     Error,
-    'FILES_AGENT_TOKEN_SHA256 must be a SHA-256 digest as 64 hex characters',
+    'FILES_OWNER_TOKEN_SHA256 must be a SHA-256 digest as 64 hex characters',
   );
+});
+
+test('it refuses one agent token hash twice', () => {
+  expect(() =>
+    loadFilesConfig({
+      FILES_DATA_DIR: '/data',
+      FILES_PUBLIC_URL: 'https://files.example.com',
+      FILES_AGENT_TOKEN_SHA256: `${'a'.repeat(64)},${'A'.repeat(64)}`,
+      FILES_OWNER_TOKEN_SHA256: 'b'.repeat(64),
+    }),
+  ).toThrowWithMessage(Error, 'FILES_AGENT_TOKEN_SHA256 must not repeat a hash');
 });
 
 test('it refuses one hash for both roles', () => {
@@ -65,7 +104,7 @@ test('it refuses one hash for both roles', () => {
     loadFilesConfig({
       FILES_DATA_DIR: '/data',
       FILES_PUBLIC_URL: 'https://files.example.com',
-      FILES_AGENT_TOKEN_SHA256: 'c'.repeat(64),
+      FILES_AGENT_TOKEN_SHA256: `${'a'.repeat(64)},${'c'.repeat(64)}`,
       FILES_OWNER_TOKEN_SHA256: 'C'.repeat(64),
     }),
   ).toThrowWithMessage(Error, 'FILES_AGENT_TOKEN_SHA256 and FILES_OWNER_TOKEN_SHA256 must differ');

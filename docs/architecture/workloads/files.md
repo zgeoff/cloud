@@ -11,10 +11,14 @@ configured.
 
 ## Uploads and roles
 
-The service knows two roles, `agent` and `owner`, each with one bearer token. It holds only the
-SHA-256 hash of each token, which Pulumi builds from the tokens in 1Password and puts in a
-Kubernetes Secret, so the cluster never holds a token itself. A write without a token, or with one
-whose hash matches neither role, gets 401.
+The service knows two roles, `agent` and `owner`. The `owner` role has one bearer token. The `agent`
+role takes several: one for each repo's agents, plus the token that every agent shared before. The
+service holds only the SHA-256 hash of each token, so the cluster never holds a token itself. Pulumi
+hashes the owner token and the shared agent token from 1Password, takes each repo's digest from
+stack config `files.agentTokenDigests`, and puts the hashes in a Kubernetes Secret. A digest of a
+32-byte random token reveals nothing about the token, so the digests sit in the public stack config,
+and each repo's token lives only in that repo's own vault. A write without a token, or with one
+whose hash matches no token, gets 401.
 
 | Action              | `agent`                                  | `owner`      |
 | ------------------- | ---------------------------------------- | ------------ |
@@ -23,9 +27,10 @@ whose hash matches neither role, gets 401.
 | Change an expiry    | no                                       | yes          |
 | Remove              | `agent` uploads only                     | yes          |
 
-Every agent shares the one `agent` token, so the service cannot tell one agent from another. An
-`owner` upload is invisible to the `agent` token: the service answers 404 for it rather than 403, so
-the agent token cannot learn that the upload exists.
+Every agent token maps to the one `agent` role, so the service cannot tell one agent from another,
+and every agent sees and removes the uploads of the others. An `owner` upload is invisible to the
+`agent` token: the service answers 404 for it rather than 403, so the agent token cannot learn that
+the upload exists.
 
 The service sets each upload's ID, size, SHA-256, upload time, uploader and content type itself. The
 uploader is the role. The client sets the filename, an optional label and link, and the expiry,

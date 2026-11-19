@@ -1,4 +1,4 @@
-// all agents share the agent token
+// every agent token maps to the agent role, so the service cannot tell one agent from another
 export type Role = 'agent' | 'owner';
 
 export interface Upload {
