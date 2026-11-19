@@ -19,7 +19,7 @@ async function setupTest() {
 
   await mkdir(join(root, '.github', 'workflows'), { recursive: true });
   await mkdir(cacheDirectory);
-  await mkdir(join(tools.seed, 'packages', 'chex', 'src'), { recursive: true });
+  await mkdir(join(tools.seed, 'packages', 'chex', 'src', 'workflows'), { recursive: true });
 
   const stub = buildStubRunner(buildRealProgramHandler(['git', process.execPath], tools.env));
   const printOut = mock<(text: string) => void>();
@@ -47,7 +47,7 @@ test('it runs the lint at the tools tag that the repo-sync caller pins, in the r
   );
 
   await writeFile(
-    join(ctx.tools.seed, 'packages', 'chex', 'src', 'run-workflows-check.ts'),
+    join(ctx.tools.seed, 'packages', 'chex', 'src', 'workflows', 'run-workflows-check.ts'),
     "process.stdout.write('linted ' + process.cwd() + ' as ' + process.env['CHECKS_PROFILE'] + '\\n');\n",
   );
 
@@ -80,7 +80,7 @@ test('it checks out the lint again beside a kept checkout that holds only sync/p
   );
 
   await writeFile(
-    join(ctx.tools.seed, 'packages', 'chex', 'src', 'run-workflows-check.ts'),
+    join(ctx.tools.seed, 'packages', 'chex', 'src', 'workflows', 'run-workflows-check.ts'),
     "process.stdout.write('linted from the chex checkout\\n');\n",
   );
 
@@ -107,7 +107,7 @@ test('it runs the lint at the tools commit that the repo-sync caller pins with a
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.tools.seed, 'packages', 'chex', 'src', 'run-workflows-check.ts'),
+    join(ctx.tools.seed, 'packages', 'chex', 'src', 'workflows', 'run-workflows-check.ts'),
     "process.stdout.write('linted at the pinned commit\\n');\n",
   );
 
@@ -119,7 +119,7 @@ test('it runs the lint at the tools commit that the repo-sync caller pins with a
   const pinned = head.trim();
 
   await writeFile(
-    join(ctx.tools.seed, 'packages', 'chex', 'src', 'run-workflows-check.ts'),
+    join(ctx.tools.seed, 'packages', 'chex', 'src', 'workflows', 'run-workflows-check.ts'),
     "process.stdout.write('linted at a newer commit\\n');\n",
   );
 
@@ -154,12 +154,20 @@ test('it reuses the checkout of a tag it already holds, and runs no git', async 
     'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v42\n',
   );
 
-  await mkdir(join(ctx.cacheDirectory, 'chex-sync-v42', 'packages', 'chex', 'src'), {
+  await mkdir(join(ctx.cacheDirectory, 'chex-sync-v42', 'packages', 'chex', 'src', 'workflows'), {
     recursive: true,
   });
 
   await writeFile(
-    join(ctx.cacheDirectory, 'chex-sync-v42', 'packages', 'chex', 'src', 'run-workflows-check.ts'),
+    join(
+      ctx.cacheDirectory,
+      'chex-sync-v42',
+      'packages',
+      'chex',
+      'src',
+      'workflows',
+      'run-workflows-check.ts',
+    ),
     "process.stdout.write('linted from the kept checkout\\n');\n",
   );
 
@@ -184,12 +192,20 @@ test("it passes the lint's error status and output through", async () => {
     'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v42\n',
   );
 
-  await mkdir(join(ctx.cacheDirectory, 'chex-sync-v42', 'packages', 'chex', 'src'), {
+  await mkdir(join(ctx.cacheDirectory, 'chex-sync-v42', 'packages', 'chex', 'src', 'workflows'), {
     recursive: true,
   });
 
   await writeFile(
-    join(ctx.cacheDirectory, 'chex-sync-v42', 'packages', 'chex', 'src', 'run-workflows-check.ts'),
+    join(
+      ctx.cacheDirectory,
+      'chex-sync-v42',
+      'packages',
+      'chex',
+      'src',
+      'workflows',
+      'run-workflows-check.ts',
+    ),
     "process.stderr.write('workflows: git show failed\\n');\nprocess.exitCode = 2;\n",
   );
 
@@ -278,7 +294,7 @@ test("it leaves the pushing repo's HEAD and config alone when a worktree's pre-p
   const worktree = join(ctx.directory, 'worktree');
 
   await writeFile(
-    join(ctx.tools.seed, 'packages', 'chex', 'src', 'run-workflows-check.ts'),
+    join(ctx.tools.seed, 'packages', 'chex', 'src', 'workflows', 'run-workflows-check.ts'),
     "process.stdout.write('linted the worktree\\n');\n",
   );
 
@@ -341,7 +357,7 @@ test("it runs the checkout's git without the caller's repository variables, and 
   );
 
   await writeFile(
-    join(ctx.tools.seed, 'packages', 'chex', 'src', 'run-workflows-check.ts'),
+    join(ctx.tools.seed, 'packages', 'chex', 'src', 'workflows', 'run-workflows-check.ts'),
     "process.stdout.write('linted\\n');\n",
   );
 
