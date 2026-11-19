@@ -92,9 +92,9 @@ Three sections of stack config `boxxy` are optional. With `pepys: { environment 
 Services, which needs stack config `pepys`. The server then sends its facts there and reads its two
 reports there. pepys ingest and the pepys API must admit the server's pod, which their own policies
 decide. With `github: { baseUrl }`, the server links and watches the pull requests of its repos. It
-merges one only through a merge step in the rules, and the live rules have none. The pod has no
-broker to add a GitHub credential, so the server calls GitHub as the boxxy App, with keys from
-`.env`. With `publicDoor: { publicURL, trustForwardedFrom }`, the server serves
+merges one only through a merge step in the rules, which the live rules run after a review passes.
+The pod has no broker to add a GitHub credential, so the server calls GitHub as the boxxy App, with
+keys from `.env`. With `publicDoor: { publicURL, trustForwardedFrom }`, the server serves
 [the public door](#the-public-door); its tunnel's token needs no item in `.env`, because Pulumi
 reads it from Cloudflare.
 
