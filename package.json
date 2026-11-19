@@ -148,7 +148,7 @@
     "@zgeoff/diet": "0.2.3",
     "@zgeoff/format-codemod": "0.3.5",
     "@zgeoff/oxlint-config": "0.10.10",
-    "@zgeoff/rig": "0.2.5",
+    "@zgeoff/rig": "0.2.6",
     "@zgeoff/testing": "0.3.1",
     "knip": "6.44.2",
     "lefthook": "2.2.2",
