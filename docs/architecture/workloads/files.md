@@ -12,13 +12,12 @@ configured.
 ## Uploads and roles
 
 The service knows two roles, `agent` and `owner`. The `owner` role has one bearer token. The `agent`
-role takes several: one for each repo's agents, plus the token that every agent shared before. The
-service holds only the SHA-256 hash of each token, so the cluster never holds a token itself. Pulumi
-hashes the owner token and the shared agent token from 1Password, takes each repo's digest from
-stack config `files.agentTokenDigests`, and puts the hashes in a Kubernetes Secret. A digest of a
-32-byte random token reveals nothing about the token, so the digests sit in the public stack config,
-and each repo's token lives only in that repo's own vault. A write without a token, or with one
-whose hash matches no token, gets 401.
+role takes several, one for each repo's agents. The service holds only the SHA-256 hash of each
+token, so the cluster never holds a token itself. Pulumi hashes the owner token from 1Password,
+takes each repo's digest from stack config `files.agentTokenDigests`, and puts the hashes in a
+Kubernetes Secret. A digest of a 32-byte random token reveals nothing about the token, so the
+digests sit in the public stack config, and each repo's token lives only in that repo's own vault. A
+write without a token, or with one whose hash matches no token, gets 401.
 
 | Action              | `agent`                                  | `owner`      |
 | ------------------- | ---------------------------------------- | ------------ |
