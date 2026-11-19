@@ -117,10 +117,10 @@ pkgs.testers.runNixOSTest {
         assert left == [], f"the root disk holds {left}"
 
 
-    with subtest("it sizes the host's pool of 2 MiB pages at 6 GiB for the imps of fixed memory"):
+    with subtest("it sizes the host's pool of 2 MiB pages at 4 GiB for the imps of fixed memory"):
         host_pool = ${toString geoffcloud.config.boot.kernel.sysctl."vm.nr_hugepages"}
 
-        assert host_pool == 3072, f"the host's pool holds {host_pool} pages"
+        assert host_pool == 2048, f"the host's pool holds {host_pool} pages"
 
 
     with subtest("it reserves the whole pool at boot and makes no page on demand"):

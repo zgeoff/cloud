@@ -275,7 +275,7 @@ in
       pool = "tank";
       arcMaxMiB = 3206;
     };
-    # the pool's 6144 MiB below, plus 14336 MiB on ordinary pages for the elastic agent imps
+    # the pool's 4096 MiB below, plus 16384 MiB on ordinary pages for the elastic agent imps
     ramBudgetMiB = 20480;
     hostFirewall = "none";
     tailscaleAuthKeyFile = "/var/lib/imp-host/secrets/tailscale-authkey";
@@ -321,15 +321,15 @@ in
     settings.IMP_WARM_CAP_MIB = "256";
     # the budget kept for nixie's sandboxes, which serve people waiting on a turn: the most nixie
     # has run at once is 6, a conversation (512 MiB) and five of at most 512 MiB each. impd keeps
-    # it in the whole budget and in the pool, where the pool's other 3072 MiB hold one imp of fixed
-    # memory at impd's default 2048 MiB
+    # it in the whole budget and in the pool, where the pool's other 1024 MiB hold one more imp of
+    # fixed memory up to 1024 MiB; every other kind of imp boots elastic, off the pool
     settings.IMP_PRIORITY_RAM_MIB = 3072;
     settings.IMP_PRIORITY_IMPS = "nixie-*";
     # none of it kept in the ordinary-page budget: nixie's sandboxes run on the pool, and a kept
     # 3072 MiB there would only take room from the elastic agent imps
     settings.IMP_PRIORITY_ORDINARY_RAM_MIB = 0;
     # image builders boot elastic on ordinary pages, off the pool: 1024 MiB at boot, growing to
-    # 2048 MiB, which fits the 14336 MiB of the budget past the pool. impd admits a builder at its max
+    # 2048 MiB, which fits the 16384 MiB of the budget past the pool. impd admits a builder at its max
     settings.IMP_BUILD_MEMORY_MIB = 1024;
     settings.IMP_BUILD_MAX_MEMORY_MIB = 2048;
     # the name of this impd in each imp identity token that its broker signs. A service stores the
@@ -351,14 +351,14 @@ in
     };
   };
 
-  # the pool of 2 MiB pages that impd's huge pages run on: 6144 MiB for the imps of fixed memory,
-  # nixie's sandboxes and one more, set apart from ramBudgetMiB. The 14336 MiB of budget past the
-  # pool is impd's ordinary-page budget, where the elastic agent imps run: the host has no ordinary
-  # memory for a budget past 20480 MiB, so the pool gives up that part. systemd-sysctl reserves the pool early in boot,
-  # before memory fragments, and applies a smaller pool at the activation by freeing unused pages;
-  # no page is made on demand past it, because Firecracker maps the pool without a reservation and a
-  # page the kernel cannot make kills the guest
-  boot.kernel.sysctl."vm.nr_hugepages" = 3072;
+  # the pool of 2 MiB pages that impd's huge pages run on: 4096 MiB for the imps of fixed memory,
+  # nixie's sandboxes and 1024 MiB more, set apart from ramBudgetMiB. The 16384 MiB of budget past
+  # the pool is impd's ordinary-page budget, where the elastic agent imps run: the host has no
+  # ordinary memory for a budget past 20480 MiB, so the pool gives up that part. systemd-sysctl
+  # reserves the pool early in boot, before memory fragments, and applies a smaller pool at the
+  # activation by freeing unused pages; no page is made on demand past it, because Firecracker maps
+  # the pool without a reservation and a page the kernel cannot make kills the guest
+  boot.kernel.sysctl."vm.nr_hugepages" = 2048;
 
   # the root disk's read-ahead at the kernel's default, in place of the 8 MiB the kernel derives
   # from what vda reports, at which Alloy's journal reads thrash its memory cgroup
