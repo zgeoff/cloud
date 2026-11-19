@@ -40,7 +40,7 @@ export function buildPepysBackupPodSpec(inputs: PepysBackupPodInputs) {
           { name: 'script', mountPath: '/opt/pepys-backup', readOnly: true },
           { name: 'tmp', mountPath: '/tmp' },
         ],
-        resources: { requests: { cpu: '50m', memory: '64Mi' }, limits: { memory: '256Mi' } },
+        resources: { requests: { cpu: '50m', memory: '64Mi' }, limits: { memory: '512Mi' } },
         securityContext: buildPepysContainerSecurity(),
       },
     ],

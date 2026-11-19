@@ -35,3 +35,17 @@ test('it runs the backup script on each bucket a store writes, with Garage and R
 
   expect(spec.volumes).toContainEqual({ name: 'script', configMap: { name: scriptConfigMap } });
 });
+
+test('it limits the backup container to 512Mi of memory, over a 64Mi request', () => {
+  const spec = buildPepysBackupPodSpec({
+    image:
+      'rclone/rclone:1.71.2@sha256:7777777777777777777777777777777777777777777777777777777777777777',
+    scriptConfigMap: output('pepys-backup-script-0a1b2c3d'),
+    envSecret: output('pepys-backup-0a1b2c3d'),
+  });
+
+  expect(spec.containers[0]?.resources).toStrictEqual({
+    requests: { cpu: '50m', memory: '64Mi' },
+    limits: { memory: '512Mi' },
+  });
+});
