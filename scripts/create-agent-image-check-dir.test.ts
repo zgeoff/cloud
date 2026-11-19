@@ -6,7 +6,7 @@ import { HttpResponse, http } from 'msw';
 import { createAgentImageCheckDir } from './create-agent-image-check-dir.ts';
 import { buildRealProgramHandler } from './src/test-utils/build-real-program-handler.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
-import { server } from './src/test-utils/node.ts';
+import { server } from './src/test-utils/server.ts';
 import { startStubGitleaksRelease } from './src/test-utils/start-stub-gitleaks-release.ts';
 
 async function setupTest() {

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { decodeNixieAnswer, encodeNixieRequest } from './nixie-rpc.ts';
+import { decodeNixieAnswer, encodeNixieRequest } from './encode-nixie-request.ts';
 
 test('#encodeNixieRequest builds a sessions/enrol call as oRPC encodes it', async () => {
   const request = await encodeNixieRequest({

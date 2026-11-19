@@ -1,8 +1,8 @@
 import type { NixieReply } from './classify-nixie-refusal.ts';
 import { classifyNixieRefusal } from './classify-nixie-refusal.ts';
+import type { NixieProcedure } from './nixie-api/encode-nixie-request.ts';
+import { decodeNixieAnswer, encodeNixieRequest } from './nixie-api/encode-nixie-request.ts';
 import type { NixieAPICheckCall } from './nixie-api/nixie-api-check-calls.ts';
-import type { NixieProcedure } from './nixie-api/nixie-rpc.ts';
-import { decodeNixieAnswer, encodeNixieRequest } from './nixie-api/nixie-rpc.ts';
 
 export interface CheckNixieAPIOptions {
   readonly url: string;

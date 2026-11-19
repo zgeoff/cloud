@@ -1,4 +1,4 @@
-import { encodeNixieRequest } from './nixie-api/nixie-rpc.ts';
+import { encodeNixieRequest } from './nixie-api/encode-nixie-request.ts';
 import type { RPCResult } from './send-nixie-rpc.ts';
 
 export interface StreamHold {

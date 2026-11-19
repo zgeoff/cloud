@@ -1,5 +1,5 @@
-import type { NixieProcedure, NixieRequest } from './nixie-api/nixie-rpc.ts';
-import { decodeNixieAnswer, encodeNixieRequest } from './nixie-api/nixie-rpc.ts';
+import type { NixieProcedure, NixieRequest } from './nixie-api/encode-nixie-request.ts';
+import { decodeNixieAnswer, encodeNixieRequest } from './nixie-api/encode-nixie-request.ts';
 
 export interface NixieCall<Procedure extends NixieProcedure, T> extends NixieRequest<Procedure> {
   // the output is whatever nixie answered, so the check reads it at run time

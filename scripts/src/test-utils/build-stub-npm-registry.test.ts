@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { buildStubNPMRegistry } from './build-stub-npm-registry.ts';
-import { server } from './node.ts';
+import { server } from './server.ts';
 
 test('it lists a version with its tarball and its sha512 integrity', async () => {
   server.use(

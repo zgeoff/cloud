@@ -4,7 +4,7 @@ import { buildStubReleaseDocker } from '../src/test-utils/build-stub-release-doc
 import { buildStubReleaseGH } from '../src/test-utils/build-stub-release-gh.ts';
 import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
 import { getReleaseRecord } from '../src/test-utils/get-release-record.ts';
-import { server } from '../src/test-utils/node.ts';
+import { server } from '../src/test-utils/server.ts';
 import { readReleaseValues } from './read-release-values.ts';
 
 test('it reads an atc release SHA256SUMS for a sums source', async () => {

@@ -1,4 +1,4 @@
-import type { NixieInput, NixieProcedure } from './nixie-rpc.ts';
+import type { NixieInput, NixieProcedure } from './encode-nixie-request.ts';
 
 export type NixieAPICheckCall = {
   [Procedure in NixieProcedure]: {

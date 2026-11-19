@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { join } from 'node:path';
 import { http, passthrough } from 'msw';
 import { spawnPiped } from './spawn-piped.ts';
-import { server } from './src/test-utils/node.ts';
+import { server } from './src/test-utils/server.ts';
 import { startKubectlProxy } from './start-kubectl-proxy.ts';
 
 test('it gives the URL that the proxy serves on', async () => {
