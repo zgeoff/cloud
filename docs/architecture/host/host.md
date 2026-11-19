@@ -28,24 +28,32 @@ host's kernel, so a NixOS upgrade can wait on ZFS. The reinstall runs `nixos-any
 the VM's Secure Boot blocks, so Secure Boot stays off
 ([the reinstall runbook](../../runbooks/reinstall-geoffcloud.md)).
 
-### Read-ahead on the root disk
+### Disk read-ahead
 
-The host holds the root disk, vda, at the small read-ahead that is the default of the
-`disk-read-ahead` module in `nixos/modules/`, which the host configuration in
-`nixos/hosts/geoffcloud/` enables for vda. A udev rule sets it at each add or change event of vda.
-The rule acts only on a device event, so the `disk-read-ahead` unit also sets it at boot and at a
-switch that adds or changes the unit. Left alone, the kernel derives a read-ahead for vda from the
-optimal I/O size the disk reports, as large as a journal window.
+The host holds two disks at the small read-ahead that is the default of the `disk-read-ahead` module
+in `nixos/modules/`: the root disk, vda, and the zvol that holds k3s's data, `tank/cloud/rancher`.
+The host configuration in `nixos/hosts/geoffcloud/` lists both. Left alone, vda's read-ahead is as
+large as a journal window, and the zvol's is larger still: the kernel sets it to twice the optimal
+I/O size that ZFS reports for the zvol.
+
+A udev rule sets the value at each add or change event of each disk, and matches the zvol by the
+`/dev/zvol/` link that ZFS's own udev rule makes. The rule acts only on a device event, so the
+`disk-read-ahead` unit also sets the value at boot and at a switch that adds or changes the unit.
+The unit skips a disk that is not there yet: the zvol appears only after the key of `tank/cloud`
+loads, and the rule sets it then.
 
 The value matters because of how the kernel serves a page fault in a mapped file. It reads up to the
 read-ahead size around the faulting page, and it charges every page it reads to the memory cgroup of
-the process that faulted. Alloy ships the host journal to Loki
-([observability](../workloads/observability.md)), and reads the journal through sd-journal, which
-maps each journal file in windows. At the kernel's derived read-ahead, a fault in any of those
-windows can read the whole window into Alloy's memory cgroup, where the host's setting reads a small
-part of it.
+the process that faulted. Two workloads fault in mapped files on these disks:
 
-The second disk, vdb, keeps the read-ahead the kernel derives, because ZFS does its own prefetch.
+- Alloy ships the host journal to Loki ([observability](../workloads/observability.md)), and reads
+  the journal on vda through sd-journal, which maps each journal file in windows. At the derived
+  read-ahead, a fault in any of those windows can read the whole window into Alloy's memory cgroup.
+- Prometheus maps its TSDB blocks, which sit on the zvol. At the derived read-ahead, each fault
+  reads far more than Prometheus needs into its memory cgroup, which evicts the pages its rules read
+  next, so each rule evaluation reads its blocks from disk again.
+
+The pool's disk, vdb, keeps the read-ahead the kernel derives, because ZFS does its own prefetch.
 
 ## Services
 

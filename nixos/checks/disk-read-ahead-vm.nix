@@ -1,10 +1,21 @@
-# services.disk-read-ahead on a booted VM with two virtio disks, as geoffcloud has: the module sets
-# vda's read-ahead through the kernel's own sysfs, after a device event and after a start of its
-# unit, as a switch starts it, and leaves vdb's alone.
+# services.disk-read-ahead on a booted VM with three virtio disks: the module sets vda's read-ahead
+# by its kernel name, and vdb's by a link an earlier udev rule makes, as ZFS's rule makes the
+# rancher zvol's on geoffcloud. It sets both through the kernel's own sysfs, after an add or change
+# event of the disk and after a start of its unit, as a switch starts it. It skips a listed disk
+# that is absent, and leaves vdc's read-ahead alone.
 # It needs KVM: run `bun run test:nixos disk-read-ahead-vm`.
 { nixpkgs }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
+
+  # stands in for ZFS's 60-zvol.rules, which links /dev/zvol/<pool>/<volume> to its zd device
+  linkRule = pkgs.writeTextFile {
+    name = "disk-read-ahead-vm-link";
+    destination = "/etc/udev/rules.d/60-disk-read-ahead-vm-link.rules";
+    text = ''
+      SUBSYSTEM=="block", KERNEL=="vdb", SYMLINK+="zvol/tank/cloud/rancher"
+    '';
+  };
 in
 pkgs.testers.runNixOSTest {
   name = "disk-read-ahead-vm";
@@ -12,13 +23,25 @@ pkgs.testers.runNixOSTest {
     imports = [ ../modules/disk-read-ahead.nix ];
     services.disk-read-ahead = {
       enable = true;
-      device = "vda";
+      devices = [
+        "vda"
+        "zvol/tank/cloud/rancher"
+        "zvol/tank/cloud/absent"
+      ];
     };
-    # vdb, the second disk
-    virtualisation.emptyDiskImages = [ 64 ];
+    services.udev.packages = [ linkRule ];
+    # vdb, the linked disk, and vdc, a disk the module does not list
+    virtualisation.emptyDiskImages = [
+      64
+      64
+    ];
   };
 
   testScript = ''
+    def read_ahead(disk):
+        return machine.succeed(f"cat /sys/block/{disk}/queue/read_ahead_kb").strip()
+
+
     machine.wait_for_unit("multi-user.target", timeout=300)
 
 
@@ -28,46 +51,49 @@ pkgs.testers.runNixOSTest {
         assert virt == "kvm", f"the VM runs under {virt!r}: QEMU fell back from KVM"
 
 
-    with subtest("it sets vda's read-ahead at boot"):
+    with subtest("it sets the listed disks' read-ahead at boot, and skips the absent one"):
         machine.wait_for_unit("disk-read-ahead.service", timeout=60)
-        read_ahead = machine.succeed("cat /sys/block/vda/queue/read_ahead_kb").strip()
+        link = machine.succeed("readlink -f /dev/zvol/tank/cloud/rancher").strip()
 
-        assert read_ahead == "128", f"vda's read-ahead is {read_ahead!r} KiB"
+        assert link == "/dev/vdb", f"the link points at {link!r}"
+        assert read_ahead("vda") == "128", f"vda's read-ahead is {read_ahead('vda')!r} KiB"
+        assert read_ahead("vdb") == "128", f"vdb's read-ahead is {read_ahead('vdb')!r} KiB"
 
 
-    with subtest("it sets vda's read-ahead again after a change event of the disk"):
+    # an add event is how the rancher zvol gets its value: it appears after the unit has run
+    for action in ["add", "change"]:
+        for disk in ["vda", "vdb"]:
+            with subtest(f"it sets {disk}'s read-ahead again after the disk's {action} event"):
+                machine.succeed(f"echo 8192 > /sys/block/{disk}/queue/read_ahead_kb")
+
+                machine.succeed(f"udevadm trigger --action={action} --settle /sys/block/{disk}")
+
+                assert read_ahead(disk) == "128", f"{disk}'s read-ahead is {read_ahead(disk)!r} KiB after the {action} event"
+
+
+    with subtest("it sets both disks' read-ahead again when its unit starts again, as a switch starts it"):
         machine.succeed("echo 8192 > /sys/block/vda/queue/read_ahead_kb")
-
-        machine.succeed("udevadm trigger --action=change --settle /sys/block/vda")
-        read_ahead = machine.succeed("cat /sys/block/vda/queue/read_ahead_kb").strip()
-
-        assert read_ahead == "128", f"vda's read-ahead is {read_ahead!r} KiB after the change event"
-
-
-    with subtest("it sets vda's read-ahead again when its unit starts again, as a switch starts it"):
-        machine.succeed("echo 8192 > /sys/block/vda/queue/read_ahead_kb")
+        machine.succeed("echo 8192 > /sys/block/vdb/queue/read_ahead_kb")
 
         machine.succeed("systemctl restart disk-read-ahead.service")
-        read_ahead = machine.succeed("cat /sys/block/vda/queue/read_ahead_kb").strip()
 
-        assert read_ahead == "128", f"vda's read-ahead is {read_ahead!r} KiB after the unit's start"
-
-
-    with subtest("it leaves vdb's read-ahead as it is after a change event of vdb"):
-        machine.succeed("echo 4096 > /sys/block/vdb/queue/read_ahead_kb")
-
-        machine.succeed("udevadm trigger --action=change --settle /sys/block/vdb")
-        read_ahead = machine.succeed("cat /sys/block/vdb/queue/read_ahead_kb").strip()
-
-        assert read_ahead == "4096", f"vdb's read-ahead is {read_ahead!r} KiB after its change event"
+        assert read_ahead("vda") == "128", f"vda's read-ahead is {read_ahead('vda')!r} KiB after the unit's start"
+        assert read_ahead("vdb") == "128", f"vdb's read-ahead is {read_ahead('vdb')!r} KiB after the unit's start"
 
 
-    with subtest("it leaves vdb's read-ahead as it is when its unit starts again"):
-        machine.succeed("echo 4096 > /sys/block/vdb/queue/read_ahead_kb")
+    with subtest("it leaves vdc's read-ahead as it is after a change event of vdc"):
+        machine.succeed("echo 4096 > /sys/block/vdc/queue/read_ahead_kb")
+
+        machine.succeed("udevadm trigger --action=change --settle /sys/block/vdc")
+
+        assert read_ahead("vdc") == "4096", f"vdc's read-ahead is {read_ahead('vdc')!r} KiB after its change event"
+
+
+    with subtest("it leaves vdc's read-ahead as it is when its unit starts again"):
+        machine.succeed("echo 4096 > /sys/block/vdc/queue/read_ahead_kb")
 
         machine.succeed("systemctl restart disk-read-ahead.service")
-        read_ahead = machine.succeed("cat /sys/block/vdb/queue/read_ahead_kb").strip()
 
-        assert read_ahead == "4096", f"vdb's read-ahead is {read_ahead!r} KiB after the unit's start"
+        assert read_ahead("vdc") == "4096", f"vdc's read-ahead is {read_ahead('vdc')!r} KiB after the unit's start"
   '';
 }

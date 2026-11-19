@@ -360,12 +360,16 @@ in
   # the pool without a reservation and a page the kernel cannot make kills the guest
   boot.kernel.sysctl."vm.nr_hugepages" = 2048;
 
-  # the root disk's read-ahead at the kernel's default, in place of the 8 MiB the kernel derives
-  # from what vda reports, at which Alloy's journal reads thrash its memory cgroup
-  # (docs/architecture/host/host.md#read-ahead-on-the-root-disk). vdb keeps its own: ZFS prefetches
+  # the kernel's default read-ahead on the root disk and on k3s's zvol, in place of the 8 MiB the
+  # kernel derives for vda and the 64 MiB it derives for the zvol, at which Alloy's journal reads
+  # and Prometheus's TSDB reads thrash their memory cgroups
+  # (docs/architecture/host/host.md#disk-read-ahead). vdb keeps its own: ZFS prefetches
   services.disk-read-ahead = {
     enable = true;
-    device = "vda";
+    devices = [
+      "vda"
+      "zvol/tank/cloud/rancher"
+    ];
   };
 
   # the TLS front on 443 for the registry's front routes (modules/public-front.nix). A hosted MCP

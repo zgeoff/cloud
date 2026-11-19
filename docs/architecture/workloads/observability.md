@@ -40,7 +40,7 @@ The stack runs in the `observability` namespace:
   `infra/observability/`, holds that page cache beside its `GOMEMLIMIT`. Under a smaller limit, the
   kernel evicts the window pages that Alloy faults in, Alloy faults them in again, and its readiness
   probe times out. Each fault reads only the host's root disk read-ahead
-  ([read-ahead on the root disk](../host/host.md#read-ahead-on-the-root-disk)).
+  ([disk read-ahead](../host/host.md#disk-read-ahead)).
 - **Three blackbox exporters** run the probes that need a network path: one opens a TCP connection
   to each atc daemon on the gateway's path to it, one fetches impd's health over HTTPS on the
   tailnet and requires a valid certificate and a ready answer, and one fetches nixie's readiness
