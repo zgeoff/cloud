@@ -1,7 +1,7 @@
 import type { NixieSession, RecordCount } from './count-nixie-records.ts';
 import { countNixieRecords } from './count-nixie-records.ts';
 import { findJSONField } from './find-json-field.ts';
-import type { NixieOutput } from './nixie-api/nixie-rpc.ts';
+import type { NixieOutput } from './nixie-api/encode-nixie-request.ts';
 import type { StreamReport } from './read-nixie-stream.ts';
 import { readNixieStream } from './read-nixie-stream.ts';
 import { sendNixieRPC } from './send-nixie-rpc.ts';

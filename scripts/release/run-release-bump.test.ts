@@ -9,7 +9,7 @@ import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
 import { createCloudCheckout } from '../src/test-utils/create-cloud-checkout.ts';
 import { createNPMTarball } from '../src/test-utils/create-npm-tarball.ts';
 import { createRestoreJobFiles } from '../src/test-utils/create-restore-job-files.ts';
-import { server } from '../src/test-utils/node.ts';
+import { server } from '../src/test-utils/server.ts';
 import { runReleaseBump } from './run-release-bump.ts';
 
 async function setupTest() {

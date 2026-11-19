@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { createImpClient } from '@impz/client';
-import { server } from './node.ts';
+import { server } from './server.ts';
 import { startStubImpdImages } from './start-stub-impd-images.ts';
 
 test("it lists its images to imp's typed client, with each record's created time as a Date", async () => {

@@ -1,5 +1,5 @@
 import { match } from 'ts-pattern';
-import type { NixieAnswer } from './nixie-api/nixie-rpc.ts';
+import type { NixieAnswer } from './nixie-api/encode-nixie-request.ts';
 
 export type NixieReply =
   | { readonly kind: 'unreached'; readonly error: string }

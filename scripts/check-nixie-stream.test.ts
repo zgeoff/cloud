@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { checkNixieStream } from './check-nixie-stream.ts';
-import { server } from './src/test-utils/node.ts';
+import { server } from './src/test-utils/server.ts';
 import { startStubNixieAPI } from './src/test-utils/start-stub-nixie-api.ts';
 
 test('it holds the stream open, reads the same record count before and after, and revokes its session', async () => {

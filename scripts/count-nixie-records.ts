@@ -1,5 +1,5 @@
 import { findJSONField } from './find-json-field.ts';
-import type { NixieOutput } from './nixie-api/nixie-rpc.ts';
+import type { NixieOutput } from './nixie-api/encode-nixie-request.ts';
 import type { RPCResult } from './send-nixie-rpc.ts';
 import { sendNixieRPC } from './send-nixie-rpc.ts';
 

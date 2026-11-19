@@ -3,7 +3,7 @@ import { HttpResponse, http } from 'msw';
 import { checkGatewayRoute } from './check-gateway-route.ts';
 import { buildStubGetent } from './src/test-utils/build-stub-getent.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
-import { server } from './src/test-utils/node.ts';
+import { server } from './src/test-utils/server.ts';
 
 test('it passes the route when its metadata answers 200', async () => {
   const stub = buildStubRunner(buildStubGetent({ 'atc.geoff.cloud': '104.21.32.1' }));

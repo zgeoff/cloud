@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll } from 'bun:test';
-import { server } from './node.ts';
+import { server } from './server.ts';
 
 // A script can turn a failed request into a result, so an unhandled request could still pass its
 // test. Each unhandled request is recorded, and the test that sent it fails.

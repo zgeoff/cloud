@@ -3,7 +3,7 @@ import { createImpClient } from '@impz/client';
 import { HttpResponse, http } from 'msw';
 import { runSandboxImageAdd } from './run-sandbox-image-add.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
-import { server } from './src/test-utils/node.ts';
+import { server } from './src/test-utils/server.ts';
 import { startStubImpdImages } from './src/test-utils/start-stub-impd-images.ts';
 
 function setupTest() {

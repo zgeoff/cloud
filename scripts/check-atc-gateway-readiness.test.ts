@@ -5,7 +5,7 @@ import { buildStubGetent } from './src/test-utils/build-stub-getent.ts';
 import { buildStubGHAuthToken } from './src/test-utils/build-stub-gh-auth-token.ts';
 import { buildStubReadinessHost } from './src/test-utils/build-stub-readiness-host.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
-import { server } from './src/test-utils/node.ts';
+import { server } from './src/test-utils/server.ts';
 
 function setupTest() {
   const out: string[] = [];

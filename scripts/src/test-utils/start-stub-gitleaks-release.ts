@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
 import { runProcess } from '../../run-process.ts';
-import { server } from './node.ts';
+import { server } from './server.ts';
 
 export async function startStubGitleaksRelease(version: string, content: string): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), 'stub-gitleaks-release-'));
