@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { KeyObject } from 'node:crypto';
 import { loadPreviewConfig } from './load-preview-config.ts';
-import { stubApp, stubAppKeyPEM } from './src/test-utils/github-app.ts';
+import { stubApp, stubAppKeyPEM } from './src/test-utils/stub-app.ts';
 
 test('it reads the settings from the environment and the secrets from the credential files', async () => {
   const files = new Map([

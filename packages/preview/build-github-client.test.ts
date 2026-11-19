@@ -3,7 +3,6 @@ import { verify } from 'node:crypto';
 import { HttpResponse, http } from 'msw';
 import { buildGitHubClient, previewCommentMarker } from './build-github-client.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
-import { stubApp, stubAppPublicKey } from './src/test-utils/github-app.ts';
 import {
   commitStatuses,
   composeFiles,
@@ -11,8 +10,9 @@ import {
   issueComments,
   pullRequestFiles,
   uninstalledRepos,
-} from './src/test-utils/github-state.ts';
-import { server } from './src/test-utils/node.ts';
+} from './src/test-utils/issue-comments.ts';
+import { server } from './src/test-utils/server.ts';
+import { stubApp, stubAppPublicKey } from './src/test-utils/stub-app.ts';
 
 test('it mints a new installation token for each call, so no token outlives its call', async () => {
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');

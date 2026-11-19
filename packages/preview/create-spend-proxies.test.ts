@@ -5,8 +5,8 @@ import { join } from 'node:path';
 import { http, passthrough } from 'msw';
 import { buildSpendProxyIO } from './build-spend-proxy-io.ts';
 import { createSpendProxies } from './create-spend-proxies.ts';
-import { server as mockServer } from './src/test-utils/node.ts';
 import { readProcessStatus } from './src/test-utils/read-process-status.ts';
+import { server as mockServer } from './src/test-utils/server.ts';
 import { waitForCondition } from './src/test-utils/wait-for-condition.ts';
 
 async function setupTest() {

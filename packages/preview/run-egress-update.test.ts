@@ -10,9 +10,9 @@ import { makeSlotLock } from './make-slot-lock.ts';
 import { runEgressUpdate } from './run-egress-update.ts';
 import { createImpdRefusalHandler } from './src/test-utils/create-impd-refusal-handler.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
-import { stubApp } from './src/test-utils/github-app.ts';
-import { server } from './src/test-utils/node.ts';
+import { server } from './src/test-utils/server.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
+import { stubApp } from './src/test-utils/stub-app.ts';
 import type { PreviewDeps } from './types.ts';
 
 async function setupTest() {

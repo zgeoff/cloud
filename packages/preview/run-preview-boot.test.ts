@@ -8,11 +8,11 @@ import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { runPreviewBoot } from './run-preview-boot.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
-import { stubApp } from './src/test-utils/github-app.ts';
-import { composeFiles } from './src/test-utils/github-state.ts';
+import { composeFiles } from './src/test-utils/issue-comments.ts';
 import { processDeps } from './src/test-utils/process-deps.ts';
 import { runBoundedProcess } from './src/test-utils/run-bounded-process.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
+import { stubApp } from './src/test-utils/stub-app.ts';
 import type { PreviewDeps } from './types.ts';
 
 async function setupTest() {

@@ -3,20 +3,20 @@ import { HttpResponse, http } from 'msw';
 import { z } from 'zod';
 import { githubAPIURL } from './github-api-url.ts';
 import {
-  stubApp,
-  stubAppLogin,
-  stubAppPublicKey,
-  stubAppSlug,
-  stubInstallations,
-} from './github-app.ts';
-import {
   commitStatuses,
   composeFiles,
   installationTokens,
   issueComments,
   pullRequestFiles,
   uninstalledRepos,
-} from './github-state.ts';
+} from './issue-comments.ts';
+import {
+  stubApp,
+  stubAppLogin,
+  stubAppPublicKey,
+  stubAppSlug,
+  stubInstallations,
+} from './stub-app.ts';
 
 const commentRequestSchema = z.object({ body: z.string() });
 

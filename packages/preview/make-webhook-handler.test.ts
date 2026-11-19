@@ -10,15 +10,15 @@ import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { makeWebhookHandler } from './make-webhook-handler.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
-import { stubApp } from './src/test-utils/github-app.ts';
 import {
   commitStatuses,
   composeFiles,
   installationTokens,
   issueComments,
   pullRequestFiles,
-} from './src/test-utils/github-state.ts';
+} from './src/test-utils/issue-comments.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
+import { stubApp } from './src/test-utils/stub-app.ts';
 import type { PreviewDeps } from './types.ts';
 
 async function setupTest() {

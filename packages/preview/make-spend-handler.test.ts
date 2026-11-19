@@ -7,7 +7,7 @@ import { buildSpendProxyIO } from './build-spend-proxy-io.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { createSpendProxies } from './create-spend-proxies.ts';
 import { makeSpendHandler } from './make-spend-handler.ts';
-import { server as mockServer } from './src/test-utils/node.ts';
+import { server as mockServer } from './src/test-utils/server.ts';
 import { waitForCondition } from './src/test-utils/wait-for-condition.ts';
 
 async function setupTest() {
