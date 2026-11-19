@@ -216,7 +216,7 @@ create_rules_source() {
   chmod -R a+rX "$dir"
 }
 
-# a configuration with the listeners, store, rules folder and review agent that
+# a configuration with the listeners, store, rules folder and review agent scope that
 # infra/cluster/render-boxxy-config.ts sets, so the rules load as the cluster loads them, its
 # trustedIssuers section when the second argument is set, the rules section in the third argument
 # in place of the plain folder at /rules, and an atc address that refuses every connection, so the runner
@@ -239,7 +239,12 @@ write_config() {
     "listen": { "hostname": "0.0.0.0", "port": 8090 },
     "workerListen": { "hostname": "0.0.0.0", "port": 8091 }
   },
-  "spawn": { "target": "image-test", "repos": {}, "reviewAgents": ["boxxy-review"] },
+  "spawn": {
+    "target": "image-test",
+    "repos": {},
+    "agents": { "boxxy-review": { "phases": ["review"] } },
+    "phases": { "review": { "requireScopedAgent": true } }
+  },
   "atc": { "url": "http://127.0.0.1:1/mcp", "host": "atc.image-test.invalid", "trustedFolders": {} }
 }
 EOF
