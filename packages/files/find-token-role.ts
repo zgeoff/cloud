@@ -24,7 +24,7 @@ export function findTokenRole(authorization: string | null, hashes: TokenHashes)
 
   const isAgent = hashes.agent
     .map((hash) => timingSafeEqual(digest, Buffer.from(hash, 'hex')))
-    .includes(true);
+    .reduce((matched, isMatch) => matched || isMatch, false);
 
   if (isOwner) {
     return 'owner';
