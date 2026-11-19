@@ -294,12 +294,22 @@ the switch.
    a secret left out loses its grants on nixie's imps, so check the list first:
 
    ```bash
-   comm -3 <(printf '%s\n' "$secret_names" | sort) \
-     <(host_imp secret ls --json < /dev/null | jq -r '.[] | select(.name | startswith("nixie-model-")) | .name' | sort)
-   host_imp token set nixie --grantable "$secrets" < /dev/null
+   (
+     set -euo pipefail
+     held="$(host_imp secret ls --json < /dev/null \
+       | jq -r '.[] | select(.name | startswith("nixie-model-")) | .name' | sort)"
+     differ="$(comm -3 <(printf '%s\n' "$secret_names" | sort) <(printf '%s\n' "$held"))"
+     if [ -n "$differ" ]; then
+       printf 'the lists differ, so nothing changed:\n%s\n' "$differ" >&2
+       exit 1
+     fi
+     host_imp token set nixie --grantable "$secrets" < /dev/null
+   )
    ```
 
-   Expect the `comm` command to print nothing before you run `token set`.
+   Expect the token's row. When the listing fails, or the lists differ, the block stops before
+   `token set` and changes nothing: add the missing secret, or the missing case in the script, and
+   run it again.
 
 5. Merge the PR that adds the route and the profile, then switch the host and dispatch the held
    `Deploy prod` run, as step 3 of [Add a model profile](#add-a-model-profile) does.
