@@ -11,7 +11,6 @@ config `files` approves the deploy, and leaving it unset keeps the service out o
 
 | Item in the `cloud` vault | Holds                                                    | Read by            |
 | ------------------------- | -------------------------------------------------------- | ------------------ |
-| `files-agent-token`       | the `agent` token that every agent shared before         | Pulumi, agents     |
 | `files-owner-token`       | the `owner` token                                        | Pulumi, the owner  |
 | `files-restic`            | the restic repository's password                         | Pulumi, the backup |
 | `r2-files-backup`         | the R2 key, endpoint and bucket of the restic repository | Pulumi, the backup |
@@ -34,19 +33,19 @@ change until the owner approves it, as [the prod apply job](./prod-apply.md) des
 
 1. Merge the service. The `files image` workflow publishes `ghcr.io/zgeoff/cloud-files:<commit>`
    from `main`, and its run summary gives the digest.
-2. Create the four items in the `cloud` vault, then copy each into `cloud-deploy`. Mint each token
-   as 32 random bytes in hex:
+2. Create the three items in the `cloud` vault, then copy each into `cloud-deploy`. Mint the owner
+   token as 32 random bytes in hex:
 
    ```bash
    openssl rand -hex 32
    ```
 
-   Copy the agent token into the `imp` and `zgeoff` vaults.
+   Mint at least one agent token, as [Add an agent token](#add-an-agent-token) describes.
 
-3. In a PR, add the references to `.env` and the `files` object to `infra/Pulumi.prod.yaml`:
+3. In a PR, add the references to `.env` and the `files` object, with each agent token's digest, to
+   `infra/Pulumi.prod.yaml`:
 
    ```bash
-   FILES_AGENT_TOKEN=op://cloud/files-agent-token/credential
    FILES_OWNER_TOKEN=op://cloud/files-owner-token/credential
    FILES_RESTIC_PASSWORD=op://cloud/files-restic/password
    FILES_R2_ACCESS_KEY_ID=op://cloud/r2-files-backup/access-key-id
@@ -59,6 +58,8 @@ change until the owner approves it, as [the prod apply job](./prod-apply.md) des
    geoff-cloud:files:
      image: ghcr.io/zgeoff/cloud-files:<commit>@sha256:<digest>
      hostname: files.geoff.cloud
+     agentTokenDigests:
+       nixie: <digest>
    ```
 
    Run `bun run preview` and check that it adds the `files` namespace, its Secrets, Service,
@@ -127,10 +128,10 @@ Expect a JSON body with the file's `url`. `expires` takes `7d` (the default), `3
 ## Revoke a token
 
 To revoke a repo's agent token, remove its entry from `files.agentTokenDigests` in a PR and merge
-it, then remove the item from the repo's vault. To revoke the owner token or the shared agent token:
+it, then remove the item from the repo's vault. To revoke the owner token:
 
-1. Mint a new value with `openssl rand -hex 32`, and put it in the item in `cloud` and in each copy:
-   `cloud-deploy`, and for the agent token `imp` and `zgeoff`.
+1. Mint a new value with `openssl rand -hex 32`, and put it in the item in `cloud` and in its copy
+   in `cloud-deploy`.
 2. [Apply by hand](./workflows.md#apply-by-hand) from `main`. The `Deploy prod` job applies only a
    new commit, so it never runs for a change in 1Password alone. Both drift checks and the preview
    show one change: Pulumi replaces the hash Secret `files-tokens`. Expect nothing else.

@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { secret } from '@pulumi/pulumi';
 import { z } from 'zod';
 import { findResticBackup } from './find-restic-backup.ts';
-import { findVariable } from './find-variable.ts';
 import { parseStackObject } from './parse-stack-object.ts';
 import { requireGeoffCloudHostname } from './require-geoff-cloud-hostname.ts';
 import { requireGHCRPullCredential } from './require-ghcr-pull-credential.ts';
@@ -50,11 +49,7 @@ export function loadFilesInputs(
   requirePinnedImage('files.image', config.image);
   requireGeoffCloudHostname('files.hostname', config.hostname);
 
-  const agent = collectAgentTokenHashes(
-    findVariable(env, 'FILES_AGENT_TOKEN'),
-    config.agentTokenDigests ?? {},
-  );
-
+  const agent = collectAgentTokenHashes(config.agentTokenDigests ?? {});
   const owner = deriveTokenHash(requireVariable(env, 'FILES_OWNER_TOKEN', tokenNeed));
 
   if (agent.includes(owner)) {
@@ -74,19 +69,13 @@ export function loadFilesInputs(
   };
 }
 
-// FILES_AGENT_TOKEN is the one token every agent shared before each repo got its own
-function collectAgentTokenHashes(
-  sharedToken: string | undefined,
-  digests: Readonly<Record<string, string>>,
-): string[] {
-  const hashes = [
-    ...(sharedToken === undefined ? [] : [deriveTokenHash(sharedToken)]),
-    ...Object.values(digests),
-  ];
+// each agent token is named by its digest, so the deploy holds no agent token itself
+function collectAgentTokenHashes(digests: Readonly<Record<string, string>>): string[] {
+  const hashes = Object.values(digests);
 
   if (hashes.length === 0) {
     throw new Error(
-      `the files service needs an agent token: set FILES_AGENT_TOKEN or stack config "files.agentTokenDigests"`,
+      'the files service needs an agent token: name its digest in stack config "files.agentTokenDigests"',
     );
   }
 
