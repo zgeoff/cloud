@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import {
   buildBoxxyOwnerServiceSpec,
   buildBoxxyWorkerServiceSpec,
-} from './build-boxxy-service-specs.ts';
+} from './build-boxxy-owner-service-spec.ts';
 
 test('it gives the owner listener a Service with no fixed address', () => {
   expect(buildBoxxyOwnerServiceSpec()).toStrictEqual({

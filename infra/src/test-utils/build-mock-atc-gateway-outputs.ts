@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { output } from '@pulumi/pulumi';
-import type { ATCGatewayOutputs } from '../../cluster/atc-gateway.ts';
+import type { ATCGatewayOutputs } from '../../cluster/create-atc-gateway.ts';
 
 export function buildMockATCGatewayOutputs(
   overrides: Partial<ATCGatewayOutputs> = {},

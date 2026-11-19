@@ -48,7 +48,7 @@ setup_test() {
   done
   (cd "$repo" && run_in_case "$tree" bun -e "
     import { alloyChart } from './infra/observability/alloy-chart.ts';
-    import { buildAlloyValues } from './infra/observability/alloy-values.ts';
+    import { buildAlloyValues } from './infra/observability/build-alloy-values.ts';
     const tree = process.env.TREE ?? '';
     await Bun.write(tree + '/chart.json', JSON.stringify(alloyChart));
     await Bun.write(tree + '/values.json', JSON.stringify(buildAlloyValues('alloy-config-1a2b3c4d')));
@@ -108,7 +108,7 @@ it_renders_the_alloy_container_with_the_entry_script_before_the_charts_run_argum
   # the Alloy container's command against the one alloy-values.ts builds, its first arguments, any
   # init container, and each pod volume the entry script reads or writes with its host path
   (cd "$repo" && run_in_case "$tree" bun -e "
-    import { buildAlloyValues } from './infra/observability/alloy-values.ts';
+    import { buildAlloyValues } from './infra/observability/build-alloy-values.ts';
     const tree = process.env.TREE ?? '';
     const pod = Bun.YAML.parse(await Bun.file(tree + '/daemonset.yaml').text()).spec.template.spec;
     const alloy = pod.containers.find((container) => container.name === 'alloy');

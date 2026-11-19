@@ -2,7 +2,7 @@ import type { Provider } from '@pulumi/kubernetes';
 import type { Output } from '@pulumi/pulumi';
 import type { ATCDaemonEndpoint, AlertWebhook } from '../inputs/index.ts';
 import { createClusterObservability } from './create-cluster-observability.ts';
-import { createHealthCheck } from './health-check.ts';
+import { createHealthCheck } from './create-health-check.ts';
 
 interface ClusterObservabilityInputs {
   readonly provider: Provider;

@@ -3,7 +3,7 @@ import { output, runtime } from '@pulumi/pulumi';
 import { z } from 'zod';
 import { buildStubResourceMocks } from '../src/test-utils/build-stub-resource-mocks.ts';
 import { createClusterProvider } from './create-cluster-provider.ts';
-import { createNixie } from './nixie.ts';
+import { createNixie } from './create-nixie.ts';
 
 async function setupTest() {
   // a held registration stands in for a sandbox image add or a roll that has not finished

@@ -247,7 +247,7 @@ gates:
       - deploy/nixie/test-config.sh
       - infra/shared/render-nixie-config.ts
       - infra/shared/build-nixie-imp-config.ts
-      - infra/cluster/nixie.ts
+      - infra/cluster/create-nixie.ts
       - infra/cluster/build-nixie-spec.ts
       - packages/topology/**
       - infra/Pulumi.prod.yaml
