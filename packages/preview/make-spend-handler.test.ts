@@ -7,8 +7,8 @@ import { buildSpendProxyIO } from './build-spend-proxy-io.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { createSpendProxies } from './create-spend-proxies.ts';
 import { makeSpendHandler } from './make-spend-handler.ts';
-import { server as mockServer } from './mocks/node.ts';
-import { waitForCondition } from './test-utils/wait-for-condition.ts';
+import { server as mockServer } from './src/test-utils/node.ts';
+import { waitForCondition } from './src/test-utils/wait-for-condition.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'spend-handler-'));
@@ -32,7 +32,7 @@ async function setupTest() {
     store,
     clock,
     lines,
-    stubPath: join(import.meta.dir, 'test-utils', 'run-stub-counting-proxy.ts'),
+    stubPath: join(import.meta.dir, 'src', 'test-utils', 'run-stub-counting-proxy.ts'),
     deps: {
       now: () => new Date(clock.now),
       log: (line: string) => {

@@ -5,7 +5,7 @@
       "entry": [
         "cluster/write-restore-jobs.ts",
         "shared/write-network-policies.ts",
-        "test-utils/port-forward-guard-program/index.ts"
+        "src/test-utils/port-forward-guard-program/index.ts"
       ],
       "project": ["**/*.ts"]
     },
@@ -17,7 +17,7 @@
       "project": ["**/*.ts"]
     },
     "packages/preview": {
-      "entry": ["main.ts", "test-utils/run-stub-counting-proxy.ts"],
+      "entry": ["main.ts", "src/test-utils/run-stub-counting-proxy.ts"],
       "project": ["**/*.ts"]
     },
     "workers/health-check": {
@@ -28,9 +28,9 @@
       "entry": [
         "deploy/boxxy/server.ts",
         "scripts/build-agent-image.ts",
-        "scripts/test-utils/run-stub-kubectl-proxy.ts"
+        "scripts/src/test-utils/run-stub-kubectl-proxy.ts"
       ],
-      "project": ["deploy/boxxy/**/*.ts", "scripts/**/*.ts", "e2e/**/*.ts"]
+      "project": ["deploy/boxxy/**/*.ts", "scripts/**/*.ts", "scripts/e2e/**/*.ts"]
     }
   },
   "ignoreDependencies": [

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import { buildRealProgramHandler } from '../test-utils/build-real-program-handler.ts';
-import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
+import { buildRealProgramHandler } from '../src/test-utils/build-real-program-handler.ts';
+import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
 import { runChecked } from './run-checked.ts';
 
 test('it gives the stdout of a program that exits 0', async () => {

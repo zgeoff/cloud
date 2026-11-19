@@ -13,9 +13,9 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
 
 runner="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-shell-suites.sh"
 
@@ -49,12 +49,12 @@ it_leaves_out_ignored_files_claude_files_other_groups_and_files_that_are_not_sui
   create_case_tree
   setup_test "$tree"
   printf '#!/usr/bin/env bash\necho a\n' > "$tree/repo/scripts/test-a.sh"
-  mkdir -p "$tree/repo/ignored" "$tree/repo/.claude/skills/x/scripts" "$tree/repo/test-support/shell"
+  mkdir -p "$tree/repo/ignored" "$tree/repo/.claude/skills/x/scripts" "$tree/repo/scripts/src/test-utils/shell"
   echo '/ignored/' > "$tree/repo/.gitignore"
   printf '#!/usr/bin/env bash\necho ignored\nexit 1\n' > "$tree/repo/ignored/test-c.sh"
   printf '#!/usr/bin/env bash\necho claude\nexit 1\n' > "$tree/repo/.claude/skills/x/scripts/test-d.sh"
   printf '#!/usr/bin/env bash\n# A Docker suite.\n# shell-suite: docker-fixture\nset -e\necho docker\nexit 1\n' > "$tree/repo/scripts/test-docker.sh"
-  printf '#!/usr/bin/env bash\necho helper\nexit 1\n' > "$tree/repo/test-support/shell/assert-equals.sh"
+  printf '#!/usr/bin/env bash\necho helper\nexit 1\n' > "$tree/repo/scripts/src/test-utils/shell/assert-equals.sh"
   printf '#!/usr/bin/env bash\necho tested\nexit 1\n' > "$tree/repo/scripts/test-a.sh.orig"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash scripts/run-shell-suites.sh) > "$tree/out" 2> "$tree/err" || status=$?

@@ -3,7 +3,7 @@
 # directory on an ephemeral loopback port, with the stand-in podman of
 # test-utils/build-stub-imp-host-podman.nix for imp-host. Each case runs on its own, in a fresh
 # directory, with its own answers, state, textfile directory and current system, and the script
-# under env -i with a HOME and TMPDIR of its own, under test-support/shell/run-cases.sh.
+# under env -i with a HOME and TMPDIR of its own, under scripts/src/test-utils/shell/run-cases.sh.
 # Run: bun run test:nixos host-build-lag
 { nixpkgs, imp }:
 let

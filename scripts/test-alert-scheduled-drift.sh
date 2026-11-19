@@ -11,10 +11,10 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-webhook-curl.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-webhook-curl.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/alert-scheduled-drift.sh"
 

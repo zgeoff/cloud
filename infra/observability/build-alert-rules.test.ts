@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { buildMockATCDaemonEndpoint } from '../test-utils/build-mock-atc-daemon-endpoint.ts';
+import { buildMockATCDaemonEndpoint } from '../src/test-utils/build-mock-atc-daemon-endpoint.ts';
 import { buildAlertRules } from './build-alert-rules.ts';
 import { buildATCSignInRules } from './build-atc-sign-in-rules.ts';
 

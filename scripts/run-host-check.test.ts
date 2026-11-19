@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { runHostCheck, runOnHost } from './run-host-check.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
-import { buildStubWordEchoHost } from './test-utils/build-stub-word-echo-host.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
+import { buildStubWordEchoHost } from './src/test-utils/build-stub-word-echo-host.ts';
 
 test('#runHostCheck it sends the command as one line with each word quoted, over a batch ssh with a connect timeout', async () => {
   const stub = buildStubRunner(() => ({}));

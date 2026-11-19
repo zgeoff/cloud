@@ -1,11 +1,11 @@
 import { expect, test } from 'bun:test';
 import { Output, isSecret } from '@pulumi/pulumi';
 import invariant from 'tiny-invariant';
-import { buildMockATCGatewayConfig } from '../test-utils/build-mock-atc-gateway-config.ts';
-import { buildMockATCGatewayEnvironment } from '../test-utils/build-mock-atc-gateway-environment.ts';
-import { buildMockATCGatewayStackConfig } from '../test-utils/build-mock-atc-gateway-stack-config.ts';
-import { buildStubConfig } from '../test-utils/build-stub-config.ts';
-import { resolveOutput } from '../test-utils/resolve-output.ts';
+import { buildMockATCGatewayConfig } from '../src/test-utils/build-mock-atc-gateway-config.ts';
+import { buildMockATCGatewayEnvironment } from '../src/test-utils/build-mock-atc-gateway-environment.ts';
+import { buildMockATCGatewayStackConfig } from '../src/test-utils/build-mock-atc-gateway-stack-config.ts';
+import { buildStubConfig } from '../src/test-utils/build-stub-config.ts';
+import { resolveOutput } from '../src/test-utils/resolve-output.ts';
 import { loadATCGatewayInputs } from './load-atc-gateway-inputs.ts';
 
 test('it returns no gateway while the stack config leaves atcGateway unset', () => {

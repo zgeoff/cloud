@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import { buildMockGHCheckRun } from '../test-utils/build-mock-gh-check-run.ts';
-import { buildMockGHPRView } from '../test-utils/build-mock-gh-pr-view.ts';
+import { buildMockGHCheckRun } from '../src/test-utils/build-mock-gh-check-run.ts';
+import { buildMockGHPRView } from '../src/test-utils/build-mock-gh-pr-view.ts';
 import { parseBumpPullRequest } from './parse-bump-pull-request.ts';
 
 test('it parses a view and leaves out commit statuses from other apps', () => {

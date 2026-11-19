@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for write-nixos-checks-cache.sh: against the docker stand-in
-# (test-support/shell/create-stub-checks-docker.sh), which answers the closure query and the
+# (scripts/src/test-utils/shell/create-stub-checks-docker.sh), which answers the closure query and the
 # path-info from files each case writes and copies paths into a cache folder as narinfo files, it
 # caches and lists the closure's outputs that cache.nixos.org did not sign, leaves the derivations
 # out, puts the new cache in place of the restored one, writes saved=false for paths the restored cache already lists and for a cache over its cap,
@@ -11,10 +11,10 @@
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-checks-docker.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-checks-docker.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/write-nixos-checks-cache.sh"

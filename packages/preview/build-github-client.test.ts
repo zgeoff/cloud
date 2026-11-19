@@ -2,8 +2,8 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { verify } from 'node:crypto';
 import { HttpResponse, http } from 'msw';
 import { buildGitHubClient, previewCommentMarker } from './build-github-client.ts';
-import { githubAPIURL } from './mocks/github-api-url.ts';
-import { stubApp, stubAppPublicKey } from './mocks/github-app.ts';
+import { githubAPIURL } from './src/test-utils/github-api-url.ts';
+import { stubApp, stubAppPublicKey } from './src/test-utils/github-app.ts';
 import {
   commitStatuses,
   composeFiles,
@@ -11,8 +11,8 @@ import {
   issueComments,
   pullRequestFiles,
   uninstalledRepos,
-} from './mocks/github-state.ts';
-import { server } from './mocks/node.ts';
+} from './src/test-utils/github-state.ts';
+import { server } from './src/test-utils/node.ts';
 
 test('it mints a new installation token for each call, so no token outlives its call', async () => {
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');

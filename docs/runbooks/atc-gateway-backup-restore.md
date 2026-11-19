@@ -1,9 +1,10 @@
 # atc-gateway: backup and restore
 
 The gateway's durable state is two SQLite files on its volume. This runbook covers what is backed
-up, where, and how to restore it. The procedure is tested by `e2e/test-atc-gateway-restore.sh` and
-`images/atc-gateway/backup/test-backup.sh` against a local restic repository, and a restore of a
-real backup from R2 into a scratch claim matched the live `mcp-auth.db` row for row.
+up, where, and how to restore it. The procedure is tested by
+`scripts/e2e/journey-atc-gateway-restore.sh` and `images/atc-gateway/backup/test-backup.sh` against
+a local restic repository, and a restore of a real backup from R2 into a scratch claim matched the
+live `mcp-auth.db` row for row.
 
 ## Data boundary
 

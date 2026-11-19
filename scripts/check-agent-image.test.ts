@@ -4,10 +4,10 @@ import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { checkAgentImage } from './check-agent-image.ts';
-import { buildRealProgramHandler } from './test-utils/build-real-program-handler.ts';
-import { buildStubAgentImageGuest } from './test-utils/build-stub-agent-image-guest.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
-import { startStubGitleaksRelease } from './test-utils/start-stub-gitleaks-release.ts';
+import { buildRealProgramHandler } from './src/test-utils/build-real-program-handler.ts';
+import { buildStubAgentImageGuest } from './src/test-utils/build-stub-agent-image-guest.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
+import { startStubGitleaksRelease } from './src/test-utils/start-stub-gitleaks-release.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'check-agent-image-'));

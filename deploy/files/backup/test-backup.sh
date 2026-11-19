@@ -26,12 +26,12 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/run-backup.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/run-backup-shell.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/normalize-restic-output.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/run-backup.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/run-backup-shell.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/normalize-restic-output.sh"
 
 it_backs_up_the_metadata_copy_and_the_files_and_leaves_the_rest_out() {
   local image="$1" script="$2" status=0

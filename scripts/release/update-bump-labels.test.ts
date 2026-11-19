@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
-import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
+import { buildStubReleaseGH } from '../src/test-utils/build-stub-release-gh.ts';
+import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
 import { updateBumpLabels } from './update-bump-labels.ts';
 
 test('it edits no labels when the pull request already carries them', async () => {

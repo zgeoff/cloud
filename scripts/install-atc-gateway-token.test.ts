@@ -3,10 +3,10 @@ import { installATCGatewayToken } from './install-atc-gateway-token.ts';
 import { loadATCCredentialsContext } from './load-atc-credentials-context.ts';
 import { readHostScript } from './read-host-script.ts';
 import type { Runner } from './run-process.ts';
-import { buildMockCredentialsHostScenario } from './test-utils/build-mock-credentials-host-scenario.ts';
-import { buildStubCredentialTools } from './test-utils/build-stub-credential-tools.ts';
-import type { StubCredentialsHostScenario } from './test-utils/build-stub-credentials-host.ts';
-import type { StubOpScenario } from './test-utils/build-stub-op.ts';
+import { buildMockCredentialsHostScenario } from './src/test-utils/build-mock-credentials-host-scenario.ts';
+import { buildStubCredentialTools } from './src/test-utils/build-stub-credential-tools.ts';
+import type { StubCredentialsHostScenario } from './src/test-utils/build-stub-credentials-host.ts';
+import type { StubOpScenario } from './src/test-utils/build-stub-op.ts';
 
 interface SetupConfig {
   readonly run: Runner;

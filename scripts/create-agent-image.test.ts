@@ -3,11 +3,11 @@ import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { createAgentImage } from './create-agent-image.ts';
-import { buildRealProgramHandler } from './test-utils/build-real-program-handler.ts';
-import { buildStubCheckAgentImage } from './test-utils/build-stub-check-agent-image.ts';
-import { buildStubImp } from './test-utils/build-stub-imp.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
-import { createGitOrigin } from './test-utils/create-git-origin.ts';
+import { buildRealProgramHandler } from './src/test-utils/build-real-program-handler.ts';
+import { buildStubCheckAgentImage } from './src/test-utils/build-stub-check-agent-image.ts';
+import { buildStubImp } from './src/test-utils/build-stub-imp.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
+import { createGitOrigin } from './src/test-utils/create-git-origin.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'create-agent-image-'));

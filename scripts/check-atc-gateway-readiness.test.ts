@@ -1,11 +1,11 @@
 import { expect, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { checkATCGatewayReadiness } from './check-atc-gateway-readiness.ts';
-import { server } from './mocks/node.ts';
-import { buildStubGetent } from './test-utils/build-stub-getent.ts';
-import { buildStubGHAuthToken } from './test-utils/build-stub-gh-auth-token.ts';
-import { buildStubReadinessHost } from './test-utils/build-stub-readiness-host.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubGetent } from './src/test-utils/build-stub-getent.ts';
+import { buildStubGHAuthToken } from './src/test-utils/build-stub-gh-auth-token.ts';
+import { buildStubReadinessHost } from './src/test-utils/build-stub-readiness-host.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
+import { server } from './src/test-utils/node.ts';
 
 function setupTest() {
   const out: string[] = [];

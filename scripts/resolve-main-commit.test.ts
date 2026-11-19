@@ -3,9 +3,9 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveMainCommit } from './resolve-main-commit.ts';
-import { buildRealProgramHandler } from './test-utils/build-real-program-handler.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
-import { createGitOrigin } from './test-utils/create-git-origin.ts';
+import { buildRealProgramHandler } from './src/test-utils/build-real-program-handler.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
+import { createGitOrigin } from './src/test-utils/create-git-origin.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'resolve-main-commit-'));

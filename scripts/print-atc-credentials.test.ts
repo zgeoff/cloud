@@ -2,8 +2,8 @@ import { expect, test } from 'bun:test';
 import { loadATCCredentialsContext } from './load-atc-credentials-context.ts';
 import { printATCCredentials } from './print-atc-credentials.ts';
 import type { Runner } from './run-process.ts';
-import { buildMockCredentialsHostScenario } from './test-utils/build-mock-credentials-host-scenario.ts';
-import { buildStubCredentialTools } from './test-utils/build-stub-credential-tools.ts';
+import { buildMockCredentialsHostScenario } from './src/test-utils/build-mock-credentials-host-scenario.ts';
+import { buildStubCredentialTools } from './src/test-utils/build-stub-credential-tools.ts';
 
 interface SetupConfig {
   readonly run: Runner;

@@ -3,9 +3,9 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runAgentImageCheck } from './run-agent-image-check.ts';
-import { buildStubCheckAgentImage } from './test-utils/build-stub-check-agent-image.ts';
-import { buildStubImp } from './test-utils/build-stub-imp.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubCheckAgentImage } from './src/test-utils/build-stub-check-agent-image.ts';
+import { buildStubImp } from './src/test-utils/build-stub-imp.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 async function setupTest() {
   const work = await mkdtemp(join(tmpdir(), 'run-agent-image-check-'));

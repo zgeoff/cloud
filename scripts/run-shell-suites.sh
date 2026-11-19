@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Run every shell suite of one group. A suite is any file named test-*.sh that git tracks, or that
-# is untracked and not ignored, so a new suite runs without an edit here, and nothing in
-# node_modules, .worktrees or .claude runs. A suite joins a group other than the default, scripts,
-# with a line `# shell-suite: <group>` in the comment block at its top:
+# Run every shell suite of one group. A suite is any file named test-*.sh, or journey-*.sh in an
+# e2e/ folder, that git tracks, or that is untracked and not ignored, so a new suite runs without an
+# edit here, and nothing in node_modules, .worktrees or .claude runs. A suite joins a group other
+# than the default, scripts, with a line `# shell-suite: <group>` in the comment block at its top:
 #
 #   bash scripts/run-shell-suites.sh                       # the scripts group: bun run test:scripts
 #   bash scripts/run-shell-suites.sh atc-gateway-fixture   # under with-fixture-images.sh
@@ -37,7 +37,7 @@ while IFS= read -r -d '' file; do
   if [ "$(read_group "$file")" = "$group" ]; then
     suites+=("$file")
   fi
-done < <(git ls-files -z --cached --others --exclude-standard --deduplicate -- ':(glob)**/test-*.sh' | LC_ALL=C sort -z)
+done < <(git ls-files -z --cached --others --exclude-standard --deduplicate -- ':(glob)**/test-*.sh' ':(glob)**/e2e/journey-*.sh' | LC_ALL=C sort -z)
 
 if [ "${#suites[@]}" -eq 0 ]; then
   echo "run-shell-suites: no suite in the $group group" >&2

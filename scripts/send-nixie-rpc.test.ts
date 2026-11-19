@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 import { HttpResponse, http, passthrough } from 'msw';
 import { findJSONField } from './find-json-field.ts';
-import { server } from './mocks/node.ts';
 import { sendNixieRPC } from './send-nixie-rpc.ts';
-import { startStubNixieAPI } from './test-utils/start-stub-nixie-api.ts';
+import { server } from './src/test-utils/node.ts';
+import { startStubNixieAPI } from './src/test-utils/start-stub-nixie-api.ts';
 
 test('it returns the output from the json field of the answer', async () => {
   startStubNixieAPI({

@@ -7,12 +7,12 @@ import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
-import { githubAPIURL } from './mocks/github-api-url.ts';
-import { stubApp } from './mocks/github-app.ts';
-import { server } from './mocks/node.ts';
 import { runEgressUpdate } from './run-egress-update.ts';
-import { createImpdRefusalHandler } from './test-utils/create-impd-refusal-handler.ts';
-import { startStubImpd } from './test-utils/start-stub-impd.ts';
+import { createImpdRefusalHandler } from './src/test-utils/create-impd-refusal-handler.ts';
+import { githubAPIURL } from './src/test-utils/github-api-url.ts';
+import { stubApp } from './src/test-utils/github-app.ts';
+import { server } from './src/test-utils/node.ts';
+import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
 
 async function setupTest() {

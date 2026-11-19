@@ -1,8 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { output, runtime } from '@pulumi/pulumi';
 import invariant from 'tiny-invariant';
-import { buildStubResourceMocks } from '../test-utils/build-stub-resource-mocks.ts';
-import { resolveOutput } from '../test-utils/resolve-output.ts';
+import { buildStubResourceMocks } from '../src/test-utils/build-stub-resource-mocks.ts';
+import { resolveOutput } from '../src/test-utils/resolve-output.ts';
 import { createIngress } from './index.ts';
 
 test("it puts the files service's route on the shared tunnel and points a proxied CNAME at it", async () => {

@@ -14,7 +14,7 @@
 # fresh, an empty tank/imp mounted nowhere, generations 1 to 3, and nothing an earlier subtest
 # left. The given subtests
 # follow, each calling setup_test() first. It needs KVM, and the checks it builds read
-# test-support/shell beside nixos/, so they build only from the repo root. The test utilities pass their own check
+# scripts/src/test-utils/shell beside nixos/, so they build only from the repo root. The test utilities pass their own check
 # (test-utils-check.nix) before the VM runs, and every check that uses this runs it on every
 # build: its boot subtests are its tests, and impd-restore-reset.nix checks its reset.
 { nixpkgs, imp }:

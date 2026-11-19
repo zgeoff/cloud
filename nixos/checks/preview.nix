@@ -3,7 +3,7 @@
 # (test-utils/build-stub-imp-host-podman.nix) and a stand-in sleep (test-utils/build-stub-sleep.nix),
 # and builds the package to check that it carries the service's modules and none of its tests,
 # and that its typed impd client loads from the dependencies it carries.
-# Each case runs on its own, in a fresh directory, under test-support/shell/run-cases.sh.
+# Each case runs on its own, in a fresh directory, under scripts/src/test-utils/shell/run-cases.sh.
 # Run: bun run test:nixos preview
 { nixpkgs, imp }:
 let

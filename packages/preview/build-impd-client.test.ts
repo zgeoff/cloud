@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { buildImpdClient } from './build-impd-client.ts';
-import { startStubImpd } from './test-utils/start-stub-impd.ts';
+import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 
 function setupTest() {
   const impd = startStubImpd();

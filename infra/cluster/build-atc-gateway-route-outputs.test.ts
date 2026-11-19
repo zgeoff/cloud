@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
-import { buildMockATCGatewayOutputs } from '../test-utils/build-mock-atc-gateway-outputs.ts';
+import { buildMockATCGatewayOutputs } from '../src/test-utils/build-mock-atc-gateway-outputs.ts';
 import { buildATCGatewayRouteOutputs } from './build-atc-gateway-route-outputs.ts';
 
 test("it routes the public host to the gateway's service and health-checks its OAuth resource metadata", () => {

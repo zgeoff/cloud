@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { checkGatewayInCluster } from './check-gateway-in-cluster.ts';
-import { buildStubReadinessHost } from './test-utils/build-stub-readiness-host.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubReadinessHost } from './src/test-utils/build-stub-readiness-host.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 test('it probes the gateway in the cluster with its public Host, with a long timeout', async () => {
   const stub = buildStubRunner(

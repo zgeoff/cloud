@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { Command } from '@pulumi/command/local';
 import { output, runtime } from '@pulumi/pulumi';
 import { Provider } from '@pulumiverse/grafana';
-import { buildStubResourceMocks } from '../test-utils/build-stub-resource-mocks.ts';
+import { buildStubResourceMocks } from '../src/test-utils/build-stub-resource-mocks.ts';
 import { buildMCPTokenSpec } from './build-mcp-token-spec.ts';
 
 async function setupTest() {

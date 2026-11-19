@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { planIdleSleeps } from './plan-idle-sleeps.ts';
-import { buildMockImpActivity } from './test-utils/build-mock-imp-activity.ts';
+import { buildMockImpActivity } from './src/test-utils/build-mock-imp-activity.ts';
 
 test('it sleeps a running preview unused for the idle timeout', () => {
   const imps = [

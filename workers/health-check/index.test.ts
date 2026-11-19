@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import handler from './index.ts';
-import { targetStatuses } from './mocks/target-statuses.ts';
-import { buildStubR2Bucket } from './test-utils/build-stub-r2-bucket.ts';
+import { buildStubR2Bucket } from './src/test-utils/build-stub-r2-bucket.ts';
+import { targetStatuses } from './src/test-utils/target-statuses.ts';
 
 // The log line goes to the real console, which this test leaves alone; the handler's own test
 // asserts it.

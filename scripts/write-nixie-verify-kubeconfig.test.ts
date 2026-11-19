@@ -5,10 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { findJSONField } from './find-json-field.ts';
 import type { Runner } from './run-process.ts';
-import { buildStubKubectlToken } from './test-utils/build-stub-kubectl-token.ts';
-import { buildStubOp } from './test-utils/build-stub-op.ts';
-import type { StubHandler } from './test-utils/build-stub-runner.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubKubectlToken } from './src/test-utils/build-stub-kubectl-token.ts';
+import { buildStubOp } from './src/test-utils/build-stub-op.ts';
+import type { StubHandler } from './src/test-utils/build-stub-runner.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 import { writeNixieVerifyKubeconfig } from './write-nixie-verify-kubeconfig.ts';
 
 async function setupTest() {

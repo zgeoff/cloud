@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { buildBunPinCheck } from '@zgeoff/cloud-preview/build-bun-pin-check.ts';
 import { HttpResponse, http } from 'msw';
 import { checkPreviewBun } from './check-preview-bun.ts';
-import { server } from './mocks/node.ts';
+import { server } from './src/test-utils/node.ts';
 
 test('it passes a script that downloads, checks and pins the release before the install, whose tarball matches its sha256', async () => {
   server.use(

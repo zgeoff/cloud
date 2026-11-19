@@ -7,7 +7,7 @@
 # build-alertmanager-values.ts builds and posts to the Discord webhook stand-in. Alloy looks for new
 # log files every 1 s and Alertmanager holds a new group for 1 s, in place of production's 10 s and
 # 30 s, which the builders' own tests pin.
-# e2e/test-atc-sign-in-alert-journey.sh runs the stages together.
+# scripts/e2e/journey-atc-sign-in-alerts.sh runs the stages together.
 #
 #   bash scripts/run-shell-suites.sh alert-rules
 #   CASE='burst' bash infra/observability/test-atc-sign-in-alerts.sh
@@ -17,14 +17,14 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/wait-for.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/assert-equals.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/has-metric.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/start-alloy.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/start-alertmanager.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/run-promtool-test.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/start-stub-discord-webhook.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/wait-for.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/assert-equals.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/has-metric.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/start-alloy.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/start-alertmanager.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-promtool-test.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/start-stub-discord-webhook.sh"
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 

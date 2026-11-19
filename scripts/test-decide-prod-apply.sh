@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test for decide-prod-apply.sh: against a real git repository in the case tree, with origin/main
 # and the deployed/prod tag set by each case, and a gh stand-in for find-ci-run.sh
-# (test-support/shell/create-stub-gh.sh) that replays the runs each case records, it decides
+# (scripts/src/test-utils/shell/create-stub-gh.sh) that replays the runs each case records, it decides
 # whether a CI run's commit or a dispatched main tip needs the prod apply, each of two merges that
 # land minutes apart and a commit that a newer apply already deployed included, writes the decision
 # and the tag's commit to the step output file, says in the step summary when nothing applies, and
@@ -20,10 +20,10 @@
 set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-prod-apply.sh"
 bun="$(command -v bun)"

@@ -1,0 +1,6 @@
+{
+  "name": "@zgeoff/cloud-scripts",
+  "private": true,
+  "description": "Repo tooling and its end-to-end tests, run through the root package.json scripts",
+  "type": "module"
+}

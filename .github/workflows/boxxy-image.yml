@@ -16,7 +16,7 @@ on:
       - scripts/write-boxxy-image-context.sh
       - scripts/publish-boxxy-image.sh
       - scripts/run-shell-suites.sh
-      - test-support/shell/**
+      - scripts/src/test-utils/shell/**
       - bun.lock
       - .bun-version
       - .github/workflows/boxxy-image.yml

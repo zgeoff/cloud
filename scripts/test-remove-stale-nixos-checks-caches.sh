@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for remove-stale-nixos-checks-caches.sh: against a gh stand-in
-# (test-support/shell/create-stub-gh.sh) that replays the cache list each case records, as the
+# (scripts/src/test-utils/shell/create-stub-gh.sh) that replays the cache list each case records, as the
 # lines its --jq filter prints ("<id> <key>" per cache), it deletes every cache an earlier run
 # saved, keeps one a later run saved, deletes nothing when the kept one is alone, names a cache it
 # could not delete and goes on, and fails with gh's error when the list fails.
@@ -10,10 +10,10 @@
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/remove-stale-nixos-checks-caches.sh"
 

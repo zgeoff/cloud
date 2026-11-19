@@ -2,9 +2,9 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { output, runtime, secret } from '@pulumi/pulumi';
 import { z } from 'zod';
 import type { BoxxyRepos } from '../inputs/index.ts';
-import { buildMockATCGatewayConfig } from '../test-utils/build-mock-atc-gateway-config.ts';
-import { buildStubResourceMocks } from '../test-utils/build-stub-resource-mocks.ts';
-import { resolveOutput } from '../test-utils/resolve-output.ts';
+import { buildMockATCGatewayConfig } from '../src/test-utils/build-mock-atc-gateway-config.ts';
+import { buildStubResourceMocks } from '../src/test-utils/build-stub-resource-mocks.ts';
+import { resolveOutput } from '../src/test-utils/resolve-output.ts';
 import { createCluster, createClusterProvider } from './index.ts';
 
 test("it returns the files service's route, from its configured host to its Service, when files is set", async () => {

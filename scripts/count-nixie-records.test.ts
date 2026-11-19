@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { countNixieRecords } from './count-nixie-records.ts';
-import { startStubNixieAPI } from './test-utils/start-stub-nixie-api.ts';
+import { startStubNixieAPI } from './src/test-utils/start-stub-nixie-api.ts';
 
 test('it counts every record across pages and keeps the sequence of the newest page', async () => {
   const stub = startStubNixieAPI({

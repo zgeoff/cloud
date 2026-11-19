@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { checkGatewayImage } from './check-gateway-image.ts';
-import { server } from './mocks/node.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
+import { server } from './src/test-utils/node.ts';
 
 function setupTest() {
   return buildStubRunner((call) =>

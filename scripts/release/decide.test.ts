@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { buildMockBumpPullRequest } from '../test-utils/build-mock-bump-pull-request.ts';
+import { buildMockBumpPullRequest } from '../src/test-utils/build-mock-bump-pull-request.ts';
 import { decide } from './decide.ts';
 
 test('it merges a green atc bump at its head', () => {

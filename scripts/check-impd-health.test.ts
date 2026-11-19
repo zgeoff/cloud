@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { readFile } from 'node:fs/promises';
 import { checkImpdHealth } from './check-impd-health.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 test('it sends read-impd-health.sh on ssh’s stdin with impd’s port, and passes a 200 whose JSON body says ready', async () => {
   const script = await readFile(new URL('host/read-impd-health.sh', import.meta.url), 'utf8');

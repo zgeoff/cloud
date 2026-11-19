@@ -3,8 +3,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runProcess } from './run-process.ts';
-import { removeDescendant } from './test-utils/remove-descendant.ts';
-import { waitForFile } from './test-utils/wait-for-file.ts';
+import { removeDescendant } from './src/test-utils/remove-descendant.ts';
+import { waitForFile } from './src/test-utils/wait-for-file.ts';
 
 test('it passes each argv element to the program whole, with no shell to split or expand it', async () => {
   const result = await runProcess(['printf', '%s|', 'two words', '$HOME', '*', "it's"]);

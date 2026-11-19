@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for decide-nixos-checks-build.sh: against a real git repository in the case tree and a gh
-# stand-in (test-support/shell/create-stub-gh.sh) that replays the artifact search each case
+# stand-in (scripts/src/test-utils/shell/create-stub-gh.sh) that replays the artifact search each case
 # records, as the line its --jq filter prints (the id of the run that uploaded the artifact), it
 # writes the key and needed=false with the run's URL when a run built the same derivations,
 # needed=true when none did or when a dispatch forces the build, gives the same derivations the
@@ -14,12 +14,12 @@
 set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-equals.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-not-equals.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-equals.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-not-equals.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-nixos-checks-build.sh"
 

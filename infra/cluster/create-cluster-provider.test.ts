@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import invariant from 'tiny-invariant';
-import { runPulumiPreview } from '../test-utils/run-pulumi-preview.ts';
+import { runPulumiPreview } from '../src/test-utils/run-pulumi-preview.ts';
 
 // Bun 1.4.2's skipIf takes a boolean, so the probe for the Pulumi CLI runs at collection; CI
 // installs the CLI and its plugin.
@@ -33,7 +33,7 @@ async function setupTest() {
     [
       'name: port-forward-guard',
       'runtime: bun',
-      `main: ${join(import.meta.dir, '..', 'test-utils', 'port-forward-guard-program', 'index.ts')}`,
+      `main: ${join(import.meta.dir, '..', 'src', 'test-utils', 'port-forward-guard-program', 'index.ts')}`,
       '',
     ].join('\n'),
   );

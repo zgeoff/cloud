@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 import { Output, isSecret } from '@pulumi/pulumi';
 import invariant from 'tiny-invariant';
-import { buildMockATCGatewayConfig } from '../test-utils/build-mock-atc-gateway-config.ts';
-import { buildStubConfig } from '../test-utils/build-stub-config.ts';
-import { resolveOutput } from '../test-utils/resolve-output.ts';
+import { buildMockATCGatewayConfig } from '../src/test-utils/build-mock-atc-gateway-config.ts';
+import { buildStubConfig } from '../src/test-utils/build-stub-config.ts';
+import { resolveOutput } from '../src/test-utils/resolve-output.ts';
 import { loadClusterInputs } from './load-cluster-inputs.ts';
 
 test('it returns nothing when the stack config leaves the cluster out', () => {

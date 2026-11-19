@@ -2,12 +2,12 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildRealProgramHandler } from '../test-utils/build-real-program-handler.ts';
-import { buildStubBunInstall } from '../test-utils/build-stub-bun-install.ts';
-import { buildStubReleaseDocker } from '../test-utils/build-stub-release-docker.ts';
-import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
-import { createRestoreJobFiles } from '../test-utils/create-restore-job-files.ts';
-import { getReleaseRecord } from '../test-utils/get-release-record.ts';
+import { buildRealProgramHandler } from '../src/test-utils/build-real-program-handler.ts';
+import { buildStubBunInstall } from '../src/test-utils/build-stub-bun-install.ts';
+import { buildStubReleaseDocker } from '../src/test-utils/build-stub-release-docker.ts';
+import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
+import { createRestoreJobFiles } from '../src/test-utils/create-restore-job-files.ts';
+import { getReleaseRecord } from '../src/test-utils/get-release-record.ts';
 import { applyReleasePins } from './apply-release-pins.ts';
 
 async function setupTest() {

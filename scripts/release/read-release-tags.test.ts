@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
-import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
+import { buildStubReleaseGH } from '../src/test-utils/build-stub-release-gh.ts';
+import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
 import { readReleaseTags } from './read-release-tags.ts';
 
 test('it reads the tags of the latest published releases, newest first', async () => {

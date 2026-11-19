@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import invariant from 'tiny-invariant';
-import { buildMockATCGatewayConfig } from '../test-utils/build-mock-atc-gateway-config.ts';
-import { buildMockATCGatewaySpecInputs } from '../test-utils/build-mock-atc-gateway-spec-inputs.ts';
+import { buildMockATCGatewayConfig } from '../src/test-utils/build-mock-atc-gateway-config.ts';
+import { buildMockATCGatewaySpecInputs } from '../src/test-utils/build-mock-atc-gateway-spec-inputs.ts';
 import { buildATCGatewaySpec, buildATCPodSecurity } from './build-atc-gateway-spec.ts';
 
 test("#buildATCGatewaySpec keeps state in $HOME's state dir and trusts no proxy when the config sets no stateDir or trustForwardedFrom, passing the claim, tokens, registry and pull Secret through and the tunnel's token to the cloudflared sidecar alone", () => {

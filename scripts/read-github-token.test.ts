@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { readGitHubToken } from './read-github-token.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 test('it reads the token gh prints, with gh telemetry and update checks off', async () => {
   const stub = buildStubRunner(() => ({ stdout: 'gh-token-1\n' }));

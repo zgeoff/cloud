@@ -17,11 +17,11 @@ on:
       - scripts/fetch-atc-release.sh
       - scripts/publish-atc-gateway-images.sh
       - scripts/run-shell-suites.sh
-      - e2e/test-atc-gateway-restore.sh
+      - scripts/e2e/journey-atc-gateway-restore.sh
       - infra/cluster/build-atc-gateway-spec.ts
       - infra/cluster/create-atc-gateway-backup-job.ts
       - infra/cluster/build-atc-gateway-backup-pod-spec.ts
-      - test-support/shell/**
+      - scripts/src/test-utils/shell/**
       - .github/workflows/atc-gateway-images.yml
   workflow_dispatch:
     inputs:

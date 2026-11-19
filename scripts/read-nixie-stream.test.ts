@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { readNixieStream } from './read-nixie-stream.ts';
-import { startStubNixieAPI } from './test-utils/start-stub-nixie-api.ts';
+import { startStubNixieAPI } from './src/test-utils/start-stub-nixie-api.ts';
 
 test('it holds the stream for the whole hold and times each keepalive', async () => {
   const stub = startStubNixieAPI({

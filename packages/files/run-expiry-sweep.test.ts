@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createUploadStore } from './create-upload-store.ts';
 import { runExpirySweep } from './run-expiry-sweep.ts';
-import { buildMockUpload } from './test-utils/build-mock-upload.ts';
+import { buildMockUpload } from './src/test-utils/build-mock-upload.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'files-sweep-'));

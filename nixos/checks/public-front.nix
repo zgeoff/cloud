@@ -2,7 +2,7 @@
 # and checks it whole, then has the front's own Caddy build, which holds the rate limit handler,
 # validate it. public-front-vm boots the front with Caddy's local CA instead, so this check is the
 # one that covers the host's ACME issuer. Each case runs on its own, in a fresh directory, under
-# test-support/shell/run-cases.sh.
+# scripts/src/test-utils/shell/run-cases.sh.
 # Run: bun run test:nixos public-front
 {
   nixpkgs,

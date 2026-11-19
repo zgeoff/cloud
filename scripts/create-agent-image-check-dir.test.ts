@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
 import { createAgentImageCheckDir } from './create-agent-image-check-dir.ts';
-import { server } from './mocks/node.ts';
-import { buildRealProgramHandler } from './test-utils/build-real-program-handler.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
-import { startStubGitleaksRelease } from './test-utils/start-stub-gitleaks-release.ts';
+import { buildRealProgramHandler } from './src/test-utils/build-real-program-handler.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
+import { server } from './src/test-utils/node.ts';
+import { startStubGitleaksRelease } from './src/test-utils/start-stub-gitleaks-release.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'create-agent-image-check-dir-'));

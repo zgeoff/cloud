@@ -4,10 +4,10 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildRealProgramHandler } from '../test-utils/build-real-program-handler.ts';
-import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
-import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
-import { createGitOrigin } from '../test-utils/create-git-origin.ts';
+import { buildRealProgramHandler } from '../src/test-utils/build-real-program-handler.ts';
+import { buildStubReleaseGH } from '../src/test-utils/build-stub-release-gh.ts';
+import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
+import { createGitOrigin } from '../src/test-utils/create-git-origin.ts';
 import { openReleaseBumpPR } from './open-release-bump-pr.ts';
 
 async function setupTest() {

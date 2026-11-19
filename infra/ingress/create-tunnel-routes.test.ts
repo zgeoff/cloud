@@ -1,8 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { output, runtime } from '@pulumi/pulumi';
 import invariant from 'tiny-invariant';
-import { buildStubResourceMocks } from '../test-utils/build-stub-resource-mocks.ts';
-import { resolveOutput } from '../test-utils/resolve-output.ts';
+import { buildStubResourceMocks } from '../src/test-utils/build-stub-resource-mocks.ts';
+import { resolveOutput } from '../src/test-utils/resolve-output.ts';
 import { createTunnelRoutes } from './create-tunnel-routes.ts';
 
 test("it renders the gateway's loopback rules on the atc tunnel and points its CNAME at the atc tunnel", async () => {

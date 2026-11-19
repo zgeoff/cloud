@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { planSlotEvictions } from './plan-slot-evictions.ts';
-import { buildMockImpActivity } from './test-utils/build-mock-imp-activity.ts';
+import { buildMockImpActivity } from './src/test-utils/build-mock-imp-activity.ts';
 
 test('it sleeps the running preview when one slot must take the opening one', () => {
   const imps = [

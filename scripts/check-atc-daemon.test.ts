@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { checkATCDaemon } from './check-atc-daemon.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 test('it passes an active daemon', async () => {
   const stub = buildStubRunner(() => ({}));

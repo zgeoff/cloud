@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { checkGatewayObjects } from './check-gateway-objects.ts';
-import { buildStubReadinessHost } from './test-utils/build-stub-readiness-host.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { buildStubReadinessHost } from './src/test-utils/build-stub-readiness-host.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 test('it reports each object the deploy creates as present or missing, in order', async () => {
   const stub = buildStubRunner(

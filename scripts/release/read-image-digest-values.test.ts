@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
-import { buildStubReleaseDocker } from '../test-utils/build-stub-release-docker.ts';
-import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
-import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
-import { getReleaseRecord } from '../test-utils/get-release-record.ts';
+import { buildStubReleaseDocker } from '../src/test-utils/build-stub-release-docker.ts';
+import { buildStubReleaseGH } from '../src/test-utils/build-stub-release-gh.ts';
+import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
+import { getReleaseRecord } from '../src/test-utils/get-release-record.ts';
 import { readImageDigestValues } from './read-image-digest-values.ts';
 
 test('it reads the tag commit and each image digest at the version tag', async () => {

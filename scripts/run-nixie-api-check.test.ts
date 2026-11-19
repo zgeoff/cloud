@@ -1,10 +1,10 @@
 import { expect, mock, test } from 'bun:test';
 import { http, passthrough } from 'msw';
-import { server } from './mocks/node.ts';
 import { runNixieAPICheck } from './run-nixie-api-check.ts';
+import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
+import { server } from './src/test-utils/node.ts';
+import { startStubNixieAPI } from './src/test-utils/start-stub-nixie-api.ts';
 import type { KubectlProxyStart } from './start-kubectl-proxy.ts';
-import { buildStubRunner } from './test-utils/build-stub-runner.ts';
-import { startStubNixieAPI } from './test-utils/start-stub-nixie-api.ts';
 
 function setupTest() {
   return {

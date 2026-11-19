@@ -5,12 +5,12 @@
 # nixie's EXTRA_IMPD_MAJORS set, read from the adapter's sandbox folder from nixie 0.72.0. It refuses an impd major bump ahead of the client, an older nixie
 # on a 1.x client beside impd 2, an impd major outside the set or before nixie 0.42.0, no nixie
 # pod, an image that is no nixie release, a lock without the client, a failed lock or source read,
-# and a configuration.nix without the imp-host pin. gh is the stand-in from test-support/shell,
+# and a configuration.nix without the imp-host pin. gh is the stand-in from scripts/src/test-utils/shell,
 # which replays the answer each case records to the read of a nixie release's bun.lock and imp
 # adapter source. Each case writes its own configuration.nix in the case tree and runs the script
 # under `env -i`, and compares its stdout, stderr and gh call log.
 #
-# The recorded locks in test-support/shell/gh-recordings hold `@zgeoff/imp-client` in the catalog
+# The recorded locks in scripts/src/test-utils/shell/gh-recordings hold `@zgeoff/imp-client` in the catalog
 # and the packages, in the line forms bun 1.4 writes (nixie's bun.lock at v0.28.0, read
 # 2026-10-16), or no such entry. The `impz-client` locks hold `@impz/client` in a workspace's
 # dependencies, the catalog and the packages, in the line forms of lockfileVersion 2 (nixie's
@@ -24,13 +24,13 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-nixie-impd-major.sh"
-recordings="$(cd "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/gh-recordings" && pwd)"
+recordings="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/src/test-utils/shell/gh-recordings" && pwd)"
 digest=sha256:7f3e9c1a5b2d4e6f8a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f
 
 # setup_test <tree>: the home and temp folders the cases run with, and the gh stand-in, which

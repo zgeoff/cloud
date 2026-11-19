@@ -25,11 +25,11 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/normalize-restic-output.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/create-stub-racing-restic.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/normalize-restic-output.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/create-stub-racing-restic.sh"
 
 # the cleanup every case passes to create_case_tree: the containers first, then the volumes
 cleanup='docker rm -f "$name-staging" "$name-job" "$name-restore" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-data" "$name-keys" "$name-copy" > /dev/null || true'

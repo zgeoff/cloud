@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
-import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
-import { getReleaseRecord } from '../test-utils/get-release-record.ts';
+import { buildStubReleaseGH } from '../src/test-utils/build-stub-release-gh.ts';
+import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
+import { getReleaseRecord } from '../src/test-utils/get-release-record.ts';
 import { readReleaseNotesValues } from './read-release-notes-values.ts';
 
 test('it reads every image digest from the target notes and flags nothing for a plain release', async () => {

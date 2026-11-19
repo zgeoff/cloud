@@ -1,6 +1,6 @@
 /* oxlint-disable id-length -- Grafana's gridPos names a panel's width w and its height h */
 import { expect, test } from 'bun:test';
-import { buildMockDashboardPanel } from '../test-utils/build-mock-dashboard-panel.ts';
+import { buildMockDashboardPanel } from '../src/test-utils/build-mock-dashboard-panel.ts';
 import { buildDashboard } from './build-dashboard.ts';
 
 test('it makes stat panels instant queries reduced to the last value, and gives a legend only where the panel sets one', () => {
