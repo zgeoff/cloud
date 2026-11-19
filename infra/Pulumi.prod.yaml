@@ -29,6 +29,7 @@ config:
     image: ghcr.io/zgeoff/cloud-files:14e4a70e35d5ef66b443efeb4de4ff9668d46783@sha256:012c1f1f7a08bf6f1c792b4f883396dc1b0592e3f3405d59278c7c1622af0171
     hostname: files.geoff.cloud
     agentTokenDigests:
+      atc: e7029a3548b85f37a6f74abc94f0c64d37daa573fc2e85f2b39f447a17489784
       boxxy: 06f2e2a3957a36081c8b2b86d18014e1f0808deff6c78374cb7e502ad9da05ba
       cloud: 664cb070173696ea256f447e064b60e9f78c2bed5f9ea07e4e278794163512f2
       imp: 683e02c486f91c96f8795fccd4d230e59a1097befdcd28f605d9f58006597bc0
