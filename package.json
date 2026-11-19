@@ -21,7 +21,7 @@
     "lint": "oxlint",
     "lint:files": "oxlint --no-error-on-unmatched-pattern",
     "lint:fix": "oxlint --fix",
-    "lint:full": "TSRS_FAST=1 oxlint --type-aware --type-check --report-unused-disable-directives-severity error",
+    "lint:full": "bun run sdk:build && TSRS_FAST=1 oxlint --type-aware --type-check --report-unused-disable-directives-severity error",
     "test": "rig unit",
     "test:health-check": "cd workers/health-check && bun test --randomize",
     "test:preview": "cd packages/preview && bun test --randomize",

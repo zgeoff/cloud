@@ -80,7 +80,8 @@ docs/
   preconditions.
 - `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and the type check.
   oxlint runs both through `tsrs-lint`, which the `tsrs` package ships and oxlint finds on its own,
-  in tsgolint's place, because stock tsgolint runs out of memory under 2 GiB. The script sets
+  in tsgolint's place, because stock tsgolint runs out of memory under 2 GiB. The script builds the
+  SDK first, so the type check reads its declarations and not its generated sources, then sets
   `TSRS_FAST=1`, tsrs's fast mode. `lint:full` is CI-only: never run it locally.
 
 ## Public repo and secrets
