@@ -8,7 +8,7 @@
   "rules": {
     "zgeoff/function-verb": "error",
 
-    "zgeoff/file-named-for-export": ["error", { "pending": ["."] }],
+    "zgeoff/file-named-for-export": "error",
 
     // the import boundaries: no relative import into another workspace package, and the direction
     // between infra's groups
@@ -120,6 +120,8 @@
       }
     ]
   },
+  // sdk/ is generated code (regenerate it with bun run sdk:gen), so no rule, including
+  // file-named-for-export, applies to it
   // the pepys deployment installs on its own, so the repo's type-aware lint cannot resolve its
   // imports; its image job type-checks it
   "ignorePatterns": ["sdk/**", "provider/**", ".claude/**", ".agents/**", "deploy/pepys/*.ts"],
