@@ -4,7 +4,7 @@
   "description": "The pepys deployment that the cloud-pepys image builds and runs, installed on its own, apart from the repo's workspaces",
   "type": "module",
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsrs --fast -p tsconfig.json"
   },
   "dependencies": {
     "@boxxy/pepys": "0.2.10",
@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@types/bun": "1.4.4",
+    "tsrs": "0.25.0-ts7.1.0-beta",
     "typescript": "7.0.2"
   },
   "trustedDependencies": [
