@@ -18,14 +18,17 @@ outside a host switch.
 
 ## What holds what
 
-| Where                                                                   | Holds                                                                     |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| vault `cloud`, item `model-gateway-control`, field `credential`         | the control token, 64 hex characters                                      |
-| `/var/lib/tank-cloud/host-secrets/model-gateway/control-token`          | the same token on the host, mode 0400 root, which the unit loads          |
-| `deploy/nixie/secrets.sops.yaml`, key `["settings"]["gateway-control"]` | nixie's copy of the control token, which nixie sends to the control relay |
-| `/var/lib/model-gateway/store.json`                                     | the counts, the limits nixie set, each sandbox's count, the lost mark     |
-| `/var/lib/model-gateway/override.json`                                  | the limit past a cap that `model-gateway raise` wrote, when one exists    |
-| `services.model-gateway` in `nixos/hosts/geoffcloud/configuration.nix`  | the zone, the caps and one priced route per nixie model profile           |
+| Where                                                                        | Holds                                                                        |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| vault `cloud`, item `model-gateway-control`, field `credential`              | the control token, 64 hex characters                                         |
+| `/var/lib/tank-cloud/host-secrets/model-gateway/control-token`               | the same token on the host, mode 0400 root, which the unit loads             |
+| `deploy/nixie/secrets.sops.yaml`, key `["settings"]["gateway-control"]`      | nixie's copy of the control token, which nixie sends to the control relay    |
+| `/var/lib/model-gateway/store.json`                                          | the counts, the limits nixie set, each sandbox's count, the lost mark        |
+| `/var/lib/model-gateway/override.json`                                       | the limit past a cap that `model-gateway raise` wrote, when one exists       |
+| `services.model-gateway` in `nixos/hosts/geoffcloud/configuration.nix`       | the zone, the caps and one priced route per nixie model profile              |
+| vault `cloud`, item `model-gateway-codex-plan-route-key`, field `credential` | the route key of the plan route `codex-plan`, 64 hex characters              |
+| `/var/lib/tank-cloud/host-secrets/model-gateway/codex-plan-route-key`        | the same key on the host, mode 0400 root, which the unit loads               |
+| `/var/lib/model-gateway/chatgpt-login-codex-plan.json`                       | the ChatGPT plan login of `codex-plan`, mode 0600, which the gateway rotates |
 
 The unit runs as the user `model-gateway`, which owns `/var/lib/model-gateway` with mode 0700.
 
@@ -242,13 +245,87 @@ every model call of nixie. Before you add a model from a new provider, send it o
 streamed request through a local gateway on the release binary, and check that the store's count
 rose and holds no `lost`.
 
+## Add the ChatGPT plan route
+
+The route `codex-plan` runs nixie's Codex tasks on the owner's ChatGPT plan. The gateway holds the
+plan login, refreshes it and sets its access token on each request, so neither nixie nor a sandbox
+holds a plan token.
+[nixie's plan login runbook](https://github.com/zgeoff/nixie/blob/main/docs/runbooks/chatgpt-plan-login.md)
+explains the parts. A route key ties the two halves: the unit loads it as a credential, and impd's
+model secret for the profile holds the same key, so the broker sends it on each plan request. The
+gateway refuses a plan request with any other key.
+
+**CAUTION:** The unit needs every route key file to start. A switch that adds a plan route before
+its key file exists stops the gateway, and with it every model call of nixie. Do steps 1 to 4 before
+the switch.
+
+1. Create the item from a random key, which never reaches a command line or the screen:
+
+   ```bash
+   openssl rand -hex 32 | jq -R '{title: "model-gateway-codex-plan-route-key", category: "API_CREDENTIAL",
+     fields: [{id: "credential", label: "credential", type: "CONCEALED", value: .}]}' \
+     | op item create --vault cloud - > /dev/null
+   ```
+
+2. Install the key on the host, on SSH's standard input:
+
+   ```bash
+   op read op://cloud/model-gateway-codex-plan-route-key/credential | tr -d '\n' | ssh root@geoffcloud \
+     'install -d -m 0700 /var/lib/tank-cloud/host-secrets/model-gateway && (umask 377 && cat > /var/lib/tank-cloud/host-secrets/model-gateway/codex-plan-route-key) && test -s /var/lib/tank-cloud/host-secrets/model-gateway/codex-plan-route-key && echo ok'
+   ```
+
+   Expect `ok`. Compare the first 8 hex of each copy's SHA-256, as step 3 of
+   [Set up the control token](#set-up-the-control-token) does for the token.
+
+3. Add the profile's model secret to impd with the same key. Set the helpers and `model_secrets` and
+   `secrets` first, as [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) step 1 does,
+   then:
+
+   ```bash
+   op read op://cloud/model-gateway-codex-plan-route-key/credential | tr -d '\n' \
+     | host_imp secret add nixie-model-e276a191ad63f5fa751 --kind static --hosts chatgpt.com \
+       --header authorization --scheme bearer --upstream http://10.88.0.1:8789
+   ```
+
+   Expect a table row for the name. nixie derives the name from the profile `codex-plan`, the header
+   `bearer` and the host `chatgpt.com`.
+
+4. Point nixie's token at the list that holds the new name. `--grantable` takes the whole list, and
+   a secret left out loses its grants on nixie's imps, so check the list first:
+
+   ```bash
+   comm -3 <(printf '%s\n' "$secret_names" | sort) \
+     <(host_imp secret ls --json < /dev/null | jq -r '.[] | select(.name | startswith("nixie-model-")) | .name' | sort)
+   host_imp token set nixie --grantable "$secrets" < /dev/null
+   ```
+
+   Expect the `comm` command to print nothing before you run `token set`.
+
+5. Merge the PR that adds the route and the profile, then switch the host and dispatch the held
+   `Deploy prod` run, as step 3 of [Add a model profile](#add-a-model-profile) does.
+
+6. Read the login's status on the control listener:
+
+   ```bash
+   ssh root@geoffcloud bash -s <<'EOF'
+   printf 'Authorization: Bearer %s\n' "$(cat /var/lib/tank-cloud/host-secrets/model-gateway/control-token)" \
+     | curl -sS -H @- http://127.0.0.1:8790/chatgpt-logins
+   EOF
+   ```
+
+   Expect `codex-plan` with `"status": "active"` and the plan type. `needs_login` means the route
+   has no login file, or OpenAI refused its refresh: sign the route in, as nixie's runbook's "Sign
+   the route in" does, with the config path from `systemctl show -P ExecStart model-gateway` and the
+   command run as `runuser -u model-gateway --`.
+
 ## Failures
 
-| Symptom                                              | Cause                                          | Fix                                                      |
-| ---------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------- |
-| the unit is skipped, `ConditionPathExists` unmet     | the token file is missing                      | [set up the control token](#set-up-the-control-token)    |
-| the unit restarts, `Failed to start server`          | imp-host has not made podman0 yet              | none: the unit retries every 5 s until the bridge exists |
-| `proxy.failed` with a config error                   | the rendered config fails the release's schema | fix `services.model-gateway`, then switch                |
-| every request gets a 503, `limit` null in the status | nixie has not set its limits                   | read nixie's log for `spend.limits_unsent`               |
-| every request gets a 503, `"lost": true`             | the count fell behind the spend                | [clear the lost mark](#clear-the-lost-mark)              |
-| a 403 that names a sandbox the store lacks           | nixie did not register the sandbox             | read nixie's log for the sandbox's registration          |
+| Symptom                                              | Cause                                          | Fix                                                                      |
+| ---------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------ |
+| the unit is skipped, `ConditionPathExists` unmet     | the token file is missing                      | [set up the control token](#set-up-the-control-token)                    |
+| the unit restarts, `Failed to start server`          | imp-host has not made podman0 yet              | none: the unit retries every 5 s until the bridge exists                 |
+| `proxy.failed` with a config error                   | the rendered config fails the release's schema | fix `services.model-gateway`, then switch                                |
+| every request gets a 503, `limit` null in the status | nixie has not set its limits                   | read nixie's log for `spend.limits_unsent`                               |
+| every request gets a 503, `"lost": true`             | the count fell behind the spend                | [clear the lost mark](#clear-the-lost-mark)                              |
+| a 403 that names a sandbox the store lacks           | nixie did not register the sandbox             | read nixie's log for the sandbox's registration                          |
+| the unit fails, `Failed to set up credentials`       | a plan route's key file is missing             | install it, as [the plan route](#add-the-chatgpt-plan-route) step 2 does |

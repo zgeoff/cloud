@@ -78,10 +78,14 @@ let
     };
 
   # starts geoffcloud's gateway on its rendered config, moved as the header says, with the token
-  # file holding "fixture-token" and a trailing newline, and sets gateway_port to the model
-  # listener's port; the stand-in must already run on $port
+  # file holding "fixture-token" and a trailing newline, and each plan route's login file and route
+  # key ("fixture-route-key") in the case's directory, with no login file, so no refresh leaves the
+  # sandbox; it sets gateway_port to the model listener's port; the stand-in must already run on
+  # $port
   startGateway = ''
     printf 'fixture-token\n' > token
+    # a plan route's key, which the case's login.json never exists beside, so the route needs a login
+    printf 'fixture-route-key\n' > route-key
     # curl reads the header from a file, as the runbook passes the real token on stdin
     printf 'Authorization: Bearer %s\n' fixture-token > auth-header
     jq --arg upstream "http://127.0.0.1:$port" --arg dir "$PWD" '
@@ -89,7 +93,8 @@ let
       | .store = "\($dir)/store.json"
       | .override = "\($dir)/override.json"
       | .control.tokenFile = "\($dir)/token"
-      | .routes |= map_values(.upstream = $upstream)' ${gateway.configFile} > config.yaml
+      | .routes |= map_values(.upstream = $upstream)
+      | .routes |= map_values(if .login then .login = {file: "\($dir)/login.json", routeKeyFile: "\($dir)/route-key"} else . end)' ${gateway.configFile} > config.yaml
     env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
       ${gateway.package}/bin/model-gateway serve --config config.yaml > gateway.log 2> gateway.err &
     gateway_pid=$!
@@ -342,6 +347,84 @@ let
         '';
     }
     {
+      title = "it loads each plan route key as a credential, renders the api, largest output and login of the route, and refuses a login on another api or outside the state directory";
+      script =
+        let
+          planRoute = {
+            api = "openai-responses";
+            upstream = "https://chatgpt.com/backend-api/codex";
+            model = "gpt-fixture";
+            maxOutputTokens = 1000;
+            inherit prices;
+            login = {
+              file = "/var/lib/model-gateway/login-plan.json";
+              routeKeyFile = "/run/fixture/plan-route-key";
+            };
+          };
+          system = buildModuleSystem ../modules/model-gateway.nix (withNftables {
+            services.model-gateway = settings // {
+              routes = settings.routes // {
+                plan = planRoute;
+              };
+            };
+          });
+          refused = buildModuleSystem ../modules/model-gateway.nix (withNftables {
+            services.model-gateway = settings // {
+              routes = settings.routes // {
+                plan = planRoute // {
+                  api = null;
+                  login = planRoute.login // {
+                    file = "/srv/login-plan.json";
+                  };
+                };
+              };
+            };
+          });
+        in
+        ''
+          jq -S . > expected <<'EOF'
+          ${builtins.toJSON {
+            credentials = [
+              "control-token:/run/fixture/control-token"
+              "plan-route-key:/run/fixture/plan-route-key"
+            ];
+            routes = {
+              sonnet = {
+                model = "claude-sonnet-fixture";
+                upstream = "https://api.anthropic.com";
+                inherit prices;
+              };
+              plan = {
+                api = "openai-responses";
+                upstream = "https://chatgpt.com/backend-api/codex";
+                model = "gpt-fixture";
+                maxOutputTokens = 1000;
+                inherit prices;
+                login = {
+                  file = "/var/lib/model-gateway/login-plan.json";
+                  routeKeyFile = "/run/credentials/model-gateway.service/plan-route-key";
+                };
+              };
+            };
+            failed = [ ];
+            refused = [
+              "services.model-gateway.routes: a route with a login speaks openai-responses, the API of ChatGPT's Codex backend."
+              "services.model-gateway.routes: a login file lives in /var/lib/model-gateway, the only folder the unit may write, because each refresh rewrites it."
+            ];
+          }}
+          EOF
+          jq -S --slurpfile config ${system.config.services.model-gateway.configFile} '.routes = $config[0].routes' > actual <<'EOF'
+          ${builtins.toJSON {
+            credentials = system.config.systemd.services.model-gateway.serviceConfig.LoadCredential;
+            routes = null;
+            failed = collectFailedAssertions system;
+            refused = collectFailedAssertions refused;
+          }}
+          EOF
+          assert_files_equal expected actual
+        '';
+    }
+    {
       title = "it renders the geoffcloud config with the nixie zone, the caps, a loopback control listener and a priced route per nixie profile";
       script =
         let
@@ -572,6 +655,32 @@ let
                 cached_input = 0.75;
                 output = 6;
               };
+              # the plan route, whose key the unit loads as a credential
+              codex-plan = {
+                api = "openai-responses";
+                upstream = "https://chatgpt.com/backend-api/codex";
+                model = "gpt-6-luna";
+                maxOutputTokens = 128000;
+                prices = {
+                  input = 0.1;
+                  cache_write = 0.125;
+                  cache_write_1h = 0.125;
+                  cached_input = 0.01;
+                  output = 0.5;
+                  long_prompt = {
+                    over_tokens = 272000;
+                    input = 0.2;
+                    cache_write = 0.25;
+                    cache_write_1h = 0.25;
+                    cached_input = 0.02;
+                    output = 0.75;
+                  };
+                };
+                login = {
+                  file = "/var/lib/model-gateway/chatgpt-login-codex-plan.json";
+                  routeKeyFile = "/run/credentials/model-gateway.service/codex-plan-route-key";
+                };
+              };
             };
           }}
           EOF
@@ -639,6 +748,35 @@ let
         assert_equals '{"day":{"dollars":0.012,"tokens":1100},"month":{"dollars":0.012,"tokens":1100},"sandbox":{"dollars":0.012,"tokens":1100}}' \
           "$(jq -c '{day: (.periods.day | {dollars, tokens}), month: (.periods.month | {dollars, tokens}), sandbox: (.sandboxes["nixie-0a1b2c"] | {dollars, tokens})}' store.json)" "the count"
         assert_equals "POST /v1/messages" "$(cat requests)" "the stand-in's requests"
+        assert_files_equal /dev/null gateway.err
+      '';
+    }
+    {
+      title = "it lists the geoffcloud plan route as needing a login, refuses a plan request with another key with a 403 and one with the key with a 401, and sends nothing upstream";
+      script = ''
+        mkdir home tmp
+        start_stub_server ${./test-utils/run-stub-model-api.py} /responses '{}' "$PWD/requests"
+        ${startGateway}
+        : > requests
+        curl -s -o /dev/null -X PUT -H @auth-header \
+          -d '{"day":{"dollars":60,"tokens":80000000},"month":{"dollars":600,"tokens":600000000}}' "$control/limits"
+        curl -s -o /dev/null -X PUT -H @auth-header -d '{"limit":null}' "$control/sandboxes/nixie-0a1b2c"
+        plan_request='{"model":"gpt-6-luna","input":"hi","stream":true}'
+        printf 'Authorization: Bearer %s\n' another-key > wrong-key-header
+        printf 'Authorization: Bearer %s\n' fixture-route-key > route-key-header
+
+        curl -s -o logins -w '%{http_code}' -H @auth-header "$control/chatgpt-logins" > logins-status
+        curl -s -o wrong-key -w '%{http_code}' -X POST "http://127.0.0.1:$gateway_port/nixie-0a1b2c/codex-plan/responses" \
+          -H @wrong-key-header -H 'content-type: application/json' -d "$plan_request" > wrong-key-status
+        curl -s -o no-login -w '%{http_code}' -X POST "http://127.0.0.1:$gateway_port/nixie-0a1b2c/codex-plan/responses" \
+          -H @route-key-header -H 'content-type: application/json' -d "$plan_request" > no-login-status
+
+        assert_equals 200 "$(cat logins-status)" "the logins' code"
+        assert_equals '["codex-plan"]' "$(jq -c keys logins)" "the plan routes"
+        assert_equals '{"status":"needs_login","reason":null}' "$(jq -c '.["codex-plan"] | {status, reason}' logins)" "the plan route's login"
+        assert_equals 403 "$(cat wrong-key-status)" "the code for another key"
+        assert_equals 401 "$(cat no-login-status)" "the code with no login"
+        assert_files_equal /dev/null requests
         assert_files_equal /dev/null gateway.err
       '';
     }

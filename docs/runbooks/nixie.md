@@ -65,11 +65,12 @@ Before the first deploy, and after a profile joins `config.yaml`, add the model 
    for [nixie's token](#mint-nixies-impd-token):
 
    ```bash
-   model_secrets=$(bun -e 'const c = Bun.YAML.parse(await Bun.file("deploy/nixie/config.yaml").text()); for (const [id, p] of Object.entries(c.models.profiles)) console.log(id, p.auth_header, new URL(p.base_url).hostname)' \
+   model_secrets=$(bun -e 'const c = Bun.YAML.parse(await Bun.file("deploy/nixie/config.yaml").text()); for (const [id, p] of Object.entries(c.models.profiles)) console.log(id, p.auth_header ?? "bearer", new URL(p.base_url).hostname)' \
      | while read -r profile header host; do
          case "$host" in
            api.anthropic.com) item=nixie-model-credential ;;
            openrouter.ai) item=nixie-openrouter-credential ;;
+           chatgpt.com) item=model-gateway-codex-plan-route-key ;;
            *) echo "no credential item for $host" >&2; continue ;;
          esac
          printf '%s\n%s\n%s' "$profile" "$header" "$host" | sha256sum | cut -c1-19 \
@@ -80,7 +81,9 @@ Before the first deploy, and after a profile joins `config.yaml`, add the model 
    ```
 
    Expect no `no credential item` line. A profile on another host needs its own item, and a case for
-   it here.
+   it here. A Codex profile has no `auth_header`, because the broker always sends its secret as a
+   bearer header. The `chatgpt.com` item holds the route key of the model gateway's
+   [plan route](./model-gateway.md#add-the-chatgpt-plan-route), not a model credential.
 
 2. Add each secret that impd lacks:
 
@@ -102,7 +105,7 @@ Before the first deploy, and after a profile joins `config.yaml`, add the model 
    host_imp secret ls < /dev/null | grep '^nixie-model-'
    ```
 
-   Expect each name with its host, `api.anthropic.com` or `openrouter.ai`, then
+   Expect each name with its host, `api.anthropic.com`, `openrouter.ai` or `chatgpt.com`, then
    `-> http://10.88.0.1:8789`. When a profile lacks its secret, nixie cannot create the sandbox that
    uses the profile, and the `imp_host` part of nixie's `/health/ready` reports unready.
 

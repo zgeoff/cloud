@@ -16,7 +16,7 @@ models:
     # needs its own model secret in impd, whose name hashes the ID and the base URL's host
     # (docs/runbooks/nixie.md). A selectable model's profile needs prices, in dollars per million
     # tokens, from the Claude API pricing page for a Claude model. Each profile names its harness,
-    # the loop that runs its turns, with no default; agent-sdk is the only harness nixie runs.
+    # the loop that runs its turns, with no default: agent-sdk, or codex for codex-plan below.
     #
     # the conversation's profile, also selectable for a task
     fable-5-2:
@@ -394,6 +394,31 @@ models:
         cache_write_1h: 3
         cached_input: 0.75
         output: 6
+    # Codex tasks on the owner's ChatGPT plan login, through the model gateway's plan route of the
+    # same ID (services.model-gateway in nixos/hosts/geoffcloud/configuration.nix), which holds the
+    # login and sets its token on each request. Its model secret in impd holds the route key, not a
+    # model credential (docs/runbooks/model-gateway.md#add-the-chatgpt-plan-route). The prices equal
+    # the route's: OpenAI's API prices for the model, which the spending stop counts.
+    codex-plan:
+      harness: codex
+      base_url: https://chatgpt.com
+      credential: deployment:codex-plan
+      chatgpt_login: true
+      model: gpt-6-luna
+      effort: medium
+      prices:
+        input: 0.1
+        cache_write: 0.125
+        cache_write_1h: 0.125
+        cached_input: 0.01
+        output: 0.5
+        long_prompt:
+          over_tokens: 272000
+          input: 0.2
+          cache_write: 0.25
+          cache_write_1h: 0.25
+          cached_input: 0.02
+          output: 0.75
   roles:
     conversation: fable-5-2
     checker: sonnet-5-5-high
