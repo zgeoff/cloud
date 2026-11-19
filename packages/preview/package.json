@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@impz/client": "7.5.1",
-    "@zgeoff/std": "0.4.3",
+    "@zgeoff/std": "0.4.4",
     "ts-pattern": "5.9.2",
     "xstate": "5.33.4",
     "zod": "4.6.7"
