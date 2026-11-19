@@ -119,9 +119,10 @@ pod, and the others come from the same Secret when their section is set:
   server would refuse at start: a client ID with whitespace, an installation ID that is not a
   number, or a private key that is not RSA.
 - `NOSLOP_GITHUB_APP_ID`, `NOSLOP_GITHUB_APP_PRIVATE_KEY` and `NOSLOP_GITHUB_APP_INSTALLATION_ID`,
-  with `spawn.reviewAgents`: the noslop App's keys, which the review gate checks and posts each
-  review with. Only this pod holds them, never a session. The deploy refuses review agents without
-  all three or without `github`, because the server then rejects every review close-out.
+  while `spawn.agents` scopes an agent to the review phase: the noslop App's keys, which the review
+  gate checks and posts each review with. Only this pod holds them, never a session. The deploy
+  refuses a review agent without all three or without `github`, because the server then rejects
+  every review close-out.
 - `BOXXY_ATC_NOTICE_TOKEN`, while `.env` holds the variable: the atc service token the server sends
   each notice with. A notice tells the owner that an item is on hold, and goes to the notice
   session, one session on the owner's PC. The token holds the `message` scope alone. A second atc
@@ -150,11 +151,13 @@ only once the sidecar's startup probe finds the first checkout. Prometheus scrap
 sync counters, and BoxxyRulesStale fires while no fetch succeeds.
 
 The review phase runs the `review-run` recipe on the atc agent `boxxy-review`, the one agent whose
-broker profile holds the read-only clone token. Stack config `boxxy.spawn.reviewAgents` lists it,
-and the server then loads the rules only when review recipes alone name it. The image test starts
-the server with the same list on rules of its own, in `images/boxxy/test-rules/`, so it never checks
-a commit of the rules repository: when a commit breaks the pairing, the server refuses it and keeps
-the rules in force.
+broker profile holds the read-only clone token. Stack config `boxxy.spawn.agents` scopes it to the
+review phase, and `boxxy.spawn.phases.review.requireScopedAgent` makes every review recipe name it,
+so the server loads the rules only when review recipes alone name it. boxxy's
+[sessions doc](https://github.com/zgeoff/boxxy/blob/main/docs/architecture/work/sessions.md#who-holds-a-credential)
+gives the rules of both fields. The image test starts the server with the same scope on rules of its
+own, in `images/boxxy/test-rules/`, so it never checks a commit of the rules repository: when a
+commit breaks the pairing, the server refuses it and keeps the rules in force.
 
 ## The caller proof
 

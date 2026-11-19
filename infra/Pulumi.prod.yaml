@@ -37,13 +37,18 @@ config:
     serviceClientDigests:
       wringer-ro: bd9b7496b91be8979ea3f37cb5cdf55b3a35bc22b154846f671bb4e31cea3689
   geoff-cloud:boxxy:
-    image: ghcr.io/zgeoff/cloud-boxxy:6106be2d6ecb4459cdade005408e90ed10427856@sha256:2ca02ee35937d8ab04cfb7fd664853ca0ca31cf472fafd9195c8c88a5706c81a
+    image: ghcr.io/zgeoff/cloud-boxxy:7b5ad41c1444804f618da29ff2d6443036c68baa@sha256:52b21e0bd012f6dce473acc17e0638ea99383533ed610d0e00385ec912e60c1c
     runner: geoffcloud
     atc:
       trustedFolders: {}
     spawn:
       target: geoffcloud
-      reviewAgents: [boxxy-review]
+      agents:
+        boxxy-review:
+          phases: [review]
+      phases:
+        review:
+          requireScopedAgent: true
     pepys:
       environment: production
     github:

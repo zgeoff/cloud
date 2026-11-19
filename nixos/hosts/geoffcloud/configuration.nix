@@ -643,8 +643,9 @@ in
         };
         # a review session of the boxxy server: it runs noslop's command on the pull request and
         # sends the result as its close-out. It alone takes github-review, the read-only clone
-        # token, which noslop reads as GH_TOKEN, and no other GitHub profile; the server lists it
-        # in spawn.reviewAgents, so the rules load only when review recipes alone name it.
+        # token, which noslop reads as GH_TOKEN, and no other GitHub profile; the server's
+        # spawn.agents scopes it to the review phase, so the rules load only when review recipes
+        # alone name it.
         boxxy-review = {
           kind = "claude";
           args = boxxyPluginArgs;
