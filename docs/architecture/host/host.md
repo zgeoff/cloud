@@ -32,9 +32,9 @@ the VM's Secure Boot blocks, so Secure Boot stays off
 
 The host holds two disks at the small read-ahead that is the default of the `disk-read-ahead` module
 in `nixos/modules/`: the root disk, vda, and the zvol that holds k3s's data, `tank/cloud/rancher`.
-The host configuration in `nixos/hosts/geoffcloud/` lists both. Left alone, the kernel derives each
-disk's read-ahead from the optimal I/O size the disk reports, which is as large as a journal window
-for vda and larger still for the zvol.
+The host configuration in `nixos/hosts/geoffcloud/` lists both. Left alone, vda's read-ahead is as
+large as a journal window, and the zvol's is larger still: the kernel sets it to twice the optimal
+I/O size that ZFS reports for the zvol.
 
 A udev rule sets the value at each add or change event of each disk, and matches the zvol by the
 `/dev/zvol/` link that ZFS's own udev rule makes. The rule acts only on a device event, so the
