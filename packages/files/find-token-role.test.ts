@@ -4,7 +4,7 @@ import { findTokenRole } from './find-token-role.ts';
 
 test('it finds the owner role for the owner token', () => {
   const hashes = {
-    agent: createHash('sha256').update('agent-secret-4f1c').digest('hex'),
+    agent: [createHash('sha256').update('agent-secret-4f1c').digest('hex')],
     owner: createHash('sha256').update('owner-secret-9a7e').digest('hex'),
   };
 
@@ -13,12 +13,28 @@ test('it finds the owner role for the owner token', () => {
 
 test('it finds the agent role for the agent token', () => {
   const hashes = {
-    agent: createHash('sha256').update('agent-secret-4f1c').digest('hex'),
+    agent: [createHash('sha256').update('agent-secret-4f1c').digest('hex')],
     owner: createHash('sha256').update('owner-secret-9a7e').digest('hex'),
   };
 
   expect(findTokenRole('Bearer agent-secret-4f1c', hashes)).toBe('agent');
 });
+
+test.each([['agent-secret-4f1c'], ['agent-secret-77d0'], ['agent-secret-b3e9']])(
+  'it finds the agent role for each of several agent tokens, such as %s',
+  (token) => {
+    const hashes = {
+      agent: [
+        createHash('sha256').update('agent-secret-4f1c').digest('hex'),
+        createHash('sha256').update('agent-secret-77d0').digest('hex'),
+        createHash('sha256').update('agent-secret-b3e9').digest('hex'),
+      ],
+      owner: createHash('sha256').update('owner-secret-9a7e').digest('hex'),
+    };
+
+    expect(findTokenRole(`Bearer ${token}`, hashes)).toBe('agent');
+  },
+);
 
 test.each([
   ['no header', null],
@@ -32,7 +48,10 @@ test.each([
   ],
 ])('it finds no role for %s', (_label, authorization) => {
   const hashes = {
-    agent: createHash('sha256').update('agent-secret-4f1c').digest('hex'),
+    agent: [
+      createHash('sha256').update('agent-secret-4f1c').digest('hex'),
+      createHash('sha256').update('agent-secret-77d0').digest('hex'),
+    ],
     owner: createHash('sha256').update('owner-secret-9a7e').digest('hex'),
   };
 

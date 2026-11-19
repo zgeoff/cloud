@@ -28,7 +28,7 @@ async function setupTest() {
     store,
     dataDir,
     tokenHashes: {
-      agent: createHash('sha256').update('agent-token-5d2b').digest('hex'),
+      agent: [createHash('sha256').update('agent-token-5d2b').digest('hex')],
       owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
     },
     publicURL: 'https://files.example.com',
@@ -489,7 +489,7 @@ test('it refuses an upload with 507 when the volume is full', async () => {
     store: ctx.store,
     dataDir: ctx.dataDir,
     tokenHashes: {
-      agent: createHash('sha256').update('agent-token-5d2b').digest('hex'),
+      agent: [createHash('sha256').update('agent-token-5d2b').digest('hex')],
       owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
     },
     publicURL: 'https://files.example.com',
@@ -754,7 +754,7 @@ test('it removes a file that a stopped run left half written', async () => {
     store: ctx.store,
     dataDir: ctx.dataDir,
     tokenHashes: {
-      agent: createHash('sha256').update('agent-token-5d2b').digest('hex'),
+      agent: [createHash('sha256').update('agent-token-5d2b').digest('hex')],
       owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
     },
     publicURL: 'https://files.example.com',
@@ -780,7 +780,7 @@ test('it removes a file that a stopped run placed without its row, and keeps eac
     store: ctx.store,
     dataDir: ctx.dataDir,
     tokenHashes: {
-      agent: createHash('sha256').update('agent-token-5d2b').digest('hex'),
+      agent: [createHash('sha256').update('agent-token-5d2b').digest('hex')],
       owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
     },
     publicURL: 'https://files.example.com',
@@ -822,7 +822,7 @@ test('it answers 507 and leaves no staged file, placed file or row when the file
     store: ctx.store,
     dataDir: ctx.dataDir,
     tokenHashes: {
-      agent: createHash('sha256').update('agent-token-5d2b').digest('hex'),
+      agent: [createHash('sha256').update('agent-token-5d2b').digest('hex')],
       owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
     },
     publicURL: 'https://files.example.com',
@@ -871,7 +871,7 @@ test('it answers 507 and removes the placed file when the metadata write finds t
     },
     dataDir: ctx.dataDir,
     tokenHashes: {
-      agent: createHash('sha256').update('agent-token-5d2b').digest('hex'),
+      agent: [createHash('sha256').update('agent-token-5d2b').digest('hex')],
       owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
     },
     publicURL: 'https://files.example.com',
