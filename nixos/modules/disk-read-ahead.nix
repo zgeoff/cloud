@@ -1,5 +1,5 @@
-# Disk read-ahead: sets one disk's read_ahead_kb in place of the value the kernel derives from the
-# disk's optimal I/O size (docs/architecture/host/host.md#read-ahead-on-the-root-disk).
+# Disk read-ahead: sets each listed disk's read_ahead_kb in place of the value the kernel derives
+# from the disk's optimal I/O size (docs/architecture/host/host.md#disk-read-ahead).
 {
   config,
   lib,
@@ -8,16 +8,37 @@
 }:
 let
   cfg = config.services.disk-read-ahead;
-  readAheadPath = "/sys/block/${cfg.device}/queue/read_ahead_kb";
+  kibibytes = toString cfg.kibibytes;
+
+  # a name with a slash is a link that an earlier udev rule makes, such as ZFS's 60-zvol.rules
+  matchDevice =
+    device: if lib.hasInfix "/" device then ''SYMLINK=="${device}"'' else ''KERNEL=="${device}"'';
+
+  # a disk that is not there yet gets its value from the rule at its add event; the rancher zvol
+  # appears only after tank/cloud's key loads
+  setReadAhead = pkgs.writeShellScript "set-disk-read-ahead" ''
+    set -euo pipefail
+    for device in ${lib.escapeShellArgs cfg.devices}; do
+      if [ ! -e "/dev/$device" ]; then
+        echo "/dev/$device is absent: the udev rule sets its read-ahead when it appears"
+        continue
+      fi
+      name=$(${pkgs.coreutils}/bin/basename "$(${pkgs.coreutils}/bin/readlink -f "/dev/$device")")
+      echo ${kibibytes} > "/sys/block/$name/queue/read_ahead_kb"
+    done
+  '';
 in
 {
   options.services.disk-read-ahead = {
-    enable = lib.mkEnableOption "a fixed read-ahead on one disk";
+    enable = lib.mkEnableOption "a fixed read-ahead on some disks";
 
-    device = lib.mkOption {
-      type = lib.types.str;
-      example = "vda";
-      description = "The kernel name of the disk, as in /sys/block.";
+    devices = lib.mkOption {
+      type = lib.types.nonEmptyListOf lib.types.str;
+      example = [
+        "vda"
+        "zvol/tank/cloud/rancher"
+      ];
+      description = "Each disk, as its name under /dev: a kernel name, as in /sys/block, or a link that an earlier udev rule makes, such as a zvol's.";
     };
 
     kibibytes = lib.mkOption {
@@ -28,19 +49,19 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # each add or change event of the disk, the boot's probe included
-    services.udev.extraRules = ''
-      ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="${cfg.device}", ATTR{queue/read_ahead_kb}="${toString cfg.kibibytes}"
-    '';
+    # each add or change event of a disk, the boot's probe included
+    services.udev.extraRules = lib.concatMapStrings (device: ''
+      ACTION=="add|change", SUBSYSTEM=="block", ${matchDevice device}, ATTR{queue/read_ahead_kb}="${kibibytes}"
+    '') cfg.devices;
 
     # boot, and a switch that adds the unit or changes its value, with no device event needed
     systemd.services.disk-read-ahead = {
-      description = "${cfg.device} read-ahead of ${toString cfg.kibibytes} KiB";
+      description = "Disk read-ahead of ${kibibytes} KiB";
       wantedBy = [ "multi-user.target" ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        ExecStart = "${pkgs.bash}/bin/bash -c 'echo ${toString cfg.kibibytes} > ${readAheadPath}'";
+        ExecStart = setReadAhead;
       };
     };
   };
