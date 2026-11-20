@@ -45,10 +45,10 @@ test.each(['first', 'second'])(
   },
 );
 
-test('it answers a fault the test sets', async () => {
+test('it answers a fault the test sets', () => {
   const ctx = setupTest();
 
   ctx.impd.fail('images/list', { code: 'FORBIDDEN', status: 403 });
 
-  await expect(ctx.client.images.list()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  expect(ctx.client.images.list()).rejects.toMatchObject({ code: 'FORBIDDEN' });
 });

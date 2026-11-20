@@ -37,5 +37,5 @@ beforeAll(startSharedScriptsImpd);
 afterAll(async () => {
   await stopScriptsImpd();
 
-  server.disable();
+  await server.disable();
 });

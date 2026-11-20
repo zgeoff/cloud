@@ -46,5 +46,5 @@ beforeAll(startSharedPreviewImpd);
 afterAll(async () => {
   await stopPreviewImpd();
 
-  server.disable();
+  await server.disable();
 });

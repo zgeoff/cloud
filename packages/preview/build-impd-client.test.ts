@@ -119,26 +119,26 @@ test('#readImp returns null for an imp impd does not know', async () => {
   expect(result).toBeNull();
 });
 
-test('#sleepImp rejects with impd error code for an imp impd does not know', async () => {
+test('#sleepImp rejects with impd error code for an imp impd does not know', () => {
   const ctx = setupTest();
 
-  await expect(ctx.client.sleepImp('pv-0a1b2c3d-7')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  expect(ctx.client.sleepImp('pv-0a1b2c3d-7')).rejects.toMatchObject({ code: 'NOT_FOUND' });
 });
 
-test('#sleepImp names impd and its error code in the message of a refusal', async () => {
+test('#sleepImp names impd and its error code in the message of a refusal', () => {
   const ctx = setupTest();
 
-  await expect(ctx.client.sleepImp('pv-0a1b2c3d-7')).rejects.toThrowWithMessage(
+  expect(ctx.client.sleepImp('pv-0a1b2c3d-7')).rejects.toThrowWithMessage(
     Error,
     'impd NOT_FOUND: imp pv-0a1b2c3d-7 not found',
   );
 });
 
-test('#readImps rejects with UNAUTHORIZED when impd refuses the token', async () => {
+test('#readImps rejects with UNAUTHORIZED when impd refuses the token', () => {
   const ctx = setupTest();
   const client = buildImpdClient(ctx.impd.url, 'imp_wrong.token');
 
-  await expect(client.readImps()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  expect(client.readImps()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
 });
 
 test('#installGrant adds the secret to an imp that lacks it', async () => {
@@ -278,10 +278,10 @@ test('#runCommand starts no command once its signal has aborted', async () => {
   expect(ctx.impd.calls).toStrictEqual([]);
 });
 
-test('#runCommand rejects with impd error code for an imp impd does not know', async () => {
+test('#runCommand rejects with impd error code for an imp impd does not know', () => {
   const ctx = setupTest();
 
-  await expect(ctx.client.runCommand('pv-0a1b2c3d-7', ['true'])).rejects.toMatchObject({
+  expect(ctx.client.runCommand('pv-0a1b2c3d-7', ['true'])).rejects.toMatchObject({
     code: 'NOT_FOUND',
   });
 });
