@@ -174,11 +174,12 @@ ITEMS
   mkdir "$tree/vault/cloud"
   printf fixture-bearer > "$tree/vault/cloud/atc-daemon-token"
 
-  run -0 --separate-stderr env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
-    op read op://cloud/atc-daemon-token/credential
+  # A bare command keeps the exact bytes: run strips the trailing newline this case pins.
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    op read op://cloud/atc-daemon-token/credential > "$tree/stdout" 2> "$tree/stderr"
 
-  assert_output fixture-bearer
-  refute_stderr
+  cmp "$tree/stdout" <(printf 'fixture-bearer\n')
+  [ ! -s "$tree/stderr" ]
   diff - "$tree/calls" <<< '["op","read","op://cloud/atc-daemon-token/credential"]'
 }
 
