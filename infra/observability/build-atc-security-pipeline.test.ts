@@ -45,7 +45,7 @@ loki.process "atc_security" {
     // the kind only with an outcome the contract gives it, and the outcome only with its kind
     stage.template {
       source   = "kind"
-      template = "{{ if regexMatch \`^(authorize_started\\\\.(accepted|rejected)|authorize_invalid\\\\.(rejected)|owner_auth\\\\.(succeeded|failed)|consent\\\\.(allowed|denied))$\` (printf \\"%v.%v\\" .kind .outcome) }}{{ .kind }}{{ else if eq (toString .kind) \\"suppressed\\" }}suppressed{{ else }}other{{ end }}"
+      template = "{{ if regexMatch \`^(authorize_started\\\\.(accepted|rejected)|authorize_invalid\\\\.(rejected)|owner_auth\\\\.(succeeded|failed)|consent\\\\.(allowed|denied)|token_exchange\\\\.(succeeded|rejected)|bearer\\\\.(rejected)|bad_host\\\\.(rejected)|bad_origin\\\\.(rejected))$\` (printf \\"%v.%v\\" .kind .outcome) }}{{ .kind }}{{ else if eq (toString .kind) \\"suppressed\\" }}suppressed{{ else }}other{{ end }}"
     }
 
     stage.template {
@@ -55,7 +55,7 @@ loki.process "atc_security" {
 
     stage.template {
       source   = "reason"
-      template = "{{ if not .Value }}none{{ else if regexMatch \`^(rate_limited|invalid_client|client_disabled|invalid_redirect|unauthorized_client|unsupported_response_type|invalid_request|invalid_scope|invalid_target|bad_host|bad_origin|other|assertion_failed|locked|expired|not_enrolled|invalid_token|none_ticked|authorize_started|authorize_invalid|owner_auth|consent)$\` (toString .Value) }}{{ .Value }}{{ else }}other{{ end }}"
+      template = "{{ if not .Value }}none{{ else if regexMatch \`^(rate_limited|invalid_client|client_disabled|invalid_redirect|unauthorized_client|unsupported_response_type|invalid_request|invalid_scope|invalid_target|bad_host|bad_origin|other|assertion_failed|locked|expired|not_enrolled|invalid_token|host_not_allowed|origin_not_allowed|missing|malformed|invalid_grant|unsupported_grant_type|temporarily_unavailable|none_ticked|authorize_started|authorize_invalid|owner_auth|consent|token_exchange|bearer)$\` (toString .Value) }}{{ .Value }}{{ else }}other{{ end }}"
     }
 
     stage.template {
