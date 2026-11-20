@@ -2,16 +2,13 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { HttpResponse, http } from 'msw';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { runEgressUpdate } from './run-egress-update.ts';
-import { createImpdRefusalHandler } from './src/test-utils/create-impd-refusal-handler.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
-import { server } from './src/test-utils/server.ts';
-import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
+import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
 import type { PreviewDeps } from './types.ts';
 
@@ -26,7 +23,7 @@ async function setupTest() {
     store.close();
   });
 
-  const impd = startStubImpd();
+  const impd = startPreviewImpd();
   const log = mock<(message: string) => void>();
   const sleeps: number[] = [];
 
@@ -70,37 +67,16 @@ async function setupTest() {
 test('it puts every imp impd lists, running or sleeping, under the public egress policy', async () => {
   const ctx = await setupTest();
 
-  ctx.impd.imps.set('pv-0a1b2c3d-17', {
-    name: 'pv-0a1b2c3d-17',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: ['gh'],
-  });
-
-  ctx.impd.imps.set('pv-4e5f6a7b-3', {
-    name: 'pv-4e5f6a7b-3',
-    state: 'sleeping',
-    createdAt: '2026-09-02T00:00:00.000Z',
-    lastActiveAt: '2026-10-14T08:00:00.000Z',
-    lastRequestAt: null,
-    httpPort: 3000,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: ['gh'],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17' });
+  await ctx.impd.seedImp({ name: 'pv-4e5f6a7b-3', httpPort: 3000, state: 'sleeping' });
 
   const updated = await runEgressUpdate(ctx.deps, ctx.signal);
 
   expect(updated).toBeTrue();
 
-  expect(ctx.impd.egressModes).toStrictEqual(
+  const modes = await ctx.impd.readEgressModes();
+
+  expect(modes).toStrictEqual(
     new Map([
       ['pv-0a1b2c3d-17', 'public'],
       ['pv-4e5f6a7b-3', 'public'],
@@ -111,42 +87,21 @@ test('it puts every imp impd lists, running or sleeping, under the public egress
 test('it tries again after impd refuses the list, and updates every imp once the list answers', async () => {
   const ctx = await setupTest();
 
-  ctx.impd.imps.set('pv-0a1b2c3d-17', {
-    name: 'pv-0a1b2c3d-17',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: ['gh'],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17' });
 
-  server.use(
-    http.post(
-      `${ctx.impd.url}/rpc/imps/list`,
-      () =>
-        HttpResponse.json(
-          {
-            json: {
-              defined: false,
-              code: 'SERVICE_UNAVAILABLE',
-              status: 503,
-              message: 'impd is starting',
-            },
-          },
-          { status: 503 },
-        ),
-      { once: true },
-    ),
+  ctx.impd.fail(
+    'imps/list',
+    { code: 'SERVICE_UNAVAILABLE', status: 503, message: 'impd is starting' },
+    { times: 1 },
   );
 
   const updated = await runEgressUpdate(ctx.deps, ctx.signal);
 
   expect(updated).toBeTrue();
-  expect(ctx.impd.egressModes).toStrictEqual(new Map([['pv-0a1b2c3d-17', 'public']]));
+
+  const modes = await ctx.impd.readEgressModes();
+
+  expect(modes).toStrictEqual(new Map([['pv-0a1b2c3d-17', 'public']]));
   expect(ctx.sleeps).toStrictEqual([5000]);
 
   expect(ctx.log.mock.calls).toStrictEqual([
@@ -157,50 +112,34 @@ test('it tries again after impd refuses the list, and updates every imp once the
 test('it updates the other imps, then tries again the imp whose update impd refused', async () => {
   const ctx = await setupTest();
 
-  ctx.impd.imps.set('pv-0a1b2c3d-17', {
-    name: 'pv-0a1b2c3d-17',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: ['gh'],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17' });
+  await ctx.impd.seedImp({ name: 'pv-4e5f6a7b-3', httpPort: 3000, state: 'sleeping' });
 
-  ctx.impd.imps.set('pv-4e5f6a7b-3', {
-    name: 'pv-4e5f6a7b-3',
-    state: 'sleeping',
-    createdAt: '2026-09-02T00:00:00.000Z',
-    lastActiveAt: '2026-10-14T08:00:00.000Z',
-    lastRequestAt: null,
-    httpPort: 3000,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: ['gh'],
-  });
-
-  server.use(
-    createImpdRefusalHandler({
-      impdURL: ctx.impd.url,
-      procedure: 'imps/setPolicy',
-      imp: 'pv-4e5f6a7b-3',
-      times: 1,
+  ctx.impd.fail(
+    'imps/setPolicy',
+    {
       code: 'MOVING',
       status: 409,
       message: 'The imp is moving between hosts',
       data: { retryAfterS: 5 },
-    }),
+    },
+    {
+      times: 1,
+      when: (input) =>
+        Bun.deepEquals(input, {
+          name: 'pv-4e5f6a7b-3',
+          policy: { mode: 'public', allow: [] },
+        }),
+    },
   );
 
   const updated = await runEgressUpdate(ctx.deps, ctx.signal);
 
   expect(updated).toBeTrue();
 
-  expect(ctx.impd.egressModes).toStrictEqual(
+  const modes = await ctx.impd.readEgressModes();
+
+  expect(modes).toStrictEqual(
     new Map([
       ['pv-0a1b2c3d-17', 'public'],
       ['pv-4e5f6a7b-3', 'public'],

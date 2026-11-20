@@ -9,7 +9,7 @@
     "./contract-script.ts": "./contract-script.ts"
   },
   "dependencies": {
-    "@impz/client": "7.6.1",
+    "@impz/client": "catalog:",
     "@zgeoff/std": "0.4.4",
     "ts-pattern": "5.9.2",
     "xstate": "5.33.4",
@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@faker-js/faker": "10.6.0",
+    "@impz/testing": "catalog:",
     "@mswjs/interceptors": "0.45.11",
     "@types/bun": "1.4.4",
     "@zgeoff/bun-test-extended": "0.2.4",

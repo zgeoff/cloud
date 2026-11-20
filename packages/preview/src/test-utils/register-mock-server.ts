@@ -1,4 +1,4 @@
-import { afterAll, afterEach } from 'bun:test';
+import { afterAll, afterEach, beforeAll } from 'bun:test';
 import {
   commitStatuses,
   composeFiles,
@@ -8,6 +8,7 @@ import {
   uninstalledRepos,
 } from './constants.ts';
 import { server } from './server.ts';
+import { startSharedPreviewImpd, stopPreviewImpd } from './start-preview-impd.ts';
 
 // A webhook answers 204 whatever GitHub said, so an unhandled request could still pass its test.
 // Each unhandled request is recorded, and the test that sent it fails.
@@ -38,4 +39,12 @@ afterEach(() => {
   }
 });
 
-afterAll(() => server.disable());
+// each file gets one impd that its tests share, started here so the start stays out of the first
+// test's time limit, and stopped with the file
+beforeAll(startSharedPreviewImpd);
+
+afterAll(async () => {
+  await stopPreviewImpd();
+
+  await server.disable();
+});

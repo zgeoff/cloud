@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { http, passthrough } from 'msw';
 import { createPreviewStore } from './create-preview-store.ts';
 import { server as mockServer } from './src/test-utils/server.ts';
-import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
+import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
 import { waitForCondition } from './src/test-utils/wait-for-condition.ts';
 import { startPreviewService } from './start-preview-service.ts';
@@ -20,6 +20,7 @@ async function setupTest() {
 
   return {
     directory,
+    impd: startPreviewImpd(),
     stubPath: join(import.meta.dir, 'src', 'test-utils', 'run-stub-counting-proxy.ts'),
   };
 }
@@ -27,20 +28,7 @@ async function setupTest() {
 test('it puts every imp impd lists under the public egress policy when it starts', async () => {
   const ctx = await setupTest();
 
-  const impd = startStubImpd();
-
-  impd.imps.set('pv-0a1b2c3d-7', {
-    name: 'pv-0a1b2c3d-7',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'pv-base',
-    memoryMib: 2048,
-    backup: false,
-    grants: [],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7', image: 'pv-base' });
 
   const service = startPreviewService({
     settings: {
@@ -61,51 +49,48 @@ test('it puts every imp impd lists under the public egress policy when it starts
     },
     linkListener: { hostname: '127.0.0.1', port: 0 },
     webhookListener: { hostname: '127.0.0.1', port: 0 },
-    impdURL: impd.url,
+    impdURL: ctx.impd.url,
     databasePath: join(ctx.directory, 'previews.sqlite'),
     webhookSecret: 'whsec-example',
     githubApp: stubApp,
-    impdToken: impd.token,
+    impdToken: ctx.impd.token,
     sweepIntervalMs: 3_600_000,
     spend: null,
   });
 
   onTestFinished(() => service.stop());
 
-  await waitForCondition(() => impd.egressModes.size > 0);
+  await waitForCondition(async () => {
+    const modes = await ctx.impd.readEgressModes();
 
-  expect(impd.egressModes).toStrictEqual(new Map([['pv-0a1b2c3d-7', 'public']]));
+    return modes.get('pv-0a1b2c3d-7') === 'public';
+  });
+
+  const modes = await ctx.impd.readEgressModes();
+
+  expect(modes).toStrictEqual(new Map([['pv-0a1b2c3d-7', 'public']]));
 });
 
 test('it keeps the model route listener closed until every imp has the public egress policy', async () => {
   const ctx = await setupTest();
 
-  const impd = startStubImpd();
-
-  impd.imps.set('pv-0a1b2c3d-7', {
-    name: 'pv-0a1b2c3d-7',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'pv-base',
-    memoryMib: 2048,
-    backup: false,
-    grants: [],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7', image: 'pv-base' });
 
   const held = { policy: false };
-  const release = Promise.withResolvers<void>();
 
-  mockServer.use(
-    http.post(`${impd.url}/rpc/imps/setPolicy`, async () => {
-      held.policy = true;
+  // the first setPolicy call freezes impd's connections, and the rule answers none of them
+  ctx.impd.fail(
+    'imps/setPolicy',
+    { code: 'INTERNAL_SERVER_ERROR', status: 500 },
+    {
+      when: () => {
+        held.policy = true;
 
-      await release.promise;
+        ctx.impd.freeze();
 
-      return passthrough();
-    }),
+        return false;
+      },
+    },
   );
 
   // the route listener needs a known port, so the test takes a free one from the kernel first
@@ -133,11 +118,11 @@ test('it keeps the model route listener closed until every imp has the public eg
     },
     linkListener: { hostname: '127.0.0.1', port: 0 },
     webhookListener: { hostname: '127.0.0.1', port: 0 },
-    impdURL: impd.url,
+    impdURL: ctx.impd.url,
     databasePath: join(ctx.directory, 'previews.sqlite'),
     webhookSecret: 'whsec-example',
     githubApp: stubApp,
-    impdToken: impd.token,
+    impdToken: ctx.impd.token,
     sweepIntervalMs: 3_600_000,
     spend: {
       listener: { hostname: '127.0.0.1', port },
@@ -162,7 +147,7 @@ test('it keeps the model route listener closed until every imp has the public eg
     () => false,
   );
 
-  release.resolve();
+  ctx.impd.thaw();
 
   await waitForCondition(() =>
     fetch(`http://127.0.0.1:${String(port)}/`).then(
@@ -172,7 +157,10 @@ test('it keeps the model route listener closed until every imp has the public eg
   );
 
   expect(reached).toBeFalse();
-  expect(impd.egressModes).toStrictEqual(new Map([['pv-0a1b2c3d-7', 'public']]));
+
+  const modes = await ctx.impd.readEgressModes();
+
+  expect(modes).toStrictEqual(new Map([['pv-0a1b2c3d-7', 'public']]));
 });
 
 test("it sends a preview's model call from its route listener to that preview's proxy", async () => {
@@ -195,8 +183,6 @@ test("it sends a preview's model call from its route listener to that preview's 
 
   probe.stop(true);
 
-  const impd = startStubImpd();
-
   const service = startPreviewService({
     settings: {
       baseURL: 'http://cloudhost.test:8417',
@@ -216,11 +202,11 @@ test("it sends a preview's model call from its route listener to that preview's 
     },
     linkListener: { hostname: '127.0.0.1', port: 0 },
     webhookListener: { hostname: '127.0.0.1', port: 0 },
-    impdURL: impd.url,
+    impdURL: ctx.impd.url,
     databasePath: join(ctx.directory, 'previews.sqlite'),
     webhookSecret: 'whsec-example',
     githubApp: stubApp,
-    impdToken: impd.token,
+    impdToken: ctx.impd.token,
     sweepIntervalMs: 3_600_000,
     spend: {
       listener: { hostname: '127.0.0.1', port },

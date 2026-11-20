@@ -13,6 +13,7 @@ minimumReleaseAge = 604800
 # uses needs an entry here, or bun install refuses the bump.
 # @impz/client releases with impd's API, so the preview service's typed client
 # would otherwise trail the impd it talks to by a week.
+# @impz/testing, the real impd that the tests start, releases with @impz/client and pins its version.
 # @heynixie/contract releases with nixie, and the release check bumps it in the
 # same PR as the nixie image pin, so the scripts' nixie calls type-check against
 # the release they deploy.
@@ -44,6 +45,7 @@ minimumReleaseAgeExcludes = [
   "@boxxy/worker-atc",
   "@heynixie/contract",
   "@impz/client",
+  "@impz/testing",
   "@noslop/cli",
   "@pepys/kit",
   "@wringer/core",

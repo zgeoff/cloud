@@ -23,6 +23,9 @@ export interface StubImpdHealth {
 // the real body needs an impd sample
 const readyHealth: StubImpdHealth = { status: 200, body: '{"ready":true}' };
 
+// The package's impd answers /health with its own body and status and logs no request outside
+// oRPC, so the tests of the health check, which send it a 503 and a body over 64 KiB and read the
+// request it received, start this stand-in.
 export function startStubImpd(goodToken: string, health: StubImpdHealth = readyHealth): StubImpd {
   const requests: StubImpdRequest[] = [];
 

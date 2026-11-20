@@ -7,13 +7,12 @@ import { z } from 'zod';
 
 type StubImpdImage = Pick<Image, 'name' | 'ref' | 'digest'>;
 
+// The package's impd cannot add an image from a registry and gives each seeded image a digest of
+// its own, so a test that needs an add to succeed starts this stand-in.
 export interface StubImpdImagesOptions {
   readonly url: string;
   readonly token: string;
   readonly images: readonly StubImpdImage[];
-
-  // an add of one of these refs gets impd's refusal of a ref outside the token's prefix
-  readonly refusedRefs?: readonly string[];
 }
 
 export interface StubImpdImages {
@@ -48,14 +47,6 @@ export function startStubImpdImages(options: Readonly<StubImpdImagesOptions>): S
   const answerAdd = (input: AddInput) => {
     calls.push(`images.add ${input.name} ${input.ref}`);
 
-    if (options.refusedRefs?.includes(input.ref) === true) {
-      return buildRPCError(
-        new ORPCError('FORBIDDEN', {
-          message: 'token nixie may add only images whose ref starts with ghcr.io/zgeoff/nixie-',
-        }),
-      );
-    }
-
     const image = { name: input.name, ref: input.ref, digest: input.ref.split('@')[1] ?? '' };
 
     images.push(image);
@@ -87,10 +78,6 @@ export function startStubImpdImages(options: Readonly<StubImpdImagesOptions>): S
   return { handlers, calls, images };
 }
 
-function buildRPCError(error: ORPCError<string, unknown>) {
-  return HttpResponse.json(serializer.serialize(error.toJSON()), { status: error.status });
-}
-
 function buildRPCAnswer(output: unknown) {
   return HttpResponse.json(serializer.serialize(output));
 }
@@ -106,4 +93,8 @@ function buildImageRecord(image: Readonly<StubImpdImage>): Image {
     sizeBytes: 1_048_576,
     pinned: false,
   };
+}
+
+function buildRPCError(error: ORPCError<string, unknown>) {
+  return HttpResponse.json(serializer.serialize(error.toJSON()), { status: error.status });
 }

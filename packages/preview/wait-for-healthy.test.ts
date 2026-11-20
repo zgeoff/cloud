@@ -9,12 +9,15 @@ import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
 import { server } from './src/test-utils/server.ts';
+import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
 import type { PreviewDeps } from './types.ts';
 import { waitForHealthy } from './wait-for-healthy.ts';
 
-async function setupTest() {
+async function setupTest<Impd extends { readonly url: string; readonly token: string }>(
+  impd: Impd,
+) {
   const directory = await mkdtemp(join(tmpdir(), 'preview-health-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
@@ -25,7 +28,6 @@ async function setupTest() {
     store.close();
   });
 
-  const impd = startStubImpd();
   const clock = { now: new Date('2026-10-15T09:00:00Z').getTime() };
 
   const deps: PreviewDeps = {
@@ -67,7 +69,7 @@ async function setupTest() {
 }
 
 test("it resolves healthy at the first probe through impd's proxy that the health path answers", async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
@@ -101,7 +103,7 @@ test("it resolves healthy at the first probe through impd's proxy that the healt
 });
 
 test("it resolves unhealthy with the proxy's last answer when the app listens on the guest's loopback alone", async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
@@ -135,7 +137,9 @@ test("it resolves unhealthy with the proxy's last answer when the app listens on
 });
 
 test("it resolves unhealthy with the error when the imp's name never answers", async () => {
-  const ctx = await setupTest();
+  const impd = startPreviewImpd();
+
+  const ctx = await setupTest(impd);
 
   server.use(
     http.get('https://pv-0a1b2c3d-17.imps.example.test/healthz', () => HttpResponse.error()),
@@ -155,7 +159,9 @@ test("it resolves unhealthy with the error when the imp's name never answers", a
 });
 
 test('it counts a redirect from the health path as healthy, as curl --fail did', async () => {
-  const ctx = await setupTest();
+  const impd = startPreviewImpd();
+
+  const ctx = await setupTest(impd);
 
   server.use(
     http.get('https://pv-0a1b2c3d-17.imps.example.test/healthz', () =>
@@ -177,7 +183,9 @@ test('it counts a redirect from the health path as healthy, as curl --fail did',
 });
 
 test('it keeps the status and the text of a plain answer that is not healthy', async () => {
-  const ctx = await setupTest();
+  const impd = startPreviewImpd();
+
+  const ctx = await setupTest(impd);
 
   server.use(
     http.get('https://pv-0a1b2c3d-17.imps.example.test/healthz', () =>

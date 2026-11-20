@@ -11,11 +11,14 @@ import { composeFiles } from './src/test-utils/constants.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
 import { processDeps } from './src/test-utils/process-deps.ts';
 import { runBoundedProcess } from './src/test-utils/run-bounded-process.ts';
+import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
 import type { PreviewDeps } from './types.ts';
 
-async function setupTest() {
+async function setupTest<Impd extends { readonly url: string; readonly token: string }>(
+  impd: Impd,
+) {
   const stack = new AsyncDisposableStack();
 
   onTestFinished(() => stack.disposeAsync());
@@ -30,7 +33,6 @@ async function setupTest() {
     store.close();
   });
 
-  const impd = startStubImpd();
   const clock = { now: new Date('2026-10-15T09:00:00Z').getTime() };
 
   const deps: PreviewDeps = {
@@ -76,7 +78,7 @@ async function setupTest() {
 }
 
 test('it creates the imp with the contract port and the grant, then builds and probes the head commit', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   composeFiles.set(
     'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -144,7 +146,7 @@ test('it creates the imp with the contract port and the grant, then builds and p
 });
 
 test("it starts the stack with compose.yaml and compose.broker.yaml, with the broker's CA bundle, when the commit has the broker file", async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
 
@@ -199,7 +201,12 @@ test("it starts the stack with compose.yaml and compose.broker.yaml, with the br
 });
 
 test('it grants the model secret beside the GitHub secret, so the stack reaches the broker', async () => {
-  const ctx = await setupTest();
+  const impd = startPreviewImpd();
+
+  const ctx = await setupTest(impd);
+
+  await impd.seedSecret('gh');
+  await impd.seedSecret('preview-model');
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
 
@@ -225,11 +232,13 @@ test('it grants the model secret beside the GitHub secret, so the stack reaches 
     },
   );
 
-  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['gh', 'preview-model']);
+  const grants = await ctx.impd.client.grants.list({ name: 'pv-0a1b2c3d-17' });
+
+  expect(grants).toStrictEqual(['gh', 'preview-model']);
 });
 
 test('it grants the model secret for the preview own route only, and passes the route to the stack, when the previews have counting proxies', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
 
@@ -293,7 +302,7 @@ test('it grants the model secret for the preview own route only, and passes the 
 });
 
 test('it swaps the uncounted model grant of an imp that booted before the counting proxies for the counted one, which impd refuses beside it', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
 
@@ -358,7 +367,7 @@ test('it swaps the uncounted model grant of an imp that booted before the counti
 });
 
 test('it swaps the counted model grant of an imp for the uncounted one once the previews run without counting proxies', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
 
@@ -406,7 +415,7 @@ test('it swaps the counted model grant of an imp for the uncounted one once the 
 });
 
 test("it writes the route into the stack's .env after the commit's own lines, so a compose run started by hand keeps it", async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   const origin = join(ctx.directory, 'origin');
   const gitConfig = join(ctx.directory, 'gitconfig');
@@ -481,7 +490,7 @@ test("it writes the route into the stack's .env after the commit's own lines, so
 test.skipIf(Bun.which('docker') === null)(
   "it keeps the route in nixie's environment for a compose command run without the boot's variables",
   async () => {
-    const ctx = await setupTest();
+    const ctx = await setupTest(startStubImpd());
 
     const origin = join(ctx.directory, 'origin');
     const gitConfig = join(ctx.directory, 'gitconfig');
@@ -572,7 +581,7 @@ test.skipIf(Bun.which('docker') === null)(
 );
 
 test("it leaves no route in the stack's .env once the previews run without counting proxies", async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   const origin = join(ctx.directory, 'origin');
   const gitConfig = join(ctx.directory, 'gitconfig');
@@ -634,7 +643,7 @@ test("it leaves no route in the stack's .env once the previews run without count
 });
 
 test('it requires the broker for the build when the model secret is the only grant', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
 
@@ -668,7 +677,7 @@ test('it requires the broker for the build when the model secret is the only gra
 });
 
 test('it records the tail of the build output when the build fails', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
 
@@ -703,7 +712,7 @@ test('it records the tail of the build output when the build fails', async () =>
 });
 
 test('it leaves a newer head waiting, not failed, when the older head it booted fails', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
 
@@ -751,7 +760,7 @@ test('it leaves a newer head waiting, not failed, when the older head it booted 
 });
 
 test("it fails the boot, naming the port, when the app listens on the guest's loopback alone", async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   composeFiles.set(
     'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -798,7 +807,7 @@ test("it fails the boot, naming the port, when the app listens on the guest's lo
 });
 
 test('it rebuilds an existing imp in place and takes the port of the new commit', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   composeFiles.set(
     'acme/greenhouse@cccccccccccccccccccccccccccccccccccccccc',
@@ -853,7 +862,9 @@ test('it rebuilds an existing imp in place and takes the port of the new commit'
 });
 
 test('it puts a sleeping existing imp under the public egress policy before it wakes the imp', async () => {
-  const ctx = await setupTest();
+  const impd = startPreviewImpd();
+
+  const ctx = await setupTest(impd);
 
   composeFiles.set(
     'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -869,16 +880,10 @@ test('it puts a sleeping existing imp under the public egress policy before it w
 
   ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
 
-  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+  await ctx.impd.seedImp({
     name: 'pv-0a1b2c3d-17',
     state: 'sleeping',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 3000,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
     grants: ['gh'],
   });
 
@@ -900,11 +905,13 @@ test('it puts a sleeping existing imp under the public egress policy before it w
     'imps/wake pv-0a1b2c3d-17',
   ]);
 
-  expect(ctx.impd.egressModes).toStrictEqual(new Map([['pv-0a1b2c3d-17', 'public']]));
+  const modes = await ctx.impd.readEgressModes();
+
+  expect(modes).toStrictEqual(new Map([['pv-0a1b2c3d-17', 'public']]));
 });
 
 test('it adds the grant to an existing imp that lacks it, even after an earlier build', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   composeFiles.set(
     'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -960,7 +967,9 @@ test('it adds the grant to an existing imp that lacks it, even after an earlier 
 });
 
 test('it leaves a preview ended when its pull request closed during the boot', async () => {
-  const ctx = await setupTest();
+  const impd = startPreviewImpd();
+
+  const ctx = await setupTest(impd);
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
 
@@ -987,7 +996,11 @@ test('it leaves a preview ended when its pull request closed during the boot', a
 });
 
 test('it removes the imp it started when the pull request closed before the imp existed', async () => {
-  const ctx = await setupTest();
+  const impd = startPreviewImpd();
+
+  const ctx = await setupTest(impd);
+
+  await impd.seedSecret('gh');
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
 
@@ -1010,12 +1023,16 @@ test('it removes the imp it started when the pull request closed before the imp 
     detail: null,
   });
 
-  expect(ctx.impd.imps.has('pv-0a1b2c3d-17')).toBeFalse();
-  expect(ctx.impd.commands).toStrictEqual([]);
+  const heldImps = await ctx.impd.client.imps.list({});
+
+  expect(heldImps).toStrictEqual([]);
+  expect(ctx.impd.calls.filter((call) => call.startsWith('exec/'))).toStrictEqual([]);
 });
 
 test('it fails the boot when the head commit has no preview/compose.yaml', async () => {
-  const ctx = await setupTest();
+  const impd = startPreviewImpd();
+
+  const ctx = await setupTest(impd);
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
