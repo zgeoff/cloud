@@ -1,5 +1,5 @@
 # Checks services.drift-check: the units the module generates, the store tree the check runs
-# from, and the Pulumi CLI it ships, run in the build sandbox. scripts/test-run-host-drift-check.sh
+# from, and the Pulumi CLI it ships, run in the build sandbox. scripts/run-host-drift-check.bats
 # tests the scripts themselves, and checks/drift-check-vm.nix runs the unit on a booted VM. Each
 # case runs on its own, in a fresh directory, under scripts/src/test-utils/shell/run-cases.sh.
 # Run: bun run test:nixos drift-check

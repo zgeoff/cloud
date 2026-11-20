@@ -176,9 +176,9 @@ NixOS checks run on `main`, and after a day of that the `HostBehindLatestBuild` 
 [the troubleshooting runbook](./troubleshooting.md#hostbehindlatestbuild-or-hostbuildlagstale-fires)
 describes. A switch clears it.
 
-`bash scripts/test-switch-geoffcloud.sh` (part of `bun run test:scripts`) checks the gates with stub
-`gh`, `docker` and `ssh`. After a switch, `ssh root@geoffcloud k3s kubectl get nodes` should show
-the node `Ready`.
+`bun run test:scripts` runs `scripts/switch-geoffcloud.bats`, which checks the gates with stub `gh`,
+`docker` and `ssh`. After a switch, `ssh root@geoffcloud k3s kubectl get nodes` should show the node
+`Ready`.
 
 Before a risky host change, take an Onidel snapshot of the root disk:
 
