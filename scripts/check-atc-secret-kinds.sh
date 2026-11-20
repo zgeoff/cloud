@@ -10,8 +10,8 @@
 # `static`, which atc 7.3.0 lacks. The impd release is the imp-host image's tag, and impd's kinds
 # are its SecretKindSchema enum, in packages/api/src/schemas/secret-schema.ts of zgeoff/impz at the
 # release's tag. atc's kinds are its BrokerSecretKind union, in
-# packages/plugin-api/src/credential-broker.ts of zgeoff/atc at the pin's tag. The check reads both
-# files through gh.
+# packages/plugin-api/src/credentials/credential-broker.ts of zgeoff/atc at the pin's tag. The check
+# reads both files through gh.
 # It prints one line and exits 0 when atc accepts every kind impd stores. It exits 1 when atc lacks
 # one, when a pin holds no release version, or when a file holds no one kind list; a gh failure
 # stops it with gh's exit code.
@@ -56,7 +56,7 @@ read -ra stored_kinds <<< "$(tr -d "'," <<< "$stored")"
 
 # atc's one line, `export type BrokerSecretKind = 'anthropic' | 'custom' | 'oauth';`
 broker="$(gh api -H 'Accept: application/vnd.github.raw' \
-  "repos/zgeoff/atc/contents/packages/plugin-api/src/credential-broker.ts?ref=%40zgeoff/atc%40$atc")"
+  "repos/zgeoff/atc/contents/packages/plugin-api/src/credentials/credential-broker.ts?ref=%40zgeoff/atc%40$atc")"
 accepted="$(sed -nE "s/^export type BrokerSecretKind = ('[a-z]+'( \| '[a-z]+')*);\$/\\1/p" <<< "$broker")"
 if [[ ! "$accepted" =~ ^\'[a-z] ]] || [ "$(wc -l <<< "$accepted")" != 1 ]; then
   echo "atc $atc's credential-broker.ts names no one BrokerSecretKind union" >&2

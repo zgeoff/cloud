@@ -9,7 +9,7 @@
 #
 # The recordings in scripts/src/test-utils/shell/gh-recordings hold zgeoff/impz's
 # packages/api/src/schemas/secret-schema.ts at v4.2.4 (five kinds) and v5.0.0 (`static` and
-# `oauth`), and zgeoff/atc's packages/plugin-api/src/credential-broker.ts at @zgeoff/atc@7.3.0
+# `oauth`), and zgeoff/atc's credential-broker.ts at @zgeoff/atc@7.3.0
 # (without `static`) and @zgeoff/atc@7.3.1 (with it), read 2026-10-26.
 #
 #   bash scripts/test-check-atc-secret-kinds.sh
@@ -56,7 +56,7 @@ schema_call() {
 }
 
 broker_call() {
-  printf '["gh","api","-H","Accept: application/vnd.github.raw","repos/zgeoff/atc/contents/packages/plugin-api/src/credential-broker.ts?ref=%%40zgeoff/atc%%40%s"]\n' "$1"
+  printf '["gh","api","-H","Accept: application/vnd.github.raw","repos/zgeoff/atc/contents/packages/plugin-api/src/credentials/credential-broker.ts?ref=%%40zgeoff/atc%%40%s"]\n' "$1"
 }
 
 it_passes_an_impd_whose_secret_kinds_the_atc_pin_accepts() {
