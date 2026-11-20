@@ -219,7 +219,7 @@ BACKUP_IMAGE_TAG=2.24.0-r2
 BASE_IMAGE=example.invalid/base:1
 RESTIC_IMAGE=example.invalid/restic:1
 EOF
-  # gh's answer for a release the repository lacks, which test-start-stub-github-api.sh pins
+  # gh's answer for a release the repository lacks, which start-stub-github-api.bats pins
   # against the real gh: "release not found" on stderr, exit 1, nothing downloaded
   cat > "$tree/gh-responses" << 'EOF'
 {"argv": ["gh", "release", "download", "@zgeoff/atc@9.9.9", "-R", "zgeoff/atc", "-p", "atc-gateway-linux-x64", "-p", "SHA256SUMS", "-D", null], "stderr": "release not found\n", "exit": 1}

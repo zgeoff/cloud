@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
+# bats file_tags=suite:scripts
 # Test for start-stub-github-api.sh: the GitHub API stand-in answers a release lookup by tag
 # with GitHub's 404 and the RepositoryReleaseByTag query with a null release, over HTTPS
 # with the certificate it writes, records each by method, path and tag, and fails closed on
@@ -11,21 +12,35 @@
 # image installs gh in /usr/bin and the cloud imp's agent image in /usr/local/bin, so the case's
 # PATH holds both.
 #
-#   bash scripts/src/test-utils/shell/test-start-stub-github-api.sh
-# shellcheck source-path=SCRIPTDIR
-# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
-set -euo pipefail
-# fixed, so the modes the cases assert do not depend on the caller's umask
-umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/start-stub-github-api.sh"
+#   bash scripts/run-bats.sh
 
-it_answers_a_release_lookup_by_tag_with_githubs_404() {
+setup_file() {
+  load '../bats/setup'
+}
+
+setup() {
+  load '../bats/setup'
+  load 'start-stub-github-api.sh'
+  # fixed, so the modes the cases assert do not depend on the caller's umask
+  umask 022
+  tree="$BATS_TEST_TMPDIR"
+}
+
+teardown() {
+  stop_timeout_watchdog
+  kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true
+}
+
+# Runtime every case needs: the stand-in, started in <tree>/github, and the HOME and TMPDIR
+# each client runs with.
+setup_test() {
+  local tree="$1"
+  mkdir "$tree/github" "$tree/home" "$tree/tmp"
+  start_stub_github_api "$tree/github" 3>&-
+}
+
+@test "it answers a release lookup by tag with githubs 404" {
   local code
-  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -33,17 +48,14 @@ it_answers_a_release_lookup_by_tag_with_githubs_404() {
     "https://127.0.0.1:$(cat "$tree/github/port")/api/v3/repos/zgeoff/atc/releases/tags/v1.0.0")"
 
   printf '%s' '{"message":"Not Found","documentation_url":"https://docs.github.com/rest/releases/releases#get-a-release-by-tag-name","status":"404"}' | diff - "$tree/body"
-  [ "$code" = 404 ] || {
-    echo "HTTP $code, want 404" >&2
-    exit 1
-  }
+  assert_equal "$code" 404
   diff - "$tree/github/requests" <<< 'GET /api/v3/repos/zgeoff/atc/releases/tags/v1.0.0'
-  assert_missing "$tree/github/unexpected" "the lookup was recorded as unexpected"
+  refute [ -e "$tree/github/unexpected" ]
+  refute [ -L "$tree/github/unexpected" ]
 }
 
-it_answers_the_release_by_tag_query_with_a_null_release() {
+@test "it answers the release by tag query with a null release" {
   local code
-  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   # shellcheck disable=SC2016 # a GraphQL variable, not a shell one
@@ -53,17 +65,14 @@ it_answers_the_release_by_tag_query_with_a_null_release() {
     "https://127.0.0.1:$(cat "$tree/github/port")/api/graphql")"
 
   printf '%s' '{"data":{"repository":{"release":null}}}' | diff - "$tree/body"
-  [ "$code" = 200 ] || {
-    echo "HTTP $code, want 200" >&2
-    exit 1
-  }
+  assert_equal "$code" 200
   diff - "$tree/github/requests" <<< 'POST /api/graphql RepositoryReleaseByTag tagName=v1.0.0'
-  assert_missing "$tree/github/unexpected" "the query was recorded as unexpected"
+  refute [ -e "$tree/github/unexpected" ]
+  refute [ -L "$tree/github/unexpected" ]
 }
 
-it_fails_closed_on_another_path() {
+@test "it fails closed on another path" {
   local code
-  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -71,17 +80,14 @@ it_fails_closed_on_another_path() {
     "https://127.0.0.1:$(cat "$tree/github/port")/api/v3/repos/zgeoff/atc/releases/latest")"
 
   printf '%s' '{"message":"stub-github-api: unexpected GET /api/v3/repos/zgeoff/atc/releases/latest"}' | diff - "$tree/body"
-  [ "$code" = 500 ] || {
-    echo "HTTP $code, want 500" >&2
-    exit 1
-  }
+  assert_equal "$code" 500
   diff - "$tree/github/unexpected" <<< 'GET /api/v3/repos/zgeoff/atc/releases/latest'
-  assert_missing "$tree/github/requests" "the request was recorded as answered"
+  refute [ -e "$tree/github/requests" ]
+  refute [ -L "$tree/github/requests" ]
 }
 
-it_fails_closed_on_another_graphql_query() {
+@test "it fails closed on another graphql query" {
   local code
-  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -90,17 +96,14 @@ it_fails_closed_on_another_graphql_query() {
     "https://127.0.0.1:$(cat "$tree/github/port")/api/graphql")"
 
   printf '%s' '{"message":"stub-github-api: unexpected POST /api/graphql"}' | diff - "$tree/body"
-  [ "$code" = 500 ] || {
-    echo "HTTP $code, want 500" >&2
-    exit 1
-  }
+  assert_equal "$code" 500
   diff - "$tree/github/unexpected" <<< 'POST /api/graphql'
-  assert_missing "$tree/github/requests" "the query was recorded as answered"
+  refute [ -e "$tree/github/requests" ]
+  refute [ -L "$tree/github/requests" ]
 }
 
-it_fails_closed_on_another_method() {
+@test "it fails closed on another method" {
   local code
-  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -108,17 +111,14 @@ it_fails_closed_on_another_method() {
     -X DELETE "https://127.0.0.1:$(cat "$tree/github/port")/api/v3/repos/zgeoff/atc/releases/tags/v1.0.0")"
 
   printf '%s' '{"message":"stub-github-api: unexpected DELETE /api/v3/repos/zgeoff/atc/releases/tags/v1.0.0"}' | diff - "$tree/body"
-  [ "$code" = 500 ] || {
-    echo "HTTP $code, want 500" >&2
-    exit 1
-  }
+  assert_equal "$code" 500
   diff - "$tree/github/unexpected" <<< 'DELETE /api/v3/repos/zgeoff/atc/releases/tags/v1.0.0'
-  assert_missing "$tree/github/requests" "the request was recorded as answered"
+  refute [ -e "$tree/github/requests" ]
+  refute [ -L "$tree/github/requests" ]
 }
 
-it_fails_closed_on_the_release_by_tag_query_without_a_tag_variable() {
+@test "it fails closed on the release by tag query without a tag variable" {
   local code
-  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   # shellcheck disable=SC2016 # a GraphQL variable, not a shell one
@@ -128,46 +128,32 @@ it_fails_closed_on_the_release_by_tag_query_without_a_tag_variable() {
     "https://127.0.0.1:$(cat "$tree/github/port")/api/graphql")"
 
   printf '%s' '{"message":"stub-github-api: unexpected POST /api/graphql"}' | diff - "$tree/body"
-  [ "$code" = 500 ] || {
-    echo "HTTP $code, want 500" >&2
-    exit 1
-  }
+  assert_equal "$code" 500
   diff - "$tree/github/unexpected" <<< 'POST /api/graphql'
-  assert_missing "$tree/github/requests" "the query was recorded as answered"
+  refute [ -e "$tree/github/requests" ]
+  refute [ -L "$tree/github/requests" ]
 }
 
 # gh sends the two lookups at once, so the recorded order is not part of the contract and
 # the requests are sorted.
-it_makes_a_real_gh_release_download_report_the_release_not_found() {
-  local status=0
-  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
+@test "it makes a real gh release download report the release not found" {
   setup_test "$tree"
   mkdir "$tree/gh" "$tree/download" "$tree/no-certs"
 
-  env -i PATH=/usr/local/bin:/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GH_CONFIG_DIR="$tree/gh" \
+  run -1 --separate-stderr env -i PATH=/usr/local/bin:/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GH_CONFIG_DIR="$tree/gh" \
     GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1 \
     GH_HOST="127.0.0.1:$(cat "$tree/github/port")" SSL_CERT_FILE="$tree/github/cert.pem" \
-    SSL_CERT_DIR="$tree/no-certs" gh release download v1.0.0 -R zgeoff/atc -p atc -D "$tree/download" > "$tree/out" 2> "$tree/err" || status=$?
+    SSL_CERT_DIR="$tree/no-certs" gh release download v1.0.0 -R zgeoff/atc -p atc -D "$tree/download"
 
-  diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'release not found'
+  refute_output
+  assert_stderr 'release not found'
   sort "$tree/github/requests" > "$tree/requests"
   diff - "$tree/requests" << 'REQUESTS'
 GET /api/v3/repos/zgeoff/atc/releases/tags/v1.0.0
 POST /api/graphql RepositoryReleaseByTag tagName=v1.0.0
 REQUESTS
-  assert_missing "$tree/github/unexpected" "gh sent an unexpected request"
+  refute [ -e "$tree/github/unexpected" ]
+  refute [ -L "$tree/github/unexpected" ]
   ls -A "$tree/download" > "$tree/downloaded"
   diff /dev/null "$tree/downloaded"
-  assert_status 1 "$status"
 }
-
-# Runtime every case needs: the stand-in, started in <tree>/github, and the HOME and TMPDIR
-# each client runs with.
-setup_test() {
-  local tree="$1"
-  mkdir "$tree/github" "$tree/home" "$tree/tmp"
-  start_stub_github_api "$tree/github"
-}
-
-run_cases
