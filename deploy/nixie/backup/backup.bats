@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
+# bats file_tags=suite:nixie-backup-fixture
 # Fixture test for nixie's backup and restore, run locally with Docker in the nixie-backup image
 # that the stack config pins as nixie.backupImage. It touches no cluster and no cloud account.
 #
@@ -18,444 +19,43 @@
 #
 # `bun run test:nixie-backup-fixture` runs it; one case alone:
 #
-#   CASE='ls mode' bash deploy/nixie/backup/test-backup.sh
-# shell-suite: nixie-backup-fixture
-# shellcheck source-path=SCRIPTDIR
-# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
-set -euo pipefail
-# fixed, so the modes the cases assert do not depend on the caller's umask
-umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/normalize-restic-output.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/create-stub-racing-restic.sh"
+#   CASE='ls mode' bash scripts/run-bats.sh nixie-backup-fixture
 
-# the cleanup every case passes to create_case_tree: the containers first, then the volumes
-cleanup='docker rm -f "$name-staging" "$name-job" "$name-restore" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-data" "$name-keys" "$name-copy" > /dev/null || true'
+# a case runs a chown container and then several runs of the backup image
+export BATS_TEST_TIMEOUT=180
 
-it_publishes_a_staged_set_to_both_repos_and_leaves_only_its_receipt_and_marker() {
-  local image="$1" status=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-  stage_sets "$name" "$image" 1:scheduled
-
-  run_job "$name" "$image" > "$tree/out" 2> "$tree/err" || status=$?
-
-  diff /dev/null "$tree/err"
-  sed -E 's/"time":"[^"]+",//' "$tree/out" > "$tree/out.normal"
-  diff - "$tree/out.normal" << 'EOF'
-{"event":"backup.set_published","sequence":1}
-EOF
-  assert_status 0 "$status"
-  run_shell "$name" "$image" > "$tree/state" << 'EOF'
-ls -A /state/backup/000000000001
-EOF
-  diff - "$tree/state" << 'EOF'
-complete
-manifest.json
-receipt.json
-EOF
-  read_repos "$name" "$image" "$tree"
-  jq -c '{status, sequence, prune, check, failure, removed: (.removedKeySnapshotIDs | length)}' \
-    "$tree/receipt-1" > "$tree/receipt"
-  diff - "$tree/receipt" <<< '{"status":"published","sequence":1,"prune":"passed","check":"passed","failure":null,"removed":0}'
-  jq -c '[.[] | {paths, tags}]' "$tree/data.json" > "$tree/data"
-  diff - "$tree/data" <<< '[{"paths":["/nixie.db"],"tags":["set-1","kind-scheduled","publish-1"]}]'
-  jq -c '[.[] | {paths, tags}]' "$tree/keys.json" > "$tree/keys"
-  diff - "$tree/keys" <<< '[{"paths":["/keys.db"],"tags":["set-1","kind-scheduled","publish-1"]}]'
-  [ "$(jq -r .dataSnapshotID "$tree/receipt-1")" = "$(jq -r '.[0].id' "$tree/data.json")" ]
-  [ "$(jq -r .keySnapshotID "$tree/receipt-1")" = "$(jq -r '.[0].id' "$tree/keys.json")" ]
+# Boot data every case needs: the nixie-backup image the stack config pins (nixie.backupImage),
+# pulled once, and the script under test, by absolute path for the bind mount.
+setup_file() {
+  load '../../../scripts/src/test-utils/bats/setup'
+  local repo
+  repo="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)"
+  image="$(cd "$repo" && bun -e 'console.log(Bun.YAML.parse(await Bun.file("infra/Pulumi.prod.yaml").text()).config["geoff-cloud:nixie"].backupImage)')"
+  docker pull -q "$image" > /dev/null
+  export image
 }
 
-# a forget stages a set at once, and its key snapshot must be the only one left
-it_keeps_the_newest_sets_key_snapshot_alone_and_every_data_snapshot() {
-  local image="$1" status=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-  stage_sets "$name" "$image" 1:scheduled
-  run_job "$name" "$image" > /dev/null
-  stage_sets "$name" "$image" 2:forget
-
-  run_job "$name" "$image" > "$tree/out" 2> "$tree/err" || status=$?
-
-  diff /dev/null "$tree/err"
-  sed -E 's/"time":"[^"]+",//' "$tree/out" > "$tree/out.normal"
-  diff - "$tree/out.normal" << 'EOF'
-{"event":"backup.set_published","sequence":2}
-EOF
-  assert_status 0 "$status"
-  read_repos "$name" "$image" "$tree"
-  jq -c '[.[] | {paths, tags}]' "$tree/keys.json" > "$tree/keys"
-  diff - "$tree/keys" <<< '[{"paths":["/keys.db"],"tags":["set-2","kind-forget","publish-2"]}]'
-  jq -c '[.[] | .tags[0]] | sort' "$tree/data.json" > "$tree/data"
-  diff - "$tree/data" <<< '["set-1","set-2"]'
-  jq -c '{status, removed: (.removedKeySnapshotIDs | length)}' "$tree/receipt-2" > "$tree/receipt"
-  diff - "$tree/receipt" <<< '{"status":"published","removed":1}'
+setup() {
+  load '../../../scripts/src/test-utils/bats/setup'
+  load '../../../scripts/src/test-utils/shell/normalize-restic-output.sh'
+  load '../../../scripts/src/test-utils/shell/create-stub-racing-restic.sh'
+  # fixed, so the modes the cases assert do not depend on the caller's umask
+  umask 022
+  tree="$BATS_TEST_TMPDIR"
+  script="$BATS_TEST_DIRNAME/restore.sh"
+  name="nixie-backup-$(basename "$BATS_RUN_TMPDIR")-$BATS_TEST_NUMBER"
 }
 
-# Why the CronJob never retries a pod (infra/cluster/build-nixie-backup-cron-job-spec.ts): a key
-# repo that refuses writes fails the set's receipt and the run, and a second run skips that set and
-# exits 0, so a retried Job would end as a success.
-it_fails_a_run_whose_set_fails_and_passes_its_rerun_with_the_receipt_unchanged() {
-  local image="$1" status=0 rerun=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-  stage_sets "$name" "$image" 1:scheduled
-  run_shell "$name" "$image" <<< 'chmod 0500 /repos/keys'
-  run_job "$name" "$image" > "$tree/out" 2> "$tree/err" || status=$?
-  run_shell "$name" "$image" > "$tree/receipt-before" <<< 'cat /state/backup/000000000001/receipt.json'
-
-  run_job "$name" "$image" > "$tree/rerun" 2> "$tree/rerun-err" || rerun=$?
-
-  assert_status 1 "$status"
-  assert_status 0 "$rerun"
-  # restic creates the repo's folders in parallel, so the first refused one varies
-  sed -E 's/"time":"[^"]+",//; s#mkdir /repos/keys/[a-z]+:#mkdir /repos/keys/FOLDER:#' "$tree/out" > \
-    "$tree/out.normal"
-  diff - "$tree/out.normal" << 'EOF'
-{"event":"backup.set_failed","level":"error","sequence":1,"failure":"restic init in the key repo exited 1: Fatal: Fatal: create repository at /repos/keys failed: mkdir /repos/keys/FOLDER: permission denied"}
-EOF
-  diff /dev/null "$tree/err"
-  sed -E 's/"time":"[^"]+",//' "$tree/rerun" > "$tree/rerun.normal"
-  diff /dev/null "$tree/rerun.normal"
-  diff /dev/null "$tree/rerun-err"
-  run_shell "$name" "$image" > "$tree/receipt-after" <<< 'cat /state/backup/000000000001/receipt.json'
-  diff "$tree/receipt-before" "$tree/receipt-after"
-  jq -c '{status}' "$tree/receipt-after" > "$tree/receipt"
-  diff - "$tree/receipt" <<< '{"status":"failed"}'
-}
-
-# The data repo's newest snapshot is set 3's, whose key snapshot never landed, as a failed key step
-# leaves it; the restore still pairs the key repo's set 2 with set 2's nixie.db. It restores keys.db
-# first, while a backup run that removes the picked key snapshot is least likely.
-it_restores_keys_db_and_the_nixie_db_of_the_same_set_from_the_two_repos() {
-  local image="$1" script="$2" status=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-  stage_sets "$name" "$image" 1:scheduled
-  run_job "$name" "$image" > /dev/null
-  stage_sets "$name" "$image" 2:forget
-  run_job "$name" "$image" > /dev/null
-  run_shell "$name" "$image" << 'EOF'
-echo 'nixie.db of set 3' | RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only \
-  restic backup -q --host nixie --tag set-3 --tag kind-scheduled --stdin --stdin-filename nixie.db
-EOF
-
-  run_restore "$name" "$image" "$script" restore > "$tree/out" 2> "$tree/err" || status=$?
-
-  diff /dev/null "$tree/err"
-  normalize_restic_output < "$tree/out" > "$tree/out.normal"
-  diff - "$tree/out.normal" << 'EOF'
-restoring snapshot ID of [/keys.db] at NOW +0000 UTC by nixie@nixie to /tmp/nixie-backup
-Summary: Restored 1 files/dirs (SIZE) in T
-restoring snapshot ID of [/nixie.db] at NOW +0000 UTC by nixie@nixie to /tmp/nixie-backup
-Summary: Restored 1 files/dirs (SIZE) in T
-EOF
-  assert_status 0 "$status"
-  run_shell "$name" "$image" > "$tree/copy" << 'EOF'
-cd /tmp/nixie-backup && stat -c '%n %u:%g' * | sort
-cat nixie.db keys.db
-EOF
-  diff - "$tree/copy" << 'EOF'
-keys.db 10001:10001
-nixie.db 10001:10001
-nixie.db of set 2
-keys.db of set 2
-EOF
-}
-
-# Set 2's key snapshot stays beside set 10's, as a failed removal leaves it. restic lists snapshots
-# oldest first, and set-10 sorts before set-2 as text, so only the set's number picks set 10.
-it_restores_the_set_with_the_highest_number_when_the_key_repo_holds_two() {
-  local image="$1" script="$2" status=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-  run_shell "$name" "$image" << 'EOF'
-RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only restic init -q
-RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only restic init -q
-for sequence in 2 10; do
-  echo "nixie.db of set $sequence" | RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only \
-    restic backup -q --host nixie --tag "set-$sequence" --tag kind-scheduled --stdin \
-    --stdin-filename nixie.db
-  echo "keys.db of set $sequence" | RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only \
-    restic backup -q --host nixie --tag "set-$sequence" --tag kind-scheduled --stdin \
-    --stdin-filename keys.db
-done
-EOF
-
-  run_restore "$name" "$image" "$script" restore > /dev/null 2> "$tree/err" || status=$?
-
-  diff /dev/null "$tree/err"
-  assert_status 0 "$status"
-  run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
-  diff - "$tree/copy" << 'EOF'
-nixie.db of set 10
-keys.db of set 10
-EOF
-}
-
-# A snapshot's host, like its paths, is free text that can read set-<n>; only its tags name a set.
-it_reads_a_backup_set_only_from_a_snapshots_tags() {
-  local image="$1" script="$2" status=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-  stage_sets "$name" "$image" 1:scheduled
-  run_job "$name" "$image" > /dev/null
-  run_shell "$name" "$image" << 'EOF'
-echo 'a note' | RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only \
-  restic backup -q --host set-99 --stdin --stdin-filename set-99
-EOF
-
-  run_restore "$name" "$image" "$script" restore > /dev/null 2> "$tree/err" || status=$?
-
-  diff /dev/null "$tree/err"
-  assert_status 0 "$status"
-  run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
-  diff - "$tree/copy" << 'EOF'
-nixie.db of set 1
-keys.db of set 1
-EOF
-}
-
-# A backup run publishes set 3 and removes set 2's key snapshot between the restore's pick of set 2
-# and its key restore, as a run that the restore races does; the restore then picks set 3.
-it_restores_the_newer_set_when_a_backup_run_removes_the_picked_key_snapshot() {
-  local image="$1" script="$2" status=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-  stage_sets "$name" "$image" 1:scheduled
-  run_job "$name" "$image" > /dev/null
-  stage_sets "$name" "$image" 2:scheduled
-  run_job "$name" "$image" > /dev/null
-  mkdir "$tree/bin"
-  create_stub_racing_restic "$tree/bin" /usr/local/bin/restic /opt/race/race.sh /tmp
-  cat > "$tree/race.sh" << 'EOF'
-set -e
-data() { RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only /usr/local/bin/restic "$@"; }
-keys() { RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only /usr/local/bin/restic "$@"; }
-echo 'nixie.db of set 3' | data backup -q --host nixie --tag set-3 --tag kind-scheduled --stdin \
-  --stdin-filename nixie.db
-echo 'keys.db of set 3' | keys backup -q --host nixie --tag set-3 --tag kind-scheduled --stdin \
-  --stdin-filename keys.db
-keys forget -q --keep-last 1 --prune > /dev/null
-EOF
-
-  run_restore "$name" "$image" "$script" -v "$tree/bin/restic:/usr/local/sbin/restic:ro" \
-    -v "$tree/race.sh:/opt/race/race.sh:ro" restore > /dev/null 2> "$tree/err" || status=$?
-
-  diff - "$tree/err" << 'EOF'
-Fatal: failed to find snapshot: snapshot filter (Paths:[] Tags:[[set-2, publish-2]] Hosts:[]): no snapshot found
-EOF
-  assert_status 0 "$status"
-  run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
-  diff - "$tree/copy" << 'EOF'
-nixie.db of set 3
-keys.db of set 3
-EOF
-}
-
-# an older nixie.db beside the newest keys.db keeps every forget since
-it_restores_the_nixie_db_that_SNAPSHOT_names_beside_the_newest_keys_db() {
-  local image="$1" script="$2" older status=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-  stage_sets "$name" "$image" 1:scheduled
-  run_job "$name" "$image" > /dev/null
-  stage_sets "$name" "$image" 2:scheduled
-  run_job "$name" "$image" > /dev/null
-  read_repos "$name" "$image" "$tree"
-  older="$(jq -r .dataSnapshotID "$tree/receipt-1")"
-
-  run_restore "$name" "$image" "$script" -e "SNAPSHOT=$older" restore > /dev/null 2> "$tree/err" ||
-    status=$?
-
-  diff /dev/null "$tree/err"
-  assert_status 0 "$status"
-  run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
-  diff - "$tree/copy" << 'EOF'
-nixie.db of set 1
-keys.db of set 2
-EOF
-}
-
-# a restore starts nixie's set sequence again from the restored database, so a later publish can
-# hold a lower set: the publish number, not the set, orders the two snapshots
-it_restores_a_SNAPSHOT_of_an_earlier_publish_whose_set_is_higher() {
-  local image="$1" script="$2" earlier status=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-  stage_sets "$name" "$image" 5:scheduled
-  run_job "$name" "$image" > /dev/null
-  earlier="$(run_shell "$name" "$image" <<< 'cat /state/backup/000000000005/receipt.json' | jq -r .dataSnapshotID)"
-  run_shell "$name" "$image" <<< 'rm -r /state/backup/000000000005'
-  stage_sets "$name" "$image" 2:scheduled
-  run_job "$name" "$image" > /dev/null
-
-  run_restore "$name" "$image" "$script" -e "SNAPSHOT=$earlier" restore > /dev/null 2> "$tree/err" ||
-    status=$?
-
-  diff /dev/null "$tree/err"
-  assert_status 0 "$status"
-  run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
-  diff - "$tree/copy" << 'EOF'
-nixie.db of set 5
-keys.db of set 2
-EOF
-}
-
-# set 2's data snapshot landed and its key snapshot did not, so set 2's records have no keys
-it_refuses_a_SNAPSHOT_whose_set_is_newer_than_the_key_repos() {
-  local image="$1" script="$2" newer status=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-  stage_sets "$name" "$image" 1:scheduled
-  run_job "$name" "$image" > /dev/null
-  newer="$(
-    run_shell "$name" "$image" << 'EOF'
-echo 'nixie.db of set 2' | RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only \
-  restic backup -q --json --host nixie --tag set-2 --tag kind-scheduled --stdin --stdin-filename nixie.db |
-  grep -o '"snapshot_id":"[0-9a-f]*"' | cut -d'"' -f4
-EOF
-  )"
-
-  run_restore "$name" "$image" "$script" -e "SNAPSHOT=$newer" restore > "$tree/out" 2> "$tree/err" ||
-    status=$?
-
-  diff - "$tree/err" <<< "the data snapshot $newer holds set-2, newer than the key repo's set-1,publish-1"
-  diff /dev/null "$tree/out"
-  assert_status 1 "$status"
-  run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup'
-  diff /dev/null "$tree/copy"
-}
-
-# a snapshot with no set tag, such as one tagged nixie that holds both databases, pairs with no
-# key snapshot
-it_refuses_a_SNAPSHOT_that_holds_no_backup_set() {
-  local image="$1" script="$2" old status=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-  stage_sets "$name" "$image" 1:scheduled
-  run_job "$name" "$image" > /dev/null
-  old="$(
-    run_shell "$name" "$image" << 'EOF'
-mkdir /tmp/old && echo old > /tmp/old/nixie.db && echo old > /tmp/old/keys.db
-cd /tmp/old && RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only \
-  restic backup -q --json --host nixie --tag nixie . | grep -o '"snapshot_id":"[0-9a-f]*"' | cut -d'"' -f4
-EOF
-  )"
-
-  run_restore "$name" "$image" "$script" -e "SNAPSHOT=$old" restore > "$tree/out" 2> "$tree/err" ||
-    status=$?
-
-  diff - "$tree/err" <<< "the data snapshot $old holds no backup set"
-  diff /dev/null "$tree/out"
-  assert_status 1 "$status"
-  run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup'
-  diff /dev/null "$tree/copy"
-}
-
-# a copy directory that holds files already would mix them into the restore
-it_refuses_a_restore_into_a_copy_directory_that_is_not_empty() {
-  local image="$1" script="$2" status=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-  stage_sets "$name" "$image" 1:scheduled
-  run_job "$name" "$image" > /dev/null
-  run_shell "$name" "$image" <<< "echo 'already here' > /tmp/nixie-backup/nixie.db"
-
-  run_restore "$name" "$image" "$script" restore > "$tree/out" 2> "$tree/err" || status=$?
-
-  diff - "$tree/err" <<< '/tmp/nixie-backup is not empty'
-  diff /dev/null "$tree/out"
-  assert_status 1 "$status"
-  run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup; cat /tmp/nixie-backup/nixie.db'
-  diff - "$tree/copy" << 'EOF'
-nixie.db
-already here
-EOF
-}
-
-# before the job's first set, the key repo holds no keys.db to pair with any nixie.db
-it_refuses_a_restore_while_the_key_repo_holds_no_snapshot() {
-  local image="$1" script="$2" status=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-  run_shell "$name" "$image" << 'EOF'
-RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only restic init -q
-RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only restic init -q
-EOF
-
-  run_restore "$name" "$image" "$script" restore > "$tree/out" 2> "$tree/err" || status=$?
-
-  diff - "$tree/err" <<< 'the key repo holds no snapshot of a backup set'
-  diff /dev/null "$tree/out"
-  assert_status 1 "$status"
-  run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup'
-  diff /dev/null "$tree/copy"
-}
-
-# each ID and time is new on every run, so the case masks them
-it_lists_both_repos_in_ls_mode() {
-  local image="$1" script="$2" status=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-  stage_sets "$name" "$image" 1:forget
-  run_job "$name" "$image" > /dev/null
-
-  run_restore "$name" "$image" "$script" ls > "$tree/out" 2> "$tree/err" || status=$?
-
-  diff /dev/null "$tree/err"
-  normalize_restic_output < "$tree/out" > "$tree/out.normal"
-  diff - "$tree/out.normal" << 'EOF'
-data repo:
-ID        Time                 Host        Tags                         Paths      Size
----------------------------------------------------------------------------------------
-ID  NOW  nixie       set-1,kind-forget,publish-1  /nixie.db  SIZE
----------------------------------------------------------------------------------------
-Timestamps shown in local time
-1 snapshots
-key repo:
-ID        Time                 Host        Tags                         Paths     Size
---------------------------------------------------------------------------------------
-ID  NOW  nixie       set-1,kind-forget,publish-1  /keys.db  SIZE
---------------------------------------------------------------------------------------
-Timestamps shown in local time
-1 snapshots
-EOF
-  assert_status 0 "$status"
-}
-
-it_rejects_an_unknown_mode_with_its_usage() {
-  local image="$1" script="$2" status=0
-  name="nixie-backup-$3-$BASHPID"
-  create_case_tree "$cleanup"
-  setup_test "$name" "$image"
-
-  run_restore "$name" "$image" "$script" backup > "$tree/out" 2> "$tree/err" || status=$?
-
-  diff - "$tree/err" <<< 'usage: nixie-restore restore|ls'
-  diff /dev/null "$tree/out"
-  assert_status 2 "$status"
+# the containers first, then the volumes
+teardown() {
+  stop_timeout_watchdog
+  docker rm -f "$name-staging" "$name-job" "$name-restore" "$name-shell" "$name-setup" > /dev/null 2>&1 || true
+  docker volume rm -f "$name-state" "$name-data" "$name-keys" "$name-copy" > /dev/null || true
 }
 
 # Boot data every case needs: the data volume, the two repos and the restore's copy directory,
 # each owned by nixie's uid, as fsGroup 10001 leaves the pod's volumes. Its chown container is
-# named for the case's trap.
+# named for the case's teardown.
 setup_test() {
   local name="$1" image="$2" volume
   for volume in state data keys copy; do
@@ -552,10 +152,362 @@ run_shell() {
     "$@" --entrypoint /bin/sh "$image" -es
 }
 
-# Boot data every case needs: the nixie-backup image the stack config pins (nixie.backupImage),
-# pulled once, and the script under test, by absolute path for the bind mount.
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-image="$(cd "$repo" && bun -e 'console.log(Bun.YAML.parse(await Bun.file("infra/Pulumi.prod.yaml").text()).config["geoff-cloud:nixie"].backupImage)')"
-docker pull -q "$image" > /dev/null
-run="$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')"
-run_cases "$image" "$repo/deploy/nixie/backup/restore.sh" "$run"
+@test "it publishes a staged set to both repos and leaves only its receipt and marker" {
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+
+  run -0 --separate-stderr run_job "$name" "$image"
+
+  refute_stderr
+  sed -E 's/"time":"[^"]+",//' <<< "$output" > "$tree/out.normal"
+  diff - "$tree/out.normal" << 'EOF'
+{"event":"backup.set_published","sequence":1}
+EOF
+  run_shell "$name" "$image" > "$tree/state" << 'EOF'
+ls -A /state/backup/000000000001
+EOF
+  diff - "$tree/state" << 'EOF'
+complete
+manifest.json
+receipt.json
+EOF
+  read_repos "$name" "$image" "$tree"
+  jq -c '{status, sequence, prune, check, failure, removed: (.removedKeySnapshotIDs | length)}' \
+    "$tree/receipt-1" > "$tree/receipt"
+  diff - "$tree/receipt" <<< '{"status":"published","sequence":1,"prune":"passed","check":"passed","failure":null,"removed":0}'
+  jq -c '[.[] | {paths, tags}]' "$tree/data.json" > "$tree/data"
+  diff - "$tree/data" <<< '[{"paths":["/nixie.db"],"tags":["set-1","kind-scheduled","publish-1"]}]'
+  jq -c '[.[] | {paths, tags}]' "$tree/keys.json" > "$tree/keys"
+  diff - "$tree/keys" <<< '[{"paths":["/keys.db"],"tags":["set-1","kind-scheduled","publish-1"]}]'
+  [ "$(jq -r .dataSnapshotID "$tree/receipt-1")" = "$(jq -r '.[0].id' "$tree/data.json")" ]
+  [ "$(jq -r .keySnapshotID "$tree/receipt-1")" = "$(jq -r '.[0].id' "$tree/keys.json")" ]
+}
+
+# a forget stages a set at once, and its key snapshot must be the only one left
+@test "it keeps the newest sets key snapshot alone and every data snapshot" {
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+  run_job "$name" "$image" > /dev/null
+  stage_sets "$name" "$image" 2:forget
+
+  run -0 --separate-stderr run_job "$name" "$image"
+
+  refute_stderr
+  sed -E 's/"time":"[^"]+",//' <<< "$output" > "$tree/out.normal"
+  diff - "$tree/out.normal" << 'EOF'
+{"event":"backup.set_published","sequence":2}
+EOF
+  read_repos "$name" "$image" "$tree"
+  jq -c '[.[] | {paths, tags}]' "$tree/keys.json" > "$tree/keys"
+  diff - "$tree/keys" <<< '[{"paths":["/keys.db"],"tags":["set-2","kind-forget","publish-2"]}]'
+  jq -c '[.[] | .tags[0]] | sort' "$tree/data.json" > "$tree/data"
+  diff - "$tree/data" <<< '["set-1","set-2"]'
+  jq -c '{status, removed: (.removedKeySnapshotIDs | length)}' "$tree/receipt-2" > "$tree/receipt"
+  diff - "$tree/receipt" <<< '{"status":"published","removed":1}'
+}
+
+# Why the CronJob never retries a pod (infra/cluster/build-nixie-backup-cron-job-spec.ts): a key
+# repo that refuses writes fails the set's receipt and the run, and a second run skips that set and
+# exits 0, so a retried Job would end as a success.
+@test "it fails a run whose set fails and passes its rerun with the receipt unchanged" {
+  local first_output first_stderr
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+  run_shell "$name" "$image" <<< 'chmod 0500 /repos/keys'
+  run -1 --separate-stderr run_job "$name" "$image"
+  first_output="$output"
+  first_stderr="$stderr"
+  run_shell "$name" "$image" > "$tree/receipt-before" <<< 'cat /state/backup/000000000001/receipt.json'
+
+  run -0 --separate-stderr run_job "$name" "$image"
+
+  # restic creates the repo's folders in parallel, so the first refused one varies
+  sed -E 's/"time":"[^"]+",//; s#mkdir /repos/keys/[a-z]+:#mkdir /repos/keys/FOLDER:#' <<< "$first_output" > \
+    "$tree/out.normal"
+  diff - "$tree/out.normal" << 'EOF'
+{"event":"backup.set_failed","level":"error","sequence":1,"failure":"restic init in the key repo exited 1: Fatal: Fatal: create repository at /repos/keys failed: mkdir /repos/keys/FOLDER: permission denied"}
+EOF
+  assert_equal "$first_stderr" ""
+  refute_output
+  refute_stderr
+  run_shell "$name" "$image" > "$tree/receipt-after" <<< 'cat /state/backup/000000000001/receipt.json'
+  diff "$tree/receipt-before" "$tree/receipt-after"
+  jq -c '{status}' "$tree/receipt-after" > "$tree/receipt"
+  diff - "$tree/receipt" <<< '{"status":"failed"}'
+}
+
+# The data repo's newest snapshot is set 3's, whose key snapshot never landed, as a failed key step
+# leaves it; the restore still pairs the key repo's set 2 with set 2's nixie.db. It restores keys.db
+# first, while a backup run that removes the picked key snapshot is least likely.
+@test "it restores keys db and the nixie db of the same set from the two repos" {
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+  run_job "$name" "$image" > /dev/null
+  stage_sets "$name" "$image" 2:forget
+  run_job "$name" "$image" > /dev/null
+  run_shell "$name" "$image" << 'EOF'
+echo 'nixie.db of set 3' | RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only \
+  restic backup -q --host nixie --tag set-3 --tag kind-scheduled --stdin --stdin-filename nixie.db
+EOF
+
+  run -0 --separate-stderr run_restore "$name" "$image" "$script" restore
+
+  refute_stderr
+  normalize_restic_output <<< "$output" > "$tree/out.normal"
+  diff - "$tree/out.normal" << 'EOF'
+restoring snapshot ID of [/keys.db] at NOW +0000 UTC by nixie@nixie to /tmp/nixie-backup
+Summary: Restored 1 files/dirs (SIZE) in T
+restoring snapshot ID of [/nixie.db] at NOW +0000 UTC by nixie@nixie to /tmp/nixie-backup
+Summary: Restored 1 files/dirs (SIZE) in T
+EOF
+  run_shell "$name" "$image" > "$tree/copy" << 'EOF'
+cd /tmp/nixie-backup && stat -c '%n %u:%g' * | sort
+cat nixie.db keys.db
+EOF
+  diff - "$tree/copy" << 'EOF'
+keys.db 10001:10001
+nixie.db 10001:10001
+nixie.db of set 2
+keys.db of set 2
+EOF
+}
+
+# Set 2's key snapshot stays beside set 10's, as a failed removal leaves it. restic lists snapshots
+# oldest first, and set-10 sorts before set-2 as text, so only the set's number picks set 10.
+@test "it restores the set with the highest number when the key repo holds two" {
+  setup_test "$name" "$image"
+  run_shell "$name" "$image" << 'EOF'
+RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only restic init -q
+RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only restic init -q
+for sequence in 2 10; do
+  echo "nixie.db of set $sequence" | RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only \
+    restic backup -q --host nixie --tag "set-$sequence" --tag kind-scheduled --stdin \
+    --stdin-filename nixie.db
+  echo "keys.db of set $sequence" | RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only \
+    restic backup -q --host nixie --tag "set-$sequence" --tag kind-scheduled --stdin \
+    --stdin-filename keys.db
+done
+EOF
+
+  run -0 --separate-stderr run_restore "$name" "$image" "$script" restore
+
+  refute_stderr
+  run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
+  diff - "$tree/copy" << 'EOF'
+nixie.db of set 10
+keys.db of set 10
+EOF
+}
+
+# A snapshot's host, like its paths, is free text that can read set-<n>; only its tags name a set.
+@test "it reads a backup set only from a snapshots tags" {
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+  run_job "$name" "$image" > /dev/null
+  run_shell "$name" "$image" << 'EOF'
+echo 'a note' | RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only \
+  restic backup -q --host set-99 --stdin --stdin-filename set-99
+EOF
+
+  run -0 --separate-stderr run_restore "$name" "$image" "$script" restore
+
+  refute_stderr
+  run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
+  diff - "$tree/copy" << 'EOF'
+nixie.db of set 1
+keys.db of set 1
+EOF
+}
+
+# A backup run publishes set 3 and removes set 2's key snapshot between the restore's pick of set 2
+# and its key restore, as a run that the restore races does; the restore then picks set 3.
+@test "it restores the newer set when a backup run removes the picked key snapshot" {
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+  run_job "$name" "$image" > /dev/null
+  stage_sets "$name" "$image" 2:scheduled
+  run_job "$name" "$image" > /dev/null
+  mkdir "$tree/bin"
+  create_stub_racing_restic "$tree/bin" /usr/local/bin/restic /opt/race/race.sh /tmp
+  cat > "$tree/race.sh" << 'EOF'
+set -e
+data() { RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only /usr/local/bin/restic "$@"; }
+keys() { RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only /usr/local/bin/restic "$@"; }
+echo 'nixie.db of set 3' | data backup -q --host nixie --tag set-3 --tag kind-scheduled --stdin \
+  --stdin-filename nixie.db
+echo 'keys.db of set 3' | keys backup -q --host nixie --tag set-3 --tag kind-scheduled --stdin \
+  --stdin-filename keys.db
+keys forget -q --keep-last 1 --prune > /dev/null
+EOF
+
+  run -0 --separate-stderr run_restore "$name" "$image" "$script" -v "$tree/bin/restic:/usr/local/sbin/restic:ro" \
+    -v "$tree/race.sh:/opt/race/race.sh:ro" restore
+
+  assert_stderr - << 'EOF'
+Fatal: failed to find snapshot: snapshot filter (Paths:[] Tags:[[set-2, publish-2]] Hosts:[]): no snapshot found
+EOF
+  run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
+  diff - "$tree/copy" << 'EOF'
+nixie.db of set 3
+keys.db of set 3
+EOF
+}
+
+# an older nixie.db beside the newest keys.db keeps every forget since
+@test "it restores the nixie db that SNAPSHOT names beside the newest keys db" {
+  local older
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+  run_job "$name" "$image" > /dev/null
+  stage_sets "$name" "$image" 2:scheduled
+  run_job "$name" "$image" > /dev/null
+  read_repos "$name" "$image" "$tree"
+  older="$(jq -r .dataSnapshotID "$tree/receipt-1")"
+
+  run -0 --separate-stderr run_restore "$name" "$image" "$script" -e "SNAPSHOT=$older" restore
+
+  refute_stderr
+  run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
+  diff - "$tree/copy" << 'EOF'
+nixie.db of set 1
+keys.db of set 2
+EOF
+}
+
+# a restore starts nixie's set sequence again from the restored database, so a later publish can
+# hold a lower set: the publish number, not the set, orders the two snapshots
+@test "it restores a SNAPSHOT of an earlier publish whose set is higher" {
+  local earlier
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 5:scheduled
+  run_job "$name" "$image" > /dev/null
+  earlier="$(run_shell "$name" "$image" <<< 'cat /state/backup/000000000005/receipt.json' | jq -r .dataSnapshotID)"
+  run_shell "$name" "$image" <<< 'rm -r /state/backup/000000000005'
+  stage_sets "$name" "$image" 2:scheduled
+  run_job "$name" "$image" > /dev/null
+
+  run -0 --separate-stderr run_restore "$name" "$image" "$script" -e "SNAPSHOT=$earlier" restore
+
+  refute_stderr
+  run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
+  diff - "$tree/copy" << 'EOF'
+nixie.db of set 5
+keys.db of set 2
+EOF
+}
+
+# set 2's data snapshot landed and its key snapshot did not, so set 2's records have no keys
+@test "it refuses a SNAPSHOT whose set is newer than the key repos" {
+  local newer
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+  run_job "$name" "$image" > /dev/null
+  newer="$(
+    run_shell "$name" "$image" << 'EOF'
+echo 'nixie.db of set 2' | RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only \
+  restic backup -q --json --host nixie --tag set-2 --tag kind-scheduled --stdin --stdin-filename nixie.db |
+  grep -o '"snapshot_id":"[0-9a-f]*"' | cut -d'"' -f4
+EOF
+  )"
+
+  run -1 --separate-stderr run_restore "$name" "$image" "$script" -e "SNAPSHOT=$newer" restore
+
+  assert_stderr "the data snapshot $newer holds set-2, newer than the key repo's set-1,publish-1"
+  refute_output
+  run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup'
+  diff /dev/null "$tree/copy"
+}
+
+# a snapshot with no set tag, such as one tagged nixie that holds both databases, pairs with no
+# key snapshot
+@test "it refuses a SNAPSHOT that holds no backup set" {
+  local old
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+  run_job "$name" "$image" > /dev/null
+  old="$(
+    run_shell "$name" "$image" << 'EOF'
+mkdir /tmp/old && echo old > /tmp/old/nixie.db && echo old > /tmp/old/keys.db
+cd /tmp/old && RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only \
+  restic backup -q --json --host nixie --tag nixie . | grep -o '"snapshot_id":"[0-9a-f]*"' | cut -d'"' -f4
+EOF
+  )"
+
+  run -1 --separate-stderr run_restore "$name" "$image" "$script" -e "SNAPSHOT=$old" restore
+
+  assert_stderr "the data snapshot $old holds no backup set"
+  refute_output
+  run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup'
+  diff /dev/null "$tree/copy"
+}
+
+# a copy directory that holds files already would mix them into the restore
+@test "it refuses a restore into a copy directory that is not empty" {
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:scheduled
+  run_job "$name" "$image" > /dev/null
+  run_shell "$name" "$image" <<< "echo 'already here' > /tmp/nixie-backup/nixie.db"
+
+  run -1 --separate-stderr run_restore "$name" "$image" "$script" restore
+
+  assert_stderr '/tmp/nixie-backup is not empty'
+  refute_output
+  run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup; cat /tmp/nixie-backup/nixie.db'
+  diff - "$tree/copy" << 'EOF'
+nixie.db
+already here
+EOF
+}
+
+# before the job's first set, the key repo holds no keys.db to pair with any nixie.db
+@test "it refuses a restore while the key repo holds no snapshot" {
+  setup_test "$name" "$image"
+  run_shell "$name" "$image" << 'EOF'
+RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only restic init -q
+RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only restic init -q
+EOF
+
+  run -1 --separate-stderr run_restore "$name" "$image" "$script" restore
+
+  assert_stderr 'the key repo holds no snapshot of a backup set'
+  refute_output
+  run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup'
+  diff /dev/null "$tree/copy"
+}
+
+# each ID and time is new on every run, so the case masks them
+@test "it lists both repos in ls mode" {
+  setup_test "$name" "$image"
+  stage_sets "$name" "$image" 1:forget
+  run_job "$name" "$image" > /dev/null
+
+  run -0 --separate-stderr run_restore "$name" "$image" "$script" ls
+
+  refute_stderr
+  normalize_restic_output <<< "$output" > "$tree/out.normal"
+  diff - "$tree/out.normal" << 'EOF'
+data repo:
+ID        Time                 Host        Tags                         Paths      Size
+---------------------------------------------------------------------------------------
+ID  NOW  nixie       set-1,kind-forget,publish-1  /nixie.db  SIZE
+---------------------------------------------------------------------------------------
+Timestamps shown in local time
+1 snapshots
+key repo:
+ID        Time                 Host        Tags                         Paths     Size
+--------------------------------------------------------------------------------------
+ID  NOW  nixie       set-1,kind-forget,publish-1  /keys.db  SIZE
+--------------------------------------------------------------------------------------
+Timestamps shown in local time
+1 snapshots
+EOF
+}
+
+@test "it rejects an unknown mode with its usage" {
+  setup_test "$name" "$image"
+
+  run -2 --separate-stderr run_restore "$name" "$image" "$script" backup
+
+  assert_stderr 'usage: nixie-restore restore|ls'
+  refute_output
+}

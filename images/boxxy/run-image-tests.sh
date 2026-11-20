@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The boxxy image test: it writes the build context with scripts/write-boxxy-image-context.sh,
 # builds the image on the base that images/boxxy/versions.env pins, under a tag that carries a
-# random per-run id, runs the boxxy-image suite (images/boxxy/test-boxxy-image.sh) with
+# random per-run id, runs the boxxy-image suite (images/boxxy/boxxy-image.bats) with
 # BOXXY_IMAGE and BOXXY_RUN set, and removes the image and the context after. When the build fails
 # it prints the build log and exits 1. The boxxy image workflow runs it as `bun run test:boxxy-image`, after `bun install`.
 #
@@ -27,4 +27,4 @@ if ! {
   exit 1
 fi
 echo "built $BOXXY_IMAGE"
-bash scripts/run-shell-suites.sh boxxy-image
+bash scripts/run-bats.sh boxxy-image
