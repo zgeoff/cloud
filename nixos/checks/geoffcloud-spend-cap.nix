@@ -2,8 +2,7 @@
 # the model and prices that geoffcloud's preview unit hands the service, against a stand-in model
 # API (test-utils/run-stub-model-api.py, started by test-utils/start-stub-server.sh) in the build
 # sandbox, and checks the count that one reply adds to the proxy's store. Each case runs on its
-# own, in a fresh directory, with its own stand-in, proxy and store, under
-# scripts/src/test-utils/shell/run-cases.sh.
+# own, in a fresh directory, with its own stand-in, proxy and store, as a bats test.
 # Run: bun run test:nixos geoffcloud-spend-cap
 {
   pkgs,
@@ -14,7 +13,13 @@ let
   lib = pkgs.lib;
   testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
-  renderCases = import ./test-utils/render-cases.nix { inherit lib; };
+  renderCases = import ./test-utils/render-cases.nix {
+    inherit lib;
+    sources = [
+      "${testLib}/wait-for.sh"
+      ./test-utils/start-stub-server.sh
+    ];
+  };
   environment = geoffcloud.config.systemd.services.preview.environment;
 
   # starts the proxy on the config the preview service writes for one imp, routed to the stand-in
@@ -51,11 +56,14 @@ let
           -d '{"model":"claude-haiku-5-5","max_tokens":1000,"messages":[{"role":"user","content":"hi"}]}' > status
         wait_for 10 "the reply's count" jq -e '.tokens > 0' count.json
 
-        assert_equals 200 "$(cat status)" "the proxy's status"
+        # the proxy's status
+        assert_equal "$(cat status)" 200
         # 100,001 input tokens at $0.50 and 1,000 output tokens at $2.50 per million
-        assert_equals '{"dollars":0.0525005,"tokens":101001}' "$(cat count.json)" "the count"
-        assert_equals "POST /v1/messages" "$(cat requests)" "the stand-in's requests"
-        assert_files_equal /dev/null proxy.err
+        # the count
+        assert_equal "$(cat count.json)" '{"dollars":0.0525005,"tokens":101001}'
+        # the stand-in's requests
+        assert_equal "$(cat requests)" "POST /v1/messages"
+        diff -u /dev/null proxy.err
       '';
     }
     {
@@ -72,11 +80,14 @@ let
           -d '{"model":"claude-haiku-5-5","max_tokens":1000,"messages":[{"role":"user","content":"hi"}]}' > status
         wait_for 10 "the reply's count" jq -e '.tokens > 0' count.json
 
-        assert_equals 200 "$(cat status)" "the proxy's status"
+        # the proxy's status
+        assert_equal "$(cat status)" 200
         # 100,000 input tokens at $0.10 and 1,000 output tokens at $0.50 per million
-        assert_equals '{"dollars":0.0105,"tokens":101000}' "$(cat count.json)" "the count"
-        assert_equals "POST /v1/messages" "$(cat requests)" "the stand-in's requests"
-        assert_files_equal /dev/null proxy.err
+        # the count
+        assert_equal "$(cat count.json)" '{"dollars":0.0105,"tokens":101000}'
+        # the stand-in's requests
+        assert_equal "$(cat requests)" "POST /v1/messages"
+        diff -u /dev/null proxy.err
       '';
     }
     {
@@ -93,12 +104,15 @@ let
           -d '{"model":"claude-haiku-5-5","max_tokens":1000,"messages":[{"role":"user","content":"hi"}]}' > status
         wait_for 10 "the reply's count" jq -e '.tokens > 0' count.json
 
-        assert_equals 200 "$(cat status)" "the proxy's status"
+        # the proxy's status
+        assert_equal "$(cat status)" 200
         # 1,000 input tokens at $0.50, 99,001 cache reads at $0.05 and 100 output tokens at $2.50
         # per million
-        assert_equals '{"dollars":0.00570005,"tokens":100101}' "$(cat count.json)" "the count"
-        assert_equals "POST /v1/messages" "$(cat requests)" "the stand-in's requests"
-        assert_files_equal /dev/null proxy.err
+        # the count
+        assert_equal "$(cat count.json)" '{"dollars":0.00570005,"tokens":100101}'
+        # the stand-in's requests
+        assert_equal "$(cat requests)" "POST /v1/messages"
+        diff -u /dev/null proxy.err
       '';
     }
   ];
@@ -106,6 +120,10 @@ in
 pkgs.runCommand "geoffcloud-spend-cap-check"
   {
     nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
       pkgs.curl
       pkgs.diffutils
       pkgs.gnugrep
@@ -116,12 +134,6 @@ pkgs.runCommand "geoffcloud-spend-cap-check"
     inherit testUtilsCheck;
   }
   ''
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${testLib}/wait-for.sh
-    source ${./test-utils/start-stub-server.sh}
-    source ${pkgs.writeText "geoffcloud-spend-cap-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "geoffcloud-spend-cap.bats" (renderCases cases)}
     touch $out
   ''

@@ -1,13 +1,12 @@
 # Checks services.drift-check: the units the module generates, the store tree the check runs
 # from, and the Pulumi CLI it ships, run in the build sandbox. scripts/run-host-drift-check.bats
 # tests the scripts themselves, and checks/drift-check-vm.nix runs the unit on a booted VM. Each
-# case runs on its own, in a fresh directory, under scripts/src/test-utils/shell/run-cases.sh.
+# case runs on its own, in a fresh directory, as a bats test.
 # Run: bun run test:nixos drift-check
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
@@ -132,7 +131,7 @@ let
           }}
           EOF
 
-          assert_files_equal expected actual
+          diff -u expected actual
         '';
     }
     {
@@ -142,15 +141,17 @@ let
           off = (buildModuleSystem ../modules/drift-check.nix { }).config;
         in
         ''
-          assert_equals false ${lib.boolToString (off.systemd.services ? drift-check)} "a drift-check service"
-          assert_equals false ${lib.boolToString (off.systemd.timers ? drift-check)} "a drift-check timer"
+          # a drift-check service
+          assert_equal ${lib.boolToString (off.systemd.services ? drift-check)} false
+          # a drift-check timer
+          assert_equal ${lib.boolToString (off.systemd.timers ? drift-check)} false
         '';
     }
     {
       title = "it runs from a tree of the repo scripts, the project file, a stack file of only the salt and the provider";
       script = ''
         (cd ${cfg.tree} && find . | LC_ALL=C sort) > listing
-        assert_files_equal ${pkgs.writeText "listing" ''
+        diff -u ${pkgs.writeText "listing" ''
           .
           ./infra
           ./infra/Pulumi.prod.yaml
@@ -166,16 +167,16 @@ let
           ./scripts/retry-transient-pulumi.sh
           ./scripts/run-host-drift-check.sh
         ''} listing
-        assert_files_equal ${../../scripts/alert-scheduled-drift.sh} ${cfg.tree}/scripts/alert-scheduled-drift.sh
-        assert_files_equal ${../../scripts/check-scheduled-drift.sh} ${cfg.tree}/scripts/check-scheduled-drift.sh
-        assert_files_equal ${../../scripts/hold-host-prod-lock.sh} ${cfg.tree}/scripts/hold-host-prod-lock.sh
-        assert_files_equal ${../../scripts/hold-prod-lock.sh} ${cfg.tree}/scripts/hold-prod-lock.sh
-        assert_files_equal ${../../scripts/retry-transient-pulumi.sh} ${cfg.tree}/scripts/retry-transient-pulumi.sh
-        assert_files_equal ${../../scripts/run-host-drift-check.sh} ${cfg.tree}/scripts/run-host-drift-check.sh
-        assert_files_equal ${../../infra/Pulumi.yaml} ${cfg.tree}/infra/Pulumi.yaml
+        diff -u ${../../scripts/alert-scheduled-drift.sh} ${cfg.tree}/scripts/alert-scheduled-drift.sh
+        diff -u ${../../scripts/check-scheduled-drift.sh} ${cfg.tree}/scripts/check-scheduled-drift.sh
+        diff -u ${../../scripts/hold-host-prod-lock.sh} ${cfg.tree}/scripts/hold-host-prod-lock.sh
+        diff -u ${../../scripts/hold-prod-lock.sh} ${cfg.tree}/scripts/hold-prod-lock.sh
+        diff -u ${../../scripts/retry-transient-pulumi.sh} ${cfg.tree}/scripts/retry-transient-pulumi.sh
+        diff -u ${../../scripts/run-host-drift-check.sh} ${cfg.tree}/scripts/run-host-drift-check.sh
+        diff -u ${../../infra/Pulumi.yaml} ${cfg.tree}/infra/Pulumi.yaml
         grep '^encryptionsalt: ' ${../../infra/Pulumi.prod.yaml} > salt
-        assert_files_equal salt ${cfg.tree}/infra/Pulumi.prod.yaml
-        assert_equals ${cfg.onidelProvider}/bin/pulumi-resource-onidel "$(readlink ${cfg.tree}/provider/bin/pulumi-resource-onidel)" "the provider link"
+        diff -u salt ${cfg.tree}/infra/Pulumi.prod.yaml
+        assert_equal "$(readlink ${cfg.tree}/provider/bin/pulumi-resource-onidel)" ${cfg.onidelProvider}/bin/pulumi-resource-onidel
         test -x ${cfg.onidelProvider}/bin/pulumi-resource-onidel
       '';
     }
@@ -185,7 +186,7 @@ let
         mkdir home
         HOME="$PWD/home" PULUMI_HOME="$PWD/home/.pulumi" PULUMI_SKIP_UPDATE_CHECK=true \
           ${cfg.pulumi}/bin/pulumi version > version
-        assert_equals v3.268.0 "$(cat version)" "pulumi version"
+        assert_equal "$(cat version)" v3.268.0
         test -x ${cfg.pulumi}/bin/pulumi-language-bun
         test -x ${cfg.pulumi}/bin/pulumi-language-nodejs
       '';
@@ -195,6 +196,10 @@ in
 pkgs.runCommand "drift-check-check"
   {
     nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
       pkgs.coreutils
       pkgs.diffutils
       pkgs.findutils
@@ -207,10 +212,6 @@ pkgs.runCommand "drift-check-check"
   ''
     # fixed, so the modes the cases assert do not depend on the builder's umask
     umask 022
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${pkgs.writeText "drift-check-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "drift-check.bats" (renderCases cases)}
     touch $out
   ''

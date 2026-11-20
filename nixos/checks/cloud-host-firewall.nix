@@ -1,8 +1,7 @@
 # Evaluates networking.cloudHost apart from any host's config and checks the inet cloud_host table
 # it renders and the module's assertions, then pins geoffcloud's own table whole and checks its
 # syntax with nft. Each module case evaluates its own config through
-# test-utils/build-module-system.nix. Each case runs on its own, in a fresh directory, under
-# scripts/src/test-utils/shell/run-cases.sh, which reports each case and fails the check when any case
+# test-utils/build-module-system.nix. Each case runs on its own, in a fresh directory, as a bats test, which reports each case and fails the check when any case
 # fails.
 # Run: bun run test:nixos cloud-host-firewall
 {
@@ -13,7 +12,6 @@
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
@@ -49,8 +47,8 @@ let
         ''
           printf '%s' ${lib.escapeShellArg table.content} > actual
 
-          assert_equals inet ${lib.escapeShellArg table.family} "the table's family"
-          assert_files_equal - actual <<'EOF'
+          assert_equal ${lib.escapeShellArg table.family} inet
+          diff -u - actual <<'EOF'
           chain input {
             type filter hook input priority filter - 10; policy accept;
             tcp dport 8415 iifname "cni0" ip saddr 10.42.0.0/16 ip daddr 100.64.0.1 accept
@@ -74,8 +72,10 @@ let
           hasTable = system.config.networking.nftables.tables ? cloud_host;
         in
         ''
-          assert_equals false ${lib.boolToString hasTable} "a cloud_host table"
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          # a cloud_host table
+          assert_equal ${lib.boolToString hasTable} false
+          # failed assertions
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} '[]'
         '';
     }
     {
@@ -98,7 +98,7 @@ let
           };
         in
         ''
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} '[]'
         '';
     }
     {
@@ -130,7 +130,7 @@ let
         ''
           printf '%s' ${lib.escapeShellArg table.content} > actual
 
-          assert_files_equal - actual <<'EOF'
+          diff -u - actual <<'EOF'
           chain input {
             type filter hook input priority filter - 10; policy accept;
             tcp dport 8415 iifname "cni0" ip saddr 10.42.0.0/16 ip daddr 100.64.0.1 accept
@@ -138,7 +138,7 @@ let
             tcp dport 8415 drop
           }
           EOF
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} '[]'
         '';
     }
     {
@@ -170,8 +170,9 @@ let
         ''
           printf '%s' ${lib.escapeShellArg table.content} > actual
 
-          assert_equals inet ${lib.escapeShellArg table.family} "the table's family"
-          assert_files_equal - actual <<'EOF'
+          # the table's family
+          assert_equal ${lib.escapeShellArg table.family} inet
+          diff -u - actual <<'EOF'
           chain input {
             type filter hook input priority filter - 10; policy accept;
             tcp dport 22 iifname "cni0" drop
@@ -179,7 +180,8 @@ let
             tcp dport 2222 iifname "cni0" drop
           }
           EOF
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          # failed assertions
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} '[]'
         '';
     }
     {
@@ -211,7 +213,7 @@ let
         ''
           printf '%s' ${lib.escapeShellArg table.content} > actual
 
-          assert_files_equal - actual <<'EOF'
+          diff -u - actual <<'EOF'
           chain input {
             type filter hook input priority filter - 10; policy accept;
             tcp dport 9022 iifname "cni0" drop
@@ -239,14 +241,14 @@ let
           };
         in
         ''
-          assert_equals ${
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "networking.cloudHost needs networking.nftables.enable: inet cloud_host is an nftables table"
                 "networking.cloudHost needs networking.nftables.flushRuleset off: a flush drops the tables of imp, k3s and netavark"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          }
         '';
     }
     {
@@ -274,15 +276,17 @@ let
         ''
           printf '%s' ${lib.escapeShellArg table.content} > actual
 
-          assert_equals inet ${lib.escapeShellArg table.family} "the table's family"
-          assert_files_equal - actual <<'EOF'
+          # the table's family
+          assert_equal ${lib.escapeShellArg table.family} inet
+          diff -u - actual <<'EOF'
           chain forward {
             type filter hook forward priority filter - 10; policy accept;
             iifname "cni0" ip daddr 10.88.0.0/16 drop
             iifname "flannel.1" ip daddr 10.88.0.0/16 drop
           }
           EOF
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          # failed assertions
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} '[]'
         '';
     }
     {
@@ -314,7 +318,7 @@ let
         ''
           printf '%s' ${lib.escapeShellArg table.content} > actual
 
-          assert_files_equal - actual <<'EOF'
+          diff -u - actual <<'EOF'
           chain input {
             type filter hook input priority filter - 10; policy accept;
             tcp dport 8415 iifname "cni0" ip saddr 10.42.0.0/16 ip daddr 100.64.0.1 accept
@@ -345,14 +349,14 @@ let
           };
         in
         ''
-          assert_equals ${
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "networking.cloudHost needs networking.nftables.enable: inet cloud_host is an nftables table"
                 "networking.cloudHost needs networking.nftables.flushRuleset off: a flush drops the tables of imp, k3s and netavark"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          }
         '';
     }
     {
@@ -368,8 +372,8 @@ let
         ''
           printf '%s' ${lib.escapeShellArg table.content} > actual
 
-          assert_equals inet ${lib.escapeShellArg table.family} "the table's family"
-          assert_files_equal - actual <<'EOF'
+          assert_equal ${lib.escapeShellArg table.family} inet
+          diff -u - actual <<'EOF'
           chain input {
             type filter hook input priority filter - 10; policy accept;
             tcp dport 22 iifname "cni0" drop
@@ -425,13 +429,13 @@ let
           };
         in
         ''
-          assert_equals ${
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "networking.cloudHost needs networking.nftables.flushRuleset off: a flush drops the tables of imp, k3s and netavark"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          }
         '';
     }
     {
@@ -454,13 +458,13 @@ let
           };
         in
         ''
-          assert_equals ${
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "networking.cloudHost needs networking.nftables.enable: inet cloud_host is an nftables table"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          }
         '';
     }
   ];
@@ -468,6 +472,10 @@ in
 pkgs.runCommand "cloud-host-firewall-check"
   {
     nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
       pkgs.diffutils
       pkgs.nftables
     ];
@@ -475,10 +483,6 @@ pkgs.runCommand "cloud-host-firewall-check"
     inherit testUtilsCheck;
   }
   ''
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${pkgs.writeText "cloud-host-firewall-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "cloud-host-firewall.bats" (renderCases cases)}
     touch $out
   ''

@@ -1,7 +1,8 @@
 # The messages renderCases rejects a check's cases with, in the order it checks them: a title
-# that is not "it " and letters, digits, spaces or , . / : -, then a title two cases share. An
-# empty list means renderCases renders the cases. render-cases.nix throws the first message;
-# nixos/checks/test-utils-check.nix tests it.
+# that is not "it " and letters, digits, spaces or , . / : -, then a title two cases share. The
+# letters, digits and few marks keep a title safe inside the double quotes of a @test line. An
+# empty list means renderCases renders the cases as a .bats file. render-cases.nix throws the first
+# message; nixos/checks/test-utils-check.nix tests it.
 { lib }:
 cases:
 let

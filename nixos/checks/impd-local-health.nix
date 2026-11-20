@@ -4,17 +4,18 @@
 # build sandbox, or, for the timeout it gives curl, with a stand-in curl that records its call
 # (test-utils/build-stub-curl.nix) and answers at once. Each case runs on its own, in a fresh
 # directory, with its own stand-in on an ephemeral port or its own call log, its own textfile
-# directory, and the probe and stand-in under env -i with a HOME and TMPDIR of their own, under
-# scripts/src/test-utils/shell/run-cases.sh, which reports each case and fails the check when any case
+# directory, and the probe and stand-in under env -i with a HOME and TMPDIR of their own, as a bats test, which reports each case and fails the check when any case
 # fails.
 # Run: bun run test:nixos impd-local-health
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
-  renderCases = import ./test-utils/render-cases.nix { inherit lib; };
+  renderCases = import ./test-utils/render-cases.nix {
+    inherit lib;
+    sources = [ ./test-utils/start-stub-server.sh ];
+  };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
   stubCurl = import ./test-utils/build-stub-curl.nix { inherit pkgs; };
   # the probe the module packages, which the probe cases run
@@ -100,7 +101,7 @@ let
           }}
           EOF
 
-          assert_files_equal expected actual
+          diff -u expected actual
         '';
     }
     {
@@ -185,7 +186,7 @@ let
           }}
           EOF
 
-          assert_files_equal expected actual
+          diff -u expected actual
         '';
     }
     {
@@ -197,16 +198,7 @@ let
             .config;
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON {
-                service = false;
-                timer = false;
-                user = false;
-                tmpfiles = [ ];
-              }
-            )
-          } ${
+          assert_equal ${
             lib.escapeShellArg (
               builtins.toJSON {
                 service = config.systemd.services ? impd-local-health;
@@ -215,7 +207,16 @@ let
                 tmpfiles = lib.filter (lib.hasInfix " impd-health ") config.systemd.tmpfiles.rules;
               }
             )
-          } "what the module adds"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON {
+                service = false;
+                timer = false;
+                user = false;
+                tmpfiles = [ ];
+              }
+            )
+          }
         '';
     }
     {
@@ -230,14 +231,17 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
         after=$(date +%s)
 
-        assert_equals 0 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
-        assert_equals "GET /health" "$(cat requests)" "the stand-in's requests"
-        assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
-        assert_equals 644 "$(stat -c %a out/impd_local_health.prom)" "the file's mode"
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        diff -u /dev/null stderr
+        # the stand-in's requests
+        assert_equal "$(cat requests)" "GET /health"
+        # the textfile directory
+        assert_equal "$(ls -A out)" impd_local_health.prom
+        # the file's mode
+        assert_equal "$(stat -c %a out/impd_local_health.prom)" 644
         stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
-        assert_between "$before" "$stamp" "$after" "the timestamp"
+        assert_within "$before" "$stamp" "$after"
         sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
           out/impd_local_health.prom > actual
         cat > expected <<'EOF'
@@ -251,7 +255,7 @@ let
         # TYPE impd_local_health_last_check_timestamp_seconds gauge
         impd_local_health_last_check_timestamp_seconds STAMP
         EOF
-        assert_files_equal expected actual
+        diff -u expected actual
       '';
     }
     {
@@ -266,14 +270,17 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
         after=$(date +%s)
 
-        assert_equals 0 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
-        assert_equals "GET /health" "$(cat requests)" "the stand-in's requests"
-        assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
-        assert_equals 644 "$(stat -c %a out/impd_local_health.prom)" "the file's mode"
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        diff -u /dev/null stderr
+        # the stand-in's requests
+        assert_equal "$(cat requests)" "GET /health"
+        # the textfile directory
+        assert_equal "$(ls -A out)" impd_local_health.prom
+        # the file's mode
+        assert_equal "$(stat -c %a out/impd_local_health.prom)" 644
         stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
-        assert_between "$before" "$stamp" "$after" "the timestamp"
+        assert_within "$before" "$stamp" "$after"
         sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
           out/impd_local_health.prom > actual
         cat > expected <<'EOF'
@@ -287,7 +294,7 @@ let
         # TYPE impd_local_health_last_check_timestamp_seconds gauge
         impd_local_health_last_check_timestamp_seconds STAMP
         EOF
-        assert_files_equal expected actual
+        diff -u expected actual
       '';
     }
     {
@@ -300,9 +307,10 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
 
-        assert_equals 0 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stderr
-        assert_equals 'impd_local_health_up 1' "$(grep '^impd_local_health_up ' out/impd_local_health.prom)" "the up gauge"
+        assert_equal "$status" 0
+        diff -u /dev/null stderr
+        # the up gauge
+        assert_equal "$(grep '^impd_local_health_up ' out/impd_local_health.prom)" 'impd_local_health_up 1'
       '';
     }
     {
@@ -315,9 +323,10 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
 
-        assert_equals 0 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stderr
-        assert_equals 'impd_local_health_up 0' "$(grep '^impd_local_health_up ' out/impd_local_health.prom)" "the up gauge"
+        assert_equal "$status" 0
+        diff -u /dev/null stderr
+        # the up gauge
+        assert_equal "$(grep '^impd_local_health_up ' out/impd_local_health.prom)" 'impd_local_health_up 0'
       '';
     }
     {
@@ -332,14 +341,17 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
         after=$(date +%s)
 
-        assert_equals 0 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
-        assert_equals "GET /health" "$(cat requests)" "the stand-in's requests"
-        assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
-        assert_equals 644 "$(stat -c %a out/impd_local_health.prom)" "the file's mode"
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        diff -u /dev/null stderr
+        # the stand-in's requests
+        assert_equal "$(cat requests)" "GET /health"
+        # the textfile directory
+        assert_equal "$(ls -A out)" impd_local_health.prom
+        # the file's mode
+        assert_equal "$(stat -c %a out/impd_local_health.prom)" 644
         stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
-        assert_between "$before" "$stamp" "$after" "the timestamp"
+        assert_within "$before" "$stamp" "$after"
         sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
           out/impd_local_health.prom > actual
         cat > expected <<'EOF'
@@ -353,7 +365,7 @@ let
         # TYPE impd_local_health_last_check_timestamp_seconds gauge
         impd_local_health_last_check_timestamp_seconds STAMP
         EOF
-        assert_files_equal expected actual
+        diff -u expected actual
       '';
     }
     {
@@ -368,14 +380,17 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
         after=$(date +%s)
 
-        assert_equals 0 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
-        assert_equals "GET /health" "$(cat requests)" "the stand-in's requests"
-        assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
-        assert_equals 644 "$(stat -c %a out/impd_local_health.prom)" "the file's mode"
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        diff -u /dev/null stderr
+        # the stand-in's requests
+        assert_equal "$(cat requests)" "GET /health"
+        # the textfile directory
+        assert_equal "$(ls -A out)" impd_local_health.prom
+        # the file's mode
+        assert_equal "$(stat -c %a out/impd_local_health.prom)" 644
         stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
-        assert_between "$before" "$stamp" "$after" "the timestamp"
+        assert_within "$before" "$stamp" "$after"
         sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
           out/impd_local_health.prom > actual
         cat > expected <<'EOF'
@@ -389,7 +404,7 @@ let
         # TYPE impd_local_health_last_check_timestamp_seconds gauge
         impd_local_health_last_check_timestamp_seconds STAMP
         EOF
-        assert_files_equal expected actual
+        diff -u expected actual
       '';
     }
     {
@@ -407,14 +422,18 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
         after=$(date +%s)
 
-        assert_equals 0 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
-        assert_missing requests "the stand-in's requests"
-        assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
-        assert_equals 644 "$(stat -c %a out/impd_local_health.prom)" "the file's mode"
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        diff -u /dev/null stderr
+        # the stand-in's requests
+        assert [ ! -e requests ]
+        assert [ ! -L requests ]
+        # the textfile directory
+        assert_equal "$(ls -A out)" impd_local_health.prom
+        # the file's mode
+        assert_equal "$(stat -c %a out/impd_local_health.prom)" 644
         stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
-        assert_between "$before" "$stamp" "$after" "the timestamp"
+        assert_within "$before" "$stamp" "$after"
         sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
           out/impd_local_health.prom > actual
         cat > expected <<'EOF'
@@ -428,7 +447,7 @@ let
         # TYPE impd_local_health_last_check_timestamp_seconds gauge
         impd_local_health_last_check_timestamp_seconds STAMP
         EOF
-        assert_files_equal expected actual
+        diff -u expected actual
       '';
     }
     {
@@ -444,12 +463,13 @@ let
           ${probe} > stdout 2> stderr || status=$?
         after=$(date +%s)
 
-        assert_equals 0 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
-        assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        diff -u /dev/null stderr
+        # the textfile directory
+        assert_equal "$(ls -A out)" impd_local_health.prom
         stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
-        assert_between "$before" "$stamp" "$after" "the timestamp"
+        assert_within "$before" "$stamp" "$after"
         sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
           out/impd_local_health.prom > actual
         cat > expected <<'EOF'
@@ -463,7 +483,7 @@ let
         # TYPE impd_local_health_last_check_timestamp_seconds gauge
         impd_local_health_last_check_timestamp_seconds STAMP
         EOF
-        assert_files_equal expected actual
+        diff -u expected actual
       '';
     }
     {
@@ -477,17 +497,19 @@ let
           IMPD_HEALTH_URL=http://127.0.0.1:7070/health TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
         after=$(date +%s)
 
-        assert_equals 0 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        diff -u /dev/null stderr
         # the -o file is the probe's temp file, removed on its way out
         sed -E "s#\"$PWD/tmp/tmp\.[A-Za-z0-9]{10}\"#\"TMPFILE\"#" curl.log > curl-calls
-        assert_equals '["-s","-o","TMPFILE","-w","%{http_code}","--max-time","5","http://127.0.0.1:7070/health"]' \
-          "$(cat curl-calls)" "the probe's call of curl"
-        assert_equals "" "$(ls -A tmp)" "the probe's temp directory"
-        assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
+        # the probe's call of curl
+        assert_equal "$(cat curl-calls)" '["-s","-o","TMPFILE","-w","%{http_code}","--max-time","5","http://127.0.0.1:7070/health"]'
+        # the probe's temp directory
+        assert_equal "$(ls -A tmp)" ""
+        # the textfile directory
+        assert_equal "$(ls -A out)" impd_local_health.prom
         stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
-        assert_between "$before" "$stamp" "$after" "the timestamp"
+        assert_within "$before" "$stamp" "$after"
         sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
           out/impd_local_health.prom > actual
         cat > expected <<'EOF'
@@ -501,7 +523,7 @@ let
         # TYPE impd_local_health_last_check_timestamp_seconds gauge
         impd_local_health_last_check_timestamp_seconds STAMP
         EOF
-        assert_files_equal expected actual
+        diff -u expected actual
       '';
     }
     {
@@ -515,17 +537,19 @@ let
           IMPD_HEALTH_URL=http://127.0.0.1:7070/health TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
         after=$(date +%s)
 
-        assert_equals 0 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        diff -u /dev/null stderr
         # the -o file is the probe's temp file, removed on its way out
         sed -E "s#\"$PWD/tmp/tmp\.[A-Za-z0-9]{10}\"#\"TMPFILE\"#" curl.log > curl-calls
-        assert_equals '["-s","-o","TMPFILE","-w","%{http_code}","--max-time","12","http://127.0.0.1:7070/health"]' \
-          "$(cat curl-calls)" "the probe's call of curl"
-        assert_equals "" "$(ls -A tmp)" "the probe's temp directory"
-        assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
+        # the probe's call of curl
+        assert_equal "$(cat curl-calls)" '["-s","-o","TMPFILE","-w","%{http_code}","--max-time","12","http://127.0.0.1:7070/health"]'
+        # the probe's temp directory
+        assert_equal "$(ls -A tmp)" ""
+        # the textfile directory
+        assert_equal "$(ls -A out)" impd_local_health.prom
         stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
-        assert_between "$before" "$stamp" "$after" "the timestamp"
+        assert_within "$before" "$stamp" "$after"
         sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
           out/impd_local_health.prom > actual
         cat > expected <<'EOF'
@@ -539,7 +563,7 @@ let
         # TYPE impd_local_health_last_check_timestamp_seconds gauge
         impd_local_health_last_check_timestamp_seconds STAMP
         EOF
-        assert_files_equal expected actual
+        diff -u expected actual
       '';
     }
     {
@@ -558,17 +582,21 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
         after=$(date +%s)
 
-        assert_equals 0 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
-        assert_equals "GET /health" "$(cat requests)" "the stand-in's requests"
-        assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        diff -u /dev/null stderr
+        # the stand-in's requests
+        assert_equal "$(cat requests)" "GET /health"
+        # the textfile directory
+        assert_equal "$(ls -A out)" impd_local_health.prom
         new_inode=$(stat -c %i out/impd_local_health.prom)
-        assert_not_equals "$old_inode" "$new_inode" "the file's inode"
-        assert_equals 'impd_local_health_up 0' "$(cat <&4)" "what the old reader sees"
-        assert_equals 644 "$(stat -c %a out/impd_local_health.prom)" "the file's mode"
+        assert_not_equal "$new_inode" "$old_inode"
+        # what the old reader sees
+        assert_equal "$(cat <&4)" 'impd_local_health_up 0'
+        # the file's mode
+        assert_equal "$(stat -c %a out/impd_local_health.prom)" 644
         stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
-        assert_between "$before" "$stamp" "$after" "the timestamp"
+        assert_within "$before" "$stamp" "$after"
         sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
           out/impd_local_health.prom > actual
         cat > expected <<'EOF'
@@ -582,7 +610,7 @@ let
         # TYPE impd_local_health_last_check_timestamp_seconds gauge
         impd_local_health_last_check_timestamp_seconds STAMP
         EOF
-        assert_files_equal expected actual
+        diff -u expected actual
       '';
     }
     {
@@ -593,12 +621,14 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
 
-        assert_equals 1 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stdout
+        assert_equal "$status" 1
+        diff -u /dev/null stdout
         # bash names the probe and the line of its curl call, counted from the lines
         # writeShellApplication puts before the script
-        assert_equals "${probe}: line 18: IMPD_HEALTH_URL: unbound variable" "$(cat stderr)" "the probe's stderr"
-        assert_equals "" "$(ls -A out)" "the textfile directory"
+        # the probe's stderr
+        assert_equal "$(cat stderr)" "${probe}: line 18: IMPD_HEALTH_URL: unbound variable"
+        # the textfile directory
+        assert_equal "$(ls -A out)" ""
       '';
     }
     {
@@ -611,13 +641,16 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" ${probe} > stdout 2> stderr || status=$?
 
-        assert_equals 1 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stdout
+        assert_equal "$status" 1
+        diff -u /dev/null stdout
         # bash names the probe and the line of its mktemp call, counted from the lines
         # writeShellApplication puts before the script
-        assert_equals "${probe}: line 27: TEXTFILE_DIR: unbound variable" "$(cat stderr)" "the probe's stderr"
-        assert_equals "GET /health" "$(cat requests)" "the stand-in's requests"
-        assert_equals "" "$(ls -A out)" "the textfile directory"
+        # the probe's stderr
+        assert_equal "$(cat stderr)" "${probe}: line 27: TEXTFILE_DIR: unbound variable"
+        # the stand-in's requests
+        assert_equal "$(cat requests)" "GET /health"
+        # the textfile directory
+        assert_equal "$(ls -A out)" ""
       '';
     }
     {
@@ -630,13 +663,17 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=missing ${probe} > stdout 2> stderr || status=$?
 
-        assert_equals 1 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stdout
-        assert_equals "mktemp: failed to create file via template 'missing/.impd_local_health.XXXXXX': No such file or directory" \
-          "$(cat stderr)" "the probe's stderr"
-        assert_equals "GET /health" "$(cat requests)" "the stand-in's requests"
-        assert_equals "" "$(ls -A tmp)" "the probe's temp directory"
-        assert_missing missing "the textfile directory"
+        assert_equal "$status" 1
+        diff -u /dev/null stdout
+        # the probe's stderr
+        assert_equal "$(cat stderr)" "mktemp: failed to create file via template 'missing/.impd_local_health.XXXXXX': No such file or directory"
+        # the stand-in's requests
+        assert_equal "$(cat requests)" "GET /health"
+        # the probe's temp directory
+        assert_equal "$(ls -A tmp)" ""
+        # the textfile directory
+        assert [ ! -e missing ]
+        assert [ ! -L missing ]
       '';
     }
     {
@@ -651,13 +688,16 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
 
-        assert_equals 1 "$status" "the probe's exit status"
-        assert_files_equal /dev/null stdout
-        assert_equals "mktemp: failed to create file via template 'out/.impd_local_health.XXXXXX': Permission denied" \
-          "$(cat stderr)" "the probe's stderr"
-        assert_equals "GET /health" "$(cat requests)" "the stand-in's requests"
-        assert_equals "" "$(ls -A out)" "the textfile directory"
-        assert_equals "" "$(ls -A tmp)" "the probe's temp directory"
+        assert_equal "$status" 1
+        diff -u /dev/null stdout
+        # the probe's stderr
+        assert_equal "$(cat stderr)" "mktemp: failed to create file via template 'out/.impd_local_health.XXXXXX': Permission denied"
+        # the stand-in's requests
+        assert_equal "$(cat requests)" "GET /health"
+        # the textfile directory
+        assert_equal "$(ls -A out)" ""
+        # the probe's temp directory
+        assert_equal "$(ls -A tmp)" ""
       '';
     }
   ];
@@ -665,6 +705,10 @@ in
 pkgs.runCommand "impd-local-health-check"
   {
     nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
       pkgs.coreutils
       pkgs.diffutils
       pkgs.gnused
@@ -678,14 +722,6 @@ pkgs.runCommand "impd-local-health-check"
   ''
     # fixed, so the modes the cases assert do not depend on the builder's umask
     umask 022
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-not-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${testLib}/assert-between.sh
-    source ${testLib}/assert-missing.sh
-    source ${./test-utils/start-stub-server.sh}
-    source ${pkgs.writeText "impd-local-health-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "impd-local-health.bats" (renderCases cases)}
     touch $out
   ''

@@ -3,13 +3,12 @@
 # directory on an ephemeral loopback port, with the stand-in podman of
 # test-utils/build-stub-imp-host-podman.nix for imp-host. Each case runs on its own, in a fresh
 # directory, with its own answers, state, textfile directory and current system, and the script
-# under env -i with a HOME and TMPDIR of its own, under scripts/src/test-utils/shell/run-cases.sh.
+# under env -i with a HOME and TMPDIR of its own, as a bats test.
 # Run: bun run test:nixos host-build-lag
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
@@ -105,7 +104,7 @@ let
   # bounds the check's own timestamp with assert_between, then masks it in a copy, actual
   maskMetrics = ''
     stamp=$(sed -n 's/^host_build_lag_last_check_timestamp_seconds //p' out/host_build_lag.prom)
-    assert_between "$before" "$stamp" "$after" "the check's timestamp"
+    assert_within "$before" "$stamp" "$after"
     sed "s/^host_build_lag_last_check_timestamp_seconds $stamp\$/host_build_lag_last_check_timestamp_seconds STAMP/" \
       out/host_build_lag.prom > actual
   '';
@@ -170,7 +169,7 @@ let
           }}
           EOF
 
-          assert_files_equal expected actual
+          diff -u expected actual
         '';
     }
     {
@@ -182,14 +181,14 @@ let
             .config;
         in
         ''
-          assert_equals '{"service":false,"timer":false}' ${
+          assert_equal ${
             lib.escapeShellArg (
               builtins.toJSON {
                 service = config.systemd.services ? host-build-lag;
                 timer = config.systemd.timers ? host-build-lag;
               }
             )
-          } "what the module adds"
+          } '{"service":false,"timer":false}'
         '';
     }
     {
@@ -214,10 +213,10 @@ let
 
         run_check
 
-        assert_equals 0 "$status" "the check's exit status"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
-        assert_files_equal - requests <<'EOF'
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        diff -u /dev/null stderr
+        diff -u - requests <<'EOF'
         ${runsRequest}
         ${comparePath}
         ${configPath}
@@ -225,17 +224,21 @@ let
         ${maskMetrics}
         system_lag=$(sed -n 's/^host_build_lag_seconds{part="system"} //p' actual)
         imp_lag=$(sed -n 's/^host_build_lag_seconds{part="imp"} //p' actual)
-        assert_between 90000 "$system_lag" "$((90000 + after - arranged))" "the system's lag"
-        assert_between 90000 "$imp_lag" "$((90000 + after - arranged))" "imp's lag"
+        assert_within 90000 "$system_lag" "$((90000 + after - arranged))"
+        assert_within 90000 "$imp_lag" "$((90000 + after - arranged))"
         sed -i -e "s/^\(host_build_lag_seconds{part=\"system\"}\) $system_lag\$/\1 LAG/" \
           -e "s/^\(host_build_lag_seconds{part=\"imp\"}\) $imp_lag\$/\1 LAG/" actual
-        assert_files_equal - actual <<'EOF'
+        diff -u - actual <<'EOF'
         ${metrics "LAG" "LAG"}
         EOF
-        assert_equals 644 "$(stat -c %a out/host_build_lag.prom)" "the file's mode"
-        assert_equals host_build_lag.prom "$(ls -A out)" "the textfile directory"
-        assert_equals "$PWD/store/aaaa-nixos-system-geoffcloud $since" "$(cat state/system-lag)" "the system's lag state"
-        assert_equals "2.2.1 $since" "$(cat state/imp-lag)" "imp's lag state"
+        # the file's mode
+        assert_equal "$(stat -c %a out/host_build_lag.prom)" 644
+        # the textfile directory
+        assert_equal "$(ls -A out)" host_build_lag.prom
+        # the system's lag state
+        assert_equal "$(cat state/system-lag)" "$PWD/store/aaaa-nixos-system-geoffcloud $since"
+        # imp's lag state
+        assert_equal "$(cat state/imp-lag)" "2.2.1 $since"
       '';
     }
     {
@@ -254,19 +257,21 @@ let
 
         run_check
 
-        assert_equals 0 "$status" "the check's exit status"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
-        assert_files_equal - requests <<'EOF'
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        diff -u /dev/null stderr
+        diff -u - requests <<'EOF'
         ${runsRequest}
         ${configPath}
         EOF
         ${maskMetrics}
-        assert_files_equal - actual <<'EOF'
+        diff -u - actual <<'EOF'
         ${metrics "0" "0"}
         EOF
-        assert_equals switches "$(ls -A state)" "the state directory"
-        assert_equals '["exec","-e","HOME=/root","imp-host","impz","info"]' "$(cat impd/calls)" "the podman calls"
+        # the state directory
+        assert_equal "$(ls -A state)" switches
+        # the podman calls
+        assert_equal "$(cat impd/calls)" '["exec","-e","HOME=/root","imp-host","impz","info"]'
       '';
     }
     {
@@ -285,19 +290,19 @@ let
 
         run_check
 
-        assert_equals 0 "$status" "the check's exit status"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        diff -u /dev/null stderr
         ${maskMetrics}
-        assert_files_equal - actual <<'EOF'
+        diff -u - actual <<'EOF'
         ${metrics "0" "0"}
         EOF
         read -r system_running system_since < state/system-lag
         read -r imp_running imp_since < state/imp-lag
-        assert_equals "$PWD/store/aaaa-nixos-system-geoffcloud" "$system_running" "the system the lag state names"
-        assert_equals "$stamp" "$system_since" "the system's lag start"
-        assert_equals 2.2.1 "$imp_running" "the imp the lag state names"
-        assert_equals "$stamp" "$imp_since" "imp's lag start"
+        assert_equal "$system_running" "$PWD/store/aaaa-nixos-system-geoffcloud"
+        assert_equal "$system_since" "$stamp"
+        assert_equal "$imp_running" 2.2.1
+        assert_equal "$imp_since" "$stamp"
       '';
     }
     {
@@ -321,18 +326,19 @@ let
 
         run_check
 
-        assert_equals 0 "$status" "the check's exit status"
-        assert_files_equal /dev/null stderr
-        assert_files_equal - requests <<'EOF'
+        assert_equal "$status" 0
+        diff -u /dev/null stderr
+        diff -u - requests <<'EOF'
         ${runsRequest}
         ${comparePath}
         ${configPath}
         EOF
         ${maskMetrics}
-        assert_files_equal - actual <<'EOF'
+        diff -u - actual <<'EOF'
         ${metrics "0" "0"}
         EOF
-        assert_equals switches "$(ls -A state)" "the state directory"
+        # the state directory
+        assert_equal "$(ls -A state)" switches
       '';
     }
     {
@@ -355,10 +361,13 @@ let
 
         run_check
 
-        assert_equals 0 "$status" "the check's exit status"
-        assert_files_equal /dev/null stderr
-        assert_equals "$PWD/store/aaaa-nixos-system-geoffcloud" "$(cut -d' ' -f1 state/system-lag)" "the system the lag state names"
-        assert_missing state/imp-lag "imp's lag state"
+        assert_equal "$status" 0
+        diff -u /dev/null stderr
+        # the system the lag state names
+        assert_equal "$(cut -d' ' -f1 state/system-lag)" "$PWD/store/aaaa-nixos-system-geoffcloud"
+        # imp's lag state
+        assert [ ! -e state/imp-lag ]
+        assert [ ! -L state/imp-lag ]
       '';
     }
     {
@@ -379,10 +388,13 @@ let
 
         run_check
 
-        assert_equals 0 "$status" "the check's exit status"
-        assert_files_equal /dev/null stderr
-        assert_equals "$PWD/store/aaaa-nixos-system-geoffcloud" "$(cut -d' ' -f1 state/system-lag)" "the system the lag state names"
-        assert_missing state/imp-lag "imp's lag state"
+        assert_equal "$status" 0
+        diff -u /dev/null stderr
+        # the system the lag state names
+        assert_equal "$(cut -d' ' -f1 state/system-lag)" "$PWD/store/aaaa-nixos-system-geoffcloud"
+        # imp's lag state
+        assert [ ! -e state/imp-lag ]
+        assert [ ! -L state/imp-lag ]
       '';
     }
     {
@@ -400,13 +412,14 @@ let
 
         run_check
 
-        assert_equals 0 "$status" "the check's exit status"
-        assert_files_equal /dev/null stderr
+        assert_equal "$status" 0
+        diff -u /dev/null stderr
         ${maskMetrics}
-        assert_files_equal - actual <<'EOF'
+        diff -u - actual <<'EOF'
         ${metrics "0" "0"}
         EOF
-        assert_equals switches "$(ls -A state)" "the state directory"
+        # the state directory
+        assert_equal "$(ls -A state)" switches
       '';
     }
     {
@@ -421,14 +434,17 @@ let
 
         run_check
 
-        assert_equals 0 "$status" "the check's exit status"
-        assert_files_equal /dev/null stderr
-        assert_files_equal - requests <<'EOF'
+        assert_equal "$status" 0
+        diff -u /dev/null stderr
+        diff -u - requests <<'EOF'
         ${runsRequest}
         ${configPath}
         EOF
-        assert_equals "$PWD/store/cccc-nixos-system-geoffcloud" "$(cut -d' ' -f1 state/system-lag)" "the system the lag state names"
-        assert_missing state/imp-lag "imp's lag state"
+        # the system the lag state names
+        assert_equal "$(cut -d' ' -f1 state/system-lag)" "$PWD/store/cccc-nixos-system-geoffcloud"
+        # imp's lag state
+        assert [ ! -e state/imp-lag ]
+        assert [ ! -L state/imp-lag ]
       '';
     }
     {
@@ -443,17 +459,21 @@ let
 
         run_check
 
-        assert_equals 0 "$status" "the check's exit status"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
-        assert_files_equal - requests <<'EOF'
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        diff -u /dev/null stderr
+        diff -u - requests <<'EOF'
         ${runsRequest}
         ${comparePath}
         ${configPath}
         EOF
-        assert_equals "$PWD/store/aaaa-nixos-system-geoffcloud" "$(cut -d' ' -f1 state/system-lag)" "the system the lag state names"
-        assert_missing state/imp-lag "imp's lag state"
-        assert_equals "" "$(ls -A tmp)" "the check's temp directory"
+        # the system the lag state names
+        assert_equal "$(cut -d' ' -f1 state/system-lag)" "$PWD/store/aaaa-nixos-system-geoffcloud"
+        # imp's lag state
+        assert [ ! -e state/imp-lag ]
+        assert [ ! -L state/imp-lag ]
+        # the check's temp directory
+        assert_equal "$(ls -A tmp)" ""
       '';
     }
     {
@@ -470,13 +490,16 @@ let
 
         run_check
 
-        assert_equals 1 "$status" "the check's exit status"
-        assert_files_equal /dev/null stdout
-        assert_equals "host-build-lag: GitHub answered 301 to the comparison of ${running} with ${green}" \
-          "$(cat stderr)" "the check's stderr"
-        assert_equals "" "$(ls -A out)" "the textfile directory"
-        assert_equals switches "$(ls -A state)" "the state directory"
-        assert_equals "" "$(ls -A tmp)" "the check's temp directory"
+        assert_equal "$status" 1
+        diff -u /dev/null stdout
+        # the check's stderr
+        assert_equal "$(cat stderr)" "host-build-lag: GitHub answered 301 to the comparison of ${running} with ${green}"
+        # the textfile directory
+        assert_equal "$(ls -A out)" ""
+        # the state directory
+        assert_equal "$(ls -A state)" switches
+        # the check's temp directory
+        assert_equal "$(ls -A tmp)" ""
       '';
     }
     {
@@ -492,11 +515,15 @@ let
 
         run_check
 
-        assert_equals 0 "$status" "the check's exit status"
-        assert_files_equal /dev/null stdout
-        assert_equals 'Error: no container with name or ID "imp-host" found: no such container' "$(cat stderr)" "the check's stderr"
-        assert_equals none "$(cut -d' ' -f1 state/imp-lag)" "the imp the lag state names"
-        assert_missing state/system-lag "the system's lag state"
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        # the check's stderr
+        assert_equal "$(cat stderr)" 'Error: no container with name or ID "imp-host" found: no such container'
+        # the imp the lag state names
+        assert_equal "$(cut -d' ' -f1 state/imp-lag)" none
+        # the system's lag state
+        assert [ ! -e state/system-lag ]
+        assert [ ! -L state/system-lag ]
       '';
     }
     {
@@ -512,12 +539,16 @@ let
 
         run_check
 
-        assert_equals 22 "$status" "the check's exit status"
-        assert_files_equal /dev/null stdout
-        assert_equals "curl: (22) The requested URL returned error: 404" "$(cat stderr)" "the check's stderr"
-        assert_equals earlier "$(cat out/host_build_lag.prom)" "the metrics"
-        assert_equals "2.2.1 1000" "$(cat state/imp-lag)" "imp's lag state"
-        assert_equals host_build_lag.prom "$(ls -A out)" "the textfile directory"
+        assert_equal "$status" 22
+        diff -u /dev/null stdout
+        # the check's stderr
+        assert_equal "$(cat stderr)" "curl: (22) The requested URL returned error: 404"
+        # the metrics
+        assert_equal "$(cat out/host_build_lag.prom)" earlier
+        # imp's lag state
+        assert_equal "$(cat state/imp-lag)" "2.2.1 1000"
+        # the textfile directory
+        assert_equal "$(ls -A out)" host_build_lag.prom
       '';
     }
     {
@@ -531,11 +562,14 @@ let
 
         run_check
 
-        assert_equals 1 "$status" "the check's exit status"
-        assert_files_equal /dev/null stdout
-        assert_equals "host-build-lag: no green NixOS checks run on main" "$(cat stderr)" "the check's stderr"
-        assert_equals "" "$(ls -A out)" "the textfile directory"
-        assert_equals "" "$(ls -A state)" "the state directory"
+        assert_equal "$status" 1
+        diff -u /dev/null stdout
+        # the check's stderr
+        assert_equal "$(cat stderr)" "host-build-lag: no green NixOS checks run on main"
+        # the textfile directory
+        assert_equal "$(ls -A out)" ""
+        # the state directory
+        assert_equal "$(ls -A state)" ""
       '';
     }
   ];
@@ -543,6 +577,10 @@ in
 pkgs.runCommand "host-build-lag-check"
   {
     nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
       pkgs.coreutils
       pkgs.diffutils
       pkgs.gnused
@@ -556,12 +594,6 @@ pkgs.runCommand "host-build-lag-check"
   ''
     # fixed, so the modes the cases assert do not depend on the builder's umask
     umask 022
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${testLib}/assert-between.sh
-    source ${testLib}/assert-missing.sh
-    source ${pkgs.writeText "host-build-lag-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "host-build-lag.bats" (renderCases cases)}
     touch $out
   ''

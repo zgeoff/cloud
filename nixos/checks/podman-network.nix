@@ -11,7 +11,6 @@
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   topology = import ../topology.nix;
@@ -24,9 +23,11 @@ let
     {
       title = "it writes the default Podman network with the bridge, gateway and subnet of the topology";
       script = ''
-        assert_equals 1 ${toString (lib.length (lib.attrNames networkFiles))} "the default network files"
+        # the default network files
+        assert_equal ${toString (lib.length (lib.attrNames networkFiles))} 1
         jq -cS '{ network_interface, subnets }' ${networkFile} > actual
-        assert_equals ${
+        # the default network
+        assert_equal "$(cat actual)" ${
           lib.escapeShellArg (
             builtins.toJSON {
               network_interface = topology.podman.bridge;
@@ -38,21 +39,24 @@ let
               ];
             }
           )
-        } "$(cat actual)" "the default network"
+        }
       '';
     }
   ];
 in
 pkgs.runCommand "podman-network-check"
   {
-    nativeBuildInputs = [ pkgs.jq ];
+    nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
+      pkgs.jq
+    ];
     # the shared test utilities pass their own tests before any case relies on them
     inherit testUtilsCheck;
   }
   ''
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${pkgs.writeText "podman-network-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "podman-network.bats" (renderCases cases)}
     touch $out
   ''

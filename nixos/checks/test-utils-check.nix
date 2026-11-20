@@ -1,17 +1,18 @@
-# Tests the checks' shared test utilities: the shell helpers in scripts/src/test-utils/shell that the checks
-# source (run-cases.sh and the assert_* helpers, by their own suites), and the Nix helpers and
-# stand-ins in nixos/checks/test-utils. The checks that use them build this first, so a broken
-# utility fails every check that relies on it instead of passing silently. The shell suites run
-# first. renderCases' own tests come next, as plain bash in a fresh directory of their own, since
-# the cases after them are rendered by it; a failing one stops the build. Every other test is a
-# case renderCases renders and run_cases runs, each in a fresh directory of its own, with the
-# assert_* helpers, whose suites have passed by then. The cases are titled "it <unit> ...",
-# because run_cases takes a case's title from its function's name, which holds no "#".
+# Tests the checks' shared test utilities: the shell helper in scripts/src/test-utils/shell that the
+# checks source (wait-for.sh), and the Nix helpers and stand-ins in nixos/checks/test-utils. The
+# checks that use them build this first, so a broken utility fails every check that relies on it
+# instead of passing silently. renderCases' own tests come first, as a plain .bats file, since the
+# cases after them are rendered by it; a failing one stops the build. Every other test is a case
+# renderCases renders into a .bats file that bats runs, each in a fresh directory of its own, with
+# the bats-support and bats-assert libraries. The cases are titled "it <unit> ...".
 { pkgs, imp }:
 let
   lib = pkgs.lib;
   testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
-  renderCases = import ./test-utils/render-cases.nix { inherit lib; };
+  renderCases = import ./test-utils/render-cases.nix {
+    inherit lib;
+    sources = [ ./test-utils/start-stub-server.sh ];
+  };
   collectCaseRejections = import ./test-utils/collect-case-rejections.nix { inherit lib; };
   collectFailedAssertions = import ./test-utils/collect-failed-assertions.nix;
   findBunRelease = import ./test-utils/find-bun-release.nix { inherit lib; };
@@ -42,23 +43,11 @@ let
 
   cases = [
     {
-      title = "it buildShellLibSource holds the shell helpers the checks read and no other file";
+      title = "it buildShellLibSource holds the shell helper the checks read and no other file";
       script = ''
         ls -A ${testLib} > listing
 
-        assert_files_equal - listing <<'EOF'
-        assert-between.sh
-        assert-equals.sh
-        assert-files-equal.sh
-        assert-missing.sh
-        assert-not-equals.sh
-        run-cases.sh
-        test-assert-between.sh
-        test-assert-equals.sh
-        test-assert-files-equal.sh
-        test-assert-missing.sh
-        test-assert-not-equals.sh
-        test-run-cases.sh
+        diff -u - listing <<'EOF'
         wait-for.sh
         EOF
       '';
@@ -87,7 +76,7 @@ let
           )
         }
 
-        assert_equals '["first","second"]' "$failed" "the failed assertions"
+        assert_equal "$failed" '["first","second"]'
       '';
     }
     {
@@ -106,7 +95,7 @@ let
           )
         }
 
-        assert_equals '[]' "$failed" "the failed assertions"
+        assert_equal "$failed" '[]'
       '';
     }
     {
@@ -135,7 +124,7 @@ let
           )
         }
 
-        assert_equals '{"hash":"sha256-newZipHash=","version":"9.2.0"}' "$release" "the release"
+        assert_equal "$release" '{"hash":"sha256-newZipHash=","version":"9.2.0"}'
       '';
     }
     {
@@ -158,7 +147,7 @@ let
           )
         }
 
-        assert_equals '{"error":"no release of Bun 9.3.0: add its image digest and the hash of its zip"}' "$release" "the release"
+        assert_equal "$release" '{"error":"no release of Bun 9.3.0: add its image digest and the hash of its zip"}'
       '';
     }
     {
@@ -181,7 +170,7 @@ let
           )
         }
 
-        assert_equals '{"error":"the Dockerfile pins Bun 9.1.0 at sha256:5555555555555555555555555555555555555555555555555555555555555555, not at sha256:1111111111111111111111111111111111111111111111111111111111111111"}' "$release" "the release"
+        assert_equal "$release" '{"error":"the Dockerfile pins Bun 9.1.0 at sha256:5555555555555555555555555555555555555555555555555555555555555555, not at sha256:1111111111111111111111111111111111111111111111111111111111111111"}'
       '';
     }
     {
@@ -205,7 +194,7 @@ let
           )
         }
 
-        assert_equals '{"error":"the Dockerfile has 2 oven/bun stages pinned by digest, not 1"}' "$release" "the release"
+        assert_equal "$release" '{"error":"the Dockerfile has 2 oven/bun stages pinned by digest, not 1"}'
       '';
     }
     {
@@ -229,7 +218,7 @@ let
           )
         }
 
-        assert_equals '{"error":"the Dockerfile has 0 oven/bun stages pinned by digest, not 1"}' "$release" "the release"
+        assert_equal "$release" '{"error":"the Dockerfile has 0 oven/bun stages pinned by digest, not 1"}'
       '';
     }
     {
@@ -250,7 +239,7 @@ let
           )
         }
 
-        assert_equals '[]' "$rejections" "the rejections"
+        assert_equal "$rejections" '[]'
       '';
     }
     {
@@ -275,12 +264,11 @@ let
           )
         }
 
-        assert_equals '["renderCases: titles must be \"it \" and letters, digits, spaces or , . / : -: reads the url","renderCases: titles must be unique: it reads the url"]' \
-          "$rejections" "the rejections"
+        assert_equal "$rejections" '["renderCases: titles must be \"it \" and letters, digits, spaces or , . / : -: reads the url","renderCases: titles must be unique: it reads the url"]'
       '';
     }
     {
-      title = "it collectCaseRejections lists a title with an underscore, which the runner would print as a space";
+      title = "it collectCaseRejections lists a title with an underscore";
       script = ''
         rejections=${
           lib.escapeShellArg (
@@ -293,7 +281,7 @@ let
           )
         }
 
-        assert_equals '["renderCases: titles must be \"it \" and letters, digits, spaces or , . / : -: it reads IMPD_HEALTH_URL"]' "$rejections" "the rejections"
+        assert_equal "$rejections" '["renderCases: titles must be \"it \" and letters, digits, spaces or , . / : -: it reads IMPD_HEALTH_URL"]'
       '';
     }
     {
@@ -310,7 +298,7 @@ let
           )
         }
 
-        assert_equals '["renderCases: titles must be \"it \" and letters, digits, spaces or , . / : -: reads the url"]' "$rejections" "the rejections"
+        assert_equal "$rejections" '["renderCases: titles must be \"it \" and letters, digits, spaces or , . / : -: reads the url"]'
       '';
     }
     {
@@ -331,7 +319,7 @@ let
           )
         }
 
-        assert_equals '["renderCases: titles must be unique: it reads the url"]' "$rejections" "the rejections"
+        assert_equal "$rejections" '["renderCases: titles must be unique: it reads the url"]'
       '';
     }
     {
@@ -356,7 +344,7 @@ let
             )
           }
 
-          assert_equals '{"etc":"greeting: hello","greeting":"hello"}' "$evaluated" "the evaluated config"
+          assert_equal "$evaluated" '{"etc":"greeting: hello","greeting":"hello"}'
         '';
     }
     {
@@ -364,7 +352,7 @@ let
       script = ''
         failed=${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions (buildModuleSystem { } { })))}
 
-        assert_equals '[]' "$failed" "the failed assertions"
+        assert_equal "$failed" '[]'
       '';
     }
     {
@@ -376,10 +364,12 @@ let
         bash -c 'set -euo pipefail; source "$1"; start_stub_server "$2" /health 200 text/plain ok "$PWD/requests"; echo "$port" > port; curl -s "http://127.0.0.1:$port/health" > body' \
           _ ${./test-utils/start-stub-server.sh} ${./test-utils/run-stub-impd.py} > out 2> err
 
-        assert_equals ok "$(cat body)" "the stand-in's answer"
-        assert_equals "GET /health" "$(cat requests)" "the stand-in's requests"
-        assert_files_equal /dev/null out
-        assert_files_equal /dev/null err
+        # the stand-in's answer
+        assert_equal "$(cat body)" ok
+        # the stand-in's requests
+        assert_equal "$(cat requests)" "GET /health"
+        diff -u /dev/null out
+        diff -u /dev/null err
         # curl exits 7 once nothing listens on the port
         wait_for 5 "the stand-in to stop" bash -c 'status=0; curl -s -o /dev/null "http://127.0.0.1:$1/health" || status=$?; [ "$status" = 7 ]' _ "$(cat port)"
       '';
@@ -393,9 +383,9 @@ let
         bash -c 'set -euo pipefail; source "$1"; start_stub_server "$2" /health 200 text/plain ok "$PWD/requests"; kill "$stub_pid"; wait "$stub_pid" || true' \
           _ ${./test-utils/start-stub-server.sh} ${./test-utils/run-stub-impd.py} > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the case's exit status"
-        assert_files_equal /dev/null out
-        assert_files_equal /dev/null err
+        assert_equal "$status" 0
+        diff -u /dev/null out
+        diff -u /dev/null err
       '';
     }
     {
@@ -407,11 +397,14 @@ let
 
         curl -s -D headers -o body "http://127.0.0.1:$port/health"
 
-        assert_equals "HTTP/1.1 200 OK" "$(head -1 headers | tr -d '\r')" "the status line"
-        assert_equals "Content-Type: application/json;charset=utf-8" \
-          "$(grep -i '^content-type:' headers | tr -d '\r')" "the content type"
-        assert_equals '{"status":"ok","ready":true,"warnings":[]}' "$(cat body)" "the body"
-        assert_equals "GET /health" "$(cat requests)" "the requests"
+        # the status line
+        assert_equal "$(head -1 headers | tr -d '\r')" "HTTP/1.1 200 OK"
+        # the content type
+        assert_equal "$(grep -i '^content-type:' headers | tr -d '\r')" "Content-Type: application/json;charset=utf-8"
+        # the body
+        assert_equal "$(cat body)" '{"status":"ok","ready":true,"warnings":[]}'
+        # the requests
+        assert_equal "$(cat requests)" "GET /health"
       '';
     }
     {
@@ -423,10 +416,14 @@ let
 
         curl -s -D headers -o body "http://127.0.0.1:$port/ready"
 
-        assert_equals "HTTP/1.1 500 Internal Server Error" "$(head -1 headers | tr -d '\r')" "the status line"
-        assert_equals "Content-Type: text/plain" "$(grep -i '^content-type:' headers | tr -d '\r')" "the content type"
-        assert_equals "unexpected request: GET /ready" "$(cat body)" "the body"
-        assert_equals "GET /ready" "$(cat requests)" "the requests"
+        # the status line
+        assert_equal "$(head -1 headers | tr -d '\r')" "HTTP/1.1 500 Internal Server Error"
+        # the content type
+        assert_equal "$(grep -i '^content-type:' headers | tr -d '\r')" "Content-Type: text/plain"
+        # the body
+        assert_equal "$(cat body)" "unexpected request: GET /ready"
+        # the requests
+        assert_equal "$(cat requests)" "GET /ready"
       '';
     }
     {
@@ -438,10 +435,14 @@ let
 
         curl -s -X POST -D headers -o body "http://127.0.0.1:$port/health"
 
-        assert_equals "HTTP/1.1 500 Internal Server Error" "$(head -1 headers | tr -d '\r')" "the status line"
-        assert_equals "Content-Type: text/plain" "$(grep -i '^content-type:' headers | tr -d '\r')" "the content type"
-        assert_equals "unexpected request: POST /health" "$(cat body)" "the body"
-        assert_equals "POST /health" "$(cat requests)" "the requests"
+        # the status line
+        assert_equal "$(head -1 headers | tr -d '\r')" "HTTP/1.1 500 Internal Server Error"
+        # the content type
+        assert_equal "$(grep -i '^content-type:' headers | tr -d '\r')" "Content-Type: text/plain"
+        # the body
+        assert_equal "$(cat body)" "unexpected request: POST /health"
+        # the requests
+        assert_equal "$(cat requests)" "POST /health"
       '';
     }
     {
@@ -467,8 +468,8 @@ let
         Content-Length: 32
 
         EOF
-        assert_files_equal expected actual
-        assert_equals "HEAD /health" "$(cat requests)" "the requests"
+        diff -u expected actual
+        assert_equal "$(cat requests)" "HEAD /health"
       '';
     }
     {
@@ -481,10 +482,14 @@ let
         curl -s -D headers -o body -X POST -H 'content-type: application/json' \
           -d '{"model":"model-small","max_tokens":3}' "http://127.0.0.1:$port/v1/messages"
 
-        assert_equals "HTTP/1.1 200 OK" "$(head -1 headers | tr -d '\r')" "the status line"
-        assert_equals "Content-Type: application/json" "$(grep -i '^content-type:' headers | tr -d '\r')" "the content type"
-        assert_equals '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}' "$(cat body)" "the body"
-        assert_equals "POST /v1/messages" "$(cat requests)" "the requests"
+        # the status line
+        assert_equal "$(head -1 headers | tr -d '\r')" "HTTP/1.1 200 OK"
+        # the content type
+        assert_equal "$(grep -i '^content-type:' headers | tr -d '\r')" "Content-Type: application/json"
+        # the body
+        assert_equal "$(cat body)" '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}'
+        # the requests
+        assert_equal "$(cat requests)" "POST /v1/messages"
       '';
     }
     {
@@ -499,9 +504,12 @@ let
         printf 'POST /v1/messages HTTP/1.1\r\nHost: 127.0.0.1\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5\r\n{"a":\r\n2\r\n1}\r\n0\r\n\r\n' >&4
         cat <&4 > response
 
-        assert_equals "HTTP/1.1 200 OK" "$(head -1 response | tr -d '\r')" "the status line"
-        assert_equals '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}' "$(tail -1 response)" "the body"
-        assert_equals "POST /v1/messages" "$(cat requests)" "the requests"
+        # the status line
+        assert_equal "$(head -1 response | tr -d '\r')" "HTTP/1.1 200 OK"
+        # the body
+        assert_equal "$(tail -1 response)" '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}'
+        # the requests
+        assert_equal "$(cat requests)" "POST /v1/messages"
       '';
     }
     {
@@ -513,10 +521,14 @@ let
 
         curl -s -D headers -o body -X POST -d '{}' "http://127.0.0.1:$port/v1/messages/batches"
 
-        assert_equals "HTTP/1.1 500 Internal Server Error" "$(head -1 headers | tr -d '\r')" "the status line"
-        assert_equals "Content-Type: text/plain" "$(grep -i '^content-type:' headers | tr -d '\r')" "the content type"
-        assert_equals "unexpected request: POST /v1/messages/batches" "$(cat body)" "the body"
-        assert_equals "POST /v1/messages/batches" "$(cat requests)" "the requests"
+        # the status line
+        assert_equal "$(head -1 headers | tr -d '\r')" "HTTP/1.1 500 Internal Server Error"
+        # the content type
+        assert_equal "$(grep -i '^content-type:' headers | tr -d '\r')" "Content-Type: text/plain"
+        # the body
+        assert_equal "$(cat body)" "unexpected request: POST /v1/messages/batches"
+        # the requests
+        assert_equal "$(cat requests)" "POST /v1/messages/batches"
       '';
     }
     {
@@ -528,10 +540,14 @@ let
 
         curl -s -D headers -o body "http://127.0.0.1:$port/v1/messages"
 
-        assert_equals "HTTP/1.1 500 Internal Server Error" "$(head -1 headers | tr -d '\r')" "the status line"
-        assert_equals "Content-Type: text/plain" "$(grep -i '^content-type:' headers | tr -d '\r')" "the content type"
-        assert_equals "unexpected request: GET /v1/messages" "$(cat body)" "the body"
-        assert_equals "GET /v1/messages" "$(cat requests)" "the requests"
+        # the status line
+        assert_equal "$(head -1 headers | tr -d '\r')" "HTTP/1.1 500 Internal Server Error"
+        # the content type
+        assert_equal "$(grep -i '^content-type:' headers | tr -d '\r')" "Content-Type: text/plain"
+        # the body
+        assert_equal "$(cat body)" "unexpected request: GET /v1/messages"
+        # the requests
+        assert_equal "$(cat requests)" "GET /v1/messages"
       '';
     }
     {
@@ -548,15 +564,15 @@ let
         grep -oE '"(elysia|deuri|exact-mirror|memoirist|typebox)": \["[^"]+".*"sha512-[^"]+"\]' \
           ${imp}/bun.lock | sed -E 's/^"([^"]+)": \["([^"]+)".*"(sha512-[^"]+)"\]$/\2 \3/' | sort > locked
 
-        assert_equals 1 "$handlers" "create-app.ts's /health handlers"
-        assert_files_equal - handler <<'EOF'
+        assert_equal "$handlers" 1
+        diff -u - handler <<'EOF'
             .get('/health', () => ({
               status: 'ok',
               ready: deps.isReady(),
               warnings: buildHealthWarnings(deps.imps.readRebootReason(), deps.storage.readWarnings()),
             }))
         EOF
-        assert_files_equal - warnings <<'EOF'
+        diff -u - warnings <<'EOF'
         function buildHealthWarnings(
           rebootReason: string | null,
           storageWarnings: readonly string[],
@@ -566,9 +582,10 @@ let
           return [...reboot, ...storageWarnings];
         }
         EOF
-        assert_equals 0 "$error_hooks" "create-app.ts's Elysia onError hooks"
-        assert_equals 2.0.0-rc.3 "$elysia" "imp's Elysia version"
-        assert_equals "" ${lib.escapeShellArg (impBunRelease.error or "")} "host/Dockerfile's Bun release"
+        assert_equal "$error_hooks" 0
+        assert_equal "$elysia" 2.0.0-rc.3
+        # host/Dockerfile's Bun release
+        assert_equal ${lib.escapeShellArg (impBunRelease.error or "")} ""
         cat > expected <<'EOF'
         deuri@3.0.1 sha512-IUgdopWhjToYbgpYDe3ZCBdzILexypCTCEakqDGQyKSlayxWL7yonY/zeJL9ICIjwVmAm3cpiAyT64rBn34gGg==
         elysia@2.0.0-rc.3 sha512-7W4qXQ6TBWGctaVwdYDhLFRKiXwROidVwdYEwlRLR5NaWLc17Mrj8CZOsFlD7xR+GzG/LrmvYjh/FC8vqkJvWw==
@@ -577,7 +594,7 @@ let
         typebox@1.4.6 sha512-Yh8Mi4hzD7gqcuv9ZIk6HK1KVJKubTlfxaNxkrYK35HCvxoCjCuWVr8cBjQ/ChfA7yliPteJEBWHGFVGWDuF5Q==
         EOF
         sort expected > expected-sorted
-        assert_files_equal expected-sorted locked
+        diff -u expected-sorted locked
       '';
     }
   ]
@@ -678,18 +695,24 @@ let
         curl -s -D stub-health.headers -o stub-health.body "http://127.0.0.1:$health_port/health"
         curl -s -D stub-missing.headers -o stub-missing.body "http://127.0.0.1:$missing_port/missing"
 
-        assert_equals "HTTP/1.1 200 OK" "$(head -1 real-health.headers | tr -d '\r')" "imp's /health status line"
-        assert_equals "HTTP/1.1 200 OK" "$(head -1 stub-health.headers | tr -d '\r')" "the stand-in's /health status line"
-        assert_equals "$(grep -i '^content-type:' real-health.headers | cut -d: -f2- | tr -d '\r')" \
-          "$(grep -i '^content-type:' stub-health.headers | cut -d: -f2- | tr -d '\r')" "the /health content type"
-        assert_files_equal real-health.body stub-health.body
-        assert_equals "HTTP/1.1 404 Not Found" "$(head -1 real-missing.headers | tr -d '\r')" "imp's unknown route's status line"
-        assert_equals "HTTP/1.1 404 Not Found" "$(head -1 stub-missing.headers | tr -d '\r')" "the stand-in's unknown route's status line"
-        assert_equals "$(grep -i '^content-type:' real-missing.headers | cut -d: -f2- | tr -d '\r')" \
-          "$(grep -i '^content-type:' stub-missing.headers | cut -d: -f2- | tr -d '\r')" "the unknown route's content type"
-        assert_files_equal real-missing.body stub-missing.body
-        assert_equals "GET /health" "$(cat health.requests)" "the /health stand-in's requests"
-        assert_equals "GET /missing" "$(cat missing.requests)" "the unknown route stand-in's requests"
+        # imp's /health status line
+        assert_equal "$(head -1 real-health.headers | tr -d '\r')" "HTTP/1.1 200 OK"
+        # the stand-in's /health status line
+        assert_equal "$(head -1 stub-health.headers | tr -d '\r')" "HTTP/1.1 200 OK"
+        # the /health content type
+        assert_equal "$(grep -i '^content-type:' stub-health.headers | cut -d: -f2- | tr -d '\r')" "$(grep -i '^content-type:' real-health.headers | cut -d: -f2- | tr -d '\r')"
+        diff -u real-health.body stub-health.body
+        # imp's unknown route's status line
+        assert_equal "$(head -1 real-missing.headers | tr -d '\r')" "HTTP/1.1 404 Not Found"
+        # the stand-in's unknown route's status line
+        assert_equal "$(head -1 stub-missing.headers | tr -d '\r')" "HTTP/1.1 404 Not Found"
+        # the unknown route's content type
+        assert_equal "$(grep -i '^content-type:' stub-missing.headers | cut -d: -f2- | tr -d '\r')" "$(grep -i '^content-type:' real-missing.headers | cut -d: -f2- | tr -d '\r')"
+        diff -u real-missing.body stub-missing.body
+        # the /health stand-in's requests
+        assert_equal "$(cat health.requests)" "GET /health"
+        # the unknown route stand-in's requests
+        assert_equal "$(cat missing.requests)" "GET /missing"
       '';
     }
   )
@@ -708,14 +731,20 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CURL_LOG="$PWD/curl.log" \
           ${stubCurl} -s -o stub.body -w '%{http_code}' --max-time 1 "http://127.0.0.1:$port/health" > stub.out 2> stub.err || stub_status=$?
 
-        assert_equals 28 "$real_status" "curl's exit status, a timeout"
-        assert_equals "000 1" "$(cat real.out)" "curl's status code and connections"
-        assert_missing real.body "curl's body"
-        assert_equals "$real_status" "$stub_status" "the stand-in's exit status"
+        assert_equal "$real_status" 28
+        # curl's status code and connections
+        assert_equal "$(cat real.out)" "000 1"
+        # curl's body
+        assert [ ! -e real.body ]
+        assert [ ! -L real.body ]
+        assert_equal "$stub_status" "$real_status"
         # the probe asks for the status code alone, the first of the two curl printed
-        assert_equals "$(cut -d' ' -f1 real.out)" "$(cat stub.out)" "the stand-in's status code"
-        assert_files_equal real.err stub.err
-        assert_missing stub.body "the stand-in's body"
+        # the stand-in's status code
+        assert_equal "$(cat stub.out)" "$(cut -d' ' -f1 real.out)"
+        diff -u real.err stub.err
+        # the stand-in's body
+        assert [ ! -e stub.body ]
+        assert [ ! -L stub.body ]
       '';
     }
     {
@@ -728,10 +757,13 @@ let
         curl -s -D headers -o body -X POST -H 'Host: mcp.example.test' -H "$authorization" \
           --data '{}' --path-as-is "http://127.0.0.1:$port/oauth2/../oauth2/token?client=a"
 
-        assert_equals "HTTP/1.1 200 OK" "$(head -1 headers | tr -d '\r')" "the status line"
-        assert_equals " text/plain" "$(grep -i '^content-type:' headers | cut -d: -f2- | tr -d '\r')" "the content type"
-        assert_equals "POST /oauth2/../oauth2/token?client=a" "$(cat body)" "the body"
-        assert_files_equal - requests <<'EOF'
+        # the status line
+        assert_equal "$(head -1 headers | tr -d '\r')" "HTTP/1.1 200 OK"
+        # the content type
+        assert_equal "$(grep -i '^content-type:' headers | cut -d: -f2- | tr -d '\r')" " text/plain"
+        # the body
+        assert_equal "$(cat body)" "POST /oauth2/../oauth2/token?client=a"
+        diff -u - requests <<'EOF'
         {"method": "POST", "path": "/oauth2/../oauth2/token?client=a", "host": "mcp.example.test", "authorization": "Bearer example-token"}
         EOF
       '';
@@ -751,16 +783,18 @@ let
         touch release
         wait "$curl_pid"
 
-        assert_equals "data: first" "$(printf '%s' "$held" | sed '/^$/d')" "the stream before the release"
-        assert_equals " text/event-stream" "$(grep -i '^content-type:' headers | cut -d: -f2- | tr -d '\r')" "the content type"
-        assert_files_equal - stream <<'EOF'
+        # the stream before the release
+        assert_equal "$(printf '%s' "$held" | sed '/^$/d')" "data: first"
+        # the content type
+        assert_equal "$(grep -i '^content-type:' headers | cut -d: -f2- | tr -d '\r')" " text/event-stream"
+        diff -u - stream <<'EOF'
         data: first
 
         data: second
 
         EOF
-        assert_equals "{\"method\": \"GET\", \"path\": \"/mcp\", \"host\": \"127.0.0.1:$port\", \"authorization\": null}" \
-          "$(cat requests)" "the requests"
+        # the requests
+        assert_equal "$(cat requests)" "{\"method\": \"GET\", \"path\": \"/mcp\", \"host\": \"127.0.0.1:$port\", \"authorization\": null}"
       '';
     }
     (
@@ -772,11 +806,14 @@ let
         script = ''
           digest=$(jq -r '.manifests[0].digest' ${stubImage.layout}/index.json)
 
-          assert_equals "ghcr.io/zgeoff/imp-host:0.28.0@$digest" ${lib.escapeShellArg stubImage.ref} "the reference"
-          assert_equals "ghcr.io/zgeoff/imp-host@$digest" ${lib.escapeShellArg stubImage.digestRef} "the reference by digest"
-          assert_equals 1 "$(jq '.manifests | length' ${stubImage.layout}/index.json)" "the layout's manifests"
-          assert_equals 0.28.0 "$(jq -r '.manifests[0].annotations."org.opencontainers.image.ref.name"' ${stubImage.layout}/index.json)" \
-            "the layout's tag"
+          # the reference
+          assert_equal ${lib.escapeShellArg stubImage.ref} "ghcr.io/zgeoff/imp-host:0.28.0@$digest"
+          # the reference by digest
+          assert_equal ${lib.escapeShellArg stubImage.digestRef} "ghcr.io/zgeoff/imp-host@$digest"
+          # the layout's manifests
+          assert_equal "$(jq '.manifests | length' ${stubImage.layout}/index.json)" 1
+          # the layout's tag
+          assert_equal "$(jq -r '.manifests[0].annotations."org.opencontainers.image.ref.name"' ${stubImage.layout}/index.json)" 0.28.0
         '';
       }
     )
@@ -791,15 +828,17 @@ let
           blobs=${stubImage.layout}/blobs/sha256
           manifest=$blobs/$(jq -r '.manifests[0].digest | ltrimstr("sha256:")' ${stubImage.layout}/index.json)
 
-          assert_equals '["ghcr.io/zgeoff/imp-host:0.28.0"]' "$(jq -c '.[0].RepoTags' archive-manifest)" "the archive's tags"
-          assert_equals 1 "$(jq 'length' archive-manifest)" "the archive's images"
+          # the archive's tags
+          assert_equal "$(jq -c '.[0].RepoTags' archive-manifest)" '["ghcr.io/zgeoff/imp-host:0.28.0"]'
+          # the archive's images
+          assert_equal "$(jq 'length' archive-manifest)" 1
           # the same command and layers; skopeo drops the archive config's empty Env and its
           # preferLocalBuild, which nothing reads
           tar -xOf ${stubImage.archive} "$(jq -r '.[0].Config' archive-manifest)" \
             | jq -S '{cmd: .config.Cmd, layers: .rootfs.diff_ids}' > archive-config
           jq -S '{cmd: .config.Cmd, layers: .rootfs.diff_ids}' \
             "$blobs/$(jq -r '.config.digest | ltrimstr("sha256:")' "$manifest")" > layout-config
-          assert_files_equal layout-config archive-config
+          diff -u layout-config archive-config
         '';
       }
     )
@@ -823,10 +862,11 @@ let
           busybox_path=''${sleep_target%/sleep}/busybox
           busybox=$(grep -cE "^-r-xr-xr-x .* ''${busybox_path#/}\$" listing || true)
 
-          assert_equals 1 "$(printf '%s\n' "$layers" | wc -l)" "the image's layers"
-          assert_equals '["sleep","infinity"]' "$cmd" "the image's command"
-          assert_equals "${pkgs.busybox}/bin/sleep" "$sleep_target" "the image's sleep"
-          assert_equals 1 "$busybox" "the image's busybox binaries"
+          # the image's layers
+          assert_equal "$(printf '%s\n' "$layers" | wc -l)" 1
+          assert_equal "$cmd" '["sleep","infinity"]'
+          assert_equal "$sleep_target" "${pkgs.busybox}/bin/sleep"
+          assert_equal "$busybox" 1
 
           impz=$(sed -n 's|^l.* \./usr/local/bin/impz -> /||p' listing)
           tar -xOf "$layer" "$impz" > impz-script
@@ -836,13 +876,15 @@ let
           other_status=0
           sh impz-script ls > other.out 2> other.err || other_status=$?
 
-          assert_equals 0 "$info_status" "impz info's exit"
-          assert_equals 'version     0.28.0' "$(cat info.out)" "impz info's output"
-          assert_files_equal /dev/null info.err
-          assert_equals 97 "$other_status" "another impz command's exit"
-          assert_files_equal /dev/null other.out
-          assert_equals 'unexpected: impz ls' "$(cat other.err)" "another impz command's error"
-          assert_equals drwxrwxrwt "$tmp_mode" "the image's /tmp"
+          assert_equal "$info_status" 0
+          # impz info's output
+          assert_equal "$(cat info.out)" 'version     0.28.0'
+          diff -u /dev/null info.err
+          assert_equal "$other_status" 97
+          diff -u /dev/null other.out
+          # another impz command's error
+          assert_equal "$(cat other.err)" 'unexpected: impz ls'
+          assert_equal "$tmp_mode" drwxrwxrwt
         '';
       }
     )
@@ -856,9 +898,9 @@ let
         runs=$(grep -cxF '  runArgs = privileges ++ probedArgs ++ sharedArgs ++ secretArgs ++ dnsArgs ++ [ cfg.image ];' \
           ${imp}/deploy/nixos/config.nix || true)
 
-        assert_equals 1 "$pulls" "the module's pulls of a missing image without an archive"
-        assert_equals 1 "$starts" "the module's imp-host starts with podman run"
-        assert_equals 1 "$runs" "the module's imp-host runs that end at the image, with no command"
+        assert_equal "$pulls" 1
+        assert_equal "$starts" 1
+        assert_equal "$runs" 1
       '';
     }
     {
@@ -869,8 +911,8 @@ let
         # impz prints each line through console.log, from 2.5 on behind its io.print
         pads=$(grep -cE '(console\.log|io\.print)\(`\$\{label\.padEnd\(12\)\}\$\{value\}`\);' "$info" || true)
 
-        assert_equals "['version',info.version]," "$first" "impz info's first line"
-        assert_equals 1 "$pads" "impz info's padded labels"
+        assert_equal "$first" "['version',info.version],"
+        assert_equal "$pads" 1
       '';
     }
     {
@@ -885,9 +927,11 @@ let
           ${stubSqlite3} "file:$PWD/db/imp.sqlite.restore?mode=ro&immutable=1" 'PRAGMA integrity_check;' > out 2> err
         holder=$(cat holder.pid)
 
-        assert_equals ok "$(cat out)" "sqlite3's answer"
-        assert_files_equal /dev/null err
-        assert_equals "$PWD/db" "$(readlink /proc/$holder/cwd)" "the holder's working directory"
+        # sqlite3's answer
+        assert_equal "$(cat out)" ok
+        diff -u /dev/null err
+        # the holder's working directory
+        assert_equal "$(readlink /proc/$holder/cwd)" "$PWD/db"
       '';
     }
     {
@@ -899,9 +943,12 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" HOLDER_PID_FILE=$PWD/holder.pid \
           ${stubSqlite3} copy.sqlite 'PRAGMA integrity_check;' > out 2> err
 
-        assert_equals ok "$(cat out)" "sqlite3's answer"
-        assert_files_equal /dev/null err
-        assert_missing holder.pid "a holder's PID file"
+        # sqlite3's answer
+        assert_equal "$(cat out)" ok
+        diff -u /dev/null err
+        # a holder's PID file
+        assert [ ! -e holder.pid ]
+        assert [ ! -L holder.pid ]
       '';
     }
     {
@@ -914,12 +961,12 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
           ${stubIntegritySqlite3} copy.sqlite 'PRAGMA integrity_check;' > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the stand-in's exit"
+        assert_equal "$status" 0
         printf '%s\n' 'wrong # of entries in index sqlite_autoindex_imps_1' \
           'row 1 missing from index sqlite_autoindex_imps_1' 'row 2 missing from index sqlite_autoindex_imps_1' \
           'row 3 missing from index sqlite_autoindex_imps_1' > expected
-        assert_files_equal expected out
-        assert_files_equal /dev/null err
+        diff -u expected out
+        diff -u /dev/null err
       '';
     }
     {
@@ -931,8 +978,8 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
           ${stubIntegritySqlite3} copy.sqlite 'SELECT v FROM t;' > out 2> err
 
-        assert_equals x "$(cat out)" "sqlite3's answer"
-        assert_files_equal /dev/null err
+        assert_equal "$(cat out)" x
+        diff -u /dev/null err
       '';
     }
     {
@@ -943,8 +990,8 @@ let
         checked=$(grep -cxF 'integrity=$("$sqlite" "$dir/imp.sqlite" "PRAGMA integrity_check;")' \
           ${../packages/impd-db-tools/copy-impd-db-host.sh} || true)
 
-        assert_equals 1 "$sqlite" "the host script's SQLITE3"
-        assert_equals 1 "$checked" "the host script's integrity_check"
+        assert_equal "$sqlite" 1
+        assert_equal "$checked" 1
       '';
     }
     {
@@ -955,9 +1002,9 @@ let
           ${../packages/impd-db-tools/restore-impd-db.sh} || true)
         sqlite=$(grep -cxF 'sqlite="''${SQLITE3:-sqlite3}"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
 
-        assert_equals 1 "$staged" "the script's staged file"
-        assert_equals 1 "$checked" "the script's checks of the staged file"
-        assert_equals 1 "$sqlite" "the script's sqlite3"
+        assert_equal "$staged" 1
+        assert_equal "$checked" 1
+        assert_equal "$sqlite" 1
       '';
     }
     {
@@ -979,12 +1026,15 @@ let
         status=0
         wait "$stub_pid" || status=$?
 
-        assert_equals "$stub_pid" "$(cat holder.pid)" "the blocked process"
-        assert_files_equal expected-command command
-        assert_equals 137 "$status" "the exit status, killed"
-        assert_files_equal /dev/null out
-        assert_files_equal /dev/null err
-        assert_missing holder.pid.partial "the partial PID file"
+        # the blocked process
+        assert_equal "$(cat holder.pid)" "$stub_pid"
+        diff -u expected-command command
+        assert_equal "$status" 137
+        diff -u /dev/null out
+        diff -u /dev/null err
+        # the partial PID file
+        assert [ ! -e holder.pid.partial ]
+        assert [ ! -L holder.pid.partial ]
       '';
     }
     {
@@ -996,9 +1046,12 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" HOLDER_PID_FILE=$PWD/holder.pid \
           ${stubBlockingSqlite3} copy.sqlite 'PRAGMA integrity_check;' > out 2> err
 
-        assert_equals ok "$(cat out)" "sqlite3's answer"
-        assert_files_equal /dev/null err
-        assert_missing holder.pid "a holder's PID file"
+        # sqlite3's answer
+        assert_equal "$(cat out)" ok
+        diff -u /dev/null err
+        # a holder's PID file
+        assert [ ! -e holder.pid ]
+        assert [ ! -L holder.pid ]
       '';
     }
     {
@@ -1011,10 +1064,10 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${stubBlockingSqlite3} copy.sqlite 'PRAGMA integrity_check;' \
           > out 2> err || status=$?
 
-        assert_equals 2 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "sqlite3-blocking-on-staged-check: set HOLDER_PID_FILE to the file that names the blocked process" \
-          "$(cat err)" "the error"
+        assert_equal "$status" 2
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "sqlite3-blocking-on-staged-check: set HOLDER_PID_FILE to the file that names the blocked process"
       '';
     }
     {
@@ -1026,9 +1079,10 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-host \
           ${stubSystemctl} show -p ActiveState --value imp-host > out 2> err || status=$?
 
-        assert_equals 1 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "Failed to get properties: Connection timed out" "$(cat err)" "the error"
+        assert_equal "$status" 1
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "Failed to get properties: Connection timed out"
       '';
     }
     {
@@ -1043,9 +1097,9 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-host \
           ${stubSystemctl} show -p ActiveState --value imp-host-image > stub.out 2> stub.err || stub_status=$?
 
-        assert_equals "$real_status" "$stub_status" "the exit status"
-        assert_files_equal real.out stub.out
-        assert_files_equal real.err stub.err
+        assert_equal "$stub_status" "$real_status"
+        diff -u real.out stub.out
+        diff -u real.err stub.err
       '';
     }
     {
@@ -1060,9 +1114,9 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-host \
           ${stubSystemctl} show -p SubState --value imp-host > stub.out 2> stub.err || stub_status=$?
 
-        assert_equals "$real_status" "$stub_status" "the exit status"
-        assert_files_equal real.out stub.out
-        assert_files_equal real.err stub.err
+        assert_equal "$stub_status" "$real_status"
+        diff -u real.out stub.out
+        diff -u real.err stub.err
       '';
     }
     {
@@ -1074,9 +1128,9 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-host \
           ${stubSystemctl} --version > stub.out 2> stub.err
 
-        assert_files_equal real.out stub.out
-        assert_files_equal real.err stub.err
-        assert_not_equals "" "$(cat stub.out)" "the version"
+        diff -u real.out stub.out
+        diff -u real.err stub.err
+        assert_not_equal "$(cat stub.out)" ""
       '';
     }
     {
@@ -1091,11 +1145,11 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-host \
           ${stubSystemctl} --no-such-option 'two words' > stub.out 2> stub.err || stub_status=$?
 
-        assert_equals "$real_status" "$stub_status" "the exit status"
-        assert_files_equal real.out stub.out
-        assert_files_equal real.err stub.err
-        assert_equals "${pkgs.systemd}/bin/systemctl: unrecognized option '--no-such-option'" "$(cat stub.err)" \
-          "the error, which names the argument"
+        assert_equal "$stub_status" "$real_status"
+        diff -u real.out stub.out
+        diff -u real.err stub.err
+        # the error, which names the argument
+        assert_equal "$(cat stub.err)" "${pkgs.systemd}/bin/systemctl: unrecognized option '--no-such-option'"
       '';
     }
     {
@@ -1106,10 +1160,10 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${stubSystemctl} --version > out 2> err || status=$?
 
-        assert_equals 2 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "systemctl-failing-one-state-read: set FAIL_SHOW_UNIT to the unit whose state read fails" "$(cat err)" \
-          "the error"
+        assert_equal "$status" 2
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "systemctl-failing-one-state-read: set FAIL_SHOW_UNIT to the unit whose state read fails"
       '';
     }
     {
@@ -1121,10 +1175,10 @@ let
           ${../packages/impd-db-tools/restore-impd-db.sh} || true)
         units=$(grep -cxF 'units=(imp-host)' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
 
-        assert_equals 1 "$message" "systemd's files that hold the message"
-        assert_equals 1 "$systemctl" "the script's systemctl"
-        assert_equals 1 "$reads" "the script's state reads"
-        assert_equals 1 "$units" "the script's units"
+        assert_equal "$message" 1
+        assert_equal "$systemctl" 1
+        assert_equal "$reads" 1
+        assert_equal "$units" 1
       '';
     }
     {
@@ -1139,9 +1193,9 @@ let
           FAIL_CMP_FIRST=$PWD/copy/imp.sqlite FAIL_CMP_SECOND="$PWD/r*/db/imp.sqlite.restore" \
           ${stubCmp} -s "$PWD/copy/imp.sqlite" "$PWD/run/db/imp.sqlite.restore" > out 2> err || status=$?
 
-        assert_equals 1 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_files_equal /dev/null err
+        assert_equal "$status" 1
+        diff -u /dev/null out
+        diff -u /dev/null err
       '';
     }
     {
@@ -1156,9 +1210,9 @@ let
           FAIL_CMP_FIRST=$PWD/copy/imp.sqlite FAIL_CMP_SECOND="$PWD/r*/db/imp.sqlite.restore" \
           ${stubCmp} -s "$PWD/copy/imp.sqlite" "$PWD/run/db/imp.sqlite" > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_files_equal /dev/null err
+        assert_equal "$status" 0
+        diff -u /dev/null out
+        diff -u /dev/null err
       '';
     }
     {
@@ -1173,9 +1227,9 @@ let
           FAIL_CMP_FIRST=$PWD/copy/imp.sqlite FAIL_CMP_SECOND="$PWD/*/imp.sqlite.restore" \
           ${stubCmp} -s "$PWD/saved/imp.sqlite.restore" "$PWD/run/db/imp.sqlite.restore" > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_files_equal /dev/null err
+        assert_equal "$status" 0
+        diff -u /dev/null out
+        diff -u /dev/null err
       '';
     }
     {
@@ -1190,9 +1244,9 @@ let
           FAIL_CMP_FIRST=$PWD/copy/imp.sqlite FAIL_CMP_SECOND="$PWD/r*/db/imp.sqlite.restore" \
           ${stubCmp} "$PWD/copy/imp.sqlite" "$PWD/run/db/imp.sqlite.restore" > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_files_equal /dev/null err
+        assert_equal "$status" 0
+        diff -u /dev/null out
+        diff -u /dev/null err
       '';
     }
     {
@@ -1209,11 +1263,12 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_CMP_FIRST=$PWD/copy/imp.sqlite FAIL_CMP_SECOND="$PWD/*" \
           ${stubCmp} 'first file' second > stub.out 2> stub.err || stub_status=$?
 
-        assert_equals 1 "$real_status" "cmp's exit status"
-        assert_equals 1 "$stub_status" "the stand-in's exit status"
-        assert_files_equal real.out stub.out
-        assert_files_equal real.err stub.err
-        assert_equals "first file second differ: char 1, line 1" "$(cat stub.out)" "the difference, which names the files"
+        assert_equal "$real_status" 1
+        assert_equal "$stub_status" 1
+        diff -u real.out stub.out
+        diff -u real.err stub.err
+        # the difference, which names the files
+        assert_equal "$(cat stub.out)" "first file second differ: char 1, line 1"
       '';
     }
     {
@@ -1229,10 +1284,10 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_CMP_FIRST=$PWD/copy/imp.sqlite FAIL_CMP_SECOND="$PWD/*" \
           ${stubCmp} -s present missing > stub.out 2> stub.err || stub_status=$?
 
-        assert_equals 2 "$real_status" "cmp's exit status"
-        assert_equals 2 "$stub_status" "the stand-in's exit status"
-        assert_files_equal real.out stub.out
-        assert_files_equal real.err stub.err
+        assert_equal "$real_status" 2
+        assert_equal "$stub_status" 2
+        diff -u real.out stub.out
+        diff -u real.err stub.err
       '';
     }
     {
@@ -1246,10 +1301,10 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_CMP_FIRST=$PWD/first \
           ${stubCmp} -s first second > out 2> err || status=$?
 
-        assert_equals 2 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "cmp-failing-one-comparison: set FAIL_CMP_FIRST and FAIL_CMP_SECOND to the comparison that fails" \
-          "$(cat err)" "the error"
+        assert_equal "$status" 2
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "cmp-failing-one-comparison: set FAIL_CMP_FIRST and FAIL_CMP_SECOND to the comparison that fails"
       '';
     }
     {
@@ -1267,14 +1322,14 @@ let
           ${../packages/impd-db-tools/restore-impd-db.sh} || true)
         calls=$(grep -cF '"$cmp"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
 
-        assert_equals 1 "$cmp" "the script's cmp"
-        assert_equals 1 "$mount" "the script's mount directory"
-        assert_equals 1 "$db" "the script's database directory"
-        assert_equals 1 "$staged_file" "the script's staged file"
-        assert_equals 1 "$staged" "the script's checks of the staged file"
-        assert_equals 1 "$published" "the script's checks of the published database"
-        assert_equals 1 "$saved" "the script's checks of the saved files"
-        assert_equals 3 "$calls" "the script's comparisons"
+        assert_equal "$cmp" 1
+        assert_equal "$mount" 1
+        assert_equal "$db" 1
+        assert_equal "$staged_file" 1
+        assert_equal "$staged" 1
+        assert_equal "$published" 1
+        assert_equal "$saved" 1
+        assert_equal "$calls" 3
       '';
     }
     {
@@ -1286,12 +1341,15 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CURL_LOG="$PWD/curl.log" \
           ${stubCurl} -s -o body -w '%{http_code}' --max-time 5 http://127.0.0.1:7070/health > out 2> err || status=$?
 
-        assert_equals 28 "$status" "the exit status, curl's for a timeout"
-        assert_equals 000 "$(cat out)" "the status code it prints"
-        assert_files_equal /dev/null err
-        assert_missing body "a body"
-        assert_equals '["-s","-o","body","-w","%{http_code}","--max-time","5","http://127.0.0.1:7070/health"]' \
-          "$(cat curl.log)" "the recorded call"
+        assert_equal "$status" 28
+        # the status code it prints
+        assert_equal "$(cat out)" 000
+        diff -u /dev/null err
+        # a body
+        assert [ ! -e body ]
+        assert [ ! -L body ]
+        # the recorded call
+        assert_equal "$(cat curl.log)" '["-s","-o","body","-w","%{http_code}","--max-time","5","http://127.0.0.1:7070/health"]'
       '';
     }
     {
@@ -1308,7 +1366,7 @@ let
         ["-s","-o","a body","-w","%{http_code}","--max-time","5","http://127.0.0.1:7070/health?q=\"x\""]
         ["-s","-o","body","-w","%{http_code}","--max-time","0.5","http://127.0.0.1:9090/ready"]
         EOF
-        assert_files_equal expected curl.log
+        diff -u expected curl.log
       '';
     }
     {
@@ -1320,10 +1378,12 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CURL_LOG="$PWD/curl.log" \
           ${stubCurl} -s http://127.0.0.1:7070/health > out 2> err || status=$?
 
-        assert_equals 97 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "unexpected: -s http://127.0.0.1:7070/health" "$(cat err)" "the error"
-        assert_equals '["-s","http://127.0.0.1:7070/health"]' "$(cat curl.log)" "the recorded call"
+        assert_equal "$status" 97
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "unexpected: -s http://127.0.0.1:7070/health"
+        # the recorded call
+        assert_equal "$(cat curl.log)" '["-s","http://127.0.0.1:7070/health"]'
       '';
     }
     {
@@ -1335,9 +1395,10 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
           ${stubCurl} -s -o body -w '%{http_code}' --max-time 5 http://127.0.0.1:7070/health > out 2> err || status=$?
 
-        assert_equals 2 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "curl-timing-out: set CURL_LOG to the file that records each call" "$(cat err)" "the error"
+        assert_equal "$status" 2
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "curl-timing-out: set CURL_LOG to the file that records each call"
       '';
     }
     {
@@ -1350,10 +1411,10 @@ let
         # a call of curl by name, outside a comment, would pass the stand-in by
         direct=$(grep -cE '^[^#]*(^|[ $(])curl ' ${../modules/impd-local-health.sh} || true)
 
-        assert_equals 1 "$curl" "the probe's curl"
-        assert_equals 1 "$call" "the probe's call"
-        assert_equals 1 "$calls" "the probe's calls through CURL"
-        assert_equals 0 "$direct" "the probe's calls of curl by name"
+        assert_equal "$curl" 1
+        assert_equal "$call" 1
+        assert_equal "$calls" 1
+        assert_equal "$direct" 0
       '';
     }
     {
@@ -1365,10 +1426,11 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" SLEEP_LOG="$PWD/sleep.log" \
           ${stubSleep} 1 > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_files_equal /dev/null err
-        assert_equals '["1"]' "$(cat sleep.log)" "the recorded call"
+        assert_equal "$status" 0
+        diff -u /dev/null out
+        diff -u /dev/null err
+        # the recorded call
+        assert_equal "$(cat sleep.log)" '["1"]'
       '';
     }
     {
@@ -1382,10 +1444,10 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" SLEEP_LOG="$PWD/sleep.log" \
           ${stubSleep} 0 > stub.out 2> stub.err || stub_status=$?
 
-        assert_equals 0 "$real_status" "sleep's exit status"
-        assert_equals "$real_status" "$stub_status" "the exit status"
-        assert_files_equal real.out stub.out
-        assert_files_equal real.err stub.err
+        assert_equal "$real_status" 0
+        assert_equal "$stub_status" "$real_status"
+        diff -u real.out stub.out
+        diff -u real.err stub.err
       '';
     }
     {
@@ -1397,7 +1459,7 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" SLEEP_LOG="$PWD/sleep.log" ${stubSleep} 0.5
 
         printf '%s\n' '["1"]' '["0.5"]' > expected
-        assert_files_equal expected sleep.log
+        diff -u expected sleep.log
       '';
     }
     {
@@ -1409,10 +1471,12 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" SLEEP_LOG="$PWD/sleep.log" \
           ${stubSleep} 1 'two words' > out 2> err || status=$?
 
-        assert_equals 97 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "unexpected: 1 two words" "$(cat err)" "the error"
-        assert_equals '["1","two words"]' "$(cat sleep.log)" "the recorded call"
+        assert_equal "$status" 97
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "unexpected: 1 two words"
+        # the recorded call
+        assert_equal "$(cat sleep.log)" '["1","two words"]'
       '';
     }
     {
@@ -1423,9 +1487,10 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${stubSleep} 1 > out 2> err || status=$?
 
-        assert_equals 2 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "sleep-returning-at-once: set SLEEP_LOG to the file that records each call" "$(cat err)" "the error"
+        assert_equal "$status" 2
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "sleep-returning-at-once: set SLEEP_LOG to the file that records each call"
       '';
     }
     {
@@ -1438,11 +1503,11 @@ let
         # a pause by name, outside a comment, would pass the stand-in by
         direct=$(grep -cE '^[^#]*(^|[ ;&|(])sleep ' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
 
-        assert_equals 1 "$sleep_cmd" "the script's sleep"
-        assert_equals 1 "$loop" "the script's start loop"
-        assert_equals 1 "$pause" "the start loop's pause"
-        assert_equals 1 "$pauses" "the script's pauses through IMPD_START_SLEEP"
-        assert_equals 0 "$direct" "the script's pauses by name"
+        assert_equal "$sleep_cmd" 1
+        assert_equal "$loop" 1
+        assert_equal "$pause" 1
+        assert_equal "$pauses" 1
+        assert_equal "$direct" 0
       '';
     }
     {
@@ -1454,10 +1519,10 @@ let
         # a pause by name, outside a comment, would pass the stand-in by
         direct=$(grep -cE '^[^#]*(^|[ ;&|(])sleep ' ${../modules/preview-image.sh} || true)
 
-        assert_equals 1 "$sleep_cmd" "the script's sleep"
-        assert_equals 1 "$pause" "the wait's pause"
-        assert_equals 1 "$pauses" "the script's pauses through SLEEP"
-        assert_equals 0 "$direct" "the script's pauses by name"
+        assert_equal "$sleep_cmd" 1
+        assert_equal "$pause" 1
+        assert_equal "$pauses" 1
+        assert_equal "$direct" 0
       '';
     }
     {
@@ -1478,7 +1543,7 @@ let
           );
         in
         ''
-          assert_files_equal - ${buildStorePathGaps script} <<'EOF'
+          diff -u - ${buildStorePathGaps script} <<'EOF'
           ${strayRoot}
           EOF
         '';
@@ -1496,7 +1561,7 @@ let
           };
         in
         ''
-          assert_files_equal /dev/null ${buildStorePathGaps script}
+          diff -u /dev/null ${buildStorePathGaps script}
         '';
     }
     {
@@ -1511,8 +1576,8 @@ let
         env -i HOME="$PWD/home" IMPD_STATE="$PWD/impd" IMPD_TOKEN_FILE="$PWD/impd/token" \
           ${stubImpzHostImage.impz} image ls --json > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_files_equal - out <<'EOF'
+        assert_equal "$status" 0
+        diff -u - out <<'EOF'
         [
           {
             "name": "base",
@@ -1521,8 +1586,8 @@ let
           }
         ]
         EOF
-        assert_files_equal /dev/null err
-        assert_files_equal - impd/calls <<'EOF'
+        diff -u /dev/null err
+        diff -u - impd/calls <<'EOF'
         ["image","ls","--json"]
         EOF
       '';
@@ -1538,9 +1603,9 @@ let
         (cd work && env -i HOME= IMPD_STATE="$PWD/../impd" IMPD_TOKEN_FILE="$PWD/../impd/token" \
           ${stubImpzHostImage.impz} image ls --json > ../out 2> ../err) || status=$?
 
-        assert_equals 1 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_files_equal - err <<'EOF'
+        assert_equal "$status" 1
+        diff -u /dev/null out
+        diff -u - err <<'EOF'
         impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>
         EOF
       '';
@@ -1557,8 +1622,8 @@ let
         env -i HOME="$PWD/home" IMPD_STATE="$PWD/impd" IMPD_TOKEN_FILE="$PWD/impd/token" \
           ${stubImpzHostImage.impz} image ls --json > out 2> err || status=$?
 
-        assert_equals 1 "$status" "the exit status"
-        assert_files_equal - err <<'EOF'
+        assert_equal "$status" 1
+        diff -u - err <<'EOF'
         impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>
         EOF
       '';
@@ -1576,10 +1641,12 @@ let
         env -i HOME="$PWD/home" IMP_TOKEN=imp_fixture_root IMPD_STATE="$PWD/impd" IMPD_TOKEN_FILE="$PWD/impd/token" \
           ${stubImpzHostImage.impz} image pin pv-base >> out 2>> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_equals '[["pv-base","ghcr.io/example/base:1.0.0",true]]' "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" "impd's images"
-        assert_equals '"pv-base"' "$(jq -c .name out)" "the added image's name"
-        assert_files_equal /dev/null err
+        assert_equal "$status" 0
+        # impd's images
+        assert_equal "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" '[["pv-base","ghcr.io/example/base:1.0.0",true]]'
+        # the added image's name
+        assert_equal "$(jq -c .name out)" '"pv-base"'
+        diff -u /dev/null err
       '';
     }
     {
@@ -1593,8 +1660,9 @@ let
         env -i IMP_TOKEN=imp_fixture_root IMPD_STATE="$PWD/impd" IMPD_TOKEN_FILE="$PWD/impd/token" \
           ${stubImpzHostImage.impz} info > out 2> err || status=$?
 
-        assert_equals 97 "$status" "the exit status"
-        assert_equals 'unexpected: impz info' "$(cat err)" "the error"
+        assert_equal "$status" 97
+        # the error
+        assert_equal "$(cat err)" 'unexpected: impz info'
       '';
     }
     {
@@ -1605,10 +1673,12 @@ let
         other_status=0
         ${stubImpzHostImage.curl} -sS http://127.0.0.1:7070/v1/imps > other 2> other-err || other_status=$?
 
-        assert_equals 0 "$health_status" "the /health exit status"
-        assert_equals '{"status":"ok","ready":true,"warnings":[]}' "$(cat health)" "the /health body"
-        assert_equals 97 "$other_status" "the other call's exit status"
-        assert_equals 'unexpected: curl -sS http://127.0.0.1:7070/v1/imps' "$(cat other-err)" "the other call's error"
+        assert_equal "$health_status" 0
+        # the /health body
+        assert_equal "$(cat health)" '{"status":"ok","ready":true,"warnings":[]}'
+        assert_equal "$other_status" 97
+        # the other call's error
+        assert_equal "$(cat other-err)" 'unexpected: curl -sS http://127.0.0.1:7070/v1/imps'
       '';
     }
     {
@@ -1621,8 +1691,8 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} exec imp-host impz image ls --json > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_files_equal - out <<'EOF'
+        assert_equal "$status" 0
+        diff -u - out <<'EOF'
         [
           {
             "id": "img-1",
@@ -1635,8 +1705,9 @@ let
           }
         ]
         EOF
-        assert_files_equal /dev/null err
-        assert_equals '["exec","imp-host","impz","image","ls","--json"]' "$(cat impd/calls)" "the recorded call"
+        diff -u /dev/null err
+        # the recorded call
+        assert_equal "$(cat impd/calls)" '["exec","imp-host","impz","image","ls","--json"]'
       '';
     }
     {
@@ -1649,11 +1720,12 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} exec imp-host impz image add ghcr.io/example/base:1.0.0 --name pv-base --json > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_equals '{"name":"pv-base","ref":"ghcr.io/example/base:1.0.0","source":"oci"}' "$(jq -c '{name, ref, source}' out)" "the printed image"
-        assert_files_equal /dev/null err
-        assert_equals '[["base","ghcr.io/example/base:1.0.0"],["pv-base","ghcr.io/example/base:1.0.0"]]' \
-          "$(jq -c 'map([.name, .ref])' impd/images.json)" "impd's images"
+        assert_equal "$status" 0
+        # the printed image
+        assert_equal "$(jq -c '{name, ref, source}' out)" '{"name":"pv-base","ref":"ghcr.io/example/base:1.0.0","source":"oci"}'
+        diff -u /dev/null err
+        # impd's images
+        assert_equal "$(jq -c 'map([.name, .ref])' impd/images.json)" '[["base","ghcr.io/example/base:1.0.0"],["pv-base","ghcr.io/example/base:1.0.0"]]'
       '';
     }
     {
@@ -1666,11 +1738,12 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} exec imp-host impz image add ghcr.io/example/base:1.0.0 --name pv-base --json > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_equals '{"name":"pv-base","ref":"ghcr.io/example/base:1.0.0","pinned":true}' "$(jq -c '{name, ref, pinned}' out)" "the printed image"
-        assert_files_equal /dev/null err
-        assert_equals '[["pv-base","ghcr.io/example/base:1.0.0",true]]' \
-          "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" "impd's images"
+        assert_equal "$status" 0
+        # the printed image
+        assert_equal "$(jq -c '{name, ref, pinned}' out)" '{"name":"pv-base","ref":"ghcr.io/example/base:1.0.0","pinned":true}'
+        diff -u /dev/null err
+        # impd's images
+        assert_equal "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" '[["pv-base","ghcr.io/example/base:1.0.0",true]]'
       '';
     }
     {
@@ -1683,10 +1756,11 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} exec imp-host impz image pin pv-base > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_files_equal /dev/null err
-        assert_equals '[["base",false],["pv-base",true]]' "$(jq -c 'map([.name, .pinned])' impd/images.json)" "impd's images"
+        assert_equal "$status" 0
+        diff -u /dev/null out
+        diff -u /dev/null err
+        # impd's images
+        assert_equal "$(jq -c 'map([.name, .pinned])' impd/images.json)" '[["base",false],["pv-base",true]]'
       '';
     }
     {
@@ -1699,10 +1773,12 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} exec imp-host impz image pin pv-base > out 2> err || status=$?
 
-        assert_equals 1 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "impz: NOT_FOUND: image pv-base not found" "$(cat err)" "the error"
-        assert_equals '[]' "$(cat impd/images.json)" "impd's images"
+        assert_equal "$status" 1
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "impz: NOT_FOUND: image pv-base not found"
+        # impd's images
+        assert_equal "$(cat impd/images.json)" '[]'
       '';
     }
     {
@@ -1719,12 +1795,14 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} exec imp-host impz image ls --json > second.out 2> second.err || second_status=$?
 
-        assert_equals 125 "$first_status" "the first call's exit status"
-        assert_files_equal /dev/null first.out
-        assert_equals 'Error: no container with name or ID "imp-host" found: no such container' "$(cat first.err)" "the first call's error"
-        assert_equals 0 "$second_status" "the second call's exit status"
-        assert_equals '[]' "$(cat second.out)" "the second call's output"
-        assert_files_equal /dev/null second.err
+        assert_equal "$first_status" 125
+        diff -u /dev/null first.out
+        # the first call's error
+        assert_equal "$(cat first.err)" 'Error: no container with name or ID "imp-host" found: no such container'
+        assert_equal "$second_status" 0
+        # the second call's output
+        assert_equal "$(cat second.out)" '[]'
+        diff -u /dev/null second.err
       '';
     }
     {
@@ -1742,14 +1820,20 @@ let
           echo "$status" > "$call.status"
         done
 
-        assert_equals 125 "$(cat first.status)" "the first call's exit status"
-        assert_equals 'Error: no container with name or ID "imp-host" found: no such container' "$(cat first.err)" "the first call's error"
-        assert_equals 1 "$(cat second.status)" "the second call's exit status"
-        assert_files_equal /dev/null second.out
-        assert_equals 'impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>' "$(cat second.err)" "the second call's error"
-        assert_equals 0 "$(cat third.status)" "the third call's exit status"
-        assert_equals '[]' "$(cat third.out)" "the third call's output"
-        assert_files_equal /dev/null third.err
+        # the first call's exit status
+        assert_equal "$(cat first.status)" 125
+        # the first call's error
+        assert_equal "$(cat first.err)" 'Error: no container with name or ID "imp-host" found: no such container'
+        # the second call's exit status
+        assert_equal "$(cat second.status)" 1
+        diff -u /dev/null second.out
+        # the second call's error
+        assert_equal "$(cat second.err)" 'impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>'
+        # the third call's exit status
+        assert_equal "$(cat third.status)" 0
+        # the third call's output
+        assert_equal "$(cat third.out)" '[]'
+        diff -u /dev/null third.err
       '';
     }
     {
@@ -1766,14 +1850,20 @@ let
           echo "$status" > "$call.status"
         done
 
-        assert_equals 125 "$(cat first.status)" "the first call's exit status"
-        assert_equals 'Error: no container with name or ID "imp-host" found: no such container' "$(cat first.err)" "the first call's error"
-        assert_equals 0 "$(cat second.status)" "the second call's exit status"
-        assert_equals '{"status":"ok","ready":false,"warnings":[]}' "$(cat second.out)" "the second call's output"
-        assert_files_equal /dev/null second.err
-        assert_equals 0 "$(cat third.status)" "the third call's exit status"
-        assert_equals '{"status":"ok","ready":true,"warnings":[]}' "$(cat third.out)" "the third call's output"
-        assert_files_equal /dev/null third.err
+        # the first call's exit status
+        assert_equal "$(cat first.status)" 125
+        # the first call's error
+        assert_equal "$(cat first.err)" 'Error: no container with name or ID "imp-host" found: no such container'
+        # the second call's exit status
+        assert_equal "$(cat second.status)" 0
+        # the second call's output
+        assert_equal "$(cat second.out)" '{"status":"ok","ready":false,"warnings":[]}'
+        diff -u /dev/null second.err
+        # the third call's exit status
+        assert_equal "$(cat third.status)" 0
+        # the third call's output
+        assert_equal "$(cat third.out)" '{"status":"ok","ready":true,"warnings":[]}'
+        diff -u /dev/null third.err
       '';
     }
     {
@@ -1788,14 +1878,15 @@ let
           env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
             ${stubImpHostPodman} exec -i imp-host sh -s -- /var/lib/imp/marker relative > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_files_equal - out <<'EOF'
+        assert_equal "$status" 0
+        diff -u - out <<'EOF'
         held
         relative
         ${pkgs.dash}/bin/dash
         EOF
-        assert_files_equal /dev/null err
-        assert_equals '["exec","-i","imp-host","sh","-s","--","/var/lib/imp/marker","relative"]' "$(cat impd/calls)" "the recorded call"
+        diff -u /dev/null err
+        # the recorded call
+        assert_equal "$(cat impd/calls)" '["exec","-i","imp-host","sh","-s","--","/var/lib/imp/marker","relative"]'
       '';
     }
     {
@@ -1812,12 +1903,16 @@ let
           echo "$status" > "$call.status"
         done
 
-        assert_equals 125 "$(cat first.status)" "the first run's exit status"
-        assert_files_equal /dev/null first.out
-        assert_equals 'Error: no container with name or ID "imp-host" found: no such container' "$(cat first.err)" "the first run's error"
-        assert_equals 0 "$(cat second.status)" "the second run's exit status"
-        assert_equals ran "$(cat second.out)" "the second run's output"
-        assert_files_equal /dev/null second.err
+        # the first run's exit status
+        assert_equal "$(cat first.status)" 125
+        diff -u /dev/null first.out
+        # the first run's error
+        assert_equal "$(cat first.err)" 'Error: no container with name or ID "imp-host" found: no such container'
+        # the second run's exit status
+        assert_equal "$(cat second.status)" 0
+        # the second run's output
+        assert_equal "$(cat second.out)" ran
+        diff -u /dev/null second.err
       '';
     }
     {
@@ -1833,12 +1928,15 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} container inspect --format '{{.Id}}' imp-host > third.out 2> third.err
 
-        assert_equals c0ffee01 "$(cat first.out)" "the first inspect's output"
-        assert_equals c0ffee02 "$(cat second.out)" "the second inspect's output"
-        assert_equals c0ffee02 "$(cat third.out)" "the third inspect's output"
-        assert_files_equal /dev/null first.err
-        assert_files_equal /dev/null second.err
-        assert_files_equal /dev/null third.err
+        # the first inspect's output
+        assert_equal "$(cat first.out)" c0ffee01
+        # the second inspect's output
+        assert_equal "$(cat second.out)" c0ffee02
+        # the third inspect's output
+        assert_equal "$(cat third.out)" c0ffee02
+        diff -u /dev/null first.err
+        diff -u /dev/null second.err
+        diff -u /dev/null third.err
       '';
     }
     {
@@ -1850,9 +1948,10 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} container inspect --format '{{.Id}}' imp-host > out 2> err || status=$?
 
-        assert_equals 125 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals 'Error: no such container "imp-host"' "$(cat err)" "the error"
+        assert_equal "$status" 125
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" 'Error: no such container "imp-host"'
       '';
     }
     {
@@ -1867,11 +1966,13 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} container inspect --format '{{.Id}}' imp-host > second.out 2> second.err || second_status=$?
 
-        assert_equals c0ffee01 "$(cat first.out)" "the first inspect's output"
-        assert_files_equal /dev/null first.err
-        assert_equals 125 "$second_status" "the second inspect's exit status"
-        assert_files_equal /dev/null second.out
-        assert_equals 'Error: no such container "imp-host"' "$(cat second.err)" "the second inspect's error"
+        # the first inspect's output
+        assert_equal "$(cat first.out)" c0ffee01
+        diff -u /dev/null first.err
+        assert_equal "$second_status" 125
+        diff -u /dev/null second.out
+        # the second inspect's error
+        assert_equal "$(cat second.err)" 'Error: no such container "imp-host"'
       '';
     }
     {
@@ -1885,10 +1986,12 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} exec imp-host impz image add ghcr.io/example/base:1.0.0 --name pv-base --json > out 2> err || status=$?
 
-        assert_equals 1 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "impz: image ghcr.io/example/base:1.0.0: pull failed" "$(cat err)" "the error"
-        assert_equals '[]' "$(cat impd/images.json)" "impd's images"
+        assert_equal "$status" 1
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "impz: image ghcr.io/example/base:1.0.0: pull failed"
+        # impd's images
+        assert_equal "$(cat impd/images.json)" '[]'
       '';
     }
     {
@@ -1901,10 +2004,12 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} exec imp-host impz image rm 'two words' > out 2> err || status=$?
 
-        assert_equals 97 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "unexpected: exec imp-host impz image rm two words" "$(cat err)" "the error"
-        assert_equals '["exec","imp-host","impz","image","rm","two words"]' "$(cat impd/calls)" "the recorded call"
+        assert_equal "$status" 97
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "unexpected: exec imp-host impz image rm two words"
+        # the recorded call
+        assert_equal "$(cat impd/calls)" '["exec","imp-host","impz","image","rm","two words"]'
       '';
     }
     {
@@ -1917,10 +2022,12 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} exec imp-host impz info > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_equals 'version     4.5.6' "$(cat out)" "the printed info"
-        assert_files_equal /dev/null err
-        assert_equals '["exec","imp-host","impz","info"]' "$(cat impd/calls)" "the recorded call"
+        assert_equal "$status" 0
+        # the printed info
+        assert_equal "$(cat out)" 'version     4.5.6'
+        diff -u /dev/null err
+        # the recorded call
+        assert_equal "$(cat impd/calls)" '["exec","imp-host","impz","info"]'
       '';
     }
     {
@@ -1932,9 +2039,10 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} exec imp-host impz info > out 2> err || status=$?
 
-        assert_equals 97 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "unexpected: exec imp-host impz info" "$(cat err)" "the error"
+        assert_equal "$status" 97
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "unexpected: exec imp-host impz info"
       '';
     }
     {
@@ -1951,13 +2059,14 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} exec imp-host stat -c %a /usr/local/bin/impz > stat.out 2> stat.err || stat_status=$?
 
-        assert_equals 0 "$cat_status" "the cat exit status"
-        assert_files_equal impd/container/usr/local/bin/impz cat.out
-        assert_files_equal /dev/null cat.err
-        assert_equals 0 "$stat_status" "the stat exit status"
-        assert_equals 750 "$(cat stat.out)" "the printed mode"
-        assert_files_equal /dev/null stat.err
-        assert_files_equal - impd/calls <<'EOF'
+        assert_equal "$cat_status" 0
+        diff -u impd/container/usr/local/bin/impz cat.out
+        diff -u /dev/null cat.err
+        assert_equal "$stat_status" 0
+        # the printed mode
+        assert_equal "$(cat stat.out)" 750
+        diff -u /dev/null stat.err
+        diff -u - impd/calls <<'EOF'
         ["exec","imp-host","cat","/usr/local/bin/impz"]
         ["exec","imp-host","stat","-c","%a","/usr/local/bin/impz"]
         EOF
@@ -1975,12 +2084,14 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} exec imp-host stat -c %a /usr/local/bin/impz > stat.out 2> stat.err || stat_status=$?
 
-        assert_equals 1 "$cat_status" "the cat exit status"
-        assert_files_equal /dev/null cat.out
-        assert_equals 'cat: /usr/local/bin/impz: No such file or directory' "$(cat cat.err)" "the cat error"
-        assert_equals 1 "$stat_status" "the stat exit status"
-        assert_files_equal /dev/null stat.out
-        assert_equals "stat: cannot statx '/usr/local/bin/impz': No such file or directory" "$(cat stat.err)" "the stat error"
+        assert_equal "$cat_status" 1
+        diff -u /dev/null cat.out
+        # the cat error
+        assert_equal "$(cat cat.err)" 'cat: /usr/local/bin/impz: No such file or directory'
+        assert_equal "$stat_status" 1
+        diff -u /dev/null stat.out
+        # the stat error
+        assert_equal "$(cat stat.err)" "stat: cannot statx '/usr/local/bin/impz': No such file or directory"
       '';
     }
     {
@@ -1993,10 +2104,12 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} exec -e HOME=/root imp-host impz image ls --json > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_equals '[]' "$(cat out)" "the images"
-        assert_files_equal /dev/null err
-        assert_equals '["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]' "$(cat impd/calls)" "the recorded call"
+        assert_equal "$status" 0
+        # the images
+        assert_equal "$(cat out)" '[]'
+        diff -u /dev/null err
+        # the recorded call
+        assert_equal "$(cat impd/calls)" '["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]'
       '';
     }
     {
@@ -2013,12 +2126,14 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
           ${stubImpHostPodman} exec -e HOME=/root imp-host impz image ls --json > named.out 2> named.err || named_status=$?
 
-        assert_equals 1 "$bare_status" "the exit status without HOME"
-        assert_files_equal /dev/null bare.out
-        assert_equals 'impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>' "$(cat bare.err)" "the error without HOME"
-        assert_equals 0 "$named_status" "the exit status with HOME"
-        assert_equals '[]' "$(cat named.out)" "the images with HOME"
-        assert_files_equal /dev/null named.err
+        assert_equal "$bare_status" 1
+        diff -u /dev/null bare.out
+        # the error without HOME
+        assert_equal "$(cat bare.err)" 'impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>'
+        assert_equal "$named_status" 0
+        # the images with HOME
+        assert_equal "$(cat named.out)" '[]'
+        diff -u /dev/null named.err
       '';
     }
     {
@@ -2035,9 +2150,10 @@ let
           IMP_URL=http://127.0.0.1:7070 IMP_TOKEN=imp_fixture_token \
           ${stubAgentImageBun} scripts/build-agent-image.ts 0123abcdef0123abcdef0123abcdef0123abcdef > "$root/out" 2> "$root/err") || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_equals 'agent-0123abc imp-build-aa check passed' "$(cat out)" "the printed result"
-        assert_files_equal /dev/null err
+        assert_equal "$status" 0
+        # the printed result
+        assert_equal "$(cat out)" 'agent-0123abc imp-build-aa check passed'
+        diff -u /dev/null err
         jq -S . > expected <<EOF
         {
           "argv": ["scripts/build-agent-image.ts", "0123abcdef0123abcdef0123abcdef0123abcdef"],
@@ -2048,7 +2164,7 @@ let
         }
         EOF
         jq -S . build/calls > actual
-        assert_files_equal expected actual
+        diff -u expected actual
       '';
     }
     {
@@ -2061,10 +2177,11 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" BUILD_STATE="$PWD/build" \
           ${stubAgentImageBun} scripts/build-agent-image.ts 0123abc > out 2> err || status=$?
 
-        assert_equals 1 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_files_equal /dev/null err
-        assert_equals '{"impURL":null,"impToken":null,"impz":null}' "$(jq -c '{impURL, impToken, impz}' build/calls)" "the recorded call"
+        assert_equal "$status" 1
+        diff -u /dev/null out
+        diff -u /dev/null err
+        # the recorded call
+        assert_equal "$(jq -c '{impURL, impToken, impz}' build/calls)" '{"impURL":null,"impToken":null,"impz":null}'
       '';
     }
     {
@@ -2076,10 +2193,13 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" BUILD_STATE="$PWD/build" \
           ${stubAgentImageBun} scripts/build-agent-image.ts --keep 0123abc > out 2> err || status=$?
 
-        assert_equals 97 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "unexpected: scripts/build-agent-image.ts --keep 0123abc" "$(cat err)" "the error"
-        assert_missing build/calls "the call log"
+        assert_equal "$status" 97
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "unexpected: scripts/build-agent-image.ts --keep 0123abc"
+        # the call log
+        assert [ ! -e build/calls ]
+        assert [ ! -L build/calls ]
       '';
     }
     {
@@ -2090,9 +2210,10 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${stubAgentImageBun} scripts/build-agent-image.ts 0123abc > out 2> err || status=$?
 
-        assert_equals 2 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "bun-answering-build-agent-image: set BUILD_STATE to the directory that holds the build's answer" "$(cat err)" "the error"
+        assert_equal "$status" 2
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "bun-answering-build-agent-image: set BUILD_STATE to the directory that holds the build's answer"
       '';
     }
     {
@@ -2103,9 +2224,10 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${stubImpHostPodman} exec imp-host impz image ls --json > out 2> err || status=$?
 
-        assert_equals 2 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "podman-answering-impz: set IMPD_STATE to the directory that holds impd's images" "$(cat err)" "the error"
+        assert_equal "$status" 2
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "podman-answering-impz: set IMPD_STATE to the directory that holds impd's images"
       '';
     }
     {
@@ -2122,15 +2244,15 @@ let
         # a podman call by name, outside a comment, would pass the stand-in by
         direct=$(grep -cE '^[^#]*(^|[ ;&|($])podman ' ${../modules/preview-image.sh} || true)
 
-        assert_equals 1 "$podman_cmd" "the script's podman"
-        assert_equals 1 "$health_url" "the script's /health URL"
-        assert_equals 1 "$health" "the script's /health call"
-        assert_equals 1 "$list" "the script's image list"
-        assert_equals 1 "$facts" "the script's token-file facts"
-        assert_equals 1 "$add" "the script's image add"
-        assert_equals 1 "$pin" "the script's image pin"
-        assert_equals 5 "$calls" "the script's calls through PODMAN"
-        assert_equals 0 "$direct" "the script's calls of podman by name"
+        assert_equal "$podman_cmd" 1
+        assert_equal "$health_url" 1
+        assert_equal "$health" 1
+        assert_equal "$list" 1
+        assert_equal "$facts" 1
+        assert_equal "$add" 1
+        assert_equal "$pin" 1
+        assert_equal "$calls" 5
+        assert_equal "$direct" 0
       '';
     }
     {
@@ -2142,10 +2264,10 @@ let
         env -i PATH="${stubOpRead}/bin:$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
           op read --no-newline op://vault/item/field > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_files_equal /dev/null err
+        assert_equal "$status" 0
+        diff -u /dev/null err
         printf '%s' 'a value with spaces' > expected
-        assert_files_equal expected out
+        diff -u expected out
       '';
     }
     {
@@ -2157,9 +2279,10 @@ let
         env -i PATH="${stubOpRead}/bin:$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
           op read --no-newline op://vault/item/missing > out 2> err || status=$?
 
-        assert_equals 1 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "[ERROR] 2026/10/07 12:00:00 could not read secret op://vault/item/missing" "$(cat err)" "the error"
+        assert_equal "$status" 1
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "[ERROR] 2026/10/07 12:00:00 could not read secret op://vault/item/missing"
       '';
     }
     {
@@ -2171,83 +2294,206 @@ let
         env -i PATH="${stubOpRead}/bin:$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
           op read op://vault/item/field > out 2> err || status=$?
 
-        assert_equals 97 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals "unexpected: read op://vault/item/field" "$(cat err)" "the error"
+        assert_equal "$status" 97
+        diff -u /dev/null out
+        # the error
+        assert_equal "$(cat err)" "unexpected: read op://vault/item/field"
       '';
     }
   ];
-in
-pkgs.runCommand "test-utils-check"
-  {
-    nativeBuildInputs = [
-      pkgs.curl
-      pkgs.diffutils
-      pkgs.gnutar
-      pkgs.gzip
-      pkgs.jq
-      pkgs.python3
-      pkgs.sqlite
-    ];
-  }
-  ''
-    set -euo pipefail
-    # fixed, so the modes the tests assert do not depend on the builder's umask
-    umask 022
+  # renderCases' own tests, as a plain .bats file: the cases after them are rendered by it, so a
+  # failing one stops the build before they run. Each runs bats on a file renderCases rendered.
+  renderCasesTests = pkgs.writeText "render-cases.bats" ''
+    bats_require_minimum_version 1.5.0
 
-    bash ${testLib}/test-run-cases.sh
-    bash ${testLib}/test-assert-equals.sh
-    bash ${testLib}/test-assert-not-equals.sh
-    bash ${testLib}/test-assert-files-equal.sh
-    bash ${testLib}/test-assert-between.sh
-    bash ${testLib}/test-assert-missing.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-not-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${testLib}/assert-missing.sh
+    setup() {
+      bats_load_library bats-support
+      bats_load_library bats-assert
+      cd "$BATS_TEST_TMPDIR"
+    }
 
-    echo "it renderCases runs each case's script in a fresh directory of its own, under its title"
-    (
-      cd "$(mktemp -d)"
-      log=$PWD
+    @test "it renderCases runs each case's script in a fresh directory of its own, under its title" {
+      export log=$PWD
 
-      (
-        source ${testLib}/run-cases.sh
-        source ${
-          pkgs.writeText "rendered-cases.sh" (renderCases [
-            {
-              title = "it writes where it runs";
-              script = ''
-                pwd > "$log/first-dir"
-                ls -A > "$log/first-listing"
-                cat > "$log/first-heredoc" <<'EOF'
-                kept at the start of its line
-                EOF
-              '';
-            }
-            {
-              title = "it writes where it runs, again";
-              script = ''
-                pwd > "$log/second-dir"
-              '';
-            }
-          ])
-        }
-        run_cases
-      ) > out 2>&1
+      bats --formatter tap ${
+        pkgs.writeText "rendered-cases.bats" (renderCases [
+          {
+            title = "it writes where it runs";
+            script = ''
+              pwd > "$log/first-dir"
+              ls -A > "$log/first-listing"
+              cat > "$log/first-heredoc" <<'EOF'
+              kept at the start of its line
+              EOF
+            '';
+          }
+          {
+            title = "it writes where it runs, again";
+            script = ''
+              pwd > "$log/second-dir"
+            '';
+          }
+        ])
+      } > out 2>&1
 
-      printf '%s\n' 'ok it writes where it runs' 'ok it writes where it runs, again' '2 cases, 0 failed' > expected
-      assert_files_equal expected out
-      assert_equals "" "$(cat first-listing)" "the first case's directory, as it starts"
-      assert_equals "kept at the start of its line" "$(cat first-heredoc)" "the first case's heredoc"
-      assert_not_equals "$(cat first-dir)" "$(cat second-dir)" "the second case's directory"
-      assert_not_equals "$log" "$(cat first-dir)" "the first case's directory"
-    )
+      printf '%s\n' 1..2 'ok 1 it writes where it runs' 'ok 2 it writes where it runs, again' > expected
+      diff -u expected out
+      assert_equal "$(cat first-listing)" ""
+      assert_equal "$(cat first-heredoc)" "kept at the start of its line"
+      assert_not_equal "$(cat first-dir)" "$(cat second-dir)"
+      assert_not_equal "$(cat first-dir)" "$log"
+    }
 
-    echo "it renderCases rejects a title with an underscore, which run_cases would print as a space"
-    (
-      cd "$(mktemp -d)"
+    @test "it renderCases fails the run for a case whose assertion fails, and passes the cases around it" {
+      run -1 bats --formatter tap ${
+        pkgs.writeText "failing-cases.bats" (renderCases [
+          {
+            title = "it passes before";
+            script = "true";
+          }
+          {
+            title = "it asserts two values equal";
+            script = "assert_equal one two";
+          }
+          {
+            title = "it passes after";
+            script = "true";
+          }
+        ])
+      }
 
+      assert_line "ok 1 it passes before"
+      assert_line "not ok 2 it asserts two values equal"
+      assert_line "ok 3 it passes after"
+    }
+
+    @test "it renderCases ends a case at its first failing command" {
+      run -1 bats --formatter tap ${
+        pkgs.writeText "errexit-cases.bats" (renderCases [
+          {
+            title = "it stops at the failing command";
+            script = ''
+              false
+              touch ran-on
+            '';
+          }
+        ])
+      }
+
+      assert_line "not ok 1 it stops at the failing command"
+    }
+
+    @test "it renderCases ends a case at the first unset variable and the first failing pipe stage" {
+      run -1 bats --formatter tap ${
+        pkgs.writeText "strict-cases.bats" (renderCases [
+          {
+            title = "it reads an unset variable";
+            script = ''
+              echo "$unset_variable"
+            '';
+          }
+          {
+            title = "it fails in a pipe";
+            script = ''
+              false | cat
+            '';
+          }
+        ])
+      }
+
+      assert_line "not ok 1 it reads an unset variable"
+      assert_line "not ok 2 it fails in a pipe"
+    }
+
+    @test "it renderCases lets a case set an EXIT trap and leave a background process running" {
+      export log=$PWD
+
+      # a background process that kept bats' output descriptor open would hold the run until it ends
+      run timeout 20 bats --formatter tap ${
+        pkgs.writeText "trap-cases.bats" (renderCases [
+          {
+            title = "it sets a trap and starts a process";
+            script = ''
+              trap 'echo trapped > "$log/trapped"' EXIT
+              sleep 60 &
+              echo $! > "$log/pid"
+            '';
+          }
+        ])
+      }
+      kill "$(cat pid)" || true
+
+      assert_success
+      assert_line "ok 1 it sets a trap and starts a process"
+      assert_equal "$(cat trapped)" trapped
+    }
+
+    @test "it renderCases sources each file of sources before the cases" {
+      run bats --formatter tap ${
+        pkgs.writeText "sourced-cases.bats" (
+          (import ./test-utils/render-cases.nix {
+            inherit lib;
+            sources = [ (pkgs.writeText "greet.sh" "greet() { echo hello; }") ];
+          })
+            [
+              {
+                title = "it calls a sourced function";
+                script = "assert_equal \"$(greet)\" hello";
+              }
+            ]
+        )
+      }
+
+      assert_success
+      assert_line "ok 1 it calls a sourced function"
+    }
+
+    @test "it renderCases defines assert_within, which takes a whole number from low to high" {
+      run bats --formatter tap ${
+        pkgs.writeText "within-cases.bats" (renderCases [
+          {
+            title = "it takes the low bound";
+            script = "assert_within 5 5 9";
+          }
+          {
+            title = "it takes the high bound";
+            script = "assert_within 5 9 9";
+          }
+        ])
+      }
+
+      assert_success
+    }
+
+    @test "it renderCases defines assert_within, which fails a value that is below, above or no number" {
+      run -1 bats --formatter tap ${
+        pkgs.writeText "outside-cases.bats" (renderCases [
+          {
+            title = "it takes a value below";
+            script = "assert_within 5 4 9";
+          }
+          {
+            title = "it takes a value above";
+            script = "assert_within 5 10 9";
+          }
+          {
+            title = "it takes a word";
+            script = "assert_within 5 six 9";
+          }
+          {
+            title = "it takes an empty value";
+            script = "assert_within 5 '' 9";
+          }
+        ])
+      }
+
+      assert_line "not ok 1 it takes a value below"
+      assert_line "not ok 2 it takes a value above"
+      assert_line "not ok 3 it takes a word"
+      assert_line "not ok 4 it takes an empty value"
+    }
+
+    @test "it renderCases rejects a title with an underscore" {
       rendered=${
         lib.boolToString
           (builtins.tryEval (renderCases [
@@ -2258,13 +2504,10 @@ pkgs.runCommand "test-utils-check"
           ])).success
       }
 
-      assert_equals false "$rendered" "whether it rendered"
-    )
+      assert_equal "$rendered" false
+    }
 
-    echo "it renderCases rejects a title that does not start with it"
-    (
-      cd "$(mktemp -d)"
-
+    @test "it renderCases rejects a title that does not start with it" {
       rendered=${
         lib.boolToString
           (builtins.tryEval (renderCases [
@@ -2275,13 +2518,10 @@ pkgs.runCommand "test-utils-check"
           ])).success
       }
 
-      assert_equals false "$rendered" "whether it rendered"
-    )
+      assert_equal "$rendered" false
+    }
 
-    echo "it renderCases rejects two cases with one title, where the second would replace the first"
-    (
-      cd "$(mktemp -d)"
-
+    @test "it renderCases rejects two cases with one title, where the second would replace the first" {
       rendered=${
         lib.boolToString
           (builtins.tryEval (renderCases [
@@ -2296,12 +2536,32 @@ pkgs.runCommand "test-utils-check"
           ])).success
       }
 
-      assert_equals false "$rendered" "whether it rendered"
-    )
+      assert_equal "$rendered" false
+    }
+  '';
+in
+pkgs.runCommand "test-utils-check"
+  {
+    nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
+      pkgs.curl
+      pkgs.diffutils
+      pkgs.gnutar
+      pkgs.gzip
+      pkgs.jq
+      pkgs.python3
+      pkgs.sqlite
+    ];
+  }
+  ''
+    set -euo pipefail
+    # fixed, so the modes the tests assert do not depend on the builder's umask
+    umask 022
 
-    source ${./test-utils/start-stub-server.sh}
-    source ${testLib}/run-cases.sh
-    source ${pkgs.writeText "test-utils-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${renderCasesTests}
+    bats --timing --print-output-on-failure ${pkgs.writeText "test-utils-check.bats" (renderCases cases)}
     touch $out
   ''
