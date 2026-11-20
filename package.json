@@ -37,7 +37,7 @@
     "test:related": "bun scripts/run-related-tests.ts",
     "test:related-root": "rig related",
     "test:scripts": "bash scripts/run-shell-suites.sh",
-    "test:alert-rules": "bash scripts/run-bats.sh alert-rules",
+    "test:alert-rules": "bash scripts/run-bats.sh alert-rules && bash scripts/run-shell-suites.sh alert-rules",
     "test:atc-gateway-fixture": "bash images/atc-gateway/run-fixture-tests.sh",
     "test:nixie-backup-fixture": "bash scripts/run-shell-suites.sh nixie-backup-fixture",
     "test:files-backup-fixture": "bash scripts/run-shell-suites.sh files-backup-fixture",

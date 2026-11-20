@@ -10,7 +10,7 @@
 # alert, Alertmanager's log, or Alloy's metrics. The second checks that the owner's activity alone
 # still reaches Discord. infra/observability/atc-sign-in-alerts.bats tests each stage on its own.
 #
-#   bash scripts/run-shell-suites.sh alert-rules
+#   bash scripts/run-shell-suites.sh alert-rules   # the only suite left in the group on this runner; bun run test:alert-rules runs it after the bats suites
 #   CASE='journey' bash scripts/e2e/journey-atc-sign-in-alerts.sh
 #
 # shell-suite: alert-rules
