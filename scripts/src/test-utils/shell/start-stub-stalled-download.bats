@@ -26,7 +26,7 @@ teardown() {
 # setup_test <tree>: the stand-in, listening, with its files in <tree>/download
 setup_test() {
   local tree="$1"
-  start_stub_stalled_download "$tree/download"
+  start_stub_stalled_download "$tree/download" 3>&-
 }
 
 @test "it sends the headers and the first 4 kib then stalls" {

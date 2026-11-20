@@ -26,7 +26,7 @@ teardown() {
 setup_test() {
   local tree="$1"
   mkdir "$tree/discord"
-  start_stub_discord_webhook "$tree/discord"
+  start_stub_discord_webhook "$tree/discord" 3>&-
 }
 
 @test "it takes a json post with 204 and records its path and body" {

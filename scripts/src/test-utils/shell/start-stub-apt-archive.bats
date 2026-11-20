@@ -39,7 +39,7 @@ setup_test() {
   mkdir -p "$tree/archive/root/ubuntu/dists/noble"
   echo 'Suite: noble' > "$tree/archive/root/ubuntu/dists/noble/Release"
   port="$(pick_port)"
-  start_stub_apt_archive "$tree/archive" "$port"
+  start_stub_apt_archive "$tree/archive" "$port" 3>&-
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" curl -q --noproxy '*' -sS --max-time 5 \
     -H 'Host: archive.ubuntu.com' -o "$tree/body" -w '%{http_code}' \
@@ -56,7 +56,7 @@ setup_test() {
   local port code
   setup_test "$tree"
   port="$(pick_port)"
-  start_stub_apt_archive "$tree/archive" "$port"
+  start_stub_apt_archive "$tree/archive" "$port" 3>&-
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" curl -q --noproxy '*' -sS --max-time 5 \
     -o "$tree/body" -w '%{http_code}' "http://127.0.0.1:$port/ubuntu/dists/noble/InRelease")"
@@ -71,7 +71,7 @@ setup_test() {
   setup_test "$tree"
   echo 'outside' > "$tree/archive/outside"
   port="$(pick_port)"
-  start_stub_apt_archive "$tree/archive" "$port"
+  start_stub_apt_archive "$tree/archive" "$port" 3>&-
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" curl -q --noproxy '*' -sS --max-time 5 \
     --path-as-is -o "$tree/body" -w '%{http_code}' "http://127.0.0.1:$port/../outside")"
@@ -88,7 +88,7 @@ setup_test() {
   echo 'deb' > "$tree/archive/root/pool/stub.deb"
   echo '503 2 /pool/stub.deb' > "$tree/archive/faults"
   port="$(pick_port)"
-  start_stub_apt_archive "$tree/archive" "$port"
+  start_stub_apt_archive "$tree/archive" "$port" 3>&-
 
   first="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" curl -q --noproxy '*' -sS --max-time 5 \
     -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/pool/stub.deb")"
@@ -115,7 +115,7 @@ EOF
   echo 'deb' > "$tree/archive/root/pool/stub.deb"
   echo '502 all /pool/stub.deb' > "$tree/archive/faults"
   port="$(pick_port)"
-  start_stub_apt_archive "$tree/archive" "$port"
+  start_stub_apt_archive "$tree/archive" "$port" 3>&-
 
   first="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" curl -q --noproxy '*' -sS --max-time 5 \
     -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/pool/stub.deb")"
@@ -134,7 +134,7 @@ EOF
   local port code
   setup_test "$tree"
   port="$(pick_port)"
-  start_stub_apt_archive "$tree/archive" "$port"
+  start_stub_apt_archive "$tree/archive" "$port" 3>&-
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" curl -q --noproxy '*' -sS --max-time 5 \
     -X POST -o "$tree/body" -w '%{http_code}' "http://127.0.0.1:$port/ubuntu/dists/noble/Release")"
