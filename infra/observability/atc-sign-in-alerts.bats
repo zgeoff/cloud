@@ -162,6 +162,30 @@ EOF
   run -1 grep -io 'canary[a-z0-9-]*' "$tree/metrics"
 }
 
+@test "it counts the kinds that raise no alert under their own labels, not under other" {
+  local now
+  setup_test "$tree"
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs"
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
+
+  sed "s/@NOW@/$now/" >> "$tree/logs/atc_atc-gateway-5d8f9c7b4-x2k9q_0f4e/atc-gateway/0.log" << 'EOF'
+@NOW@ stderr F atc security {"v":1,"kind":"bearer","outcome":"rejected","reason":"missing","route":"/"}
+@NOW@ stderr F atc security {"v":1,"kind":"token_exchange","outcome":"rejected","reason":"invalid_grant","route":"/oauth2/token"}
+@NOW@ stderr F atc security {"v":1,"kind":"bad_host","outcome":"rejected","reason":"host_not_allowed","route":"/mcp"}
+@NOW@ stderr F atc security {"v":1,"kind":"consent","outcome":"denied","reason":"none_ticked","route":"/consent"}
+EOF
+  wait_for 30 "Alloy to count the last event" has_metric "$(cat "$tree/alloy/url")" 'kind="consent",method="none",outcome="denied"'
+
+  curl -fsS "$(cat "$tree/alloy/url")/metrics" > "$tree/metrics"
+  grep '^loki_process_custom_atc_security_' "$tree/metrics" > "$tree/out"
+  run -0 diff - "$tree/out" << 'EOF'
+loki_process_custom_atc_security_events_total{component_id="loki.process.atc_security",component_path="/",kind="bad_host",method="none",outcome="rejected",reason="host_not_allowed",route="/mcp"} 1
+loki_process_custom_atc_security_events_total{component_id="loki.process.atc_security",component_path="/",kind="bearer",method="none",outcome="rejected",reason="missing",route="/"} 1
+loki_process_custom_atc_security_events_total{component_id="loki.process.atc_security",component_path="/",kind="consent",method="none",outcome="denied",reason="none_ticked",route="/consent"} 1
+loki_process_custom_atc_security_events_total{component_id="loki.process.atc_security",component_path="/",kind="token_exchange",method="none",outcome="rejected",reason="invalid_grant",route="/oauth2/token"} 1
+EOF
+}
+
 @test "it gives a forwarded address no place in the metrics even one marked trusted" {
   local now
   setup_test "$tree"

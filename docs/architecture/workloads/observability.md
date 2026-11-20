@@ -182,9 +182,11 @@ Alloy labels each count with the event's kind, outcome, reason, route and method
 value against the contract. A kind and an outcome pass only as a pair that the contract lists, and
 every other label passes only from its own list. A value outside the contract becomes `other`, and a
 line whose kind and outcome fail the check counts under kind `other`, which raises an alert of its
-own, so a change to the contract shows instead of passing unseen. The client's id and name, the
-validated redirect host, the correlation id, the user agent and the addresses never become labels.
-They stay in the event line in Loki, where the owner reads them in Grafana over the tailnet.
+own, so a change to the contract shows instead of passing unseen. The kinds `token_exchange`,
+`bearer`, `bad_host` and `bad_origin` count under their own labels and raise no alert. The client's
+id and name, the validated redirect host, the correlation id, the user agent and the addresses never
+become labels. They stay in the event line in Loki, where the owner reads them in Grafana over the
+tailnet.
 
 An alert holds no source address. Anyone can send the `CF-Connecting-IP` header, and the contract
 marks its value `trusted` only when the request came from a proxy that atc lists. atc matches each

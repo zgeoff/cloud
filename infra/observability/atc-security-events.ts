@@ -1,5 +1,5 @@
 // atc's security-event contract (zgeoff/atc docs/architecture/remote/oauth.md, "Security
-// events", at @zgeoff/atc@4.13.2)
+// events", at @zgeoff/atc@7.21.1)
 export const atcSecurityEvents = {
   // `suppressed` has no outcome
   outcomes: {
@@ -7,6 +7,10 @@ export const atcSecurityEvents = {
     authorize_invalid: ['rejected'],
     owner_auth: ['succeeded', 'failed'],
     consent: ['allowed', 'denied'],
+    token_exchange: ['succeeded', 'rejected'],
+    bearer: ['rejected'],
+    bad_host: ['rejected'],
+    bad_origin: ['rejected'],
   },
 
   reasons: [
@@ -27,11 +31,20 @@ export const atcSecurityEvents = {
     'expired',
     'not_enrolled',
     'invalid_token',
+    'host_not_allowed',
+    'origin_not_allowed',
+    'missing',
+    'malformed',
+    'invalid_grant',
+    'unsupported_grant_type',
+    'temporarily_unavailable',
     'none_ticked',
     'authorize_started',
     'authorize_invalid',
     'owner_auth',
     'consent',
+    'token_exchange',
+    'bearer',
   ],
 
   // atc writes any other path as `other`
