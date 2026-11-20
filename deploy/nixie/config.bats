@@ -16,6 +16,8 @@
 #
 #   CASE='context cap' bash scripts/run-bats.sh nixie-config
 
+# each case starts a container, which a cold host can take longer than 30 seconds over
+export BATS_TEST_TIMEOUT=120
 
 # Boot data every case needs: the nixie image the stack config pins (nixie.image), pulled once.
 setup_file() {

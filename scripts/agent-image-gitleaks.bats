@@ -10,6 +10,9 @@
 #
 #   CASE='github token' bash scripts/run-bats.sh agent-image
 
+# each case starts a container, which a cold host can take longer than 30 seconds over
+export BATS_TEST_TIMEOUT=120
+
 # Boot data every case needs: the image that test:agent-image builds, the config under test by
 # absolute path for the bind mount, the Bedrock rule's pattern source (split here so the repo's
 # own scan does not match this file), a GitHub token that matches gitleaks' github-pat rule, and
@@ -45,10 +48,10 @@ setup_test() {
   mkdir -p "$tree/opt/auto-mode/dist" "$tree/opt/chrome/resources/accessibility"
 }
 
-# scan <status>: runs the image's gitleaks over the case tree's /opt with the config under test, and
-# checks its exit status; its report is in $output and its log in $stderr
+# scan: the image's gitleaks over the case tree's /opt with the config under test; a case runs it
+# with `run`, and reads the report in $output and the log in $stderr
 scan() {
-  run "-$1" --separate-stderr docker run --rm --network none --entrypoint gitleaks -v "$tree/opt:/opt:ro" \
+  docker run --rm --network none --entrypoint gitleaks -v "$tree/opt:/opt:ro" \
     -v "$config:/run/gitleaks.toml:ro" "$image" dir /opt --config /run/gitleaks.toml --no-banner \
     --no-color --redact --report-format json --report-path -
 }
@@ -58,7 +61,7 @@ scan() {
   printf '{"rules":[{"id":"aws-amazon-bedrock-api-key-short-lived","pattern":{"source":"%s","flags":"","engine":"js"}}]}' \
     "$BEDROCK_PATTERN" > "$tree/opt/auto-mode/dist/secret-rules.json"
 
-  scan 0
+  run -0 --separate-stderr scan
 
   jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" > "$tree/findings"
   diff /dev/null "$tree/findings"
@@ -75,7 +78,7 @@ EOF
   printf 'const rules = [{\n\tid: "aws-amazon-bedrock-api-key-short-lived",\n\tpattern: {\n\t\t"source": "%s",\n\t},\n}];\n' \
     "$BEDROCK_PATTERN" > "$tree/opt/auto-mode/dist/classify-edit-B10-ua5i.js"
 
-  scan 0
+  run -0 --separate-stderr scan
 
   jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" > "$tree/findings"
   diff /dev/null "$tree/findings"
@@ -95,7 +98,7 @@ EOF
   printf '{"rules":[{"id":"aws-amazon-bedrock-api-key-short-lived","pattern":{"source":"%s","flags":"","engine":"js"}}]}' \
     "$BEDROCK_PATTERN" > "$tree/opt/other/secret-rules.json"
 
-  scan 1
+  run -1 --separate-stderr scan
 
   jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" | LC_ALL=C sort > "$tree/findings"
   diff - "$tree/findings" << 'EOF'
@@ -115,7 +118,7 @@ EOF
   printf '{"rules":[{"id":"aws-amazon-bedrock-api-key-short-lived","pattern":{"source":"%s","flags":"","engine":"js"}}]}\n{"token":"%s"}\n' \
     "$BEDROCK_PATTERN" "$GITHUB_TOKEN" > "$tree/opt/auto-mode/dist/secret-rules.json"
 
-  scan 1
+  run -1 --separate-stderr scan
 
   jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" > "$tree/findings"
   diff - "$tree/findings" << 'EOF'
@@ -134,7 +137,7 @@ EOF
   printf 'const rules = [{\n\tid: "aws-amazon-bedrock-api-key-short-lived",\n\tpattern: {\n\t\t"source": "%s",\n\t},\n}];\nconst token = "%s";\n' \
     "$BEDROCK_PATTERN" "$GITHUB_TOKEN" > "$tree/opt/auto-mode/dist/classify-edit-B10-ua5i.js"
 
-  scan 1
+  run -1 --separate-stderr scan
 
   jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" > "$tree/findings"
   diff - "$tree/findings" << 'EOF'
@@ -153,7 +156,7 @@ EOF
   printf '{\n  "key": "%s",\n  "manifest_version": 3\n}\n' "$CHROME_KEY" \
     > "$tree/opt/chrome/resources/accessibility/reading_mode_gdocs_helper_manifest.json"
 
-  scan 0
+  run -0 --separate-stderr scan
 
   jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" > "$tree/findings"
   diff /dev/null "$tree/findings"
@@ -170,7 +173,7 @@ EOF
   printf '{\n  "key": "%s",\n  "manifest_version": 3\n}\n' "$CHROME_KEY" \
     > "$tree/opt/chrome/resources/accessibility/other_manifest.json"
 
-  scan 1
+  run -1 --separate-stderr scan
 
   jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" > "$tree/findings"
   diff - "$tree/findings" << 'EOF'
@@ -189,7 +192,7 @@ EOF
   printf '{\n  "key": "%s",\n  "token": "%s"\n}\n' "$CHROME_KEY" "$GITHUB_TOKEN" \
     > "$tree/opt/chrome/resources/accessibility/reading_mode_gdocs_helper_manifest.json"
 
-  scan 1
+  run -1 --separate-stderr scan
 
   jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" > "$tree/findings"
   diff - "$tree/findings" << 'EOF'

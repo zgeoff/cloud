@@ -22,6 +22,9 @@
 #
 #   CASE='replaced' bash scripts/run-bats.sh agent-image
 
+# each case starts a container and runs apt, which a cold host can take longer than 30 seconds over
+export BATS_TEST_TIMEOUT=180
+
 setup_file() {
   load '../../scripts/src/test-utils/bats/setup'
   if ! command -v dpkg-deb > /dev/null; then

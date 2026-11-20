@@ -22,6 +22,9 @@
 #   CASE='ls mode' bash scripts/run-bats.sh files-backup-fixture
 #   BACKUP_IMAGE=<local tag> bash scripts/run-bats.sh files-backup-fixture
 
+# a case runs a chown container and then the backup image, and some run restic several times
+export BATS_TEST_TIMEOUT=180
+
 # Boot data every case needs: the backup image the stack config pins for the gateway, nixie and the
 # files service (atcGateway.backupImage), pulled once unless BACKUP_IMAGE names a local build, and
 # the script under test, by absolute path for the bind mount.

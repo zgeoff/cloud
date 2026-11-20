@@ -9,7 +9,7 @@
 #
 # Bun acts as bunx when its argv[0] is bunx, so /usr/local/bin/bunx links to this script, and the
 # script runs the binary of its own name: /opt/bun/<version>/bun or /opt/bun/<version>/bunx.
-# AGENT_BUN_ROOT moves /opt/bun, for the bats suite.
+# AGENT_BUN_ROOT moves /opt/bun, for the shell suite.
 set -eu
 
 root=${AGENT_BUN_ROOT:-/opt/bun}

@@ -119,7 +119,7 @@ EOF
 a log line on stderr
 a log line on stdout
 EOF
-  # wait_for_ready paused before it reported the stop
+  # wait_for_ready reported the stop without a pause
   refute [ -e "$tree/pauses" ]
   refute [ -L "$tree/pauses" ]
 }
