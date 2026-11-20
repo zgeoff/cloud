@@ -39,7 +39,7 @@ async function setupTest() {
       'deploy/nixie/restore-job.yaml',
       'nixos/hosts/geoffcloud/configuration.nix',
       'scripts/nix-image.sh',
-      'infra/observability/test-nixie-alerts.sh',
+      'infra/observability/nixie-alerts.bats',
       'infra/shared/pepys-images.ts',
     ].map((file) => writeFile(join(root, file), '')),
   );

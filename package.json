@@ -7,12 +7,19 @@
     "type": "git",
     "url": "git+https://github.com/zgeoff/cloud.git"
   },
-  "workspaces": [
-    "infra",
-    "packages/*",
-    "sdk/*",
-    "workers/*"
-  ],
+  "workspaces": {
+    "packages": [
+      "infra",
+      "packages/*",
+      "sdk/*",
+      "workers/*"
+    ],
+    "catalog": {
+      "bats": "1.13.0",
+      "bats-assert": "2.2.4",
+      "bats-support": "0.3.0"
+    }
+  },
   "type": "module",
   "scripts": {
     "audit": "bun audit --ignore=GHSA-3g3m-2fjr-6pw4 --ignore=GHSA-g3hv-75wg-m249",
@@ -30,7 +37,7 @@
     "test:related": "bun scripts/run-related-tests.ts",
     "test:related-root": "rig related",
     "test:scripts": "bash scripts/run-shell-suites.sh",
-    "test:alert-rules": "bash scripts/run-shell-suites.sh alert-rules",
+    "test:alert-rules": "bash scripts/run-bats.sh alert-rules && bash scripts/run-shell-suites.sh alert-rules",
     "test:atc-gateway-fixture": "bash images/atc-gateway/run-fixture-tests.sh",
     "test:nixie-backup-fixture": "bash scripts/run-shell-suites.sh nixie-backup-fixture",
     "test:files-backup-fixture": "bash scripts/run-shell-suites.sh files-backup-fixture",
@@ -150,6 +157,9 @@
     "@zgeoff/oxlint-config": "0.10.10",
     "@zgeoff/rig": "0.2.6",
     "@zgeoff/testing": "0.3.1",
+    "bats": "catalog:",
+    "bats-assert": "catalog:",
+    "bats-support": "catalog:",
     "knip": "6.44.2",
     "lefthook": "2.2.2",
     "msw": "3.0.4",

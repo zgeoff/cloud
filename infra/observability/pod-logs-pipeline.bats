@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
+# bats file_tags=suite:alert-rules
 # Test for the pod-log pipeline in the pinned Alloy: Alloy runs the pipeline
 # build-pod-logs-pipeline.ts builds over one container's logs in the case tree, written in the
 # kubelet's CRI format, with a target shaped as discovery.kubernetes gives it. Each start runs as
@@ -9,21 +10,27 @@
 # its pod, and a second container on the volume for a new pod. loki.echo stands in for Loki and
 # prints each entry's labels and line to Alloy's log, which each case compares.
 #
-#   bash scripts/run-shell-suites.sh alert-rules
-#   CASE='labelled' bash infra/observability/test-pod-logs-pipeline.sh
-#
-# shell-suite: alert-rules
-# shellcheck source-path=SCRIPTDIR
-set -euo pipefail
-# fixed, so the files the cases write do not depend on the caller's umask
-umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/wait-for.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/has-metric.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/start-alloy.sh"
+#   bash scripts/run-bats.sh alert-rules
+#   CASE='labelled' bash scripts/run-bats.sh alert-rules
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-log_dir='shop_web-7f9c8d6b5-q4z2m_3b1f0c2e-5a7d-4c19-9e2b-0d6f8a1c4e73/web'
+# a case waits for Alloy to start, tail and restart, and the first one pulls its image
+export BATS_TEST_TIMEOUT=300
+
+setup_file() {
+  load '../../scripts/src/test-utils/bats/setup'
+}
+
+setup() {
+  load '../../scripts/src/test-utils/bats/setup'
+  load '../../scripts/src/test-utils/shell/wait-for.sh'
+  load '../../scripts/src/test-utils/shell/has-metric.sh'
+  load '../../scripts/src/test-utils/shell/start-alloy.sh'
+  # fixed, so the files the cases write do not depend on the caller's umask
+  umask 022
+  repo="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+  tree="$BATS_TEST_TMPDIR"
+  log_dir='shop_web-7f9c8d6b5-q4z2m_3b1f0c2e-5a7d-4c19-9e2b-0d6f8a1c4e73/web'
+}
 
 # setup_test <tree>: the pipeline as the repo builds it, fed one pod's container and printing each
 # entry, the seed script for /logs and /storage, the directories each Alloy start records itself
@@ -53,18 +60,16 @@ setup_test() {
   ")
 }
 
-# teardown: each step safe when setup_test or the case stopped before it
+# each step safe when setup_test or the case stopped before it
 teardown() {
+  stop_timeout_watchdog
   docker rm -f "$(cat "$tree/alloy/container" 2> /dev/null)" > /dev/null 2>&1 || true
   docker rm -f "$(cat "$tree/alloy-again/container" 2> /dev/null)" > /dev/null 2>&1 || true
   docker volume rm "${volume:-}" > /dev/null 2>&1 || true
-  rm -rf "$tree" || true
 }
 
-it_ships_each_line_the_container_writes_once_alloy_tails_its_file_labelled_as_a_pod_stream_with_partial_lines_joined() {
+@test "it ships each line the container writes once alloy tails its file labelled as a pod stream with partial lines joined" {
   local now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
   wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
@@ -79,19 +84,17 @@ EOF
 
   # shellcheck disable=SC2016 # expanded by the inner sh
   wait_for 30 "Alloy to ship the last line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 42 placed\""' _ "$(cat "$tree/alloy/container")"
-  docker logs "$(cat "$tree/alloy/container")" 2>&1 |
-    sed -n 's/.*component_id=loki\.echo\.loki labels="\(.*\)" entry="\(.*\)" entry_timestamp=.*/\1 \2/p' > "$tree/entries"
-  diff - "$tree/entries" << 'EOF'
+  docker logs "$(cat "$tree/alloy/container")" > "$tree/alloy.log" 2>&1
+  sed -n 's/.*component_id=loki\.echo\.loki labels="\(.*\)" entry="\(.*\)" entry_timestamp=.*/\1 \2/p' "$tree/alloy.log" > "$tree/entries"
+  run -0 diff - "$tree/entries" << 'EOF'
 {container=\"web\", instance=\"shop/web-7f9c8d6b5-q4z2m:web\", job=\"loki.source.kubernetes.pods\", namespace=\"shop\", pod=\"web-7f9c8d6b5-q4z2m\"} order 41 placed
 {container=\"web\", instance=\"shop/web-7f9c8d6b5-q4z2m:web\", job=\"loki.source.kubernetes.pods\", namespace=\"shop\", pod=\"web-7f9c8d6b5-q4z2m\"} payment for order 41 timed out
 {container=\"web\", instance=\"shop/web-7f9c8d6b5-q4z2m:web\", job=\"loki.source.kubernetes.pods\", namespace=\"shop\", pod=\"web-7f9c8d6b5-q4z2m\"} order 42 placed
 EOF
 }
 
-it_reads_none_of_the_lines_a_log_held_before_alloy_started_with_an_empty_position_store() {
+@test "it reads none of the lines a log held before alloy started with an empty position store" {
   local before now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   before="$(date -u -d '-2 minutes' +%Y-%m-%dT%H:%M:%S.000000000Z)"
   sed "s/@BEFORE@/$before/" >> "$tree/logs/$log_dir/0.log" << 'EOF'
@@ -106,17 +109,15 @@ EOF
 
   # shellcheck disable=SC2016 # expanded by the inner sh
   wait_for 30 "Alloy to ship the new line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 41 placed\""' _ "$(cat "$tree/alloy/container")"
-  docker logs "$(cat "$tree/alloy/container")" 2>&1 |
-    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
-  diff - "$tree/entries" << 'EOF'
+  docker logs "$(cat "$tree/alloy/container")" > "$tree/alloy.log" 2>&1
+  sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' "$tree/alloy.log" > "$tree/entries"
+  run -0 diff - "$tree/entries" << 'EOF'
 order 41 placed
 EOF
 }
 
-it_ships_each_line_once_across_a_rotation_of_the_tailed_log_including_the_lines_written_before_alloy_reopens_it() {
+@test "it ships each line once across a rotation of the tailed log including the lines written before alloy reopens it" {
   local now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
   wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
@@ -137,9 +138,9 @@ EOF
 
   # shellcheck disable=SC2016 # expanded by the inner sh
   wait_for 30 "Alloy to ship the last line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 44 failed\""' _ "$(cat "$tree/alloy/container")"
-  docker logs "$(cat "$tree/alloy/container")" 2>&1 |
-    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
-  diff - "$tree/entries" << 'EOF'
+  docker logs "$(cat "$tree/alloy/container")" > "$tree/alloy.log" 2>&1
+  sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' "$tree/alloy.log" > "$tree/entries"
+  run -0 diff - "$tree/entries" << 'EOF'
 order 41 placed
 order 42 placed
 order 43 placed
@@ -147,10 +148,8 @@ order 44 failed
 EOF
 }
 
-it_resumes_from_the_saved_position_after_a_restart_shipping_each_line_written_while_alloy_was_stopped_once() {
+@test "it resumes from the saved position after a restart shipping each line written while alloy was stopped once" {
   local now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
   wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
@@ -169,18 +168,16 @@ EOF
 
   # shellcheck disable=SC2016 # expanded by the inner sh
   wait_for 30 "Alloy to ship the last line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 43 failed\""' _ "$(cat "$tree/alloy-again/container")"
-  docker logs "$(cat "$tree/alloy-again/container")" 2>&1 |
-    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
-  diff - "$tree/entries" << 'EOF'
+  docker logs "$(cat "$tree/alloy-again/container")" > "$tree/alloy.log" 2>&1
+  sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' "$tree/alloy.log" > "$tree/entries"
+  run -0 diff - "$tree/entries" << 'EOF'
 order 42 placed
 order 43 failed
 EOF
 }
 
-it_ships_each_line_once_after_a_restart_that_follows_a_rotation_which_left_the_new_log_empty() {
+@test "it ships each line once after a restart that follows a rotation which left the new log empty" {
   local before now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   before="$(date -u -d '-2 minutes' +%Y-%m-%dT%H:%M:%S.000000000Z)"
   sed "s/@BEFORE@/$before/" >> "$tree/logs/$log_dir/0.log" << 'EOF'
@@ -207,18 +204,16 @@ EOF
 
   # shellcheck disable=SC2016 # expanded by the inner sh
   wait_for 30 "Alloy to ship the last line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 43 failed\""' _ "$(cat "$tree/alloy-again/container")"
-  docker logs "$(cat "$tree/alloy-again/container")" 2>&1 |
-    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
-  diff - "$tree/entries" << 'EOF'
+  docker logs "$(cat "$tree/alloy-again/container")" > "$tree/alloy.log" 2>&1
+  sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' "$tree/alloy.log" > "$tree/entries"
+  run -0 diff - "$tree/entries" << 'EOF'
 order 42 placed
 order 43 failed
 EOF
 }
 
-it_keeps_the_seeded_position_of_a_log_with_no_shipped_line_when_alloy_crashes_and_restarts_in_its_container() {
+@test "it keeps the seeded position of a log with no shipped line when alloy crashes and restarts in its container" {
   local before now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   before="$(date -u -d '-2 minutes' +%Y-%m-%dT%H:%M:%S.000000000Z)"
   sed "s/@BEFORE@/$before/" >> "$tree/logs/$log_dir/0.log" << 'EOF'
@@ -236,17 +231,15 @@ EOF
 
   # shellcheck disable=SC2016 # expanded by the inner sh
   wait_for 60 "Alloy to ship the new line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 41 placed\""' _ "$(cat "$tree/alloy/container")"
-  docker logs "$(cat "$tree/alloy/container")" 2>&1 |
-    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
-  diff - "$tree/entries" << 'EOF'
+  docker logs "$(cat "$tree/alloy/container")" > "$tree/alloy.log" 2>&1
+  sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' "$tree/alloy.log" > "$tree/entries"
+  run -0 diff - "$tree/entries" << 'EOF'
 order 41 placed
 EOF
 }
 
-it_reads_a_log_from_its_first_line_when_the_kubelet_replaced_it_before_a_crash_with_no_shipped_line() {
+@test "it reads a log from its first line when the kubelet replaced it before a crash with no shipped line" {
   local before now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   before="$(date -u -d '-2 minutes' +%Y-%m-%dT%H:%M:%S.000000000Z)"
   sed "s/@BEFORE@/$before/" >> "$tree/logs/$log_dir/0.log" << 'EOF'
@@ -269,18 +262,16 @@ EOF
 
   # shellcheck disable=SC2016 # expanded by the inner sh
   wait_for 60 "Alloy to ship the new log's last line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 42 failed\""' _ "$(cat "$tree/alloy/container")"
-  docker logs "$(cat "$tree/alloy/container")" 2>&1 |
-    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
-  diff - "$tree/entries" << 'EOF'
+  docker logs "$(cat "$tree/alloy/container")" > "$tree/alloy.log" 2>&1
+  sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' "$tree/alloy.log" > "$tree/entries"
+  run -0 diff - "$tree/entries" << 'EOF'
 order 41 placed
 order 42 failed
 EOF
 }
 
-it_reads_the_new_log_from_its_first_line_when_the_kubelet_rotates_it_while_alloy_is_stopped() {
+@test "it reads the new log from its first line when the kubelet rotates it while alloy is stopped" {
   local now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
   wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
@@ -303,9 +294,9 @@ EOF
 
   # shellcheck disable=SC2016 # expanded by the inner sh
   wait_for 60 "Alloy to ship the new log's last line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 44 failed\""' _ "$(cat "$tree/alloy/container")"
-  docker logs "$(cat "$tree/alloy/container")" 2>&1 |
-    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
-  diff - "$tree/entries" << 'EOF'
+  docker logs "$(cat "$tree/alloy/container")" > "$tree/alloy.log" 2>&1
+  sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' "$tree/alloy.log" > "$tree/entries"
+  run -0 diff - "$tree/entries" << 'EOF'
 order 40 placed
 order 41 placed
 order 42 placed
@@ -314,10 +305,8 @@ order 44 failed
 EOF
 }
 
-it_resumes_after_a_restart_in_its_container_and_reads_a_log_that_appeared_while_alloy_was_stopped_from_its_first_line() {
+@test "it resumes after a restart in its container and reads a log that appeared while alloy was stopped from its first line" {
   local now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
   wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
@@ -336,9 +325,10 @@ EOF
 
   # shellcheck disable=SC2016 # expanded by the inner sh
   wait_for 60 "Alloy to ship both logs' last lines" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 42 placed\"" && docker logs "$1" 2>&1 | grep -qF "entry=\"order 43 placed\""' _ "$(cat "$tree/alloy/container")"
-  docker logs "$(cat "$tree/alloy/container")" 2>&1 |
-    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' | sort > "$tree/entries"
-  diff - "$tree/entries" << 'EOF'
+  docker logs "$(cat "$tree/alloy/container")" > "$tree/alloy.log" 2>&1
+  sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' "$tree/alloy.log" > "$tree/entries.unsorted"
+  LC_ALL=C sort "$tree/entries.unsorted" > "$tree/entries"
+  run -0 diff - "$tree/entries" << 'EOF'
 listening on :8080
 order 41 placed
 order 42 placed
@@ -346,10 +336,8 @@ order 43 placed
 EOF
 }
 
-it_keeps_the_first_lines_of_a_restarted_containers_new_log_that_appears_after_alloy_started() {
+@test "it keeps the first lines of a restarted containers new log that appears after alloy started" {
   local now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
   wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
@@ -368,19 +356,17 @@ EOF
 
   # shellcheck disable=SC2016 # expanded by the inner sh
   wait_for 30 "Alloy to ship the new log's lines" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 42 placed\""' _ "$(cat "$tree/alloy/container")"
-  docker logs "$(cat "$tree/alloy/container")" 2>&1 |
-    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
-  diff - "$tree/entries" << 'EOF'
+  docker logs "$(cat "$tree/alloy/container")" > "$tree/alloy.log" 2>&1
+  sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' "$tree/alloy.log" > "$tree/entries"
+  run -0 diff - "$tree/entries" << 'EOF'
 order 41 placed
 listening on :8080
 order 42 placed
 EOF
 }
 
-it_keeps_the_first_lines_of_a_containers_log_that_is_missing_when_alloy_starts() {
+@test "it keeps the first lines of a containers log that is missing when alloy starts" {
   local now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   rm "$tree/logs/$log_dir/0.log"
   start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
@@ -394,12 +380,10 @@ EOF
 
   # shellcheck disable=SC2016 # expanded by the inner sh
   wait_for 30 "Alloy to ship the log's lines" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 41 placed\""' _ "$(cat "$tree/alloy/container")"
-  docker logs "$(cat "$tree/alloy/container")" 2>&1 |
-    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
-  diff - "$tree/entries" << 'EOF'
+  docker logs "$(cat "$tree/alloy/container")" > "$tree/alloy.log" 2>&1
+  sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' "$tree/alloy.log" > "$tree/entries"
+  run -0 diff - "$tree/entries" << 'EOF'
 listening on :8080
 order 41 placed
 EOF
 }
-
-run_cases

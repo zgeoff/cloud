@@ -1,23 +1,32 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
+# bats file_tags=suite:alert-rules
 # Test for NodeMemoryMajorPagesFaults in the real engine: promtool tests the rule that
 # build-alert-rules.ts builds against node-exporter's major fault and pressure stall counters. The
 # faults rise by 83,000 a minute, about the rate that a wake's 250,000 faults every 3 minutes
 # averages. Each case compares promtool's whole output and exit status.
 #
-#   bash scripts/run-shell-suites.sh alert-rules
-#   CASE='memory' bash infra/observability/test-node-major-faults-alert.sh
-#
-# shell-suite: alert-rules
-# shellcheck source-path=SCRIPTDIR
-set -euo pipefail
-# fixed, so the files the cases write do not depend on the caller's umask
-umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/assert-equals.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-promtool-test.sh"
+#   bash scripts/run-bats.sh alert-rules
+#   CASE='memory' bash scripts/run-bats.sh alert-rules
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# promtool and the images it runs in take longer than the shared 30 seconds on a cold image cache
+export BATS_TEST_TIMEOUT=180
+
+setup_file() {
+  load '../../scripts/src/test-utils/bats/setup'
+}
+
+setup() {
+  load '../../scripts/src/test-utils/bats/setup'
+  load '../../scripts/src/test-utils/shell/run-promtool-test.sh'
+  # fixed, so the files the cases write do not depend on the caller's umask
+  umask 022
+  repo="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+  tree="$BATS_TEST_TMPDIR"
+}
+
+teardown() {
+  stop_timeout_watchdog
+}
 
 # setup_test <tree>: the rules as JSON from the repo's builder
 setup_test() {
@@ -42,27 +51,19 @@ write_test() {
 EOF
 }
 
-it_stays_silent_on_the_wake_faults_while_nothing_stalls() {
-  local status=0
-  create_case_tree
+@test "it stays silent on the wake faults while nothing stalls" {
   setup_test "$tree"
   # 1% of the time waiting on memory and 0.2% stalled on IO, as during the wake bursts
   write_test "$tree" '0+83000x60' '0+0.6x60' '0+0.12x60' '[
 {"eval_time":"10m","alertname":"NodeMemoryMajorPagesFaults","exp_alerts":[]},
 {"eval_time":"60m","alertname":"NodeMemoryMajorPagesFaults","exp_alerts":[]}]'
 
-  run_promtool_test "$tree/config" test.json > "$tree/out" 2>&1 || status=$?
+  run -0 run_promtool_test "$tree/config" test.json
 
-  diff - "$tree/out" << 'EOF'
-  SUCCESS
-
-EOF
-  assert_equals 0 "$status" "promtool's exit"
+  assert_output '  SUCCESS'
 }
 
-it_fires_within_10_minutes_of_the_faults_meeting_a_memory_stall() {
-  local status=0
-  create_case_tree
+@test "it fires within 10 minutes of the faults meeting a memory stall" {
   setup_test "$tree"
   # from 10m, 20% of the time waiting on memory
   write_test "$tree" '0+83000x60' '0+0.6x10 6+12x50' '0+0.12x60' '[
@@ -71,18 +72,12 @@ it_fires_within_10_minutes_of_the_faults_meeting_a_memory_stall() {
 {"exp_labels":{"severity":"warning","job":"node-exporter","instance":"stu-test:9100"},
 "exp_annotations":{"summary":"geoffcloud takes 1.383k major page faults a second while memory or IO stalls its tasks."}}]}]'
 
-  run_promtool_test "$tree/config" test.json > "$tree/out" 2>&1 || status=$?
+  run -0 run_promtool_test "$tree/config" test.json
 
-  diff - "$tree/out" << 'EOF'
-  SUCCESS
-
-EOF
-  assert_equals 0 "$status" "promtool's exit"
+  assert_output '  SUCCESS'
 }
 
-it_fires_within_10_minutes_of_the_faults_meeting_an_io_stall() {
-  local status=0
-  create_case_tree
+@test "it fires within 10 minutes of the faults meeting an io stall" {
   setup_test "$tree"
   # from 10m, every task stalled on IO 15% of the time
   write_test "$tree" '0+83000x60' '0+0.6x60' '0+0.12x10 1.2+9x50' '[
@@ -91,30 +86,18 @@ it_fires_within_10_minutes_of_the_faults_meeting_an_io_stall() {
 {"exp_labels":{"severity":"warning","job":"node-exporter","instance":"stu-test:9100"},
 "exp_annotations":{"summary":"geoffcloud takes 1.383k major page faults a second while memory or IO stalls its tasks."}}]}]'
 
-  run_promtool_test "$tree/config" test.json > "$tree/out" 2>&1 || status=$?
+  run -0 run_promtool_test "$tree/config" test.json
 
-  diff - "$tree/out" << 'EOF'
-  SUCCESS
-
-EOF
-  assert_equals 0 "$status" "promtool's exit"
+  assert_output '  SUCCESS'
 }
 
-it_stays_silent_on_a_memory_stall_without_the_faults() {
-  local status=0
-  create_case_tree
+@test "it stays silent on a memory stall without the faults" {
   setup_test "$tree"
   # 3 faults a second, the rate between bursts, beside 20% of the time waiting on memory
   write_test "$tree" '0+180x60' '0+12x60' '0+0.12x60' '[
 {"eval_time":"60m","alertname":"NodeMemoryMajorPagesFaults","exp_alerts":[]}]'
 
-  run_promtool_test "$tree/config" test.json > "$tree/out" 2>&1 || status=$?
+  run -0 run_promtool_test "$tree/config" test.json
 
-  diff - "$tree/out" << 'EOF'
-  SUCCESS
-
-EOF
-  assert_equals 0 "$status" "promtool's exit"
+  assert_output '  SUCCESS'
 }
-
-run_cases

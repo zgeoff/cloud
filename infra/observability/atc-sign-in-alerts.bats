@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
+# bats file_tags=suite:alert-rules
 # Test for the atc sign-in alerts in their real engines, one stage per case. The pinned Alloy runs
 # the pipeline build-atc-security-pipeline.ts builds over gateway container logs in the case tree,
 # written in the kubelet's CRI format and stamped relative to now, and each Alloy case compares the
@@ -9,24 +10,29 @@
 # 30 s, which the builders' own tests pin.
 # scripts/e2e/journey-atc-sign-in-alerts.sh runs the stages together.
 #
-#   bash scripts/run-shell-suites.sh alert-rules
-#   CASE='burst' bash infra/observability/test-atc-sign-in-alerts.sh
-#
-# shell-suite: alert-rules
-# shellcheck source-path=SCRIPTDIR
-set -euo pipefail
-# fixed, so the files the cases write do not depend on the caller's umask
-umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/wait-for.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/assert-equals.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/has-metric.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/start-alloy.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/start-alertmanager.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-promtool-test.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/start-stub-discord-webhook.sh"
+#   bash scripts/run-bats.sh alert-rules
+#   CASE='burst' bash scripts/run-bats.sh alert-rules
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# a case waits for Alloy to tail and Alertmanager to post, and the first one pulls the images
+export BATS_TEST_TIMEOUT=300
+
+setup_file() {
+  load '../../scripts/src/test-utils/bats/setup'
+}
+
+setup() {
+  load '../../scripts/src/test-utils/bats/setup'
+  load '../../scripts/src/test-utils/shell/wait-for.sh'
+  load '../../scripts/src/test-utils/shell/has-metric.sh'
+  load '../../scripts/src/test-utils/shell/start-alloy.sh'
+  load '../../scripts/src/test-utils/shell/start-alertmanager.sh'
+  load '../../scripts/src/test-utils/shell/run-promtool-test.sh'
+  load '../../scripts/src/test-utils/shell/start-stub-discord-webhook.sh'
+  # fixed, so the files the cases write do not depend on the caller's umask
+  umask 022
+  repo="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+  tree="$BATS_TEST_TMPDIR"
+}
 
 # setup_test <tree>: the configs as the repo's builders write them, the directories each engine
 # records itself in, and one gateway pod's empty log
@@ -49,18 +55,16 @@ setup_test() {
   ")
 }
 
-# teardown: each step safe when setup_test or the case stopped before it
+# each step safe when setup_test or the case stopped before it
 teardown() {
+  stop_timeout_watchdog
   docker rm -f "$(cat "$tree/alloy/container" 2> /dev/null)" > /dev/null 2>&1 || true
   docker rm -f "$(cat "$tree/alertmanager/container" 2> /dev/null)" > /dev/null 2>&1 || true
   kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true
-  rm -rf "$tree" || true
 }
 
-it_counts_each_sign_in_outcome_from_the_gateways_stderr_and_nothing_from_stdout_or_from_before_the_cutoff() {
+@test "it counts each sign in outcome from the gateways stderr and nothing from stdout or from before the cutoff" {
   local now old
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
   old="$(date -u -d '-1 hour' +%Y-%m-%dT%H:%M:%S.000000000Z)"
@@ -88,7 +92,7 @@ EOF
 
   curl -fsS "$(cat "$tree/alloy/url")/metrics" > "$tree/metrics"
   grep '^loki_process_custom_atc_security_' "$tree/metrics" > "$tree/out"
-  diff - "$tree/out" << 'EOF'
+  run -0 diff - "$tree/out" << 'EOF'
 loki_process_custom_atc_security_events_total{component_id="loki.process.atc_security",component_path="/",kind="authorize_invalid",method="none",outcome="rejected",reason="bad_host",route="/mcp"} 1
 loki_process_custom_atc_security_events_total{component_id="loki.process.atc_security",component_path="/",kind="authorize_invalid",method="none",outcome="rejected",reason="invalid_redirect",route="/oauth2/authorize"} 1
 loki_process_custom_atc_security_events_total{component_id="loki.process.atc_security",component_path="/",kind="authorize_started",method="none",outcome="accepted",reason="none",route="/oauth2/authorize"} 1
@@ -103,10 +107,8 @@ loki_process_custom_atc_security_suppressed_events_total{component_id="loki.proc
 EOF
 }
 
-it_counts_the_first_events_of_a_pod_log_that_appears_after_alloy_started() {
+@test "it counts the first events of a pod log that appears after alloy started" {
   local now new_log
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   start_alloy "$tree/alloy" "$tree/config" "$tree/logs"
   wait_for 60 "Alloy to tail the first pod's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
@@ -120,17 +122,16 @@ it_counts_the_first_events_of_a_pod_log_that_appears_after_alloy_started() {
 EOF
   wait_for 60 "Alloy to count the new pod's sign-in" has_metric "$(cat "$tree/alloy/url")" 'kind="owner_auth",method="passkey",outcome="succeeded"'
 
-  curl -fsS "$(cat "$tree/alloy/url")/metrics" | grep '^loki_process_custom_atc_security_' > "$tree/out"
-  diff - "$tree/out" << 'EOF'
+  curl -fsS "$(cat "$tree/alloy/url")/metrics" > "$tree/metrics"
+  grep '^loki_process_custom_atc_security_' "$tree/metrics" > "$tree/out"
+  run -0 diff - "$tree/out" << 'EOF'
 loki_process_custom_atc_security_events_total{component_id="loki.process.atc_security",component_path="/",kind="authorize_started",method="none",outcome="accepted",reason="none",route="/oauth2/authorize"} 1
 loki_process_custom_atc_security_events_total{component_id="loki.process.atc_security",component_path="/",kind="owner_auth",method="passkey",outcome="succeeded",reason="none",route="/login"} 1
 EOF
 }
 
-it_counts_a_line_outside_the_contract_under_other_and_keeps_every_client_string_out_of_the_metrics() {
+@test "it counts a line outside the contract under other and keeps every client string out of the metrics" {
   local now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   start_alloy "$tree/alloy" "$tree/config" "$tree/logs"
   now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
@@ -149,7 +150,7 @@ EOF
 
   curl -fsS "$(cat "$tree/alloy/url")/metrics" > "$tree/metrics"
   grep '^loki_process_custom_atc_security_' "$tree/metrics" > "$tree/out"
-  diff - "$tree/out" << 'EOF'
+  run -0 diff - "$tree/out" << 'EOF'
 loki_process_custom_atc_security_events_total{component_id="loki.process.atc_security",component_path="/",kind="consent",method="none",outcome="denied",reason="none_ticked",route="/consent"} 1
 loki_process_custom_atc_security_events_total{component_id="loki.process.atc_security",component_path="/",kind="other",method="none",outcome="other",reason="none",route="/login"} 1
 loki_process_custom_atc_security_events_total{component_id="loki.process.atc_security",component_path="/",kind="other",method="none",outcome="other",reason="none",route="none"} 2
@@ -158,14 +159,11 @@ loki_process_custom_atc_security_events_total{component_id="loki.process.atc_sec
 loki_process_custom_atc_security_events_total{component_id="loki.process.atc_security",component_path="/",kind="suppressed",method="none",outcome="none",reason="owner_auth",route="none"} 1
 loki_process_custom_atc_security_suppressed_events_total{component_id="loki.process.atc_security",component_path="/",kind="suppressed",method="none",outcome="none",reason="owner_auth",route="none"} 0
 EOF
-  grep -io 'canary[a-z0-9-]*' "$tree/metrics" > "$tree/leaks" || true
-  diff /dev/null "$tree/leaks"
+  run -1 grep -io 'canary[a-z0-9-]*' "$tree/metrics"
 }
 
-it_gives_a_forwarded_address_no_place_in_the_metrics_even_one_marked_trusted() {
+@test "it gives a forwarded address no place in the metrics even one marked trusted" {
   local now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   start_alloy "$tree/alloy" "$tree/config" "$tree/logs"
   now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
@@ -178,17 +176,13 @@ EOF
 
   curl -fsS "$(cat "$tree/alloy/url")/metrics" > "$tree/metrics"
   grep '^loki_process_custom_atc_security_' "$tree/metrics" > "$tree/out"
-  diff - "$tree/out" << 'EOF'
+  run -0 diff - "$tree/out" << 'EOF'
 loki_process_custom_atc_security_events_total{component_id="loki.process.atc_security",component_path="/",kind="owner_auth",method="passkey",outcome="failed",reason="assertion_failed",route="/login"} 2
 EOF
-  grep -Eo '203\.0\.113\.77|198\.51\.100\.4|10\.42\.0\.17|trusted|unverified|provenance|forwarded' "$tree/metrics" > "$tree/leaks" || true
-  diff /dev/null "$tree/leaks"
+  run -1 grep -Eo '203\.0\.113\.77|198\.51\.100\.4|10\.42\.0\.17|trusted|unverified|provenance|forwarded' "$tree/metrics"
 }
 
-it_sums_a_burst_of_invalid_requests_into_one_alert_per_reason_and_route_with_its_count() {
-  local status=0
-  tree="$(mktemp -d)"
-  trap teardown EXIT
+@test "it sums a burst of invalid requests into one alert per reason and route with its count" {
   setup_test "$tree"
   cat > "$tree/config/test.json" << 'EOF'
 {"rule_files":["rules.json"],"evaluation_interval":"30s","tests":[{"interval":"30s",
@@ -202,19 +196,12 @@ it_sums_a_burst_of_invalid_requests_into_one_alert_per_reason_and_route_with_its
 "exp_annotations":{"summary":"The atc gateway rejected 100 invalid request(s), invalid_client on /oauth2/authorize, in the last 5m."}}]}]}]}
 EOF
 
-  run_promtool_test "$tree/config" test.json > "$tree/out" 2>&1 || status=$?
+  run -0 run_promtool_test "$tree/config" test.json
 
-  diff - "$tree/out" << 'EOF'
-  SUCCESS
-
-EOF
-  assert_equals 0 "$status" "promtool's exit"
+  assert_output '  SUCCESS'
 }
 
-it_keeps_an_accepted_start_and_a_successful_sign_in_in_separate_alerts() {
-  local status=0
-  tree="$(mktemp -d)"
-  trap teardown EXIT
+@test "it keeps an accepted start and a successful sign in in separate alerts" {
   setup_test "$tree"
   cat > "$tree/config/test.json" << 'EOF'
 {"rule_files":["rules.json"],"evaluation_interval":"30s","tests":[{"interval":"30s",
@@ -230,19 +217,12 @@ it_keeps_an_accepted_start_and_a_successful_sign_in_in_separate_alerts() {
 "exp_annotations":{"summary":"The owner signed in to the atc gateway 1 time(s) by passkey in the last 5m."}}]}]}]}
 EOF
 
-  run_promtool_test "$tree/config" test.json > "$tree/out" 2>&1 || status=$?
+  run -0 run_promtool_test "$tree/config" test.json
 
-  diff - "$tree/out" << 'EOF'
-  SUCCESS
-
-EOF
-  assert_equals 0 "$status" "promtool's exit"
+  assert_output '  SUCCESS'
 }
 
-it_fires_on_the_first_event_of_a_new_series_or_after_alloy_restarts_and_clears_a_window_after_the_last() {
-  local status=0
-  tree="$(mktemp -d)"
-  trap teardown EXIT
+@test "it fires on the first event of a new series or after alloy restarts and clears a window after the last" {
   setup_test "$tree"
   # the sign-in series appears at 1m holding its first event; the consent series drops from 7 to 1
   # when Alloy restarts at 9m, with one consent since
@@ -262,19 +242,12 @@ it_fires_on_the_first_event_of_a_new_series_or_after_alloy_restarts_and_clears_a
 "exp_annotations":{"summary":"The owner allowed 1 client consent(s) at the atc gateway in the last 5m."}}]}]}]}
 EOF
 
-  run_promtool_test "$tree/config" test.json > "$tree/out" 2>&1 || status=$?
+  run -0 run_promtool_test "$tree/config" test.json
 
-  diff - "$tree/out" << 'EOF'
-  SUCCESS
-
-EOF
-  assert_equals 0 "$status" "promtool's exit"
+  assert_output '  SUCCESS'
 }
 
-it_fires_on_an_event_after_alloy_restarts_and_restores_the_counter_at_its_old_value() {
-  local status=0
-  tree="$(mktemp -d)"
-  trap teardown EXIT
+@test "it fires on an event after alloy restarts and restores the counter at its old value" {
   setup_test "$tree"
   # one sign-in at 1m, whose alert clears; Alloy is down from 10m and starts again at 11m, a new
   # process, and counts one new sign-in, so the counter reads 1 on both sides of the restart
@@ -291,18 +264,12 @@ it_fires_on_an_event_after_alloy_restarts_and_restores_the_counter_at_its_old_va
 {"eval_time":"17m","alertname":"ATCGatewayOwnerSignedIn","exp_alerts":[]}]}]}
 EOF
 
-  run_promtool_test "$tree/config" test.json > "$tree/out" 2>&1 || status=$?
+  run -0 run_promtool_test "$tree/config" test.json
 
-  diff - "$tree/out" << 'EOF'
-  SUCCESS
-
-EOF
-  assert_equals 0 "$status" "promtool's exit"
+  assert_output '  SUCCESS'
 }
 
-it_sends_one_discord_message_per_sign_in_alert_name_however_many_alerts_and_posts_arrive() {
-  tree="$(mktemp -d)"
-  trap teardown EXIT
+@test "it sends one discord message per sign in alert name however many alerts and posts arrive" {
   setup_test "$tree"
   start_stub_discord_webhook "$tree/discord"
   printf 'http://127.0.0.1:%s/api/webhooks/1234/CANARY-WEBHOOK-TOKEN' "$(cat "$tree/discord/port")" > "$tree/config/webhook-url"
@@ -318,22 +285,21 @@ EOF
   done
   wait_for 90 "Alertmanager to post to Discord" test -f "$tree/discord/bodies/3.json"
 
-  jq -r '.embeds[].title' "$tree"/discord/bodies/*.json | LC_ALL=C sort > "$tree/out"
-  diff - "$tree/out" << 'EOF'
+  jq -r '.embeds[].title' "$tree"/discord/bodies/*.json > "$tree/titles"
+  LC_ALL=C sort "$tree/titles" > "$tree/out"
+  run -0 diff - "$tree/out" << 'EOF'
 [FIRING:1] ATCGatewayOwnerSignedIn (passkey /login notice)
 [FIRING:1] ATCGatewaySignInStarted (/oauth2/authorize notice)
 [FIRING:2] ATCGatewayInvalidSignInRequests (warning)
 EOF
-  diff - "$tree/discord/requests" << 'EOF'
+  run -0 diff - "$tree/discord/requests" << 'EOF'
 POST /api/webhooks/1234/CANARY-WEBHOOK-TOKEN
 POST /api/webhooks/1234/CANARY-WEBHOOK-TOKEN
 POST /api/webhooks/1234/CANARY-WEBHOOK-TOKEN
 EOF
 }
 
-it_logs_and_counts_a_failed_discord_delivery_without_the_webhooks_token() {
-  tree="$(mktemp -d)"
-  trap teardown EXIT
+@test "it logs and counts a failed discord delivery without the webhooks token" {
   setup_test "$tree"
   echo 500 > "$tree/discord/status"
   start_stub_discord_webhook "$tree/discord"
@@ -345,22 +311,18 @@ it_logs_and_counts_a_failed_discord_delivery_without_the_webhooks_token() {
 EOF
   wait_for 90 "Alertmanager to retry the post" test -f "$tree/discord/bodies/2.json"
 
-  curl -fsS "$(cat "$tree/alertmanager/url")/metrics" | grep '^alertmanager_notification_requests_failed_total{integration="discord"' > "$tree/failed"
+  curl -fsS "$(cat "$tree/alertmanager/url")/metrics" > "$tree/metrics"
+  grep '^alertmanager_notification_requests_failed_total{integration="discord"' "$tree/metrics" > "$tree/failed"
   docker logs "$(cat "$tree/alertmanager/container")" > "$tree/log" 2>&1
 
   # the retries go on while the case reads, so the count is a measurement: at least the two posts
   # the stand-in took, and masked in the compared line
-  [ "$(awk '{ print $2 }' "$tree/failed")" -ge 2 ] || {
-    echo "failed count $(cat "$tree/failed"), want 2 or more" >&2
-    exit 1
-  }
+  run -0 cut -d ' ' -f 2 "$tree/failed"
+  assert [ "$output" -ge 2 ]
   sed 's/ [0-9]*$/ <count>/' "$tree/failed" > "$tree/out"
-  diff - "$tree/out" << 'EOF'
+  run -0 diff - "$tree/out" << 'EOF'
 alertmanager_notification_requests_failed_total{integration="discord"} <count>
 EOF
-  grep -c 'msg="Notify attempt failed, will retry later" component=dispatcher receiver=discord-sign-in integration=discord\[0\]' "$tree/log" > /dev/null
-  grep -o 'CANARY[A-Z-]*\|/api/webhooks[^ "]*' "$tree/log" > "$tree/leaks" || true
-  diff /dev/null "$tree/leaks"
+  run -0 grep -c 'msg="Notify attempt failed, will retry later" component=dispatcher receiver=discord-sign-in integration=discord\[0\]' "$tree/log"
+  run -1 grep -o 'CANARY[A-Z-]*\|/api/webhooks[^ "]*' "$tree/log"
 }
-
-run_cases

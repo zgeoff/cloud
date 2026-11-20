@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
+# bats file_tags=suite:alert-rules
 # Test for the kube-prometheus-stack chart as the repo configures it: the pinned Helm renders the
 # chart that metrics-chart.ts pins with the values build-metrics-values.ts builds, as Pulumi's Chart
 # does. One case checks the Grafana Deployment's rollout strategy, which server-side apply merges
@@ -6,22 +7,30 @@
 # checks the spec of Grafana's volume claim, whose every change makes Pulumi replace it. One checks
 # that the chart's node-exporter rules leave out the major page faults rule that the repo replaces.
 #
-#   bash scripts/run-shell-suites.sh alert-rules
-#   CASE='strategy' bash infra/observability/test-metrics-chart.sh
-#
-# shell-suite: alert-rules
-# shellcheck source-path=SCRIPTDIR
-set -euo pipefail
-# fixed, so the files the cases write do not depend on the caller's umask
-umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/assert-equals.sh"
+#   bash scripts/run-bats.sh alert-rules
+#   CASE='strategy' bash scripts/run-bats.sh alert-rules
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-helm_image='alpine/helm:3.19.0@sha256:aef9b56f64e866207d9591d0abd8f6d767b36aadd12edf68f8a719716d9d29c9'
-# the sha256 of the chart archive at metrics-chart.ts's version, so a moved release fails the case
-chart_digest='dbd50ecc4b3c4a0231d8a7c766d4fd8690be4bf2230acb572849fae129797a23'
+# the first case pulls Helm's image and the chart on a cold cache
+export BATS_TEST_TIMEOUT=180
+
+setup_file() {
+  load '../../scripts/src/test-utils/bats/setup'
+}
+
+setup() {
+  load '../../scripts/src/test-utils/bats/setup'
+  # fixed, so the files the cases write do not depend on the caller's umask
+  umask 022
+  repo="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+  tree="$BATS_TEST_TMPDIR"
+  helm_image='alpine/helm:3.19.0@sha256:aef9b56f64e866207d9591d0abd8f6d767b36aadd12edf68f8a719716d9d29c9'
+  # the sha256 of the chart archive at metrics-chart.ts's version, so a moved release fails the case
+  chart_digest='dbd50ecc4b3c4a0231d8a7c766d4fd8690be4bf2230acb572849fae129797a23'
+}
+
+teardown() {
+  stop_timeout_watchdog
+}
 
 # run_in_case <tree> <command>...: <command> with none of the caller's environment, so a
 # DOCKER_HOST or DOCKER_CONTEXT never picks the daemon, and with PATH, HOME and TMPDIR in the tree
@@ -61,59 +70,53 @@ setup_test() {
   (cd "$tree/chart" && echo "$chart_digest  $(jq -r '.chart + "-" + .version' "$tree/chart.json").tgz" | sha256sum -c --quiet)
 }
 
-it_renders_the_grafana_deployment_strategy_as_recreate_with_no_rolling_update_block() {
-  local status=0
-  create_case_tree
+@test "it renders the grafana deployment strategy as recreate with no rolling update block" {
   setup_test "$tree"
 
-  run_helm "$tree" template kube-prometheus-stack "/work/chart/$(ls "$tree/chart")" \
+  run -0 --separate-stderr run_helm "$tree" template kube-prometheus-stack "/work/chart/$(ls "$tree/chart")" \
     --namespace observability -f /work/values.json \
-    --show-only charts/grafana/templates/deployment.yaml > "$tree/deployment.yaml" 2> "$tree/err" || status=$?
+    --show-only charts/grafana/templates/deployment.yaml
 
-  assert_equals 0 "$status" 'helm template exit'
-  diff /dev/null "$tree/err"
+  assert_equal "$stderr" ''
+  printf '%s\n' "$output" > "$tree/deployment.yaml"
   (cd "$repo" && run_in_case "$tree" bun -e "
     const tree = process.env.TREE ?? '';
     const deployment = Bun.YAML.parse(await Bun.file(tree + '/deployment.yaml').text());
     await Bun.write(tree + '/strategy.json', JSON.stringify(deployment.spec.strategy) + '\n');
   ")
-  diff - "$tree/strategy.json" << 'EOF'
+  run -0 diff - "$tree/strategy.json" << 'EOF'
 {"type":"Recreate"}
 EOF
 }
 
-it_renders_the_grafana_claim_on_the_retaining_class_with_no_volume_name() {
-  local status=0
-  create_case_tree
+@test "it renders the grafana claim on the retaining class with no volume name" {
   setup_test "$tree"
 
-  run_helm "$tree" template kube-prometheus-stack "/work/chart/$(ls "$tree/chart")" \
+  run -0 --separate-stderr run_helm "$tree" template kube-prometheus-stack "/work/chart/$(ls "$tree/chart")" \
     --namespace observability -f /work/values.json \
-    --show-only charts/grafana/templates/pvc.yaml > "$tree/pvc.yaml" 2> "$tree/err" || status=$?
+    --show-only charts/grafana/templates/pvc.yaml
 
-  assert_equals 0 "$status" 'helm template exit'
-  diff /dev/null "$tree/err"
+  assert_equal "$stderr" ''
+  printf '%s\n' "$output" > "$tree/pvc.yaml"
   (cd "$repo" && run_in_case "$tree" bun -e "
     const tree = process.env.TREE ?? '';
     const claim = Bun.YAML.parse(await Bun.file(tree + '/pvc.yaml').text());
     await Bun.write(tree + '/claim.json', JSON.stringify(claim.spec) + '\n');
   ")
-  diff - "$tree/claim.json" << 'EOF'
+  run -0 diff - "$tree/claim.json" << 'EOF'
 {"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"1Gi"}},"storageClassName":"local-path-retain"}
 EOF
 }
 
-it_renders_the_node_exporter_alerts_with_no_major_page_faults_rule() {
-  local status=0
-  create_case_tree
+@test "it renders the node exporter alerts with no major page faults rule" {
   setup_test "$tree"
 
-  run_helm "$tree" template kube-prometheus-stack "/work/chart/$(ls "$tree/chart")" \
+  run -0 --separate-stderr run_helm "$tree" template kube-prometheus-stack "/work/chart/$(ls "$tree/chart")" \
     --namespace observability -f /work/values.json \
-    --show-only templates/prometheus/rules-1.14/node-exporter.yaml > "$tree/rules.yaml" 2> "$tree/err" || status=$?
+    --show-only templates/prometheus/rules-1.14/node-exporter.yaml
 
-  assert_equals 0 "$status" 'helm template exit'
-  diff /dev/null "$tree/err"
+  assert_equal "$stderr" ''
+  printf '%s\n' "$output" > "$tree/rules.yaml"
   (cd "$repo" && run_in_case "$tree" bun -e "
     const tree = process.env.TREE ?? '';
     const rule = Bun.YAML.parse(await Bun.file(tree + '/rules.yaml').text());
@@ -123,10 +126,8 @@ it_renders_the_node_exporter_alerts_with_no_major_page_faults_rule() {
   ")
   # build-alert-rules.ts builds the NodeMemoryMajorPagesFaults that replaces the chart's, and the
   # chart's other node alerts stay
-  diff - "$tree/alerts.txt" << 'EOF'
+  run -0 diff - "$tree/alerts.txt" << 'EOF'
 NodeMemoryMajorPagesFaults false
 NodeMemoryHighUtilization true
 EOF
 }
-
-run_cases

@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
+# bats file_tags=suite:alert-rules
 # Test for imp's health probe in the real engine: impd's /health body served from the case tree
 # over loopback, and the pinned blackbox exporter running the imp_health module that
 # imp-health-probe-values.ts builds. The exporter is the version the chart in blackbox-chart.ts
@@ -6,21 +7,26 @@
 # HTTP on loopback, so the case turns the module's fail_if_not_ssl off and keeps every other field
 # as built; the module's own test pins fail_if_not_ssl on.
 #
-#   bash scripts/run-shell-suites.sh alert-rules
-#   CASE='not JSON' bash infra/observability/test-imp-health-probe.sh
-#
-# shell-suite: alert-rules
-# shellcheck source-path=SCRIPTDIR
-set -euo pipefail
-# fixed, so the files the cases write do not depend on the caller's umask
-umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/wait-for.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/assert-equals.sh"
+#   bash scripts/run-bats.sh alert-rules
+#   CASE='not JSON' bash scripts/run-bats.sh alert-rules
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-blackbox_image='quay.io/prometheus/blackbox-exporter:v0.28.0@sha256:e753ff9f3fc458d02cca5eddab5a77e1c175eee484a8925ac7d524f04366c2fc'
-run_id="$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')"
+# the first case pulls the exporter's image on a cold cache
+export BATS_TEST_TIMEOUT=180
+
+setup_file() {
+  load '../../scripts/src/test-utils/bats/setup'
+}
+
+setup() {
+  load '../../scripts/src/test-utils/bats/setup'
+  load '../../scripts/src/test-utils/shell/wait-for.sh'
+  # fixed, so the files the cases write do not depend on the caller's umask
+  umask 022
+  repo="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+  tree="$BATS_TEST_TMPDIR"
+  blackbox_image='quay.io/prometheus/blackbox-exporter:v0.28.0@sha256:e753ff9f3fc458d02cca5eddab5a77e1c175eee484a8925ac7d524f04366c2fc'
+  run_id="$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')"
+}
 
 # setup_test <tree>: the exporter's config, as JSON from the repo's builder, a file server over the
 # case tree, and the exporter on the host network, both on loopback ports
@@ -36,9 +42,9 @@ setup_test() {
     config.modules.imp_health.http.fail_if_not_ssl = false;
     await Bun.write((process.env.TREE ?? '') + '/config/blackbox.json', JSON.stringify(config));
   ")
-  # pulled here, so a cold image cache never writes its progress into a case's compared output
   docker pull -q "$blackbox_image" > /dev/null
-  python3 -m http.server --bind 127.0.0.1 --directory "$tree/www" "$web_port" > "$tree/www.log" 2>&1 &
+  # 3>&-, so the server does not keep bats' output pipe open past the case
+  python3 -m http.server --bind 127.0.0.1 --directory "$tree/www" "$web_port" > "$tree/www.log" 2>&1 3>&- &
   server_pid=$!
   container="imp-health-exporter-$run_id-$BASHPID"
   docker run -d --name "$container" --network host --user 65532 --read-only --cap-drop ALL \
@@ -48,11 +54,11 @@ setup_test() {
   wait_for 10 "the file server" curl -fs -o /dev/null "http://127.0.0.1:$web_port/"
 }
 
-# teardown: each step safe when setup_test stopped before it
+# each step safe when setup_test stopped before it
 teardown() {
+  stop_timeout_watchdog
   if [ -n "${container:-}" ]; then docker rm -f "$container" > /dev/null 2>&1 || true; fi
   if [ -n "${server_pid:-}" ]; then kill "$server_pid" 2> /dev/null || true; fi
-  rm -rf "$tree" || true
 }
 
 # read_probe_success <tree> <body>: serves the body as impd's /health and prints the exporter's
@@ -65,44 +71,42 @@ read_probe_success() {
 
 # impd's /health body as its daemon serves it: { status: 'ok', ready: deps.isReady() } as JSON
 # (zgeoff/impz packages/daemon/src/build-app.ts at 51df459d), with the warnings it lists
-it_passes_a_body_whose_ready_is_true() {
-  tree="$(mktemp -d)"
-  trap teardown EXIT
+@test "it passes a body whose ready is true" {
   setup_test "$tree"
 
-  assert_equals 1 "$(read_probe_success "$tree" '{"status":"ok","ready":true,"warnings":[]}')" "probe_success"
+  run -0 read_probe_success "$tree" '{"status":"ok","ready":true,"warnings":[]}'
+
+  assert_output 1
 }
 
-it_passes_a_ready_body_that_JSON_spaces_over_lines() {
-  tree="$(mktemp -d)"
-  trap teardown EXIT
+@test "it passes a ready body that JSON spaces over lines" {
   setup_test "$tree"
 
-  assert_equals 1 "$(read_probe_success "$tree" $'{\n  "status": "ok",\n  "ready": true\n}\n')" "probe_success"
+  run -0 read_probe_success "$tree" $'{\n  "status": "ok",\n  "ready": true\n}\n'
+
+  assert_output 1
 }
 
-it_fails_a_body_whose_ready_is_false() {
-  tree="$(mktemp -d)"
-  trap teardown EXIT
+@test "it fails a body whose ready is false" {
   setup_test "$tree"
 
-  assert_equals 0 "$(read_probe_success "$tree" '{"status":"ok","ready":false}')" "probe_success"
+  run -0 read_probe_success "$tree" '{"status":"ok","ready":false}'
+
+  assert_output 0
 }
 
-it_fails_a_body_without_ready() {
-  tree="$(mktemp -d)"
-  trap teardown EXIT
+@test "it fails a body without ready" {
   setup_test "$tree"
 
-  assert_equals 0 "$(read_probe_success "$tree" '{"status":"ok"}')" "probe_success"
+  run -0 read_probe_success "$tree" '{"status":"ok"}'
+
+  assert_output 0
 }
 
-it_fails_a_body_that_names_ready_true_but_is_not_JSON() {
-  tree="$(mktemp -d)"
-  trap teardown EXIT
+@test "it fails a body that names ready true but is not JSON" {
   setup_test "$tree"
 
-  assert_equals 0 "$(read_probe_success "$tree" '<p>"ready":true</p>')" "probe_success"
-}
+  run -0 read_probe_success "$tree" '<p>"ready":true</p>'
 
-run_cases
+  assert_output 0
+}

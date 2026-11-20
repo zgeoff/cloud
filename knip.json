@@ -37,7 +37,10 @@
     "@pepys/kit",
     "@stylistic/eslint-plugin",
     "@zgeoff/agent-hooks",
-    "@zgeoff/diet"
+    "@zgeoff/diet",
+    "bats",
+    "bats-assert",
+    "bats-support"
   ],
   "ignoreBinaries": ["go", "op"],
   "ignoreWorkspaces": ["sdk/*"]

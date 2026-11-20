@@ -1,26 +1,35 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
+# bats file_tags=suite:alert-rules
 # Test for the Alloy chart as the repo configures it: the pinned Helm renders the chart that
 # alloy-chart.ts pins with the values build-alloy-values.ts builds, as Pulumi's Chart does. One case
 # checks that the chart creates no ConfigMap and mounts Alloy's config from the ConfigMap the values
 # name, which Pulumi creates and names itself. The other checks the Alloy container's command, which
 # seeds or repairs Alloy's read positions before Alloy starts, and its volumes.
 #
-#   bash scripts/run-shell-suites.sh alert-rules
-#   CASE='ConfigMap' bash infra/observability/test-alloy-chart.sh
-#
-# shell-suite: alert-rules
-# shellcheck source-path=SCRIPTDIR
-set -euo pipefail
-# fixed, so the files the cases write do not depend on the caller's umask
-umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/assert-equals.sh"
+#   bash scripts/run-bats.sh alert-rules
+#   CASE='ConfigMap' bash scripts/run-bats.sh alert-rules
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-helm_image='alpine/helm:3.19.0@sha256:aef9b56f64e866207d9591d0abd8f6d767b36aadd12edf68f8a719716d9d29c9'
-# the sha256 of the chart archive at alloy-chart.ts's version, so a moved release fails the case
-chart_digest='bfdda6cb770c3526444897b9cb5a4fb33711c608d364d9e7857ec699a2fff4fb'
+# the first case pulls Helm's image and the chart on a cold cache
+export BATS_TEST_TIMEOUT=180
+
+setup_file() {
+  load '../../scripts/src/test-utils/bats/setup'
+}
+
+setup() {
+  load '../../scripts/src/test-utils/bats/setup'
+  # fixed, so the files the cases write do not depend on the caller's umask
+  umask 022
+  repo="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+  tree="$BATS_TEST_TMPDIR"
+  helm_image='alpine/helm:3.19.0@sha256:aef9b56f64e866207d9591d0abd8f6d767b36aadd12edf68f8a719716d9d29c9'
+  # the sha256 of the chart archive at alloy-chart.ts's version, so a moved release fails the case
+  chart_digest='bfdda6cb770c3526444897b9cb5a4fb33711c608d364d9e7857ec699a2fff4fb'
+}
+
+teardown() {
+  stop_timeout_watchdog
+}
 
 # run_in_case <tree> <command>...: <command> with none of the caller's environment, so a
 # DOCKER_HOST or DOCKER_CONTEXT never picks the daemon, and with PATH, HOME and TMPDIR in the tree
@@ -60,16 +69,14 @@ setup_test() {
   (cd "$tree/chart" && echo "$chart_digest  $(jq -r '.chart + "-" + .version' "$tree/chart.json").tgz" | sha256sum -c --quiet)
 }
 
-it_renders_no_configmap_and_mounts_alloys_config_from_the_configmap_the_values_name() {
-  local status=0
-  create_case_tree
+@test "it renders no configmap and mounts alloys config from the configmap the values name" {
   setup_test "$tree"
 
-  run_helm "$tree" template alloy "/work/chart/$(ls "$tree/chart")" --namespace observability \
-    -f /work/values.json > "$tree/chart.yaml" 2> "$tree/err" || status=$?
+  run -0 --separate-stderr run_helm "$tree" template alloy "/work/chart/$(ls "$tree/chart")" --namespace observability \
+    -f /work/values.json
 
-  assert_equals 0 "$status" 'helm template exit'
-  diff /dev/null "$tree/err"
+  assert_equal "$stderr" ''
+  printf '%s\n' "$output" > "$tree/chart.yaml"
   # the kinds the chart renders that hold config, the ConfigMap the DaemonSet's config volume
   # names, and the file Alloy runs
   (cd "$repo" && run_in_case "$tree" bun -e "
@@ -87,7 +94,7 @@ it_renders_no_configmap_and_mounts_alloys_config_from_the_configmap_the_values_n
     ];
     await Bun.write(tree + '/config.txt', lines.join('\n') + '\n');
   ")
-  diff - "$tree/config.txt" << 'EOF'
+  run -0 diff - "$tree/config.txt" << 'EOF'
 configmaps 0
 secrets 0
 config volume alloy-config-1a2b3c4d
@@ -95,16 +102,14 @@ config file /etc/alloy/config.alloy
 EOF
 }
 
-it_renders_the_alloy_container_with_the_entry_script_before_the_charts_run_arguments_over_the_nodes_log_and_storage_directories() {
-  local status=0
-  create_case_tree
+@test "it renders the alloy container with the entry script before the charts run arguments over the nodes log and storage directories" {
   setup_test "$tree"
 
-  run_helm "$tree" template alloy "/work/chart/$(ls "$tree/chart")" --namespace observability \
-    -f /work/values.json --show-only templates/controllers/daemonset.yaml > "$tree/daemonset.yaml" 2> "$tree/err" || status=$?
+  run -0 --separate-stderr run_helm "$tree" template alloy "/work/chart/$(ls "$tree/chart")" --namespace observability \
+    -f /work/values.json --show-only templates/controllers/daemonset.yaml
 
-  assert_equals 0 "$status" 'helm template exit'
-  diff /dev/null "$tree/err"
+  assert_equal "$stderr" ''
+  printf '%s\n' "$output" > "$tree/daemonset.yaml"
   # the Alloy container's command against the one build-alloy-values.ts builds, its first arguments,
   # any init container, and each pod volume the entry script reads or writes with its host path
   (cd "$repo" && run_in_case "$tree" bun -e "
@@ -124,7 +129,7 @@ it_renders_the_alloy_container_with_the_entry_script_before_the_charts_run_argum
     }
     await Bun.write(tree + '/alloy.txt', lines.join('\n') + '\n');
   ")
-  diff - "$tree/alloy.txt" << 'EOF'
+  run -0 diff - "$tree/alloy.txt" << 'EOF'
 command as built
 args run /etc/alloy/config.alloy --storage.path=/var/lib/alloy
 init containers 0
@@ -132,5 +137,3 @@ varlog /var/log ro /var/log
 storage /var/lib/alloy rw /var/lib/alloy
 EOF
 }
-
-run_cases

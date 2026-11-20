@@ -93,7 +93,7 @@ with open(os.path.join(out_dir, "port.tmp"), "w") as out:
 os.rename(os.path.join(out_dir, "port.tmp"), os.path.join(out_dir, "port"))
 server.serve_forever()
 PY
-  )" "$dir" &
+  )" "$dir" 3>&- &
   echo "$!" > "$dir/pid"
   wait_for 10 "the Discord webhook stand-in to listen" test -f "$dir/port"
 }
