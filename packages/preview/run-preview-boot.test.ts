@@ -990,7 +990,10 @@ test('it leaves a preview ended when its pull request closed during the boot', a
 });
 
 test('it removes the imp it started when the pull request closed before the imp existed', async () => {
-  const ctx = await setupTest(startStubImpd());
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
+
+  await impd.seedSecret('gh');
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
 
@@ -1013,8 +1016,9 @@ test('it removes the imp it started when the pull request closed before the imp 
     detail: null,
   });
 
-  expect(ctx.impd.imps.has('pv-0a1b2c3d-17')).toBeFalse();
-  expect(ctx.impd.commands).toStrictEqual([]);
+  const heldImps = await ctx.impd.client.imps.list({});
+
+  expect(heldImps).toStrictEqual([]);
 });
 
 test('it fails the boot when the head commit has no preview/compose.yaml', async () => {
