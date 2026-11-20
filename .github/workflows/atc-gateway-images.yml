@@ -18,7 +18,7 @@ on:
       - scripts/publish-atc-gateway-images.sh
       - scripts/run-bats.sh
       - scripts/run-shell-suites.sh
-      - scripts/e2e/journey-atc-gateway-restore.sh
+      - scripts/e2e/journey-atc-gateway-restore.bats
       - infra/cluster/build-atc-gateway-spec.ts
       - infra/cluster/create-atc-gateway-backup-job.ts
       - infra/cluster/build-atc-gateway-backup-pod-spec.ts

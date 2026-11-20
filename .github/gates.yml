@@ -146,6 +146,8 @@ gates:
     paths:
       - images/agent/**
       - scripts/*agent-image*
+      - scripts/run-bats.sh
+      - scripts/src/test-utils/bats/**
       - .bun-version
       - scripts/src/test-utils/shell/*-stub-apt-*
       - .github/workflows/ci.yml
