@@ -8,6 +8,7 @@ import {
   uninstalledRepos,
 } from './constants.ts';
 import { server } from './server.ts';
+import { stopPreviewImpd } from './start-preview-impd.ts';
 
 // A webhook answers 204 whatever GitHub said, so an unhandled request could still pass its test.
 // Each unhandled request is recorded, and the test that sent it fails.
@@ -38,4 +39,9 @@ afterEach(() => {
   }
 });
 
-afterAll(() => server.disable());
+// the impd that a test started stops with its file; a file that started none stops nothing
+afterAll(async () => {
+  await stopPreviewImpd();
+
+  server.disable();
+});

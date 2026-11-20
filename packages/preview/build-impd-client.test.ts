@@ -1,16 +1,18 @@
 import { expect, test } from 'bun:test';
 import { buildImpdClient } from './build-impd-client.ts';
+import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 
-function setupTest() {
-  const impd = startStubImpd();
+async function setupTest() {
+  const impd = await startPreviewImpd();
+
   const client = buildImpdClient(impd.url, impd.token);
 
   return { impd, client };
 }
 
 test('#createImp creates an elastic imp outside every backup, with the memory and HTTP port it names', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
   await ctx.client.createImp({
     name: 'pv-0a1b2c3d-7',
@@ -20,23 +22,29 @@ test('#createImp creates an elastic imp outside every backup, with the memory an
     httpPort: 3000,
   });
 
-  expect(ctx.impd.imps.get('pv-0a1b2c3d-7')).toStrictEqual({
+  const imp = await ctx.impd.client.imps.get({ name: 'pv-0a1b2c3d-7' });
+
+  expect({
+    name: imp.name,
+    state: imp.state,
+    httpPort: imp.httpPort,
+    image: imp.image,
+    memoryMib: imp.memoryMib,
+    maxMemoryMib: imp.maxMemoryMib,
+    backup: imp.backup,
+  }).toStrictEqual({
     name: 'pv-0a1b2c3d-7',
     state: 'running',
-    createdAt: expect.toSatisfy((value: string) => !Number.isNaN(Date.parse(value))),
-    lastActiveAt: expect.toSatisfy((value: string) => !Number.isNaN(Date.parse(value))),
-    lastRequestAt: null,
     httpPort: 3000,
     image: 'base',
     memoryMib: 1024,
     maxMemoryMib: 2048,
     backup: false,
-    grants: [],
   });
 });
 
 test('#createImp creates the imp under the public egress policy, which keeps its guest off private addresses', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
   await ctx.client.createImp({
     name: 'pv-0a1b2c3d-7',
@@ -46,59 +54,43 @@ test('#createImp creates the imp under the public egress policy, which keeps its
     httpPort: 3000,
   });
 
-  expect(ctx.impd.egressModes).toStrictEqual(new Map([['pv-0a1b2c3d-7', 'public']]));
+  const modes = await ctx.impd.readEgressModes();
+
+  expect(modes).toStrictEqual(new Map([['pv-0a1b2c3d-7', 'public']]));
 });
 
 test('#updatePublicEgress puts an existing imp under the public egress policy', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
-  ctx.impd.imps.set('pv-0a1b2c3d-7', {
-    name: 'pv-0a1b2c3d-7',
-    state: 'sleeping',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-01T09:00:00.000Z',
-    lastRequestAt: null,
-    httpPort: 3000,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: [],
-  });
-
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7', httpPort: 3000, state: 'sleeping' });
   await ctx.client.updatePublicEgress('pv-0a1b2c3d-7');
 
-  expect(ctx.impd.egressModes).toStrictEqual(new Map([['pv-0a1b2c3d-7', 'public']]));
+  const modes = await ctx.impd.readEgressModes();
+
+  expect(modes).toStrictEqual(new Map([['pv-0a1b2c3d-7', 'public']]));
 });
 
 test('#readImp reads an imp with no proxied request, as an impd before 6.4.0 reports it, as last used at its last activity', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
-  ctx.impd.imps.set('pv-0a1b2c3d-7', {
-    name: 'pv-0a1b2c3d-7',
-    state: 'running',
-    createdAt: '2026-10-01T08:00:00.000Z',
-    lastActiveAt: '2026-10-01T09:00:00.000Z',
-    lastRequestAt: null,
-    httpPort: 8080,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: [],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7' });
 
+  const held = await ctx.impd.client.imps.get({ name: 'pv-0a1b2c3d-7' });
   const result = await ctx.client.readImp('pv-0a1b2c3d-7');
 
   expect(result).toStrictEqual({
     name: 'pv-0a1b2c3d-7',
     state: 'running',
-    lastUsedAt: new Date('2026-10-01T09:00:00.000Z'),
+    lastUsedAt: held.lastActiveAt,
   });
 });
 
 test('#readImp reads an imp as last used at its last proxied request, whatever its last activity', async () => {
-  const ctx = setupTest();
+  // the package's impd has no wake proxy, so nothing sets an imp's last request time
+  const stub = startStubImpd();
+  const client = buildImpdClient(stub.url, stub.token);
 
-  ctx.impd.imps.set('pv-0a1b2c3d-7', {
+  stub.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'sleeping',
     createdAt: '2026-09-01T00:00:00.000Z',
@@ -111,7 +103,7 @@ test('#readImp reads an imp as last used at its last proxied request, whatever i
     grants: [],
   });
 
-  const result = await ctx.client.readImp('pv-0a1b2c3d-7');
+  const result = await client.readImp('pv-0a1b2c3d-7');
 
   expect(result).toStrictEqual({
     name: 'pv-0a1b2c3d-7',
@@ -121,150 +113,104 @@ test('#readImp reads an imp as last used at its last proxied request, whatever i
 });
 
 test('#readImp returns null for an imp impd does not know', async () => {
-  const ctx = setupTest();
-
+  const ctx = await setupTest();
   const result = await ctx.client.readImp('pv-0a1b2c3d-7');
 
   expect(result).toBeNull();
 });
 
-test('#sleepImp rejects with impd error code for an imp impd does not know', () => {
-  const ctx = setupTest();
+test('#sleepImp rejects with impd error code for an imp impd does not know', async () => {
+  const ctx = await setupTest();
 
   expect(ctx.client.sleepImp('pv-0a1b2c3d-7')).rejects.toMatchObject({ code: 'NOT_FOUND' });
 });
 
-test('#sleepImp names impd and its error code in the message of a refusal', () => {
-  const ctx = setupTest();
+test('#sleepImp names impd and its error code in the message of a refusal', async () => {
+  const ctx = await setupTest();
 
   expect(ctx.client.sleepImp('pv-0a1b2c3d-7')).rejects.toThrowWithMessage(
     Error,
-    'impd NOT_FOUND: no imp named pv-0a1b2c3d-7',
+    'impd NOT_FOUND: imp pv-0a1b2c3d-7 not found',
   );
 });
 
-test('#readImps rejects with UNAUTHORIZED when impd refuses the token', () => {
-  const ctx = setupTest();
+test('#readImps rejects with UNAUTHORIZED when impd refuses the token', async () => {
+  const ctx = await setupTest();
+
   const client = buildImpdClient(ctx.impd.url, 'imp_wrong.token');
 
   expect(client.readImps()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
 });
 
 test('#installGrant adds the secret to an imp that lacks it', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
-  ctx.impd.imps.set('pv-0a1b2c3d-7', {
-    name: 'pv-0a1b2c3d-7',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: [],
-  });
-
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7' });
+  await ctx.impd.seedSecret('gh');
   await ctx.client.installGrant('pv-0a1b2c3d-7', 'gh');
 
-  expect(ctx.impd.imps.get('pv-0a1b2c3d-7')?.grants).toStrictEqual(['gh']);
+  const grants = await ctx.impd.client.grants.list({ name: 'pv-0a1b2c3d-7' });
+
+  expect(grants).toStrictEqual(['gh']);
 });
 
 test('#installGrant leaves an imp that holds the secret without a second grant', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
-  ctx.impd.imps.set('pv-0a1b2c3d-7', {
-    name: 'pv-0a1b2c3d-7',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: ['gh'],
-  });
-
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7', grants: ['gh'] });
   await ctx.client.installGrant('pv-0a1b2c3d-7', 'gh');
 
   expect(ctx.impd.calls).toStrictEqual(['grants/list pv-0a1b2c3d-7']);
 });
 
 test('#removeGrantsExcept removes every grant of the imp outside the kept secrets', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
-  ctx.impd.imps.set('pv-0a1b2c3d-7', {
+  await ctx.impd.seedImp({
     name: 'pv-0a1b2c3d-7',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
     grants: ['gh', 'model-sonnet', 'model-sonnet-counted', 'search-api'],
   });
 
   await ctx.client.removeGrantsExcept('pv-0a1b2c3d-7', ['gh', 'model-sonnet-counted']);
 
-  expect(ctx.impd.imps.get('pv-0a1b2c3d-7')?.grants).toStrictEqual(['gh', 'model-sonnet-counted']);
+  const grants = await ctx.impd.client.grants.list({ name: 'pv-0a1b2c3d-7' });
+
+  expect(grants).toStrictEqual(['gh', 'model-sonnet-counted']);
 });
 
 test('#removeGrantsExcept leaves an imp that holds only kept secrets without a removal', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
-  ctx.impd.imps.set('pv-0a1b2c3d-7', {
-    name: 'pv-0a1b2c3d-7',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: ['gh'],
-  });
-
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7', grants: ['gh'] });
   await ctx.client.removeGrantsExcept('pv-0a1b2c3d-7', ['gh', 'model-sonnet-counted']);
 
   expect(ctx.impd.calls).toStrictEqual(['grants/list pv-0a1b2c3d-7']);
 });
 
 test('#installPathGrant narrows a grant the imp already holds to the paths it names', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
-  ctx.impd.imps.set('pv-0a1b2c3d-7', {
-    name: 'pv-0a1b2c3d-7',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: ['preview-model-counted'],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7', grants: ['preview-model-counted'] });
 
   await ctx.client.installPathGrant('pv-0a1b2c3d-7', 'preview-model-counted', [
     '/pv-0a1b2c3d-7/**',
   ]);
 
-  expect(ctx.impd.imps.get('pv-0a1b2c3d-7')?.grants).toStrictEqual(['preview-model-counted']);
+  const grants = await ctx.impd.client.grants.list({ name: 'pv-0a1b2c3d-7' });
 
-  expect(ctx.impd.grantPaths.get('pv-0a1b2c3d-7 preview-model-counted')).toStrictEqual([
-    '/pv-0a1b2c3d-7/**',
-  ]);
+  expect(grants).toStrictEqual(['preview-model-counted']);
+
+  expect(ctx.impd.readGrantPaths()).toStrictEqual(
+    new Map([['pv-0a1b2c3d-7 preview-model-counted', ['/pv-0a1b2c3d-7/**']]]),
+  );
 });
 
 test('#runCommand returns the exit code and output of a guest command that requires the broker', async () => {
-  const ctx = setupTest();
+  // the package's impd runs no command, so a stand-in answers the exec
+  const stub = startStubImpd();
+  const client = buildImpdClient(stub.url, stub.token);
 
-  ctx.impd.imps.set('pv-0a1b2c3d-7', {
+  stub.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'running',
     createdAt: '2026-09-01T00:00:00.000Z',
@@ -277,23 +223,25 @@ test('#runCommand returns the exit code and output of a guest command that requi
     grants: [],
   });
 
-  ctx.impd.answerCommand = () => ({ code: 3, stdout: 'compose: no such service: seed\n' });
+  stub.answerCommand = () => ({ code: 3, stdout: 'compose: no such service: seed\n' });
 
-  const result = await ctx.client.runCommand('pv-0a1b2c3d-7', ['docker', 'compose', 'up'], {
+  const result = await client.runCommand('pv-0a1b2c3d-7', ['docker', 'compose', 'up'], {
     requireBroker: true,
   });
 
   expect(result).toStrictEqual({ code: 3, output: 'compose: no such service: seed\n' });
 
-  expect(ctx.impd.commands).toStrictEqual([
+  expect(stub.commands).toStrictEqual([
     { imp: 'pv-0a1b2c3d-7', argv: ['docker', 'compose', 'up'], require: ['broker'] },
   ]);
 });
 
 test('#runCommand returns the output of both streams in the order impd sent them', async () => {
-  const ctx = setupTest();
+  // the package's impd runs no command, so a stand-in answers the exec
+  const stub = startStubImpd();
+  const client = buildImpdClient(stub.url, stub.token);
 
-  ctx.impd.imps.set('pv-0a1b2c3d-7', {
+  stub.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'running',
     createdAt: '2026-09-01T00:00:00.000Z',
@@ -306,32 +254,21 @@ test('#runCommand returns the output of both streams in the order impd sent them
     grants: [],
   });
 
-  ctx.impd.answerCommand = () => ({
+  stub.answerCommand = () => ({
     code: 1,
     stdout: 'pulling seed\n',
     stderr: 'seed: exited 1\n',
   });
 
-  const result = await ctx.client.runCommand('pv-0a1b2c3d-7', ['docker', 'compose', 'up']);
+  const result = await client.runCommand('pv-0a1b2c3d-7', ['docker', 'compose', 'up']);
 
   expect(result).toStrictEqual({ code: 1, output: 'pulling seed\nseed: exited 1\n' });
 });
 
 test('#runCommand starts no command once its signal has aborted', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
-  ctx.impd.imps.set('pv-0a1b2c3d-7', {
-    name: 'pv-0a1b2c3d-7',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: [],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7' });
 
   const result = ctx.client.runCommand('pv-0a1b2c3d-7', ['true'], { signal: AbortSignal.abort() });
 
@@ -340,8 +277,8 @@ test('#runCommand starts no command once its signal has aborted', async () => {
   expect(ctx.impd.calls).toStrictEqual([]);
 });
 
-test('#runCommand rejects with impd error code for an imp impd does not know', () => {
-  const ctx = setupTest();
+test('#runCommand rejects with impd error code for an imp impd does not know', async () => {
+  const ctx = await setupTest();
 
   expect(ctx.client.runCommand('pv-0a1b2c3d-7', ['true'])).rejects.toMatchObject({
     code: 'NOT_FOUND',
