@@ -1,20 +1,20 @@
 import { expect, mock, test } from 'bun:test';
 import { createImpClient } from '@impz/client';
-import { HttpResponse, http } from 'msw';
 import { runSandboxImageAdd } from './run-sandbox-image-add.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 import { server } from './src/test-utils/server.ts';
+import { startScriptsImpd } from './src/test-utils/start-scripts-impd.ts';
 import { startStubImpdImages } from './src/test-utils/start-stub-impd-images.ts';
 
-function setupTest() {
+async function setupTest() {
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
 
-  return { printOut, printErr };
+  return { printOut, printErr, impd: await startScriptsImpd() };
 }
 
 test('it adds each manifest image that impd lacks, skips one it holds, and never prints the token', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
   const impd = startStubImpdImages({
     url: 'https://impd.test',
@@ -85,21 +85,16 @@ test('it adds each manifest image that impd lacks, skips one it holds, and never
 });
 
 test('it exits 1 and names the image when impd refuses an add', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
-  const impd = startStubImpdImages({
-    url: 'https://impd.test',
-    token: 'nixie-impd-token-for-tests',
-    images: [],
-    refusedRefs: [
-      'ghcr.io/zgeoff/nixie-conversation@sha256:5c0ffee0aa11bb22cc33dd44ee55ff6600112233445566778899aabbccddeeff',
-    ],
+  ctx.impd.fail('images/add', {
+    code: 'FORBIDDEN',
+    status: 403,
+    message: 'token nixie may add only images whose ref starts with ghcr.io/zgeoff/nixie-',
   });
 
-  server.use(...impd.handlers);
-
   const runner = buildStubRunner(
-    (call) => (call.argv[0] === 'sops' ? { stdout: 'nixie-impd-token-for-tests\n' } : undefined),
+    (call) => (call.argv[0] === 'sops' ? { stdout: `${ctx.impd.token}\n` } : undefined),
     (call) =>
       call.argv.join(' ') === 'nixie sandbox-manifest'
         ? {
@@ -118,7 +113,7 @@ test('it exits 1 and names the image when impd refuses an add', async () => {
   );
 
   const exitCode = await runSandboxImageAdd({
-    env: { IMPD_URL: 'https://impd.test', NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
+    env: { IMPD_URL: ctx.impd.url, NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
     run: runner.run,
     createImpClient,
     printOut: ctx.printOut,
@@ -127,9 +122,9 @@ test('it exits 1 and names the image when impd refuses an add', async () => {
 
   expect(exitCode).toBe(1);
 
-  expect(impd.calls).toStrictEqual([
-    'images.list',
-    'images.add nixie-conversation-5c0ffee0aa11 ghcr.io/zgeoff/nixie-conversation@sha256:5c0ffee0aa11bb22cc33dd44ee55ff6600112233445566778899aabbccddeeff',
+  expect(ctx.impd.calls).toStrictEqual([
+    'images/list',
+    'images/add nixie-conversation-5c0ffee0aa11 ghcr.io/zgeoff/nixie-conversation@sha256:5c0ffee0aa11bb22cc33dd44ee55ff6600112233445566778899aabbccddeeff',
   ]);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
@@ -142,24 +137,12 @@ test('it exits 1 and names the image when impd refuses an add', async () => {
 });
 
 test('it exits 1 with no add when impd holds a manifest name at another digest', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
-  const impd = startStubImpdImages({
-    url: 'https://impd.test',
-    token: 'nixie-impd-token-for-tests',
-    images: [
-      {
-        name: 'nixie-fetch-77aa88bb99cc',
-        ref: 'ghcr.io/zgeoff/nixie-fetch@sha256:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f',
-        digest: 'sha256:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f',
-      },
-    ],
-  });
-
-  server.use(...impd.handlers);
+  await ctx.impd.seedImage('nixie-fetch-77aa88bb99cc');
 
   const runner = buildStubRunner(
-    (call) => (call.argv[0] === 'sops' ? { stdout: 'nixie-impd-token-for-tests' } : undefined),
+    (call) => (call.argv[0] === 'sops' ? { stdout: ctx.impd.token } : undefined),
     (call) =>
       call.argv.join(' ') === 'nixie sandbox-manifest'
         ? {
@@ -178,7 +161,7 @@ test('it exits 1 with no add when impd holds a manifest name at another digest',
   );
 
   const exitCode = await runSandboxImageAdd({
-    env: { IMPD_URL: 'https://impd.test', NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
+    env: { IMPD_URL: ctx.impd.url, NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
     run: runner.run,
     createImpClient,
     printOut: ctx.printOut,
@@ -186,25 +169,17 @@ test('it exits 1 with no add when impd holds a manifest name at another digest',
   });
 
   expect(exitCode).toBe(1);
-  expect(impd.calls).toStrictEqual(['images.list']);
+  expect(ctx.impd.calls).toStrictEqual(['images/list']);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
     [
-      'impd holds the image nixie-fetch-77aa88bb99cc at sha256:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f from ghcr.io/zgeoff/nixie-fetch@sha256:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f, not sha256:77aa88bb99cc00dd11ee22ff33004455667788990011223344556677889900aa\n',
+      'impd holds the image nixie-fetch-77aa88bb99cc at sha256:nixie-fetch-77aa88bb99cc from nixie-fetch-77aa88bb99cc:latest, not sha256:77aa88bb99cc00dd11ee22ff33004455667788990011223344556677889900aa\n',
     ],
   ]);
 });
 
 test('it exits 1 with no impd call when sops cannot read the token', async () => {
-  const ctx = setupTest();
-
-  const impd = startStubImpdImages({
-    url: 'https://impd.test',
-    token: 'nixie-impd-token-for-tests',
-    images: [],
-  });
-
-  server.use(...impd.handlers);
+  const ctx = await setupTest();
 
   // sops 3.x's answer to a file that no age identity it holds decrypts
   const runner = buildStubRunner((call) =>
@@ -214,7 +189,7 @@ test('it exits 1 with no impd call when sops cannot read the token', async () =>
   );
 
   const exitCode = await runSandboxImageAdd({
-    env: { IMPD_URL: 'https://impd.test', NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
+    env: { IMPD_URL: ctx.impd.url, NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
     run: runner.run,
     createImpClient,
     printOut: ctx.printOut,
@@ -222,7 +197,7 @@ test('it exits 1 with no impd call when sops cannot read the token', async () =>
   });
 
   expect(exitCode).toBe(1);
-  expect(impd.calls).toStrictEqual([]);
+  expect(ctx.impd.calls).toStrictEqual([]);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
     [
@@ -232,36 +207,24 @@ test('it exits 1 with no impd call when sops cannot read the token', async () =>
 });
 
 test('it exits 1 with no add when impd refuses to list its images', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
-  const impd = startStubImpdImages({
-    url: 'https://impd.test',
-    token: 'nixie-impd-token-for-tests',
-    images: [],
+  // oRPC's answer to a procedure that threw an undefined error
+  ctx.impd.fail('images/list', {
+    status: 500,
+    body: {
+      json: {
+        defined: false,
+        code: 'INTERNAL_SERVER_ERROR',
+        status: 500,
+        message: 'Internal server error',
+      },
+      meta: [],
+    },
   });
 
-  server.use(...impd.handlers);
-
-  // oRPC's answer to a procedure that threw an undefined error, which server.use puts first
-  server.use(
-    http.post('https://impd.test/rpc/images/list', () =>
-      HttpResponse.json(
-        {
-          json: {
-            defined: false,
-            code: 'INTERNAL_SERVER_ERROR',
-            status: 500,
-            message: 'Internal server error',
-          },
-          meta: [],
-        },
-        { status: 500 },
-      ),
-    ),
-  );
-
   const runner = buildStubRunner(
-    (call) => (call.argv[0] === 'sops' ? { stdout: 'nixie-impd-token-for-tests' } : undefined),
+    (call) => (call.argv[0] === 'sops' ? { stdout: ctx.impd.token } : undefined),
     (call) =>
       call.argv.join(' ') === 'nixie sandbox-manifest'
         ? {
@@ -276,7 +239,7 @@ test('it exits 1 with no add when impd refuses to list its images', async () => 
   );
 
   const exitCode = await runSandboxImageAdd({
-    env: { IMPD_URL: 'https://impd.test', NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
+    env: { IMPD_URL: ctx.impd.url, NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
     run: runner.run,
     createImpClient,
     printOut: ctx.printOut,
@@ -284,8 +247,7 @@ test('it exits 1 with no add when impd refuses to list its images', async () => 
   });
 
   expect(exitCode).toBe(1);
-  expect(impd.calls).toStrictEqual([]);
-  expect(impd.images).toStrictEqual([]);
+  expect(ctx.impd.calls).toStrictEqual(['images/list']);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
     ['run-sandbox-image-add: impd did not list its images: Internal server error\n'],
@@ -293,18 +255,10 @@ test('it exits 1 with no add when impd refuses to list its images', async () => 
 });
 
 test('it exits 1 with no impd call when nixie cannot print its sandbox manifest', async () => {
-  const ctx = setupTest();
-
-  const impd = startStubImpdImages({
-    url: 'https://impd.test',
-    token: 'nixie-impd-token-for-tests',
-    images: [],
-  });
-
-  server.use(...impd.handlers);
+  const ctx = await setupTest();
 
   const runner = buildStubRunner(
-    (call) => (call.argv[0] === 'sops' ? { stdout: 'nixie-impd-token-for-tests' } : undefined),
+    (call) => (call.argv[0] === 'sops' ? { stdout: ctx.impd.token } : undefined),
     (call) =>
       call.argv.join(' ') === 'nixie sandbox-manifest'
         ? { exitCode: 1, stderr: 'nixie: the sandbox manifest is missing from this build\n' }
@@ -312,7 +266,7 @@ test('it exits 1 with no impd call when nixie cannot print its sandbox manifest'
   );
 
   const exitCode = await runSandboxImageAdd({
-    env: { IMPD_URL: 'https://impd.test', NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
+    env: { IMPD_URL: ctx.impd.url, NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
     run: runner.run,
     createImpClient,
     printOut: ctx.printOut,
@@ -320,7 +274,7 @@ test('it exits 1 with no impd call when nixie cannot print its sandbox manifest'
   });
 
   expect(exitCode).toBe(1);
-  expect(impd.calls).toStrictEqual([]);
+  expect(ctx.impd.calls).toStrictEqual([]);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
     [
@@ -330,18 +284,10 @@ test('it exits 1 with no impd call when nixie cannot print its sandbox manifest'
 });
 
 test("it exits 1 with no impd call when the manifest holds a ref outside nixie's registry path", async () => {
-  const ctx = setupTest();
-
-  const impd = startStubImpdImages({
-    url: 'https://impd.test',
-    token: 'nixie-impd-token-for-tests',
-    images: [],
-  });
-
-  server.use(...impd.handlers);
+  const ctx = await setupTest();
 
   const runner = buildStubRunner(
-    (call) => (call.argv[0] === 'sops' ? { stdout: 'nixie-impd-token-for-tests' } : undefined),
+    (call) => (call.argv[0] === 'sops' ? { stdout: ctx.impd.token } : undefined),
     (call) =>
       call.argv.join(' ') === 'nixie sandbox-manifest'
         ? {
@@ -356,7 +302,7 @@ test("it exits 1 with no impd call when the manifest holds a ref outside nixie's
   );
 
   const exitCode = await runSandboxImageAdd({
-    env: { IMPD_URL: 'https://impd.test', NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
+    env: { IMPD_URL: ctx.impd.url, NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
     run: runner.run,
     createImpClient,
     printOut: ctx.printOut,
@@ -364,7 +310,7 @@ test("it exits 1 with no impd call when the manifest holds a ref outside nixie's
   });
 
   expect(exitCode).toBe(1);
-  expect(impd.calls).toStrictEqual([]);
+  expect(ctx.impd.calls).toStrictEqual([]);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
     [
@@ -374,7 +320,8 @@ test("it exits 1 with no impd call when the manifest holds a ref outside nixie's
 });
 
 test('it exits 2 when the Job leaves out its environment', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
+
   const runner = buildStubRunner();
 
   const exitCode = await runSandboxImageAdd({
