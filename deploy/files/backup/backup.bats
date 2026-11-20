@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
+# bats file_tags=suite:files-backup-fixture
 # Fixture test for the files service's backup script (backup.sh), run locally with Docker in the
 # backup image that the stack config pins as atcGateway.backupImage. It touches no cluster and no
 # cloud account.
@@ -18,25 +19,61 @@
 # `bun run test:files-backup-fixture` runs it; one case alone, or against a local build of the
 # backup image (images/atc-gateway/backup) in place of the pinned one:
 #
-#   CASE='ls mode' bash deploy/files/backup/test-backup.sh
-#   BACKUP_IMAGE=<local tag> bash deploy/files/backup/test-backup.sh
-# shell-suite: files-backup-fixture
-# shellcheck source-path=SCRIPTDIR
-# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
-set -euo pipefail
-# fixed, so the modes the cases assert do not depend on the caller's umask
-umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/assert-status.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/run-backup.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/run-backup-shell.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/normalize-restic-output.sh"
+#   CASE='ls mode' bash scripts/run-bats.sh files-backup-fixture
+#   BACKUP_IMAGE=<local tag> bash scripts/run-bats.sh files-backup-fixture
 
-it_backs_up_the_metadata_copy_and_the_files_and_leaves_the_rest_out() {
-  local image="$1" script="$2" status=0
-  name="files-backup-$3-$BASHPID"
-  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
+# a case runs a chown container and then the backup image, and some run restic several times
+export BATS_TEST_TIMEOUT=180
+
+# Boot data every case needs: the backup image the stack config pins for the gateway, nixie and the
+# files service (atcGateway.backupImage), pulled once unless BACKUP_IMAGE names a local build, and
+# the script under test, by absolute path for the bind mount.
+setup_file() {
+  load '../../../scripts/src/test-utils/bats/setup'
+  local repo
+  repo="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)"
+  if [ -n "${BACKUP_IMAGE:-}" ]; then
+    image="$BACKUP_IMAGE"
+  else
+    image="$(cd "$repo" && bun -e 'console.log(Bun.YAML.parse(await Bun.file("infra/Pulumi.prod.yaml").text()).config["geoff-cloud:atcGateway"].backupImage)')"
+    docker pull -q "$image" > /dev/null
+  fi
+  export image
+}
+
+setup() {
+  load '../../../scripts/src/test-utils/bats/setup'
+  load '../../../scripts/src/test-utils/shell/run-backup.sh'
+  load '../../../scripts/src/test-utils/shell/run-backup-shell.sh'
+  load '../../../scripts/src/test-utils/shell/normalize-restic-output.sh'
+  # fixed, so the modes the cases assert do not depend on the caller's umask
+  umask 022
+  tree="$BATS_TEST_TMPDIR"
+  script="$BATS_TEST_DIRNAME/backup.sh"
+  name="files-backup-$(basename "$BATS_RUN_TMPDIR")-$BATS_TEST_NUMBER"
+}
+
+teardown() {
+  stop_timeout_watchdog
+  docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true
+  docker volume rm -f "$name-state" "$name-repo" > /dev/null || true
+}
+
+# Boot data every case needs: a seed directory the backup shell reads at /seed, and a state volume
+# and a restic repository volume owned by the service's uid, as fsGroup 65532 leaves the pod's
+# volume. Its chown container is named for the case's teardown.
+setup_test() {
+  local tree="$1" name="$2" image="$3"
+  mkdir "$tree/seed"
+  chmod -R a+rwX "$tree/seed"
+  chmod -R a+rX "$tree"
+  docker volume create "$name-state" > /dev/null
+  docker volume create "$name-repo" > /dev/null
+  docker run --rm --name "$name-setup" --user 0 --entrypoint /bin/sh \
+    -v "$name-state:/s" -v "$name-repo:/r" "$image" -c 'chown 65532:65532 /s /r'
+}
+
+@test "it backs up the metadata copy and the files and leaves the rest out" {
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" << 'EOF'
 sqlite3 /state/files.db "CREATE TABLE uploads (id TEXT PRIMARY KEY); INSERT INTO uploads VALUES ('AAAAAAAAAAAAAAAAAAAAAA');"
@@ -46,8 +83,7 @@ echo 'half written' > /state/incoming/BBBBBBBBBBBBBBBBBBBBBB
 EOF
 
   run_backup "$name" "$image" --entrypoint /bin/sh \
-    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh backup \
-    > "$tree/out" 2> "$tree/err" || status=$?
+    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh backup > "$tree/out" 2> "$tree/err"
 
   diff /dev/null "$tree/err"
   normalize_restic_output < "$tree/out" > "$tree/out.normal"
@@ -75,7 +111,6 @@ ID  NOW  files       files       daily snapshot   /state/files            SIZE
 1 snapshots
 
 EOF
-  assert_status 0 "$status"
   run_backup_shell "$name" "$image" "$tree" > "$tree/snapshot" << 'EOF'
 restic ls --tag files --host files latest | tail -n +2
 restic dump latest /files-backup.db > /tmp/copy.db && sqlite3 /tmp/copy.db 'SELECT id FROM uploads'
@@ -95,10 +130,7 @@ EOF
 # A writer holds files.db open in WAL mode, as the service does, and its last row is still in the
 # WAL when the backup runs. The backup runs inside the same container as the writer, so the writer
 # stays open; the case reads the row back from the snapshot.
-it_backs_up_the_rows_in_a_live_writers_wal() {
-  local image="$1" script="$2"
-  name="files-backup-$3-$BASHPID"
-  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
+@test "it backs up the rows in a live writers wal" {
   setup_test "$tree" "$name" "$image"
 
   run_backup_shell "$name" "$image" "$tree" -e STATE_DIR=/state \
@@ -126,19 +158,16 @@ CCCCCCCCCCCCCCCCCCCCCC
 EOF
 }
 
-it_stops_before_restic_without_files_db() {
-  local image="$1" script="$2" status=0
-  name="files-backup-$3-$BASHPID"
-  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
+@test "it stops before restic without files db" {
+  local status=0
   setup_test "$tree" "$name" "$image"
 
   run_backup "$name" "$image" --entrypoint /bin/sh \
-    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh backup \
-    > "$tree/out" 2> "$tree/err" || status=$?
+    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh backup > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'no files.db in /state'
-  assert_status 1 "$status"
   run_backup_shell "$name" "$image" "$tree" > "$tree/repo" << 'EOF'
 ls -A /repo
 EOF
@@ -148,10 +177,7 @@ EOF
 # The service wrote one upload after the backup's metadata copy, and left a WAL beside its
 # database; the restore brings back the snapshot's file and row, drops the WAL, and removes the
 # later file, which no restored row lists.
-it_restores_the_files_and_the_metadata_and_removes_a_file_without_a_row() {
-  local image="$1" script="$2" status=0
-  name="files-backup-$3-$BASHPID"
-  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
+@test "it restores the files and the metadata and removes a file without a row" {
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" -e STATE_DIR=/state \
     -v "$script:/opt/files-backup/backup.sh:ro" << 'EOF'
@@ -166,8 +192,7 @@ echo 'stale wal' > /state/files.db-wal
 EOF
 
   run_backup "$name" "$image" --entrypoint /bin/sh \
-    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh restore \
-    > "$tree/out" 2> "$tree/err" || status=$?
+    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh restore > "$tree/out" 2> "$tree/err"
 
   diff /dev/null "$tree/err"
   normalize_restic_output < "$tree/out" > "$tree/out.normal"
@@ -178,7 +203,6 @@ restoring snapshot ID of [/state/files-backup.db /state/files] at NOW +0000 UTC 
 Summary: Restored 2 files/dirs (SIZE) in T
 restored files.db: integrity_check ok, 1 uploads, 1 files without a row removed
 EOF
-  assert_status 0 "$status"
   run_backup_shell "$name" "$image" "$tree" > "$tree/state" << 'EOF'
 ls -A /state /state/files
 cat /state/files/AAAAAAAAAAAAAAAAAAAAAA
@@ -198,10 +222,8 @@ EOF
 }
 
 # A snapshot whose metadata copy is not a database: the restore stops before it touches the state.
-it_stops_a_restore_before_any_change_when_the_metadata_copy_fails_its_check() {
-  local image="$1" script="$2" status=0
-  name="files-backup-$3-$BASHPID"
-  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
+@test "it stops a restore before any change when the metadata copy fails its check" {
+  local status=0
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" << 'EOF'
 restic init > /dev/null
@@ -212,8 +234,8 @@ sqlite3 /state/files.db "CREATE TABLE uploads (id TEXT PRIMARY KEY); INSERT INTO
 EOF
 
   run_backup "$name" "$image" --entrypoint /bin/sh \
-    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh restore \
-    > "$tree/out" 2> "$tree/err" || status=$?
+    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh restore > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
   normalize_restic_output < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
@@ -224,7 +246,6 @@ EOF
 Error: in prepare, file is not a database (26)
 the restored files-backup.db failed the integrity check
 EOF
-  assert_status 1 "$status"
   run_backup_shell "$name" "$image" "$tree" > "$tree/state" << 'EOF'
 ls -A /state
 sqlite3 /state/files.db 'SELECT id FROM uploads'
@@ -238,10 +259,7 @@ EOF
 
 # Another job holds the lock, as a manual job does beside the CronJob's run: the backup stops
 # before it makes or removes a metadata copy, and saves no snapshot.
-it_refuses_a_backup_while_another_job_holds_the_lock() {
-  local image="$1" script="$2"
-  name="files-backup-$3-$BASHPID"
-  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
+@test "it refuses a backup while another job holds the lock" {
   setup_test "$tree" "$name" "$image"
 
   run_backup_shell "$name" "$image" "$tree" -e STATE_DIR=/state \
@@ -267,10 +285,7 @@ EOF
 # Two snapshots, the later with another upload: SNAPSHOT names the earlier, and the restore brings
 # back that snapshot's metadata and files, not the latest one's. The later snapshot comes from
 # restic directly, since the script's retention keeps one snapshot a day.
-it_restores_the_snapshot_that_snapshot_names_rather_than_the_latest() {
-  local image="$1" script="$2" status=0
-  name="files-backup-$3-$BASHPID"
-  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
+@test "it restores the snapshot that snapshot names rather than the latest" {
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" -e STATE_DIR=/state \
     -v "$script:/opt/files-backup/backup.sh:ro" > "$tree/first" << 'EOF'
@@ -287,13 +302,11 @@ rm /state/files-backup.db
 EOF
 
   run_backup "$name" "$image" --entrypoint /bin/sh -e "SNAPSHOT=$(cat "$tree/first")" \
-    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh restore \
-    > "$tree/out" 2> "$tree/err" || status=$?
+    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh restore > "$tree/out" 2> "$tree/err"
 
   diff /dev/null "$tree/err"
-  tail -n 1 "$tree/out" > "$tree/summary"
+  tail -n 1 < "$tree/out" > "$tree/summary"
   diff - "$tree/summary" <<< 'restored files.db: integrity_check ok, 1 uploads, 1 files without a row removed'
-  assert_status 0 "$status"
   run_backup_shell "$name" "$image" "$tree" > "$tree/state" << 'EOF'
 ls /state/files
 cat /state/files/EEEEEEEEEEEEEEEEEEEEEE
@@ -309,10 +322,7 @@ EOF
 # The state volume is a small tmpfs with too little room left for the snapshot's metadata copy:
 # the restore stops at the staging copy, before it changes the live database or the files. A tmpfs
 # volume empties when no container mounts it, so the setup, the restore and the check share one.
-it_stops_a_restore_before_any_change_when_the_metadata_does_not_fit_on_the_volume() {
-  local image="$1" script="$2"
-  name="files-backup-$3-$BASHPID"
-  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
+@test "it stops a restore before any change when the metadata does not fit on the volume" {
   setup_test "$tree" "$name" "$image"
   docker volume rm "$name-state" > /dev/null
   docker volume create --driver local --opt type=tmpfs --opt device=tmpfs \
@@ -352,10 +362,7 @@ LIVELIVELIVELIVELIVELI
 EOF
 }
 
-it_lists_the_snapshots_in_ls_mode() {
-  local image="$1" script="$2" status=0
-  name="files-backup-$3-$BASHPID"
-  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
+@test "it lists the snapshots in ls mode" {
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" << 'EOF'
 restic init > /dev/null
@@ -365,8 +372,7 @@ sqlite3 /tmp/snap/files-backup.db 'CREATE TABLE uploads (id TEXT PRIMARY KEY);'
 EOF
 
   run_backup "$name" "$image" --entrypoint /bin/sh \
-    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh ls \
-    > "$tree/out" 2> "$tree/err" || status=$?
+    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh ls > "$tree/out" 2> "$tree/err"
 
   diff /dev/null "$tree/err"
   normalize_restic_output < "$tree/out" > "$tree/out.normal"
@@ -378,47 +384,16 @@ ID  2020-01-02 03:04:05  files       files       /tmp/snap/files            SIZE
 --------------------------------------------------------------------------------------------
 1 snapshots
 EOF
-  assert_status 0 "$status"
 }
 
-it_prints_the_usage_for_an_unknown_mode() {
-  local image="$1" script="$2" status=0
-  name="files-backup-$3-$BASHPID"
-  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
+@test "it prints the usage for an unknown mode" {
+  local status=0
   setup_test "$tree" "$name" "$image"
 
   run_backup "$name" "$image" --entrypoint /bin/sh \
-    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh prune \
-    > "$tree/out" 2> "$tree/err" || status=$?
+    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh prune > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: files-backup backup|restore|ls'
-  assert_status 2 "$status"
 }
-
-# Boot data every case needs: a seed directory the backup shell reads at /seed, and a state volume
-# and a restic repository volume owned by the service's uid, as fsGroup 65532 leaves the pod's
-# volume. Its chown container is named for the case's trap.
-setup_test() {
-  local tree="$1" name="$2" image="$3"
-  mkdir "$tree/seed"
-  chmod -R a+rwX "$tree/seed"
-  chmod -R a+rX "$tree"
-  docker volume create "$name-state" > /dev/null
-  docker volume create "$name-repo" > /dev/null
-  docker run --rm --name "$name-setup" --user 0 --entrypoint /bin/sh \
-    -v "$name-state:/s" -v "$name-repo:/r" "$image" -c 'chown 65532:65532 /s /r'
-}
-
-# Boot data every case needs: the backup image the stack config pins for the gateway, nixie and the
-# files service (atcGateway.backupImage), pulled once unless BACKUP_IMAGE names a local build, and
-# the script under test, by absolute path for the bind mount.
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-if [ -n "${BACKUP_IMAGE:-}" ]; then
-  image="$BACKUP_IMAGE"
-else
-  image="$(cd "$repo" && bun -e 'console.log(Bun.YAML.parse(await Bun.file("infra/Pulumi.prod.yaml").text()).config["geoff-cloud:atcGateway"].backupImage)')"
-  docker pull -q "$image" > /dev/null
-fi
-run="$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')"
-run_cases "$image" "$repo/deploy/files/backup/backup.sh" "$run"

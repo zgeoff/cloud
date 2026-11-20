@@ -8,7 +8,7 @@
 # build-alertmanager-values.ts builds and posts to the Discord webhook stand-in. Alloy looks for new
 # log files every 1 s and Alertmanager holds a new group for 1 s, in place of production's 10 s and
 # 30 s, which the builders' own tests pin.
-# scripts/e2e/journey-atc-sign-in-alerts.sh runs the stages together.
+# scripts/e2e/journey-atc-sign-in-alerts.bats runs the stages together.
 #
 #   bash scripts/run-bats.sh alert-rules
 #   CASE='burst' bash scripts/run-bats.sh alert-rules

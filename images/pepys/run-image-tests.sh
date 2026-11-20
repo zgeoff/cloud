@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The pepys image test: it writes a stand-in build context, builds images/pepys/Dockerfile on the
 # pinned distroless base under a tag that carries a random per-run id, runs the pepys-image suites
-# (images/pepys/test-pepys-image.sh) with PEPYS_IMAGE and PEPYS_RUN set, and removes the image and
+# (images/pepys/pepys-image.bats) with PEPYS_IMAGE and PEPYS_RUN set, and removes the image and
 # the context after. When the build fails it prints the build log and exits 1.
 #
 # The context holds a probe, compiled with `bun build --compile` as ingest and the API are, in
@@ -55,4 +55,4 @@ if ! {
   exit 1
 fi
 echo "built $PEPYS_IMAGE"
-bash scripts/run-shell-suites.sh pepys-image
+bash scripts/run-bats.sh pepys-image

@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
+# bats file_tags=suite:pepys-image
 # Image test for cloud-pepys (images/pepys/Dockerfile), run locally with Docker. It touches no
 # cluster and no cloud account.
 #
@@ -14,14 +15,26 @@
 #
 #   bash images/pepys/run-image-tests.sh
 #   CASE='modules' bash images/pepys/run-image-tests.sh
-# shell-suite: pepys-image
-# shellcheck source-path=SCRIPTDIR
-set -euo pipefail
-# fixed, so the files the cases write do not depend on the caller's umask
-umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/src/test-utils/shell/assert-equals.sh"
+
+# starting a container on a cold Docker host can take most of the shared 30 seconds
+export BATS_TEST_TIMEOUT=120
+
+setup_file() {
+  load '../../scripts/src/test-utils/bats/setup'
+  : "${PEPYS_IMAGE:?is unset: run this through images/pepys/run-image-tests.sh}"
+  : "${PEPYS_RUN:?is unset: run this through images/pepys/run-image-tests.sh}"
+}
+
+setup() {
+  load '../../scripts/src/test-utils/bats/setup'
+  # fixed, so the files the cases write do not depend on the caller's umask
+  umask 022
+  tree="$BATS_TEST_TMPDIR"
+}
+
+teardown() {
+  stop_timeout_watchdog
+}
 
 # run_probe <image> <program> <path>...: runs <program> with the pods' container security
 run_probe() {
@@ -31,25 +44,21 @@ run_probe() {
     --entrypoint "/usr/local/bin/$program" "$image" "$@"
 }
 
-it_runs_each_program_as_the_nonroot_user_from_a_read_only_executable_file() {
-  local image="$1" program
-  create_case_tree
+@test "it runs each program as the nonroot user from a read only executable file" {
+  local program
 
   for program in pepys-host pepys-ingest pepys-api; do
-    run_probe "$image" "$program" "/usr/local/bin/$program" > "$tree/$program.json"
+    run_probe "$PEPYS_IMAGE" "$program" "/usr/local/bin/$program" > "$tree/$program.json"
 
-    assert_equals 65532 "$(jq -r .uid "$tree/$program.json")" "$program uid"
-    assert_equals 65532 "$(jq -r .gid "$tree/$program.json")" "$program gid"
-    assert_equals 555 "$(jq -r --arg p "/usr/local/bin/$program" '.paths[$p].mode' "$tree/$program.json")" "$program mode"
+    assert_equal "$(jq -r .uid "$tree/$program.json")" 65532
+    assert_equal "$(jq -r .gid "$tree/$program.json")" 65532
+    assert_equal "$(jq -r --arg p "/usr/local/bin/$program" '.paths[$p].mode' "$tree/$program.json")" 555
   done
 }
 
-it_lets_the_nonroot_user_read_the_modules_and_keeps_them_read_only() {
-  local image="$1"
-  create_case_tree
-
+@test "it lets the nonroot user read the modules and keeps them read only" {
   # COPY makes /modules itself 0755 whatever --chmod says; root owns it, so the user cannot write it
-  run_probe "$image" pepys-host /modules /modules/ledger /modules/consumers.json /modules/ledger/0123abcd.wasm \
+  run_probe "$PEPYS_IMAGE" pepys-host /modules /modules/ledger /modules/consumers.json /modules/ledger/0123abcd.wasm \
     > "$tree/modules.json"
 
   jq -S .paths "$tree/modules.json" | diff - <(
@@ -71,7 +80,3 @@ it_lets_the_nonroot_user_read_the_modules_and_keeps_them_read_only() {
 JSON
   )
 }
-
-: "${PEPYS_IMAGE:?is unset: run this through images/pepys/run-image-tests.sh}"
-: "${PEPYS_RUN:?is unset: run this through images/pepys/run-image-tests.sh}"
-run_cases "$PEPYS_IMAGE"

@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
+# bats file_tags=suite:agent-image
 # Tests the agent image's build step, sbin/install-ubuntu-packages, with the real apt in the image
 # that `bun run test:agent-image` builds, against a stand-in for the Ubuntu archive hosts. What
 # this proves: a pin installs as the snapshot holds it after the live archive replaced it, an
@@ -19,341 +20,43 @@
 # it. The suites are built on the host, so the host needs dpkg-deb; without it the suite fails
 # before any case. One case alone:
 #
-#   CASE='replaced' bash images/agent/test-install-ubuntu-packages.sh
-# shell-suite: agent-image
-# shellcheck source-path=SCRIPTDIR/../..
-# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
-set -euo pipefail
-umask 022
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo="$(cd "$here/../.." && pwd)"
-# shellcheck source=scripts/src/test-utils/shell/run-cases.sh
-source "$repo/scripts/src/test-utils/shell/run-cases.sh"
-# shellcheck source=scripts/src/test-utils/shell/create-case-tree.sh
-source "$repo/scripts/src/test-utils/shell/create-case-tree.sh"
-# shellcheck source=scripts/src/test-utils/shell/assert-status.sh
-source "$repo/scripts/src/test-utils/shell/assert-status.sh"
-# shellcheck source=scripts/src/test-utils/shell/create-stub-apt-suite.sh
-source "$repo/scripts/src/test-utils/shell/create-stub-apt-suite.sh"
+#   CASE='replaced' bash scripts/run-bats.sh agent-image
 
-if ! command -v dpkg-deb > /dev/null; then
-  echo "test-install-ubuntu-packages: dpkg-deb is not on PATH, and every case needs it" >&2
-  exit 1
-fi
+# each case starts a container and runs apt, which a cold host can take longer than 30 seconds over
+export BATS_TEST_TIMEOUT=180
 
-it_installs_a_pin_that_the_live_archive_replaced_as_the_snapshot_holds_it() {
-  local image="$1" status=0 suite
-  create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
-  setup_test "$image"
-  for suite in "$codename" "$codename-backports" "$codename-security"; do
-    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
-    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
-  done
-  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-2
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
-  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
-    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
-
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
-    "$container" \
-    /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
-    > /dev/null 2> "$tree/err" || status=$?
-
-  docker exec "$container" dpkg-query -W cloud-stub > "$tree/installed"
-  diff - "$tree/installed" <<< $'cloud-stub\t1.0-1'
-  docker exec "$container" grep ' /ubuntu/[^d]*pool/' /run/stub/requests > "$tree/requests"
-  diff - "$tree/requests" << 'EOF'
-200 snapshot.ubuntu.com /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb
-EOF
-  sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff /dev/null "$tree/err.normal"
-  assert_status 0 "$status"
+setup_file() {
+  load '../../scripts/src/test-utils/bats/setup'
+  if ! command -v dpkg-deb > /dev/null; then
+    echo "install-ubuntu-packages: dpkg-deb is not on PATH, and every case needs it" >&2
+    return 1
+  fi
+  export image="${AGENT_IMAGE:-cloud/agent-image}"
 }
 
-it_resolves_an_unpinned_dependency_as_the_snapshot_holds_it_when_the_live_archive_has_a_newer_one() {
-  local image="$1" status=0 suite
-  create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
-  setup_test "$image"
-  for suite in "$codename" "$codename-backports" "$codename-security"; do
-    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
-    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
-  done
-  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" \
-    cloud-stub=1.0-1/cloud-stub-lib cloud-stub-lib=2.0-2
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" \
-    cloud-stub=1.0-1/cloud-stub-lib cloud-stub-lib=2.0-1
-  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
-    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
-
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
-    "$container" \
-    /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
-    > /dev/null 2> "$tree/err" || status=$?
-
-  docker exec "$container" dpkg-query -W cloud-stub cloud-stub-lib > "$tree/installed"
-  diff - "$tree/installed" << 'EOF'
-cloud-stub	1.0-1
-cloud-stub-lib	2.0-1
-EOF
-  sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff /dev/null "$tree/err.normal"
-  assert_status 0 "$status"
+setup() {
+  load '../../scripts/src/test-utils/bats/setup'
+  load '../../scripts/src/test-utils/shell/create-stub-apt-suite.sh'
+  # fixed, so the files the cases write do not depend on the caller's umask
+  umask 022
+  tree="$BATS_TEST_TMPDIR"
+  repo="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+  container="install-ubuntu-packages-$(basename "$BATS_RUN_TMPDIR")-$BATS_TEST_NUMBER"
 }
 
-it_fetches_a_file_from_the_live_archive_first() {
-  local image="$1" status=0 suite
-  create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
-  setup_test "$image"
-  for suite in "$codename" "$codename-backports" "$codename-security"; do
-    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
-    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
-  done
-  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-1
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
-  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
-    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
-
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
-    "$container" \
-    /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
-    > /dev/null 2> "$tree/err" || status=$?
-
-  docker exec "$container" grep ' /ubuntu/[^d]*pool/' /run/stub/requests > "$tree/requests"
-  diff - "$tree/requests" << 'EOF'
-200 archive.ubuntu.com /ubuntu/pool/main/cloud-stub_1.0-1_all.deb
-EOF
-  sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff /dev/null "$tree/err.normal"
-  assert_status 0 "$status"
+teardown() {
+  stop_timeout_watchdog
+  docker rm -f "$container" > /dev/null 2>&1 || true
 }
 
-it_fetches_a_file_from_the_snapshot_when_the_live_archive_fails_to_serve_it() {
-  local image="$1" status=0 suite
-  create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
-  setup_test "$image"
-  for suite in "$codename" "$codename-backports" "$codename-security"; do
-    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
-    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
-  done
-  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-1
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
-  echo '503 all /ubuntu/pool/main/cloud-stub_1.0-1_all.deb' > "$tree/faults"
-  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
-    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
-
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
-    "$container" \
-    /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
-    > /dev/null 2> "$tree/err" || status=$?
-
-  docker exec "$container" dpkg-query -W cloud-stub > "$tree/installed"
-  diff - "$tree/installed" <<< $'cloud-stub\t1.0-1'
-  docker exec "$container" grep ' /ubuntu/[^d]*pool/' /run/stub/requests > "$tree/requests"
-  diff - "$tree/requests" << 'EOF'
-503 archive.ubuntu.com /ubuntu/pool/main/cloud-stub_1.0-1_all.deb
-200 snapshot.ubuntu.com /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb
-EOF
-  sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff /dev/null "$tree/err.normal"
-  assert_status 0 "$status"
-}
-
-it_fetches_a_list_again_after_a_wait_when_the_snapshot_fails_to_serve_it_at_first() {
-  local image="$1" status=0 suite
-  create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
-  setup_test "$image"
-  for suite in "$codename" "$codename-backports" "$codename-security"; do
-    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
-    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
-  done
-  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates"
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
-  echo "503 2 /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages" \
-    > "$tree/faults"
-  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
-    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
-
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
-    "$container" \
-    /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
-    > /dev/null 2> "$tree/err" || status=$?
-
-  docker exec "$container" dpkg-query -W cloud-stub > "$tree/installed"
-  diff - "$tree/installed" <<< $'cloud-stub\t1.0-1'
-  docker exec "$container" grep " /ubuntu/20260101T000000Z/dists/$codename-updates/main/" \
-    /run/stub/requests > "$tree/requests"
-  diff - "$tree/requests" << EOF
-503 snapshot.ubuntu.com /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages
-503 snapshot.ubuntu.com /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages
-200 snapshot.ubuntu.com /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages
-EOF
-  docker exec "$container" cat /run/clock/pauses > "$tree/pauses"
-  diff - "$tree/pauses" << 'EOF'
-10
-20
-EOF
-  sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff - "$tree/err.normal" << EOF
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
-E: Some index files failed to download. They have been ignored, or old ones used instead.
-install-ubuntu-packages: apt-get update exited 100, again in 10s
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
-E: Some index files failed to download. They have been ignored, or old ones used instead.
-install-ubuntu-packages: apt-get update exited 100, again in 20s
-EOF
-  assert_status 0 "$status"
-}
-
-it_fetches_a_file_again_after_a_wait_when_the_snapshot_fails_to_serve_it_at_first() {
-  local image="$1" status=0 suite
-  create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
-  setup_test "$image"
-  for suite in "$codename" "$codename-backports" "$codename-security"; do
-    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
-    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
-  done
-  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-2
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
-  echo '503 1 /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb' > "$tree/faults"
-  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
-    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
-
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
-    "$container" \
-    /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
-    > /dev/null 2> "$tree/err" || status=$?
-
-  docker exec "$container" dpkg-query -W cloud-stub > "$tree/installed"
-  diff - "$tree/installed" <<< $'cloud-stub\t1.0-1'
-  docker exec "$container" grep ' /ubuntu/[^d]*pool/' /run/stub/requests > "$tree/requests"
-  diff - "$tree/requests" << 'EOF'
-503 snapshot.ubuntu.com /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb
-200 snapshot.ubuntu.com /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb
-EOF
-  docker exec "$container" cat /run/clock/pauses > "$tree/pauses"
-  diff - "$tree/pauses" <<< 10
-  sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff - "$tree/err.normal" << 'EOF'
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb  503  Service Unavailable [IP: 127.0.0.1 80]
-E: Some files failed to download
-install-ubuntu-packages: apt-get install exited 100, again in 10s
-EOF
-  assert_status 0 "$status"
-}
-
-it_fails_with_apt_s_error_when_the_snapshot_keeps_failing_a_list() {
-  local image="$1" status=0 suite
-  create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
-  setup_test "$image"
-  for suite in "$codename" "$codename-backports" "$codename-security"; do
-    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
-    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
-  done
-  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates"
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
-  echo "503 all /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages" \
-    > "$tree/faults"
-  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
-    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
-
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
-    "$container" \
-    /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
-    > /dev/null 2> "$tree/err" || status=$?
-
-  docker exec "$container" grep -c " /ubuntu/20260101T000000Z/dists/$codename-updates/main/" \
-    /run/stub/requests > "$tree/requests"
-  diff - "$tree/requests" <<< 5
-  docker exec "$container" cat /run/clock/pauses > "$tree/pauses"
-  diff - "$tree/pauses" << 'EOF'
-10
-20
-40
-80
-EOF
-  sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff - "$tree/err.normal" << EOF
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
-E: Some index files failed to download. They have been ignored, or old ones used instead.
-install-ubuntu-packages: apt-get update exited 100, again in 10s
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
-E: Some index files failed to download. They have been ignored, or old ones used instead.
-install-ubuntu-packages: apt-get update exited 100, again in 20s
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
-E: Some index files failed to download. They have been ignored, or old ones used instead.
-install-ubuntu-packages: apt-get update exited 100, again in 40s
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
-E: Some index files failed to download. They have been ignored, or old ones used instead.
-install-ubuntu-packages: apt-get update exited 100, again in 80s
-E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
-E: Some index files failed to download. They have been ignored, or old ones used instead.
-EOF
-  assert_status 100 "$status"
-}
-
-it_leaves_the_image_s_own_apt_sources_and_no_pin() {
-  local image="$1" status=0 suite
-  create_case_tree 'docker rm -f "$container" > /dev/null 2>&1 || true'
-  setup_test "$image"
-  for suite in "$codename-updates" "$codename-backports" "$codename-security"; do
-    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
-    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
-  done
-  create_stub_apt_suite "$tree/archive/ubuntu" "$codename"
-  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename" cloud-stub=1.0-1
-  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
-    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
-
-  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
-    "$container" \
-    /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 \
-    > /dev/null 2> "$tree/err" || status=$?
-
-  docker exec "$container" sh -c \
-    'cd /etc/apt && find sources.list.d preferences.d | sort && ls -A /var/lib/apt/lists' \
-    > "$tree/after"
-  diff - "$tree/after" << 'EOF'
-preferences.d
-sources.list.d
-sources.list.d/ubuntu.sources
-EOF
-  sed '/^W: The repository .* is not signed\.$/d' "$tree/err" > "$tree/err.normal"
-  diff /dev/null "$tree/err.normal"
-  assert_status 0 "$status"
-}
-
-it_refuses_a_call_without_a_package() {
-  local status=0
-  create_case_tree
-
-  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$here/sbin/install-ubuntu-packages" \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ > "$tree/out" 2> "$tree/err" || status=$?
-
-  diff /dev/null "$tree/out"
-  diff - "$tree/err" << 'EOF'
-usage: install-ubuntu-packages <snapshot URI> <package>=<version>...
-EOF
-  assert_status 2 "$status"
-}
-
-# Starts the case's container of <image>, named for the case tree so a run never meets another
-# run's container, with the repo and the case tree mounted read-only, and the pause of
+# Starts the case's container of $image, named for the run and the case so a run never meets
+# another run's container, with the repo and the case tree mounted read-only, and the pause of
 # create_stub_clock in /run/clock. The stand-in serves $tree/archive, with the faults in
 # $tree/faults, from /run/stub; each case writes both, then starts it. apt's config allows the
 # stand-in's unsigned suites, and Docker's source, which the container cannot reach, is gone. The
 # image's own sources.list.d holds ubuntu.sources besides. Sets codename to the image's Ubuntu
 # release, which names the suites that its ubuntu.sources and the step read.
 setup_test() {
-  local image="$1"
-  container="install-ubuntu-packages-$(basename "$tree")"
   codename="$(docker run --rm --network none --entrypoint sed "$image" \
     -n 's/^VERSION_CODENAME=//p' /etc/os-release)"
   mkdir -p "$tree/archive"
@@ -372,5 +75,280 @@ setup_test() {
       "APT::Get::AllowUnauthenticated \"true\";" > /etc/apt/apt.conf.d/99-stub-archive'
 }
 
-image="${AGENT_IMAGE:-cloud/agent-image}"
-run_cases "$image"
+@test "it installs a pin that the live archive replaced as the snapshot holds it" {
+  local suite
+  setup_test
+  for suite in "$codename" "$codename-backports" "$codename-security"; do
+    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
+    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
+  done
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-2
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
+  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
+    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
+
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
+    /repo/images/agent/sbin/install-ubuntu-packages \
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err"
+
+  docker exec "$container" dpkg-query -W cloud-stub > "$tree/installed"
+  diff - "$tree/installed" <<< $'cloud-stub\t1.0-1'
+  docker exec "$container" grep ' /ubuntu/[^d]*pool/' /run/stub/requests > "$tree/requests"
+  diff - "$tree/requests" << 'EOF'
+200 snapshot.ubuntu.com /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb
+EOF
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
+  diff /dev/null "$tree/err.normal"
+}
+
+@test "it resolves an unpinned dependency as the snapshot holds it when the live archive has a newer one" {
+  local suite
+  setup_test
+  for suite in "$codename" "$codename-backports" "$codename-security"; do
+    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
+    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
+  done
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" \
+    cloud-stub=1.0-1/cloud-stub-lib cloud-stub-lib=2.0-2
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" \
+    cloud-stub=1.0-1/cloud-stub-lib cloud-stub-lib=2.0-1
+  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
+    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
+
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
+    /repo/images/agent/sbin/install-ubuntu-packages \
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err"
+
+  docker exec "$container" dpkg-query -W cloud-stub cloud-stub-lib > "$tree/installed"
+  diff - "$tree/installed" << 'EOF'
+cloud-stub	1.0-1
+cloud-stub-lib	2.0-1
+EOF
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
+  diff /dev/null "$tree/err.normal"
+}
+
+@test "it fetches a file from the live archive first" {
+  local suite
+  setup_test
+  for suite in "$codename" "$codename-backports" "$codename-security"; do
+    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
+    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
+  done
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-1
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
+  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
+    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
+
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
+    /repo/images/agent/sbin/install-ubuntu-packages \
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err"
+
+  docker exec "$container" grep ' /ubuntu/[^d]*pool/' /run/stub/requests > "$tree/requests"
+  diff - "$tree/requests" << 'EOF'
+200 archive.ubuntu.com /ubuntu/pool/main/cloud-stub_1.0-1_all.deb
+EOF
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
+  diff /dev/null "$tree/err.normal"
+}
+
+@test "it fetches a file from the snapshot when the live archive fails to serve it" {
+  local suite
+  setup_test
+  for suite in "$codename" "$codename-backports" "$codename-security"; do
+    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
+    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
+  done
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-1
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
+  echo '503 all /ubuntu/pool/main/cloud-stub_1.0-1_all.deb' > "$tree/faults"
+  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
+    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
+
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
+    /repo/images/agent/sbin/install-ubuntu-packages \
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err"
+
+  docker exec "$container" dpkg-query -W cloud-stub > "$tree/installed"
+  diff - "$tree/installed" <<< $'cloud-stub\t1.0-1'
+  docker exec "$container" grep ' /ubuntu/[^d]*pool/' /run/stub/requests > "$tree/requests"
+  diff - "$tree/requests" << 'EOF'
+503 archive.ubuntu.com /ubuntu/pool/main/cloud-stub_1.0-1_all.deb
+200 snapshot.ubuntu.com /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb
+EOF
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
+  diff /dev/null "$tree/err.normal"
+}
+
+@test "it fetches a list again after a wait when the snapshot fails to serve it at first" {
+  local suite
+  setup_test
+  for suite in "$codename" "$codename-backports" "$codename-security"; do
+    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
+    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
+  done
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates"
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
+  echo "503 2 /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages" \
+    > "$tree/faults"
+  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
+    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
+
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
+    /repo/images/agent/sbin/install-ubuntu-packages \
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err"
+
+  docker exec "$container" dpkg-query -W cloud-stub > "$tree/installed"
+  diff - "$tree/installed" <<< $'cloud-stub\t1.0-1'
+  docker exec "$container" grep " /ubuntu/20260101T000000Z/dists/$codename-updates/main/" \
+    /run/stub/requests > "$tree/requests"
+  diff - "$tree/requests" << EOF
+503 snapshot.ubuntu.com /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages
+503 snapshot.ubuntu.com /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages
+200 snapshot.ubuntu.com /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages
+EOF
+  docker exec "$container" cat /run/clock/pauses > "$tree/pauses"
+  diff - "$tree/pauses" << 'EOF'
+10
+20
+EOF
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
+  diff - "$tree/err.normal" << EOF
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
+E: Some index files failed to download. They have been ignored, or old ones used instead.
+install-ubuntu-packages: apt-get update exited 100, again in 10s
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
+E: Some index files failed to download. They have been ignored, or old ones used instead.
+install-ubuntu-packages: apt-get update exited 100, again in 20s
+EOF
+}
+
+@test "it fetches a file again after a wait when the snapshot fails to serve it at first" {
+  local suite
+  setup_test
+  for suite in "$codename" "$codename-backports" "$codename-security"; do
+    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
+    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
+  done
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates" cloud-stub=1.0-2
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
+  echo '503 1 /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb' > "$tree/faults"
+  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
+    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
+
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
+    /repo/images/agent/sbin/install-ubuntu-packages \
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err"
+
+  docker exec "$container" dpkg-query -W cloud-stub > "$tree/installed"
+  diff - "$tree/installed" <<< $'cloud-stub\t1.0-1'
+  docker exec "$container" grep ' /ubuntu/[^d]*pool/' /run/stub/requests > "$tree/requests"
+  diff - "$tree/requests" << 'EOF'
+503 snapshot.ubuntu.com /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb
+200 snapshot.ubuntu.com /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb
+EOF
+  docker exec "$container" cat /run/clock/pauses > "$tree/pauses"
+  diff - "$tree/pauses" <<< 10
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
+  diff - "$tree/err.normal" << 'EOF'
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb  503  Service Unavailable [IP: 127.0.0.1 80]
+E: Some files failed to download
+install-ubuntu-packages: apt-get install exited 100, again in 10s
+EOF
+}
+
+@test "it fails with apt s error when the snapshot keeps failing a list" {
+  local status=0
+  local suite
+  setup_test
+  for suite in "$codename" "$codename-backports" "$codename-security"; do
+    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
+    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
+  done
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename-updates"
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename-updates" cloud-stub=1.0-1
+  echo "503 all /ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages" \
+    > "$tree/faults"
+  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
+    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
+
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
+    /repo/images/agent/sbin/install-ubuntu-packages \
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 100
+
+  docker exec "$container" grep -c " /ubuntu/20260101T000000Z/dists/$codename-updates/main/" \
+    /run/stub/requests > "$tree/requests"
+  diff - "$tree/requests" <<< 5
+  docker exec "$container" cat /run/clock/pauses > "$tree/pauses"
+  diff - "$tree/pauses" << 'EOF'
+10
+20
+40
+80
+EOF
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
+  diff - "$tree/err.normal" << EOF
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
+E: Some index files failed to download. They have been ignored, or old ones used instead.
+install-ubuntu-packages: apt-get update exited 100, again in 10s
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
+E: Some index files failed to download. They have been ignored, or old ones used instead.
+install-ubuntu-packages: apt-get update exited 100, again in 20s
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
+E: Some index files failed to download. They have been ignored, or old ones used instead.
+install-ubuntu-packages: apt-get update exited 100, again in 40s
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
+E: Some index files failed to download. They have been ignored, or old ones used instead.
+install-ubuntu-packages: apt-get update exited 100, again in 80s
+E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
+E: Some index files failed to download. They have been ignored, or old ones used instead.
+EOF
+}
+
+@test "it leaves the image s own apt sources and no pin" {
+  local suite
+  setup_test
+  for suite in "$codename-updates" "$codename-backports" "$codename-security"; do
+    create_stub_apt_suite "$tree/archive/ubuntu" "$suite"
+    create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$suite"
+  done
+  create_stub_apt_suite "$tree/archive/ubuntu" "$codename"
+  create_stub_apt_suite "$tree/archive/ubuntu/20260101T000000Z" "$codename" cloud-stub=1.0-1
+  docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
+    start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
+
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+    "$container" \
+    /repo/images/agent/sbin/install-ubuntu-packages \
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err"
+
+  docker exec "$container" sh -c \
+    'cd /etc/apt && find sources.list.d preferences.d | sort && ls -A /var/lib/apt/lists' \
+    > "$tree/after"
+  diff - "$tree/after" << 'EOF'
+preferences.d
+sources.list.d
+sources.list.d/ubuntu.sources
+EOF
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
+  diff /dev/null "$tree/err.normal"
+}
+
+@test "it refuses a call without a package" {
+  local status=0
+
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$BATS_TEST_DIRNAME/sbin/install-ubuntu-packages" \
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'usage: install-ubuntu-packages <snapshot URI> <package>=<version>...'
+}

@@ -1,18 +1,27 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
+# bats file_tags=suite:scripts
 # Test for pepys's bucket backup script (backup.sh), with a stand-in rclone that records each
 # call. It needs no Docker, no Garage and no R2: it proves the calls the script makes, not that
 # rclone copies.
 #
-#   bash deploy/pepys/backup/test-backup.sh
-#   CASE='stops' bash deploy/pepys/backup/test-backup.sh
-# shellcheck source-path=SCRIPTDIR
-set -euo pipefail
-umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/create-case-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/src/test-utils/shell/assert-status.sh"
+#   bash scripts/run-bats.sh
+#   CASE='stops' bash scripts/run-bats.sh
 
-script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/backup.sh"
+setup_file() {
+  load '../../../scripts/src/test-utils/bats/setup'
+}
+
+setup() {
+  load '../../../scripts/src/test-utils/bats/setup'
+  # fixed, so the files the cases write do not depend on the caller's umask
+  umask 022
+  tree="$BATS_TEST_TMPDIR"
+  script="$BATS_TEST_DIRNAME/backup.sh"
+}
+
+teardown() {
+  stop_timeout_watchdog
+}
 
 setup_test() {
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp"
@@ -29,56 +38,53 @@ run_backup_script() {
     RCLONE_LOG="$tree/rclone.log" "$@"
 }
 
-it_copies_each_named_bucket_to_its_own_folder_of_the_target_by_checksum() {
-  create_case_tree
+@test "it copies each named bucket to its own folder of the target by checksum" {
   setup_test
 
   run_backup_script PEPYS_BACKUP_BUCKET=pepys-backup sh "$script" facts blobs > "$tree/out"
 
-  diff - "$tree/rclone.log" << 'EOF2'
+  diff - "$tree/rclone.log" << 'EOF'
 rclone copy garage:facts r2:pepys-backup/facts --checksum
 rclone copy garage:blobs r2:pepys-backup/blobs --checksum
-EOF2
-  diff - "$tree/out" << 'EOF2'
+EOF
+  diff - "$tree/out" << 'EOF'
 copied facts
 copied blobs
-EOF2
+EOF
 }
 
-it_stops_at_the_first_bucket_that_fails_and_copies_no_later_one() {
+@test "it stops at the first bucket that fails and copies no later one" {
   local status=0
-  create_case_tree
   setup_test
 
   run_backup_script PEPYS_BACKUP_BUCKET=pepys-backup sh "$script" broken facts > /dev/null || status=$?
 
-  assert_status 7 "$status"
+  assert_equal "$status" 7
+
   diff - "$tree/rclone.log" <<< 'rclone copy garage:broken r2:pepys-backup/broken --checksum'
 }
 
-it_refuses_to_run_without_a_target_bucket() {
+@test "it refuses to run without a target bucket" {
   local status=0
-  create_case_tree
   setup_test
-
-  run_backup_script sh "$script" facts 2> "$tree/err" || status=$?
 
   # the exit status of a failed ${name:?} expansion differs between shells
-  [ "$status" != 0 ]
+  run_backup_script sh "$script" facts 2> "$tree/err" || status=$?
+
+  refute [ "$status" = 0 ]
   grep -q 'set PEPYS_BACKUP_BUCKET' "$tree/err"
-  [ ! -e "$tree/rclone.log" ]
+  refute [ -e "$tree/rclone.log" ]
+  refute [ -L "$tree/rclone.log" ]
 }
 
-it_refuses_to_run_without_a_bucket_to_copy() {
+@test "it refuses to run without a bucket to copy" {
   local status=0
-  create_case_tree
   setup_test
 
-  run_backup_script PEPYS_BACKUP_BUCKET=pepys-backup sh "$script" 2> "$tree/err" || status=$?
+  run_backup_script PEPYS_BACKUP_BUCKET=pepys-backup sh "$script" > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
-  assert_status 2 "$status"
   diff - "$tree/err" <<< 'usage: backup.sh <bucket>...'
-  [ ! -e "$tree/rclone.log" ]
+  refute [ -e "$tree/rclone.log" ]
+  refute [ -L "$tree/rclone.log" ]
 }
-
-run_cases

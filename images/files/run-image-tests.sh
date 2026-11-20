@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The files image test: it writes the build context with scripts/write-files-image-context.sh,
 # builds the image on the pinned distroless base under a tag that carries a random per-run id, runs
-# the files-image suites (images/files/test-files-image.sh) with FILES_IMAGE and FILES_RUN set, and
+# the files-image suites (images/files/files-image.bats) with FILES_IMAGE and FILES_RUN set, and
 # removes the image and the context after. When the build fails it prints the build log and
 # exits 1. The files image workflow runs it as `bun run test:files-image`, after `bun install`.
 #
@@ -27,4 +27,4 @@ if ! {
   exit 1
 fi
 echo "built $FILES_IMAGE"
-bash scripts/run-shell-suites.sh files-image
+bash scripts/run-bats.sh files-image

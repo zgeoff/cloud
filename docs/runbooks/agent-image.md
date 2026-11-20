@@ -162,10 +162,10 @@ The check prints one line per item and exits non-zero on any failure:
   lane does.
 
 `bun run test:agent-image` runs the same check on a local Docker build, before the host build. It
-then runs `scripts/test-agent-image-gitleaks.sh`, which scans planted files with the image's
-gitleaks to prove what the allowlist exempts and what it still reports. A finding in an upstream
-file that holds no credential goes into `scripts/agent-image-gitleaks.toml` with its reason,
-narrowed to that file or folder.
+then runs `scripts/agent-image-gitleaks.bats`, which scans planted files with the image's gitleaks
+to prove what the allowlist exempts and what it still reports. A finding in an upstream file that
+holds no credential goes into `scripts/agent-image-gitleaks.toml` with its reason, narrowed to that
+file or folder.
 
 ## Switch the `cloud` target
 

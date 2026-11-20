@@ -12,7 +12,7 @@
 # Run as a script, it calls with_fixture_images with its arguments, so the Docker test
 # files share one build:
 #
-#   bash scripts/src/test-utils/shell/with-fixture-images.sh bash scripts/src/test-utils/shell/test-run-backup.sh
+#   bash scripts/src/test-utils/shell/with-fixture-images.sh bash scripts/run-bats.sh atc-gateway-fixture
 with_fixture_images() (
   set -euo pipefail
   local repo work status=0

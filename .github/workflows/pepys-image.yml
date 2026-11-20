@@ -24,7 +24,9 @@ on:
       - scripts/publish-pepys-image.sh
       - scripts/check-pepys-routes.ts
       - scripts/build-pepys-route-table.ts
+      - scripts/run-bats.sh
       - scripts/run-shell-suites.sh
+      - scripts/src/test-utils/bats/**
       - scripts/src/test-utils/shell/**
       - .bun-version
       - .github/workflows/pepys-image.yml

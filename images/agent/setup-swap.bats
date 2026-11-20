@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
+# bats file_tags=suite:scripts
 # Test for the agent image's boot service, sbin/setup-swap, through its --size-for
 # mode: the swapfile size it picks for an amount of free space is at most 2048 MiB, at most a
 # quarter of the free space, and leaves 2048 MiB free, and it makes none under 256 MiB, across every
@@ -8,100 +9,78 @@
 # the script's sizing function into one such shell. The boot mode writes /swapfile
 # and runs swapon as root, so check-agent-image.ts checks it in a fresh imp instead.
 #
-#   bash images/agent/test-setup-swap.sh
-# shellcheck source-path=SCRIPTDIR/../..
-set -euo pipefail
-umask 022
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/src/test-utils/shell/run-cases.sh
-source "$here/../../scripts/src/test-utils/shell/run-cases.sh"
-# shellcheck source=scripts/src/test-utils/shell/create-case-tree.sh
-source "$here/../../scripts/src/test-utils/shell/create-case-tree.sh"
-# shellcheck source=scripts/src/test-utils/shell/assert-status.sh
-source "$here/../../scripts/src/test-utils/shell/assert-status.sh"
+#   bash scripts/run-bats.sh
 
-script="$here/sbin/setup-swap"
+setup_file() {
+  load '../../scripts/src/test-utils/bats/setup'
+}
 
-it_picks_2048_mib_for_the_free_space_of_a_32_gib_imp() {
-  local status=0
-  create_case_tree
+setup() {
+  load '../../scripts/src/test-utils/bats/setup'
+  # fixed, so the files the cases write do not depend on the caller's umask
+  umask 022
+  tree="$BATS_TEST_TMPDIR"
+  script="$BATS_TEST_DIRNAME/sbin/setup-swap"
+}
 
-  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 31457280 > "$tree/out" 2> "$tree/err" || status=$?
+teardown() {
+  stop_timeout_watchdog
+}
+
+@test "it picks 2048 mib for the free space of a 32 gib imp" {
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 31457280 > "$tree/out" 2> "$tree/err"
 
   diff - "$tree/out" <<< 2048
   diff /dev/null "$tree/err"
-  assert_status 0 "$status"
 }
 
-it_picks_a_quarter_of_the_free_space_when_that_is_under_2048_mib() {
-  local status=0
-  create_case_tree
-
+@test "it picks a quarter of the free space when that is under 2048 mib" {
   # 6144 MiB free
-  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 6291456 > "$tree/out" 2> "$tree/err" || status=$?
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 6291456 > "$tree/out" 2> "$tree/err"
 
   diff - "$tree/out" <<< 1536
   diff /dev/null "$tree/err"
-  assert_status 0 "$status"
 }
 
-it_leaves_2048_mib_free_when_that_is_the_tightest_bound() {
-  local status=0
-  create_case_tree
-
+@test "it leaves 2048 mib free when that is the tightest bound" {
   # 2560 MiB free: a quarter is 640 MiB, and 512 MiB leaves 2048 MiB
-  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2621440 > "$tree/out" 2> "$tree/err" || status=$?
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2621440 > "$tree/out" 2> "$tree/err"
 
   diff - "$tree/out" <<< 512
   diff /dev/null "$tree/err"
-  assert_status 0 "$status"
 }
 
-it_picks_256_mib_at_the_floor() {
-  local status=0
-  create_case_tree
-
+@test "it picks 256 mib at the floor" {
   # 2304 MiB free: 256 MiB leaves 2048 MiB
-  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2359296 > "$tree/out" 2> "$tree/err" || status=$?
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2359296 > "$tree/out" 2> "$tree/err"
 
   diff - "$tree/out" <<< 256
   diff /dev/null "$tree/err"
-  assert_status 0 "$status"
 }
 
-it_picks_no_swapfile_under_the_floor() {
-  local status=0
-  create_case_tree
-
+@test "it picks no swapfile under the floor" {
   # 2303 MiB free: 255 MiB would leave 2048 MiB
-  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2358272 > "$tree/out" 2> "$tree/err" || status=$?
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2358272 > "$tree/out" 2> "$tree/err"
 
   diff - "$tree/out" <<< 0
   diff /dev/null "$tree/err"
-  assert_status 0 "$status"
 }
 
-it_picks_no_swapfile_when_less_than_2048_mib_is_free() {
-  local status=0
-  create_case_tree
-
+@test "it picks no swapfile when less than 2048 mib is free" {
   # 1024 MiB free
-  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 1048576 > "$tree/out" 2> "$tree/err" || status=$?
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 1048576 > "$tree/out" 2> "$tree/err"
 
   diff - "$tree/out" <<< 0
   diff /dev/null "$tree/err"
-  assert_status 0 "$status"
 }
 
-it_keeps_2048_mib_free_for_every_free_space_up_to_64_gib() {
-  create_case_tree
-
+@test "it keeps 2048 mib free for every free space up to 64 gib" {
   # the script's settings and sizing function, the lines from `set -eu` to its argument parse, so
   # one shell sizes all 4131 free spaces instead of starting sh once for each
   sed -n '/^set -eu$/,/^case /p' "$script" | sed '$d' > "$tree/size-for.sh"
 
   # every 16 MiB from 0 to 64 GiB, plus each MiB around the floor and the 2048 MiB cap
-  # shellcheck disable=SC2016
+  # shellcheck disable=SC2016,SC2046
   env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh -c '
     . "$1"
     shift
@@ -115,32 +94,23 @@ it_keeps_2048_mib_free_for_every_free_space_up_to_64_gib() {
   # it does not
   awk '!(($2 == 0 && $1 < 2304) || ($2 >= 256 && $2 <= 2048 && $2 <= int($1 / 4) && $1 - $2 >= 2048))' "$tree/sizes" > "$tree/violations"
   diff /dev/null "$tree/violations"
-  [ "$(wc -l < "$tree/sizes")" = 4131 ] || {
-    echo "$(wc -l < "$tree/sizes") sizes, want 4131" >&2
-    exit 1
-  }
+  assert_equal "$(wc -l < "$tree/sizes")" 4131
 }
 
-it_refuses_a_free_space_that_is_not_a_whole_number() {
+@test "it refuses a free space that is not a whole number" {
   local status=0
-  create_case_tree
-
   env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2g > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'setup-swap: --size-for takes the free space in KiB, a whole number'
-  assert_status 2 "$status"
 }
 
-it_refuses_an_unknown_argument() {
+@test "it refuses an unknown argument" {
   local status=0
-  create_case_tree
-
   env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size 2048 > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: setup-swap [--size-for <free KiB>]'
-  assert_status 2 "$status"
 }
-
-run_cases

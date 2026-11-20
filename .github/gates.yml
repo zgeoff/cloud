@@ -146,6 +146,8 @@ gates:
     paths:
       - images/agent/**
       - scripts/*agent-image*
+      - scripts/run-bats.sh
+      - scripts/src/test-utils/bats/**
       - .bun-version
       - scripts/src/test-utils/shell/*-stub-apt-*
       - .github/workflows/ci.yml
@@ -156,8 +158,10 @@ gates:
       - images/atc-gateway/**
       - scripts/fetch-atc-release.sh
       - scripts/publish-atc-gateway-images.sh
+      - scripts/run-bats.sh
+      - scripts/src/test-utils/bats/**
       - scripts/run-shell-suites.sh
-      - scripts/e2e/journey-atc-gateway-restore.sh
+      - scripts/e2e/journey-atc-gateway-restore.bats
       - infra/cluster/build-atc-gateway-spec.ts
       - infra/cluster/create-atc-gateway-backup-job.ts
       - infra/cluster/build-atc-gateway-backup-pod-spec.ts
@@ -172,6 +176,8 @@ gates:
       - images/atc-gateway/versions.env
       - scripts/write-files-image-context.sh
       - scripts/publish-files-image.sh
+      - scripts/run-bats.sh
+      - scripts/src/test-utils/bats/**
       - scripts/run-shell-suites.sh
       - scripts/src/test-utils/shell/**
       - bun.lock
@@ -191,6 +197,8 @@ gates:
       - deploy/pepys/tsconfig.json
       - images/pepys/**
       - images/atc-gateway/versions.env
+      - scripts/run-bats.sh
+      - scripts/src/test-utils/bats/**
       - scripts/run-shell-suites.sh
       - scripts/src/test-utils/shell/**
   boxxy-image:
@@ -201,6 +209,8 @@ gates:
       - images/atc-gateway/versions.env
       - scripts/write-boxxy-image-context.sh
       - scripts/publish-boxxy-image.sh
+      - scripts/run-bats.sh
+      - scripts/src/test-utils/bats/**
       - scripts/run-shell-suites.sh
       - scripts/src/test-utils/shell/**
       - bun.lock
@@ -211,6 +221,8 @@ gates:
     skipped: Nothing the files backup reads changed, so its fixture test did not run.
     paths:
       - deploy/files/backup/**
+      - scripts/run-bats.sh
+      - scripts/src/test-utils/bats/**
       - scripts/run-shell-suites.sh
       - scripts/src/test-utils/shell/run-cases.sh
       - scripts/src/test-utils/shell/run-backup.sh
@@ -225,6 +237,8 @@ gates:
     skipped: Nothing the nixie backup reads changed, so its fixture test did not run.
     paths:
       - deploy/nixie/backup/**
+      - scripts/run-bats.sh
+      - scripts/src/test-utils/bats/**
       - scripts/run-shell-suites.sh
       - scripts/src/test-utils/shell/run-cases.sh
       - scripts/src/test-utils/shell/create-case-tree.sh
@@ -244,13 +258,15 @@ gates:
     skipped: Nothing nixie's config is built from changed, so the pinned nixie did not check it.
     paths:
       - deploy/nixie/config.yaml
-      - deploy/nixie/test-config.sh
+      - deploy/nixie/config.bats
       - infra/shared/render-nixie-config.ts
       - infra/shared/build-nixie-imp-config.ts
       - infra/cluster/create-nixie.ts
       - infra/cluster/build-nixie-spec.ts
       - packages/topology/**
       - infra/Pulumi.prod.yaml
+      - scripts/run-bats.sh
+      - scripts/src/test-utils/bats/**
       - scripts/run-shell-suites.sh
       - scripts/src/test-utils/shell/run-cases.sh
       - scripts/src/test-utils/shell/create-case-tree.sh
@@ -270,7 +286,7 @@ gates:
       - infra/**
       - packages/topology/**
       - workers/health-check/**
-      - scripts/e2e/journey-atc-sign-in-alerts.sh
+      - scripts/e2e/journey-atc-sign-in-alerts.bats
       - scripts/src/test-utils/shell/**
       - scripts/src/test-utils/bats/**
       - scripts/run-bats.sh
