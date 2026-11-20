@@ -16,11 +16,13 @@ on:
       - images/atc-gateway/**
       - scripts/fetch-atc-release.sh
       - scripts/publish-atc-gateway-images.sh
+      - scripts/run-bats.sh
       - scripts/run-shell-suites.sh
       - scripts/e2e/journey-atc-gateway-restore.sh
       - infra/cluster/build-atc-gateway-spec.ts
       - infra/cluster/create-atc-gateway-backup-job.ts
       - infra/cluster/build-atc-gateway-backup-pod-spec.ts
+      - scripts/src/test-utils/bats/**
       - scripts/src/test-utils/shell/**
       - .github/workflows/atc-gateway-images.yml
   workflow_dispatch:
@@ -48,6 +50,9 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
+
+      - name: Install
+        run: bun install --frozen-lockfile
 
       - name: Fixture test
         env:

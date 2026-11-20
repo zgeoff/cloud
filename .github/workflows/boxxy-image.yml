@@ -15,7 +15,9 @@ on:
       - images/atc-gateway/versions.env
       - scripts/write-boxxy-image-context.sh
       - scripts/publish-boxxy-image.sh
+      - scripts/run-bats.sh
       - scripts/run-shell-suites.sh
+      - scripts/src/test-utils/bats/**
       - scripts/src/test-utils/shell/**
       - bun.lock
       - .bun-version
