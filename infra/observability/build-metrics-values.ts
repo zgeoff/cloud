@@ -45,8 +45,10 @@ interface GrafanaInputs {
 
 export function buildMetricsValues(grafana: GrafanaInputs): Record<string, unknown> {
   return {
-    // a per-target TargetDown rule replaces the chart's ratio-based one
-    defaultRules: { disabled: { TargetDown: true } },
+    // a per-target TargetDown rule replaces the chart's ratio-based one, and a
+    // NodeMemoryMajorPagesFaults that needs a memory or IO stall replaces the chart's, which
+    // fires on the fault rate alone
+    defaultRules: { disabled: { TargetDown: true, NodeMemoryMajorPagesFaults: true } },
 
     // k3s runs these inside the k3s binary, whose metrics the apiserver and kubelet jobs scrape
     kubeEtcd: { enabled: false },

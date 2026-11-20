@@ -128,6 +128,9 @@ only on a bad value, because a target that vanishes is no longer a target. They 
   ratio;
 - a container whose last restart was an out-of-memory kill, because spaced restarts never trip the
   chart's crash-loop rule;
+- the host's major page faults, only while memory or IO stalls its tasks too, replacing the chart's
+  rule that alerts on the fault rate alone: each imp wake takes a burst of faults that the ZFS cache
+  serves, so wakes a few minutes apart cross the chart's rate with nothing wrong;
 - the atc gateway's sign-in events, in a group of their own with one alert per category
   ([sign-in alerts](#sign-in-alerts)).
 

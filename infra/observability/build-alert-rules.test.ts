@@ -81,6 +81,16 @@ test.each([
                 'Container {{ $labels.namespace }}/{{ $labels.pod }} {{ $labels.container }} was OOM-killed.',
             },
           },
+          {
+            alert: 'NodeMemoryMajorPagesFaults',
+            expr: 'rate(node_vmstat_pgmajfault{job="node-exporter"}[5m]) > 500 and on (instance) (rate(node_pressure_memory_waiting_seconds_total{job="node-exporter"}[5m]) > 0.1 or rate(node_pressure_io_stalled_seconds_total{job="node-exporter"}[5m]) > 0.1)',
+            for: '5m',
+            labels: { severity: 'warning' },
+            annotations: {
+              summary:
+                'geoffcloud takes {{ $value | humanize }} major page faults a second while memory or IO stalls its tasks.',
+            },
+          },
         ],
       },
       buildATCSignInRules(),
@@ -176,6 +186,16 @@ test("it alerts on geoffcloud's daemon under the plain atc-daemon target, after 
           annotations: {
             summary:
               'Container {{ $labels.namespace }}/{{ $labels.pod }} {{ $labels.container }} was OOM-killed.',
+          },
+        },
+        {
+          alert: 'NodeMemoryMajorPagesFaults',
+          expr: 'rate(node_vmstat_pgmajfault{job="node-exporter"}[5m]) > 500 and on (instance) (rate(node_pressure_memory_waiting_seconds_total{job="node-exporter"}[5m]) > 0.1 or rate(node_pressure_io_stalled_seconds_total{job="node-exporter"}[5m]) > 0.1)',
+          for: '5m',
+          labels: { severity: 'warning' },
+          annotations: {
+            summary:
+              'geoffcloud takes {{ $value | humanize }} major page faults a second while memory or IO stalls its tasks.',
           },
         },
       ],
@@ -288,6 +308,16 @@ test('it alerts on each daemon in order, at its own severity, any but geoffcloud
               'Container {{ $labels.namespace }}/{{ $labels.pod }} {{ $labels.container }} was OOM-killed.',
           },
         },
+        {
+          alert: 'NodeMemoryMajorPagesFaults',
+          expr: 'rate(node_vmstat_pgmajfault{job="node-exporter"}[5m]) > 500 and on (instance) (rate(node_pressure_memory_waiting_seconds_total{job="node-exporter"}[5m]) > 0.1 or rate(node_pressure_io_stalled_seconds_total{job="node-exporter"}[5m]) > 0.1)',
+          for: '5m',
+          labels: { severity: 'warning' },
+          annotations: {
+            summary:
+              'geoffcloud takes {{ $value | humanize }} major page faults a second while memory or IO stalls its tasks.',
+          },
+        },
       ],
     },
     buildATCSignInRules(),
@@ -397,6 +427,16 @@ test("it alerts on nixie's failing turns and on a status other than ready from t
           annotations: {
             summary:
               'Container {{ $labels.namespace }}/{{ $labels.pod }} {{ $labels.container }} was OOM-killed.',
+          },
+        },
+        {
+          alert: 'NodeMemoryMajorPagesFaults',
+          expr: 'rate(node_vmstat_pgmajfault{job="node-exporter"}[5m]) > 500 and on (instance) (rate(node_pressure_memory_waiting_seconds_total{job="node-exporter"}[5m]) > 0.1 or rate(node_pressure_io_stalled_seconds_total{job="node-exporter"}[5m]) > 0.1)',
+          for: '5m',
+          labels: { severity: 'warning' },
+          annotations: {
+            summary:
+              'geoffcloud takes {{ $value | humanize }} major page faults a second while memory or IO stalls its tasks.',
           },
         },
       ],
