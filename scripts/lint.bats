@@ -141,6 +141,8 @@ EOF
   assert_stderr 'lint.sh: no py files to lint'
 
   refute [ -e "$tree/calls" ]
+
+  refute [ -L "$tree/calls" ]
 }
 
 @test "it rejects an unknown kind with its usage" {
@@ -152,6 +154,8 @@ EOF
   assert_stderr 'usage: lint.sh sh|nix|py|actions'
 
   refute [ -e "$tree/calls" ]
+
+  refute [ -L "$tree/calls" ]
 }
 
 @test "it rejects a call without a kind with its usage" {

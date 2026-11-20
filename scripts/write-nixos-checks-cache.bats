@@ -74,6 +74,7 @@ EOF
   assert_output 'The cache holds 2 paths in SIZE MB.'
   run -0 diff - "$tree/output" <<< 'saved=true'
   refute [ -e "$tree/cache" ]
+  refute [ -L "$tree/cache" ]
   run -0 diff - "$tree/restored/paths" << 'EOF'
 /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern-kernel
 /nix/store/cccccccccccccccccccccccccccccccc-lantern-check

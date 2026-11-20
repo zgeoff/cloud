@@ -132,6 +132,7 @@ EOF
   jq -c .spec "$tree/store/kube-system/cloud-prod-state.json" > "$tree/lease"
   run -0 diff - "$tree/lease" <<< '{"leaseDurationSeconds":6000,"acquireTime":"2026-10-21T05:41:00.000000Z","renewTime":"2026-10-21T05:41:00.000000Z"}'
   refute [ -e "$tree/runner/kubeconfig" ]
+  refute [ -L "$tree/runner/kubeconfig" ]
   run -0 diff /dev/null "$tree/calls"
 }
 

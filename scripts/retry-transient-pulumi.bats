@@ -53,6 +53,7 @@ EOF
 
   run -0 diff - "$tree/calls" <<< "{\"cwd\":\"$tree/repo\",\"argv\":[\"bun\",\"run\",\"drift\",\"--\",\"--suppress-outputs\"]}"
   refute [ -e "$tree/clock/pauses" ]
+  refute [ -L "$tree/clock/pauses" ]
 }
 
 @test "it runs the command again in its directory after an acme server s 503" {
@@ -131,6 +132,7 @@ EOF
 
   run -0 diff - "$tree/calls" <<< "{\"cwd\":\"$tree/repo\",\"argv\":[\"bun\",\"run\",\"drift\",\"--\",\"--suppress-outputs\"]}"
   refute [ -e "$tree/clock/pauses" ]
+  refute [ -L "$tree/clock/pauses" ]
 }
 
 @test "it fails at once on an acme server s 429 rate limit" {
@@ -146,6 +148,8 @@ EOF
   refute_stderr
 
   refute [ -e "$tree/clock/pauses" ]
+
+  refute [ -L "$tree/clock/pauses" ]
 }
 
 @test "it runs a preview again after a cloudflare api 504 to a get" {
@@ -221,6 +225,8 @@ EOF
   refute_stderr
 
   refute [ -e "$tree/clock/pauses" ]
+
+  refute [ -L "$tree/clock/pauses" ]
 }
 
 @test "it fails at once on a cloudflare api 4xx to a get" {
@@ -236,6 +242,8 @@ EOF
   refute_stderr
 
   refute [ -e "$tree/clock/pauses" ]
+
+  refute [ -L "$tree/clock/pauses" ]
 }
 
 @test "it gives up with the last status after the attempts run out" {

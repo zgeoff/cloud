@@ -26,6 +26,8 @@
 #   bash scripts/run-bats.sh
 #   CASE='unknown argument' bash scripts/run-bats.sh   # the cases whose title holds it
 
+# shellcheck disable=SC2030,SC2031 # the docker socket case moves its own tree under /tmp
+
 setup_file() {
   load 'src/test-utils/bats/setup'
 }
@@ -72,15 +74,12 @@ setup() {
   pool_call='["ssh","-o","BatchMode=yes","root@geoffcloud","sysctl -n vm.nr_hugepages; sed -n '"'"'s/^vm\\.nr_hugepages=//p'"'"' /etc/sysctl.d/60-nixos.conf"]'
   # the dry-activate of the built system on root@geoffcloud, which every switch that copies runs
   dry_activate_call='["ssh","-o","BatchMode=yes","root@geoffcloud","NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE     -E NIXOS_INSTALL_BOOTLOADER -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud-dry-activate '"'"'/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration'"'"'     dry-activate"]'
-  # under /tmp, not $TMPDIR: the real docker meets a socket in this tree, and a socket path
-  # past 107 bytes, the most sun_path holds, makes docker 29.7.2 panic or print another error
-  tree="$(mktemp -d -p /tmp)"
+  tree="$BATS_TEST_TMPDIR"
 }
 
 teardown() {
   stop_timeout_watchdog
-  chmod -R u+w "$tree" || true
-  rm -rf "$tree"
+  if [ -n "${socket_tree:-}" ]; then rm -rf "$socket_tree" || true; fi
 }
 
 # Boot data every case needs: a clone of a bare origin whose main holds one empty commit,
@@ -197,7 +196,8 @@ $pool_call
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   run -0 diff /dev/null "$tree/tmp-left"
-  find "$tree/build-saw" -type f -printf '%P\n' | sort > "$tree/build-saw-files"
+  find "$tree/build-saw" -type f -printf '%P\n' > "$tree/build-saw-found"
+  sort "$tree/build-saw-found" > "$tree/build-saw-files"
   run -0 diff - "$tree/build-saw-files" << 'EOF'
 nixos/hosts/geoffcloud/configuration.nix
 nixos/marker
@@ -734,7 +734,8 @@ $nixie_lock_call
 $images_call
 $pool_call
 EOF
-  find "$tree/build-saw" -type f -printf '%P\n' | sort > "$tree/build-saw-files"
+  find "$tree/build-saw" -type f -printf '%P\n' > "$tree/build-saw-found"
+  sort "$tree/build-saw-found" > "$tree/build-saw-files"
   run -0 diff - "$tree/build-saw-files" << 'EOF'
 nixos/hosts/geoffcloud/configuration.nix
 nixos/marker
@@ -1077,6 +1078,7 @@ $gh_runs_call
 $nixie_lock_call
 EOF
   refute [ -e "$tree/build-saw" ]
+  refute [ -L "$tree/build-saw" ]
   ls -A "$tree/tmp" > "$tree/tmp-left"
   run -0 diff /dev/null "$tree/tmp-left"
 }
@@ -1123,6 +1125,7 @@ $nixie_lock_call
 $kinds_calls
 EOF
   refute [ -e "$tree/build-saw" ]
+  refute [ -L "$tree/build-saw" ]
   ls -A "$tree/tmp" > "$tree/tmp-left"
   run -0 diff /dev/null "$tree/tmp-left"
 }
@@ -1821,6 +1824,10 @@ EOF
 # and 28 adds a help line and exits 125, so the case accepts either stderr with its status.
 @test "it never switches when docker cannot reach its daemon" {
   local commit
+  # under /tmp, not $TMPDIR: the real docker meets a socket in this tree, and a socket path
+  # past 107 bytes, the most sun_path holds, makes docker 29.7.2 panic or print another error
+  tree="$(mktemp -d -p /tmp)"
+  socket_tree="$tree"
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"

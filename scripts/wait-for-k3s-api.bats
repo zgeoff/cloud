@@ -45,6 +45,7 @@ setup_test() {
 
   run -0 diff - "$tree/calls" <<< '["curl","-sk","-o","/dev/null","--max-time","5","https://geoffcloud:6443/livez"]'
   refute [ -e "$tree/clock/pauses" ]
+  refute [ -L "$tree/clock/pauses" ]
 }
 
 @test "it pauses 2 seconds after each try that does not answer" {

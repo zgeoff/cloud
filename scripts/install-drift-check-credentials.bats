@@ -275,7 +275,8 @@ CALLS
   refute_output
   assert_stderr $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
 
-  tail -n 1 "$tree/calls" | jq -r '.[3]' > "$tree/destination"
+  tail -n 1 "$tree/calls" > "$tree/last-call"
+  jq -r '.[3]' "$tree/last-call" > "$tree/destination"
   run -0 diff - "$tree/destination" <<< 'ssh://root@127.0.0.1:1'
   ls -A "$tree/host/secrets" > "$tree/files"
   run -0 diff /dev/null "$tree/files"

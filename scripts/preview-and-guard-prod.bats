@@ -140,6 +140,7 @@ EOF
   run -0 diff /dev/null "$tree/output"
   run -0 diff /dev/null "$tree/summary"
   refute [ -e "$tree/runner/plan.json" ]
+  refute [ -L "$tree/runner/plan.json" ]
   run -0 diff - "$tree/calls" <<< "{\"cwd\":\"$tree/repo/program\",\"argv\":[\"bun\",\"run\",\"sdk:build\"]}"
 }
 

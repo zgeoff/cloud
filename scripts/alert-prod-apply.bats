@@ -149,6 +149,7 @@ EOF
 
   run -0 diff - "$tree/calls" <<< '["op","read","--no-newline","op://cloud-deploy/alert-webhook/credential"]'
   refute [ -e "$tree/webhook-body" ]
+  refute [ -L "$tree/webhook-body" ]
 }
 
 @test "it fails before op runs when the env file sets no webhook" {

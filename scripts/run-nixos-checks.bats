@@ -77,7 +77,8 @@ setup_test() {
 ["docker","run","--rm","--network","host","--device","$tree/kvm:/dev/kvm","-v","cloud-nixos-checks-store:/nix","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","/nix/store/00000000000000000000000000000000-atc-daemon.drv^*","/nix/store/00000000000000000000000000000000-impd-restore.drv^*","/nix/store/00000000000000000000000000000000-impd-restore-boundaries.drv^*"]
 EOF
   # the deleted nixos/gone.nix and the untracked, ignored notes.txt stay out
-  find "$tree/source-saw" -type f -printf '%P\n' | sort > "$tree/source-saw-files"
+  find "$tree/source-saw" -type f -printf '%P\n' > "$tree/source-saw-found"
+  sort "$tree/source-saw-found" > "$tree/source-saw-files"
   run -0 diff - "$tree/source-saw-files" << 'EOF'
 nixos/flake.nix
 scripts/untracked.sh

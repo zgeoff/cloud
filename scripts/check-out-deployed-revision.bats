@@ -90,6 +90,8 @@ EOF
   assert_stderr 'fatal: invalid reference: 0000000000000000000000000000000000000001'
 
   refute [ -e "$tree/runner/deployed" ]
+
+  refute [ -L "$tree/runner/deployed" ]
   run -0 diff /dev/null "$tree/calls"
 }
 

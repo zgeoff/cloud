@@ -91,6 +91,7 @@ EOF
   jq -c .spec "$tree/store/kube-system/cloud-prod-state.json" > "$tree/lease"
   run -0 diff - "$tree/lease" <<< '{"leaseDurationSeconds":3000,"acquireTime":"2026-10-21T05:41:00.000000Z","renewTime":"2026-10-21T05:41:00.000000Z"}'
   refute [ -e "$tree/lock-status" ]
+  refute [ -L "$tree/lock-status" ]
 }
 
 @test "it refuses to run without its status file" {

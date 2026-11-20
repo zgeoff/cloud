@@ -56,6 +56,7 @@ EOT
   run -0 diff - "$tree/bun-calls" <<< "{\"cwd\":\"$tree/repo/program\",\"argv\":[\"bun\",\"run\",\"provider:build\"]}"
   run -0 diff - "$tree/op-calls" <<< "{\"cwd\":\"$tree/repo/program/infra\",\"argv\":[\"op\",\"run\",\"--env-file=../.env\",\"--\",\"pulumi\",\"refresh\",\"--stack\",\"prod\",\"--yes\",\"--skip-preview\",\"--suppress-outputs\"]}"
   refute [ -e "$tree/clock/pauses" ]
+  refute [ -L "$tree/clock/pauses" ]
 }
 
 @test "it refreshes again after a cloudflare api 502 to a get" {

@@ -81,6 +81,7 @@ EOF
 EOF
   run -0 diff - "$tree/outcome" <<< 'drift'
   refute [ -e "$tree/clock/pauses" ]
+  refute [ -L "$tree/clock/pauses" ]
 }
 
 @test "it writes outcome failed and exits with the refresh s status on any other error" {

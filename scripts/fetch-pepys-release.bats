@@ -81,6 +81,7 @@ EOF2
 
   assert_output --partial FAILED
   refute [ -e "$tree/context/pepys-host" ]
+  refute [ -L "$tree/context/pepys-host" ]
 }
 
 @test "it stops with no binary when the pin differs" {
@@ -92,6 +93,7 @@ EOF2
 
   assert_output --partial FAILED
   refute [ -e "$tree/context/pepys-host" ]
+  refute [ -L "$tree/context/pepys-host" ]
 }
 
 @test "it refuses to run without a context folder" {
@@ -103,4 +105,5 @@ EOF2
 
   assert_stderr --partial 'usage: fetch-pepys-release.sh <context-dir>'
   refute [ -e "$tree/calls" ]
+  refute [ -L "$tree/calls" ]
 }

@@ -142,7 +142,9 @@ EOF2
 
   assert_stderr --partial '/hooks/example'
   refute [ -e "$tree/calls" ]
+  refute [ -L "$tree/calls" ]
   refute [ -e "$tree/builds" ]
+  refute [ -L "$tree/builds" ]
 }
 
 @test "it stops before any step when the deployment is not installed" {
@@ -153,7 +155,9 @@ EOF2
 
   assert_stderr --partial 'deploy/pepys is not installed'
   refute [ -e "$tree/calls" ]
+  refute [ -L "$tree/calls" ]
   refute [ -e "$tree/builds" ]
+  refute [ -L "$tree/builds" ]
 }
 
 @test "it refuses to run without a context folder" {

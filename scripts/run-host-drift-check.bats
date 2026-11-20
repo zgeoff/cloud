@@ -87,6 +87,7 @@ EOF
 ["timeout","2700","bash","$check","--suppress-outputs"]
 EOF
   refute [ -e "$tree/discord/requests" ]
+  refute [ -L "$tree/discord/requests" ]
 }
 
 @test "it posts that the check found drift and exits 7 when the refresh finds a change" {
@@ -319,6 +320,7 @@ EOF
 
   run -0 diff /dev/null "$tree/calls"
   refute [ -e "$tree/timeout-calls" ]
+  refute [ -L "$tree/timeout-calls" ]
   run -0 diff - "$tree/discord/requests" <<< 'POST /api/webhooks/1/example-token'
   printf '%s' '{  "content": "The scheduled drift check failed: on geoffcloud: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9"}' |
     run -0 diff - "$tree/discord/bodies/1.json"
@@ -458,6 +460,7 @@ EOF
 
   run -0 diff /dev/null "$tree/calls"
   refute [ -e "$tree/discord/requests" ]
+  refute [ -L "$tree/discord/requests" ]
 }
 
 @test "it refuses to run without its invocation id" {

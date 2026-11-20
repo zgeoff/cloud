@@ -68,6 +68,7 @@ repeat_line() {
 
   run -0 diff - "$tree/calls" <<< "$exec_call"
   refute [ -e "$tree/clock/pauses" ]
+  refute [ -L "$tree/clock/pauses" ]
 }
 
 @test "it passes naming each advisory part that is not ready" {
@@ -84,6 +85,7 @@ EOF
 
   run -0 diff - "$tree/calls" <<< "$exec_call"
   refute [ -e "$tree/clock/pauses" ]
+  refute [ -L "$tree/clock/pauses" ]
 }
 
 @test "it pauses 10 seconds after each try that is not ready" {
