@@ -92,7 +92,7 @@ EOF
 # opt-outs. The case passes none of them itself, so a match shows the helper's own; a call
 # without one matches no recorded answer and ends with exit 97 and "unexpected: <argv>", so the
 # output would differ. The recorded answer is gh's for a missing release, "release not found"
-# and exit 1, which test-start-stub-github-api.sh pins against the real gh, so nothing is fetched
+# and exit 1, which start-stub-github-api.bats pins against the real gh, so nothing is fetched
 # or built.
 it_runs_the_release_fetch_with_ghs_telemetry_and_update_check_off() {
   local release status=0
