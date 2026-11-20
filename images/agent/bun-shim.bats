@@ -49,11 +49,11 @@ setup_test() {
   echo 1.4.2 > "$tree/1.4.2-answers/1.out"
 
   cd "$tree/repo"
-  run -0 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
-    sh "$tree/bin/bun" --version
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
+    sh "$tree/bin/bun" --version > "$tree/out" 2> "$tree/err"
 
-  assert_output 1.4.2
-  refute_stderr
+  diff - "$tree/out" <<< 1.4.2
+  diff /dev/null "$tree/err"
   diff - "$tree/1.4.2.log" <<< "{\"cwd\":\"$tree/repo\",\"argv\":[\"bun\",\"--version\"]}"
   refute [ -e "$tree/1.4.3.log" ]
   refute [ -L "$tree/1.4.3.log" ]
@@ -66,11 +66,11 @@ setup_test() {
   echo 0 > "$tree/1.4.2-answers/1.status"
 
   cd "$tree/repo/sub"
-  run -0 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
-    sh "$tree/bin/bun" test a.test.ts
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
+    sh "$tree/bin/bun" test a.test.ts > "$tree/out" 2> "$tree/err"
 
-  refute_output
-  refute_stderr
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
   diff - "$tree/1.4.2.log" <<< "{\"cwd\":\"$tree/repo/sub\",\"argv\":[\"bun\",\"test\",\"a.test.ts\"]}"
   refute [ -e "$tree/1.4.3.log" ]
   refute [ -L "$tree/1.4.3.log" ]
@@ -82,11 +82,11 @@ setup_test() {
   echo 0 > "$tree/1.4.2-answers/1.status"
 
   cd "$tree/repo"
-  run -0 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
-    sh "$tree/bin/bunx" oxlint --fix
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
+    sh "$tree/bin/bunx" oxlint --fix > "$tree/out" 2> "$tree/err"
 
-  refute_output
-  refute_stderr
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
   diff - "$tree/1.4.2.log" <<< "{\"cwd\":\"$tree/repo\",\"argv\":[\"bunx\",\"oxlint\",\"--fix\"]}"
   refute [ -e "$tree/1.4.3.log" ]
   refute [ -L "$tree/1.4.3.log" ]
@@ -98,10 +98,10 @@ setup_test() {
   echo 0 > "$tree/1.4.2-answers/1.status"
 
   cd "$tree/repo"
-  run -0 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
-    sh "$tree/bin/bun" --version
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
+    sh "$tree/bin/bun" --version > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
+  diff /dev/null "$tree/err"
   diff - "$tree/1.4.2.log" <<< "{\"cwd\":\"$tree/repo\",\"argv\":[\"bun\",\"--version\"]}"
   refute [ -e "$tree/1.4.3.log" ]
   refute [ -L "$tree/1.4.3.log" ]
@@ -112,10 +112,10 @@ setup_test() {
   echo 0 > "$tree/1.4.3-answers/1.status"
 
   cd "$tree/repo"
-  run -0 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
-    sh "$tree/bin/bun" --version
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
+    sh "$tree/bin/bun" --version > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
+  diff /dev/null "$tree/err"
   diff - "$tree/1.4.3.log" <<< "{\"cwd\":\"$tree/repo\",\"argv\":[\"bun\",\"--version\"]}"
   refute [ -e "$tree/1.4.2.log" ]
   refute [ -L "$tree/1.4.2.log" ]
@@ -127,10 +127,10 @@ setup_test() {
   echo 0 > "$tree/1.4.3-answers/1.status"
 
   cd "$tree/repo/sub"
-  run -0 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
-    sh "$tree/bin/bun" --version
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
+    sh "$tree/bin/bun" --version > "$tree/out" 2> "$tree/err"
 
-  assert_stderr "bun: $tree/repo/.bun-version pins Bun 1.4.4, which this image lacks; running 1.4.3"
+  diff - "$tree/err" <<< "bun: $tree/repo/.bun-version pins Bun 1.4.4, which this image lacks; running 1.4.3"
   diff - "$tree/1.4.3.log" <<< "{\"cwd\":\"$tree/repo/sub\",\"argv\":[\"bun\",\"--version\"]}"
   refute [ -e "$tree/1.4.2.log" ]
   refute [ -L "$tree/1.4.2.log" ]
@@ -144,25 +144,27 @@ setup_test() {
   echo 0 > "$tree/1.4.3-answers/1.status"
 
   cd "$tree/repo"
-  run -0 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
-    sh "$tree/bin/bun" --version
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
+    sh "$tree/bin/bun" --version > "$tree/out" 2> "$tree/err"
 
-  assert_stderr "bun: $tree/repo/.bun-version pins '../outside', which is no version; running the image's default Bun"
+  diff - "$tree/err" <<< "bun: $tree/repo/.bun-version pins '../outside', which is no version; running the image's default Bun"
   diff - "$tree/1.4.3.log" <<< "{\"cwd\":\"$tree/repo\",\"argv\":[\"bun\",\"--version\"]}"
   refute [ -e "$tree/outside.log" ]
   refute [ -L "$tree/outside.log" ]
 }
 
 @test "it passes on the exit status and output of the bun it runs" {
+  local status=0
   setup_test
   echo 1.4.2 > "$tree/repo/.bun-version"
   echo '1 fail' > "$tree/1.4.2-answers/1.err"
   echo 1 > "$tree/1.4.2-answers/1.status"
 
   cd "$tree/repo"
-  run -1 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
-    sh "$tree/bin/bun" test
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" AGENT_BUN_ROOT="$tree/opt" \
+    sh "$tree/bin/bun" test > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  refute_output
-  assert_stderr '1 fail'
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< '1 fail'
 }

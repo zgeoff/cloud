@@ -40,18 +40,20 @@ setup_test() {
 }
 
 @test "it retries a transfer that stalls after its headers and then fails with exit 28" {
+  local status=0
   local options
   setup_test "$tree"
   options="$(sed -nE 's/^ARG CURL_RETRY="(.*)"$/\1/p' "$dockerfile" |
     sed -E 's/--speed-time [0-9]+/--speed-time 1/; s/--retry [0-9]+/--retry 1/')"
 
   # shellcheck disable=SC2086 # the options split into words, as ${CURL_RETRY} does in a RUN step
-  run -28 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
     timeout 30 curl -q --noproxy '*' -fsSL $options -o "$tree/go.tar.gz" \
-    "http://127.0.0.1:$(cat "$tree/download/port")/go.tar.gz"
+    "http://127.0.0.1:$(cat "$tree/download/port")/go.tar.gz" > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 28
 
-  refute_output
-  assert_stderr - << 'EOF'
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << 'EOF'
 curl: (28) Operation too slow. Less than 1024 bytes/sec transferred the last 1 seconds
 curl: (28) Operation too slow. Less than 1024 bytes/sec transferred the last 1 seconds
 EOF

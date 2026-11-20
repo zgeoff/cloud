@@ -193,17 +193,19 @@ EOF
 }
 
 @test "it exits 1 and names each missing token" {
+  local status=0
   write_config "$tree"
   docker volume create "$name-data" > /dev/null
   docker run --rm --user 0 --entrypoint /bin/sh -v "$name-data:/s" "$restic_image" -c 'chown 65532:65532 /s'
 
-  run -1 --separate-stderr docker run --name "$name" --read-only --cap-drop ALL --security-opt no-new-privileges \
+  docker run --name "$name" --read-only --cap-drop ALL --security-opt no-new-privileges \
     -v "$name-data:/data" -v "$tree/config.json:/etc/boxxy/config.json:ro" \
     -v "$repo/images/boxxy/test-rules:/rules:ro" \
-    "$image"
+    "$image" > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  refute_output
-  assert_stderr 'set these variables: BOXXY_WORKER_TOKEN, BOXXY_ATC_TOKEN'
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'set these variables: BOXXY_WORKER_TOKEN, BOXXY_ATC_TOKEN'
 }
 
 @test "it starts with each trust document of the repo mounted as a file" {
@@ -231,19 +233,21 @@ EOF
 }
 
 @test "it exits 1 on a trust document that is not json" {
+  local status=0
   write_config "$tree" trusted
   echo 'not json' > "$tree/broken.json"
   chmod a+r "$tree/broken.json"
   docker volume create "$name-data" > /dev/null
   docker run --rm --user 0 --entrypoint /bin/sh -v "$name-data:/s" "$restic_image" -c 'chown 65532:65532 /s'
 
-  run -1 --separate-stderr docker run --name "$name" --read-only --cap-drop ALL --security-opt no-new-privileges \
+  docker run --name "$name" --read-only --cap-drop ALL --security-opt no-new-privileges \
     -v "$name-data:/data" -v "$tree/config.json:/etc/boxxy/config.json:ro" \
     -v "$repo/images/boxxy/test-rules:/rules:ro" -v "$tree/broken.json:/etc/boxxy-issuers/broken.json:ro" \
     -e BOXXY_WORKER_TOKEN=worker-token-image-test -e BOXXY_ATC_TOKEN=atc-token-image-test \
-    "$image"
+    "$image" > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  assert_stderr 'the trust document at /etc/boxxy-issuers/broken.json is not JSON'
+  diff - "$tree/err" <<< 'the trust document at /etc/boxxy-issuers/broken.json is not JSON'
 }
 
 @test "it loads its rules from a git sync checkout that another uid owns" {

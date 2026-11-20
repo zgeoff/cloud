@@ -81,11 +81,11 @@ write_observation args printf '<%s>\n' "$@"
 EOF
   chmod a+r "$tree/probe.sh"
 
-  run -0 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE" -e SNAPSHOT=abc12345 -v "$tree/probe.sh:/probe.sh:ro" \
-    -v "$tree/obs:/obs" --entrypoint /bin/sh /probe.sh one "two words"
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" -e SNAPSHOT=abc12345 -v "$tree/probe.sh:/probe.sh:ro" \
+    -v "$tree/obs:/obs" --entrypoint /bin/sh /probe.sh one "two words" > "$tree/out" 2> "$tree/err"
 
-  refute_output
-  refute_stderr
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
   printf '65532\nexit 0\n' | diff - "$tree/obs/uid"
   printf '65532\nexit 0\n' | diff - "$tree/obs/gid"
   printf 'HOME=/tmp STATE_DIR=/state RESTIC_REPOSITORY=/repo RESTIC_PASSWORD=fixture-only SNAPSHOT=abc12345\nexit 0\n' | diff - "$tree/obs/env"
@@ -107,10 +107,10 @@ mkdir /tmp/a && echo a > /tmp/a/gateway.db
 (cd /tmp/a && restic backup -q --tag atc-gateway --host atc-gateway --time "2020-01-06 10:00:00" .)
 EOF
 
-  run -0 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE" ls
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" ls > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
-  normalize_restic_output <<< "$output" > "$tree/out.normal"
+  diff /dev/null "$tree/err"
+  normalize_restic_output < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 ID        Time                 Host         Tags         Paths   Size
 ---------------------------------------------------------------------
@@ -122,12 +122,14 @@ EOF
 
 # restic exits 10 when the repository does not exist, a status no other path gives
 @test "it returns the backup entrypoints exit status" {
+  local status=0
   setup_test
 
-  run -10 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE" ls
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" ls > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 10
 
-  refute_output
-  assert_stderr - << 'EOF'
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << 'EOF'
 Fatal: repository does not exist: unable to open config file: stat /repo/config: no such file or directory
 Is there a repository at the following location?
 /repo
@@ -135,12 +137,14 @@ EOF
 }
 
 @test "it refuses a docker run option without a value" {
+  local status=0
   setup_test
 
-  run -2 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE" --version
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" --version > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
-  refute_output
-  assert_stderr 'run_backup: the docker run option --version has no value'
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'run_backup: the docker run option --version has no value'
 }
 
 # A teardown removes the containers by name, so a run that is interrupted leaves none behind.
@@ -161,18 +165,18 @@ EOF
   setup_test
   run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" <<< 'echo in state > /state/marker'
 
-  run -0 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE" --entrypoint /bin/cat /state/marker
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" --entrypoint /bin/cat /state/marker > "$tree/out" 2> "$tree/err"
 
-  assert_output 'in state'
-  refute_stderr
+  diff - "$tree/out" <<< 'in state'
+  diff /dev/null "$tree/err"
 }
 
 @test "it shares the repository volume between run backup shell and run backup" {
   setup_test
   run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" <<< 'echo in repo > /repo/marker'
 
-  run -0 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE" --entrypoint /bin/cat /repo/marker
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" --entrypoint /bin/cat /repo/marker > "$tree/out" 2> "$tree/err"
 
-  assert_output 'in repo'
-  refute_stderr
+  diff - "$tree/out" <<< 'in repo'
+  diff /dev/null "$tree/err"
 }

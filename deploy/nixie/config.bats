@@ -65,18 +65,21 @@ run_health() {
 }
 
 @test "it loads the rendered config in the pinned nixie" {
+  local status=0
   render_config "$repo/deploy/nixie/config.yaml" "$tree/config.yaml"
 
-  run -1 --separate-stderr run_health "$name" "$image" "$tree/config.yaml"
+  run_health "$name" "$image" "$tree/config.yaml" > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  refute_stderr
-  sed -E 's/"time":"[^"]+",//' <<< "$output" > "$tree/out.normal"
+  diff /dev/null "$tree/err"
+  sed -E 's/"time":"[^"]+",//' < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 {"event":"command.failed","command":"health","error":"TypeError","message":"ECONNREFUSED: Unable to connect. Is the computer able to access the url?"}
 EOF
 }
 
 @test "it shows the refusal of a context cap above the cli window" {
+  local status=0
   # a copy of the conversation's profile on an ID the CLI's catalog lacks, which gets the
   # 200000-token window, with a 400000 cap
   (cd "$repo" && bun -e '
@@ -87,10 +90,11 @@ EOF
   ') > "$tree/source.yaml"
   render_config "$tree/source.yaml" "$tree/config.yaml"
 
-  run -1 --separate-stderr run_health "$name" "$image" "$tree/config.yaml"
+  run_health "$name" "$image" "$tree/config.yaml" > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  refute_stderr
-  sed -E 's/"time":"[^"]+",//' <<< "$output" > "$tree/out.normal"
+  diff /dev/null "$tree/err"
+  sed -E 's/"time":"[^"]+",//' < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 {"event":"command.failed","command":"health","error":"Error","message":"nixie refuses the deployment configuration in /etc/nixie/config.yaml:\nmodels.profiles.test-refused.context_tokens: the context cap of 400000 tokens is larger than the 200000-token window the Claude CLI assumes for claude-test-1"}
 EOF

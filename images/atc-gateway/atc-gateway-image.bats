@@ -173,16 +173,17 @@ EOF
   setup_test
   start_gateway "$name" "$tree" "$FIXTURE_GATEWAY_IMAGE"
 
-  run -0 --separate-stderr docker exec "$name" /usr/local/bin/atc-gateway clients add fixture-client \
-    --redirect-uri https://client.fixture.invalid/callback
+  docker exec "$name" /usr/local/bin/atc-gateway clients add fixture-client \
+    --redirect-uri https://client.fixture.invalid/callback > "$tree/out" 2> "$tree/err"
 
-  client_id="$(sed -n 's/^Added fixture-client\. Its client ID is \([A-Za-z0-9]*\)$/\1/p' <<< "$output")"
+  client_id="$(sed -n 's/^Added fixture-client\. Its client ID is \([A-Za-z0-9]*\)$/\1/p' < "$tree/out")"
   [ -n "$client_id" ] || {
-    echo "no client ID in the add output: $output" >&2
+    cat "$tree/out" >&2
+    echo "no client ID in the add output" >&2
     return 1
   }
-  assert_output "Added fixture-client. Its client ID is $client_id"
-  refute_stderr
+  diff - "$tree/out" <<< "Added fixture-client. Its client ID is $client_id"
+  diff /dev/null "$tree/err"
 }
 
 @test "it keeps a stored client across a restart" {

@@ -242,44 +242,52 @@ EOF
 }
 
 @test "it rejects a run without a mode with its usage" {
+  local status=0
   setup_test "$tree" "$name" "$restic_image"
 
-  run -2 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE"
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
-  assert_stderr 'usage: atc-gateway-backup backup|restore|ls'
-  refute_output
+  diff - "$tree/err" <<< 'usage: atc-gateway-backup backup|restore|ls'
+  diff /dev/null "$tree/out"
 }
 
 @test "it rejects an unknown mode with its usage" {
+  local status=0
   setup_test "$tree" "$name" "$restic_image"
 
-  run -2 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE" prune
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" prune > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
-  assert_stderr 'usage: atc-gateway-backup backup|restore|ls'
-  refute_output
+  diff - "$tree/err" <<< 'usage: atc-gateway-backup backup|restore|ls'
+  diff /dev/null "$tree/out"
 }
 
 @test "it stops before restic when STATE DIR is unset" {
+  local status=0
   setup_test "$tree" "$name" "$restic_image"
 
-  run -2 --separate-stderr docker run --rm --name "$name-backup" --user 65532:65532 --security-opt no-new-privileges \
+  docker run --rm --name "$name-backup" --user 65532:65532 --security-opt no-new-privileges \
     --cap-drop ALL -e HOME=/tmp --tmpfs /tmp -v "$name-repo:/repo" -e RESTIC_REPOSITORY=/repo \
-    -e RESTIC_PASSWORD=fixture-only "$FIXTURE_BACKUP_IMAGE" backup
+    -e RESTIC_PASSWORD=fixture-only "$FIXTURE_BACKUP_IMAGE" backup > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
-  assert_stderr '/usr/local/bin/atc-gateway-backup: line 14: STATE_DIR: set STATE_DIR'
-  refute_output
+  diff - "$tree/err" <<< '/usr/local/bin/atc-gateway-backup: line 14: STATE_DIR: set STATE_DIR'
+  diff /dev/null "$tree/out"
   run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" <<< 'ls -A /repo' > "$tree/repo"
   diff /dev/null "$tree/repo"
 }
 
 @test "it fails a backup of a state dir without databases" {
+  local status=0
   setup_test "$tree" "$name" "$restic_image"
   run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" <<< 'restic init -q; echo notes > /state/readme'
 
-  run -1 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE" backup
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" backup > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  assert_stderr 'no databases in /state'
-  refute_output
+  diff - "$tree/err" <<< 'no databases in /state'
+  diff /dev/null "$tree/out"
   run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" <<< 'restic snapshots --json' > "$tree/snapshots"
   diff - "$tree/snapshots" <<< '[]'
 }
@@ -344,6 +352,7 @@ EOF
 # The same index corruption, inside the latest gateway snapshot: the restore checks each
 # database before it replaces anything, so the state keeps the database it had.
 @test "it fails a restore whose snapshot fails the integrity check and keeps the state" {
+  local status=0
   setup_test "$tree" "$name" "$restic_image"
   python3 - "$tree/seed/gateway.db" << 'EOF'
 import sqlite3, sys
@@ -367,10 +376,11 @@ mkdir /tmp/snap && cp /seed/gateway.db /tmp/snap/gateway.db
 sqlite3 /state/gateway.db "CREATE TABLE f (v); INSERT INTO f VALUES ('current');"
 EOF
 
-  run -1 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE" restore
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" restore > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  refute_stderr
-  normalize_restic_output <<< "$output" > "$tree/out.normal"
+  diff /dev/null "$tree/err"
+  normalize_restic_output < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 restoring snapshot ID of [/tmp/snap] at 2020-01-06 10:00:00 +0000 UTC by @atc-gateway to /tmp/tmp.X
 Summary: Restored 1 files/dirs (SIZE) in T
@@ -382,6 +392,7 @@ EOF
 }
 
 @test "it fails a restore of a snapshot without databases" {
+  local status=0
   setup_test "$tree" "$name" "$restic_image"
   run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" << 'EOF'
 restic init -q
@@ -389,10 +400,11 @@ mkdir /tmp/snap && echo notes > /tmp/snap/readme
 (cd /tmp/snap && restic backup -q --tag atc-gateway --host atc-gateway --time "2020-01-06 10:00:00" .)
 EOF
 
-  run -1 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE" restore
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" restore > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  assert_stderr 'snapshot holds no databases'
-  normalize_restic_output <<< "$output" > "$tree/out.normal"
+  diff - "$tree/err" <<< 'snapshot holds no databases'
+  normalize_restic_output < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 restoring snapshot ID of [/tmp/snap] at 2020-01-06 10:00:00 +0000 UTC by @atc-gateway to /tmp/tmp.X
 Summary: Restored 1 files/dirs (SIZE) in T
@@ -402,6 +414,7 @@ EOF
 }
 
 @test "it fails a restore when the repository holds no gateway snapshot" {
+  local status=0
   setup_test "$tree" "$name" "$restic_image"
   run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" << 'EOF'
 restic init -q
@@ -409,12 +422,13 @@ mkdir /tmp/other && echo other > /tmp/other/gateway.db
 (cd /tmp/other && restic backup -q --tag other --host other --time "2020-01-06 10:00:00" .)
 EOF
 
-  run -1 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE" restore
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" restore > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  assert_stderr - << 'EOF'
+  diff - "$tree/err" << 'EOF'
 Fatal: failed to find snapshot: snapshot filter (Paths:[] Tags:[[atc-gateway]] Hosts:[atc-gateway]): no snapshot found
 EOF
-  refute_output
+  diff /dev/null "$tree/out"
 }
 
 # ls lists the gateway's snapshots alone; each ID is random, so the case masks that column
@@ -428,10 +442,10 @@ mkdir /tmp/a /tmp/other && echo a > /tmp/a/gateway.db && echo other > /tmp/other
 (cd /tmp/other && restic backup -q --tag other --host other --time "2020-01-06 09:00:00" .)
 EOF
 
-  run -0 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE" ls
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" ls > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
-  normalize_restic_output <<< "$output" > "$tree/out.normal"
+  diff /dev/null "$tree/err"
+  normalize_restic_output < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 ID        Time                 Host         Tags         Paths   Size
 ---------------------------------------------------------------------
@@ -460,10 +474,10 @@ EOF
     return 1
   }
 
-  run -0 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE" -e "SNAPSHOT=$older" restore
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" -e "SNAPSHOT=$older" restore > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
-  normalize_restic_output <<< "$output" > "$tree/out.normal"
+  diff /dev/null "$tree/err"
+  normalize_restic_output < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 restoring snapshot ID of [/tmp/snap] at 2020-01-06 10:00:00 +0000 UTC by @atc-gateway to /tmp/tmp.X
 Summary: Restored 1 files/dirs (SIZE) in T
@@ -485,10 +499,10 @@ echo stale-shm > /state/gateway.db-shm
 echo kept > /state/other.db-wal
 EOF
 
-  run -0 --separate-stderr run_backup "$name" "$FIXTURE_BACKUP_IMAGE" restore
+  run_backup "$name" "$FIXTURE_BACKUP_IMAGE" restore > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
-  normalize_restic_output <<< "$output" > "$tree/out.normal"
+  diff /dev/null "$tree/err"
+  normalize_restic_output < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 restoring snapshot ID of [/tmp/snap] at 2020-01-06 10:00:00 +0000 UTC by @atc-gateway to /tmp/tmp.X
 Summary: Restored 1 files/dirs (SIZE) in T

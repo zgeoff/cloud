@@ -41,44 +41,50 @@ run_backup_script() {
 @test "it copies each named bucket to its own folder of the target by checksum" {
   setup_test
 
-  run -0 run_backup_script PEPYS_BACKUP_BUCKET=pepys-backup sh "$script" facts blobs
+  run_backup_script PEPYS_BACKUP_BUCKET=pepys-backup sh "$script" facts blobs > "$tree/out"
 
   diff - "$tree/rclone.log" << 'EOF'
 rclone copy garage:facts r2:pepys-backup/facts --checksum
 rclone copy garage:blobs r2:pepys-backup/blobs --checksum
 EOF
-  assert_output - << 'EOF'
+  diff - "$tree/out" << 'EOF'
 copied facts
 copied blobs
 EOF
 }
 
 @test "it stops at the first bucket that fails and copies no later one" {
+  local status=0
   setup_test
 
-  run -7 run_backup_script PEPYS_BACKUP_BUCKET=pepys-backup sh "$script" broken facts
+  run_backup_script PEPYS_BACKUP_BUCKET=pepys-backup sh "$script" broken facts > /dev/null || status=$?
+
+  assert_equal "$status" 7
 
   diff - "$tree/rclone.log" <<< 'rclone copy garage:broken r2:pepys-backup/broken --checksum'
 }
 
 @test "it refuses to run without a target bucket" {
+  local status=0
   setup_test
 
   # the exit status of a failed ${name:?} expansion differs between shells
-  run --separate-stderr run_backup_script sh "$script" facts
+  run_backup_script sh "$script" facts 2> "$tree/err" || status=$?
 
-  assert_failure
-  assert_stderr --partial 'set PEPYS_BACKUP_BUCKET'
+  refute [ "$status" = 0 ]
+  grep -q 'set PEPYS_BACKUP_BUCKET' "$tree/err"
   refute [ -e "$tree/rclone.log" ]
   refute [ -L "$tree/rclone.log" ]
 }
 
 @test "it refuses to run without a bucket to copy" {
+  local status=0
   setup_test
 
-  run -2 --separate-stderr run_backup_script PEPYS_BACKUP_BUCKET=pepys-backup sh "$script"
+  run_backup_script PEPYS_BACKUP_BUCKET=pepys-backup sh "$script" > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
-  assert_stderr 'usage: backup.sh <bucket>...'
+  diff - "$tree/err" <<< 'usage: backup.sh <bucket>...'
   refute [ -e "$tree/rclone.log" ]
   refute [ -L "$tree/rclone.log" ]
 }

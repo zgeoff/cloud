@@ -41,14 +41,14 @@ setup_test() {
   # 384 KiB at 128 KiB/s takes 3 s, and the floor ends each attempt after about 1 s
   start_stub_slow_download "$tree/download" 393216 131072 3>&-
 
-  run -0 --separate-stderr env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     timeout 30 "$step" "$tree/chrome.zip" "http://127.0.0.1:$(cat "$tree/download/port")/chrome.zip" \
-    -q --noproxy '*' --speed-limit 1048576 --speed-time 1
+    -q --noproxy '*' --speed-limit 1048576 --speed-time 1 > "$tree/out" 2> "$tree/err"
 
   cmp "$tree/download/body" "$tree/chrome.zip"
-  refute_output
+  diff /dev/null "$tree/out"
   # how many bytes each attempt fetched depends on timing, so the counts are masked
-  sed -E 's/with [0-9]+ bytes/with <n> bytes/' <<< "$stderr" | sort -u > "$tree/err-lines"
+  sed -E 's/with [0-9]+ bytes/with <n> bytes/' < "$tree/err" | sort -u > "$tree/err-lines"
   diff - "$tree/err-lines" << 'EOF'
 curl: (28) Operation too slow. Less than 1048576 bytes/sec transferred the last 1 seconds
 download-with-resume: curl exited 28 with <n> bytes, resuming in 2s
@@ -64,15 +64,17 @@ EOF
 }
 
 @test "it fails with curls status after 5 attempts in a row that add no bytes" {
+  local status=0
   setup_test "$tree"
 
   # nothing listens on port 1, so each attempt fails at once and adds no bytes
-  run -7 --separate-stderr env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    timeout 30 "$step" "$tree/chrome.zip" "http://127.0.0.1:1/chrome.zip" -q --noproxy '*'
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    timeout 30 "$step" "$tree/chrome.zip" "http://127.0.0.1:1/chrome.zip" -q --noproxy '*' > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 7
 
-  refute_output
+  diff /dev/null "$tree/out"
   # curl writes its own message, whose wording changes between curl releases, so the case masks it
-  sed -E 's/^(curl: \(7\)) .*/\1 <message>/' <<< "$stderr" > "$tree/err-masked"
+  sed -E 's/^(curl: \(7\)) .*/\1 <message>/' < "$tree/err" > "$tree/err-masked"
   diff - "$tree/err-masked" << 'EOF'
 curl: (7) <message>
 download-with-resume: curl exited 7 with 0 bytes, resuming in 2s
@@ -94,11 +96,13 @@ EOF
 }
 
 @test "it refuses a call without a url" {
+  local status=0
   setup_test "$tree"
 
-  run -2 --separate-stderr env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    "$step" "$tree/chrome.zip"
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    "$step" "$tree/chrome.zip" > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
-  refute_output
-  assert_stderr 'usage: download-with-resume <file> <url> [<curl option>...]'
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'usage: download-with-resume <file> <url> [<curl option>...]'
 }

@@ -159,13 +159,15 @@ EOF
 }
 
 @test "it stops before restic without files db" {
+  local status=0
   setup_test "$tree" "$name" "$image"
 
-  run -1 --separate-stderr run_backup "$name" "$image" --entrypoint /bin/sh \
-    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh backup
+  run_backup "$name" "$image" --entrypoint /bin/sh \
+    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh backup > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  refute_output
-  assert_stderr 'no files.db in /state'
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'no files.db in /state'
   run_backup_shell "$name" "$image" "$tree" > "$tree/repo" << 'EOF'
 ls -A /repo
 EOF
@@ -189,11 +191,11 @@ echo 'a later upload' > /state/files/DDDDDDDDDDDDDDDDDDDDDD
 echo 'stale wal' > /state/files.db-wal
 EOF
 
-  run -0 --separate-stderr run_backup "$name" "$image" --entrypoint /bin/sh \
-    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh restore
+  run_backup "$name" "$image" --entrypoint /bin/sh \
+    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh restore > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
-  normalize_restic_output <<< "$output" > "$tree/out.normal"
+  diff /dev/null "$tree/err"
+  normalize_restic_output < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 restoring snapshot ID of [/state/files-backup.db /state/files] at NOW +0000 UTC by @files to /tmp/tmp.X
 Summary: Restored 1 files/dirs (SIZE) in T
@@ -221,6 +223,7 @@ EOF
 
 # A snapshot whose metadata copy is not a database: the restore stops before it touches the state.
 @test "it stops a restore before any change when the metadata copy fails its check" {
+  local status=0
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" << 'EOF'
 restic init > /dev/null
@@ -230,15 +233,16 @@ echo 'not a database' > /tmp/snap/files-backup.db
 sqlite3 /state/files.db "CREATE TABLE uploads (id TEXT PRIMARY KEY); INSERT INTO uploads VALUES ('LIVELIVELIVELIVELIVELI');"
 EOF
 
-  run -1 --separate-stderr run_backup "$name" "$image" --entrypoint /bin/sh \
-    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh restore
+  run_backup "$name" "$image" --entrypoint /bin/sh \
+    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh restore > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  normalize_restic_output <<< "$output" > "$tree/out.normal"
+  normalize_restic_output < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 restoring snapshot ID of [/tmp/snap/files-backup.db /tmp/snap/files] at NOW +0000 UTC by @files to /tmp/tmp.X
 Summary: Restored 1 files/dirs (SIZE) in T
 EOF
-  assert_stderr - << 'EOF'
+  diff - "$tree/err" << 'EOF'
 Error: in prepare, file is not a database (26)
 the restored files-backup.db failed the integrity check
 EOF
@@ -297,11 +301,11 @@ sqlite3 /state/files.db ".backup '/state/files-backup.db'"
 rm /state/files-backup.db
 EOF
 
-  run -0 --separate-stderr run_backup "$name" "$image" --entrypoint /bin/sh -e "SNAPSHOT=$(cat "$tree/first")" \
-    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh restore
+  run_backup "$name" "$image" --entrypoint /bin/sh -e "SNAPSHOT=$(cat "$tree/first")" \
+    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh restore > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
-  tail -n 1 <<< "$output" > "$tree/summary"
+  diff /dev/null "$tree/err"
+  tail -n 1 < "$tree/out" > "$tree/summary"
   diff - "$tree/summary" <<< 'restored files.db: integrity_check ok, 1 uploads, 1 files without a row removed'
   run_backup_shell "$name" "$image" "$tree" > "$tree/state" << 'EOF'
 ls /state/files
@@ -367,11 +371,11 @@ sqlite3 /tmp/snap/files-backup.db 'CREATE TABLE uploads (id TEXT PRIMARY KEY);'
 (cd /tmp/snap && restic backup --tag files --host files --time '2020-01-02 03:04:05' files-backup.db files > /dev/null)
 EOF
 
-  run -0 --separate-stderr run_backup "$name" "$image" --entrypoint /bin/sh \
-    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh ls
+  run_backup "$name" "$image" --entrypoint /bin/sh \
+    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh ls > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
-  normalize_restic_output <<< "$output" > "$tree/out.normal"
+  diff /dev/null "$tree/err"
+  normalize_restic_output < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 ID        Time                 Host        Tags        Paths                      Size
 --------------------------------------------------------------------------------------------
@@ -383,11 +387,13 @@ EOF
 }
 
 @test "it prints the usage for an unknown mode" {
+  local status=0
   setup_test "$tree" "$name" "$image"
 
-  run -2 --separate-stderr run_backup "$name" "$image" --entrypoint /bin/sh \
-    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh prune
+  run_backup "$name" "$image" --entrypoint /bin/sh \
+    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh prune > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
-  refute_output
-  assert_stderr 'usage: files-backup backup|restore|ls'
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'usage: files-backup backup|restore|ls'
 }

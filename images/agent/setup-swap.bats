@@ -28,50 +28,50 @@ teardown() {
 }
 
 @test "it picks 2048 mib for the free space of a 32 gib imp" {
-  run -0 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 31457280
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 31457280 > "$tree/out" 2> "$tree/err"
 
-  assert_output 2048
-  refute_stderr
+  diff - "$tree/out" <<< 2048
+  diff /dev/null "$tree/err"
 }
 
 @test "it picks a quarter of the free space when that is under 2048 mib" {
   # 6144 MiB free
-  run -0 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 6291456
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 6291456 > "$tree/out" 2> "$tree/err"
 
-  assert_output 1536
-  refute_stderr
+  diff - "$tree/out" <<< 1536
+  diff /dev/null "$tree/err"
 }
 
 @test "it leaves 2048 mib free when that is the tightest bound" {
   # 2560 MiB free: a quarter is 640 MiB, and 512 MiB leaves 2048 MiB
-  run -0 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2621440
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2621440 > "$tree/out" 2> "$tree/err"
 
-  assert_output 512
-  refute_stderr
+  diff - "$tree/out" <<< 512
+  diff /dev/null "$tree/err"
 }
 
 @test "it picks 256 mib at the floor" {
   # 2304 MiB free: 256 MiB leaves 2048 MiB
-  run -0 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2359296
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2359296 > "$tree/out" 2> "$tree/err"
 
-  assert_output 256
-  refute_stderr
+  diff - "$tree/out" <<< 256
+  diff /dev/null "$tree/err"
 }
 
 @test "it picks no swapfile under the floor" {
   # 2303 MiB free: 255 MiB would leave 2048 MiB
-  run -0 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2358272
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2358272 > "$tree/out" 2> "$tree/err"
 
-  assert_output 0
-  refute_stderr
+  diff - "$tree/out" <<< 0
+  diff /dev/null "$tree/err"
 }
 
 @test "it picks no swapfile when less than 2048 mib is free" {
   # 1024 MiB free
-  run -0 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 1048576
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 1048576 > "$tree/out" 2> "$tree/err"
 
-  assert_output 0
-  refute_stderr
+  diff - "$tree/out" <<< 0
+  diff /dev/null "$tree/err"
 }
 
 @test "it keeps 2048 mib free for every free space up to 64 gib" {
@@ -98,15 +98,19 @@ teardown() {
 }
 
 @test "it refuses a free space that is not a whole number" {
-  run -2 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2g
+  local status=0
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for 2g > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
-  refute_output
-  assert_stderr 'setup-swap: --size-for takes the free space in KiB, a whole number'
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'setup-swap: --size-for takes the free space in KiB, a whole number'
 }
 
 @test "it refuses an unknown argument" {
-  run -2 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size 2048
+  local status=0
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size 2048 > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
-  refute_output
-  assert_stderr 'usage: setup-swap [--size-for <free KiB>]'
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'usage: setup-swap [--size-for <free KiB>]'
 }

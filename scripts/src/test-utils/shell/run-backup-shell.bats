@@ -100,12 +100,14 @@ EOF
 }
 
 @test "it stops the backup shell at the first failing command" {
+  local status=0
   setup_test
 
-  run -1 --separate-stderr run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" <<< 'echo before; false; echo after'
+  run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" <<< 'echo before; false; echo after' > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  assert_output before
-  refute_stderr
+  diff - "$tree/out" <<< before
+  diff /dev/null "$tree/err"
 }
 
 @test "it replaces a default with a trailing docker run option" {
@@ -113,22 +115,24 @@ EOF
 
   # the shell in the container expands the command, so it stays unexpanded here
   # shellcheck disable=SC2016
-  run -0 --separate-stderr run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" --user 10001:10001 -e STATE_DIR=/state \
-    <<< 'echo "$(id -u):$(id -g) $STATE_DIR"'
+  run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" --user 10001:10001 -e STATE_DIR=/state \
+    <<< 'echo "$(id -u):$(id -g) $STATE_DIR"' > "$tree/out" 2> "$tree/err"
 
-  assert_output '10001:10001 /state'
-  refute_stderr
+  diff - "$tree/out" <<< '10001:10001 /state'
+  diff /dev/null "$tree/err"
 }
 
 @test "it refuses a trailing docker run option without a value" {
+  local status=0
   setup_test
 
-  run -2 --separate-stderr run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" --user <<< 'touch /state/ran'
+  run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" --user <<< 'touch /state/ran' > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
-  refute_output
-  assert_stderr 'run_backup_shell: the docker run option --user has no value'
-  run -0 --separate-stderr run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" <<< 'ls -A /state'
-  refute_output
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'run_backup_shell: the docker run option --user has no value'
+  run_backup_shell "$name" "$FIXTURE_BACKUP_IMAGE" "$tree" <<< 'ls -A /state' > "$tree/out" 2> "$tree/err"
+  diff /dev/null "$tree/out"
 }
 
 @test "it names the backup shell container after the case while it runs" {

@@ -87,10 +87,10 @@ setup_test() {
   docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  run -0 --separate-stderr docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
     "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err"
 
   docker exec "$container" dpkg-query -W cloud-stub > "$tree/installed"
   diff - "$tree/installed" <<< $'cloud-stub\t1.0-1'
@@ -98,7 +98,7 @@ setup_test() {
   diff - "$tree/requests" << 'EOF'
 200 snapshot.ubuntu.com /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb
 EOF
-  sed '/^W: The repository .* is not signed\.$/d' <<< "$stderr" > "$tree/err.normal"
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
   diff /dev/null "$tree/err.normal"
 }
 
@@ -116,17 +116,17 @@ EOF
   docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  run -0 --separate-stderr docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
     "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err"
 
   docker exec "$container" dpkg-query -W cloud-stub cloud-stub-lib > "$tree/installed"
   diff - "$tree/installed" << 'EOF'
 cloud-stub	1.0-1
 cloud-stub-lib	2.0-1
 EOF
-  sed '/^W: The repository .* is not signed\.$/d' <<< "$stderr" > "$tree/err.normal"
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
   diff /dev/null "$tree/err.normal"
 }
 
@@ -142,16 +142,16 @@ EOF
   docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  run -0 --separate-stderr docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
     "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err"
 
   docker exec "$container" grep ' /ubuntu/[^d]*pool/' /run/stub/requests > "$tree/requests"
   diff - "$tree/requests" << 'EOF'
 200 archive.ubuntu.com /ubuntu/pool/main/cloud-stub_1.0-1_all.deb
 EOF
-  sed '/^W: The repository .* is not signed\.$/d' <<< "$stderr" > "$tree/err.normal"
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
   diff /dev/null "$tree/err.normal"
 }
 
@@ -168,10 +168,10 @@ EOF
   docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  run -0 --separate-stderr docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
     "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err"
 
   docker exec "$container" dpkg-query -W cloud-stub > "$tree/installed"
   diff - "$tree/installed" <<< $'cloud-stub\t1.0-1'
@@ -180,7 +180,7 @@ EOF
 503 archive.ubuntu.com /ubuntu/pool/main/cloud-stub_1.0-1_all.deb
 200 snapshot.ubuntu.com /ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb
 EOF
-  sed '/^W: The repository .* is not signed\.$/d' <<< "$stderr" > "$tree/err.normal"
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
   diff /dev/null "$tree/err.normal"
 }
 
@@ -198,10 +198,10 @@ EOF
   docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  run -0 --separate-stderr docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
     "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err"
 
   docker exec "$container" dpkg-query -W cloud-stub > "$tree/installed"
   diff - "$tree/installed" <<< $'cloud-stub\t1.0-1'
@@ -217,7 +217,7 @@ EOF
 10
 20
 EOF
-  sed '/^W: The repository .* is not signed\.$/d' <<< "$stderr" > "$tree/err.normal"
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
   diff - "$tree/err.normal" << EOF
 E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
 E: Some index files failed to download. They have been ignored, or old ones used instead.
@@ -241,10 +241,10 @@ EOF
   docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  run -0 --separate-stderr docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
     "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err"
 
   docker exec "$container" dpkg-query -W cloud-stub > "$tree/installed"
   diff - "$tree/installed" <<< $'cloud-stub\t1.0-1'
@@ -255,7 +255,7 @@ EOF
 EOF
   docker exec "$container" cat /run/clock/pauses > "$tree/pauses"
   diff - "$tree/pauses" <<< 10
-  sed '/^W: The repository .* is not signed\.$/d' <<< "$stderr" > "$tree/err.normal"
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
   diff - "$tree/err.normal" << 'EOF'
 E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/pool/main/cloud-stub_1.0-1_all.deb  503  Service Unavailable [IP: 127.0.0.1 80]
 E: Some files failed to download
@@ -264,6 +264,7 @@ EOF
 }
 
 @test "it fails with apt s error when the snapshot keeps failing a list" {
+  local status=0
   local suite
   setup_test
   for suite in "$codename" "$codename-backports" "$codename-security"; do
@@ -277,10 +278,11 @@ EOF
   docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  run -100 --separate-stderr docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
     "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 100
 
   docker exec "$container" grep -c " /ubuntu/20260101T000000Z/dists/$codename-updates/main/" \
     /run/stub/requests > "$tree/requests"
@@ -292,7 +294,7 @@ EOF
 40
 80
 EOF
-  sed '/^W: The repository .* is not signed\.$/d' <<< "$stderr" > "$tree/err.normal"
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
   diff - "$tree/err.normal" << EOF
 E: Failed to fetch http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/dists/$codename-updates/main/binary-amd64/Packages  503  Service Unavailable [IP: 127.0.0.1 80]
 E: Some index files failed to download. They have been ignored, or old ones used instead.
@@ -323,10 +325,10 @@ EOF
   docker exec "$container" bash -c 'source /repo/scripts/src/test-utils/shell/start-stub-apt-archive.sh &&
     start_stub_apt_archive /run/stub 80 > /dev/null 2>&1'
 
-  run -0 --separate-stderr docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
+  docker exec -e PATH=/run/clock:/usr/sbin:/usr/bin:/sbin:/bin -e DEBIAN_FRONTEND=noninteractive \
     "$container" \
     /repo/images/agent/sbin/install-ubuntu-packages \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ cloud-stub=1.0-1 > "$tree/out" 2> "$tree/err"
 
   docker exec "$container" sh -c \
     'cd /etc/apt && find sources.list.d preferences.d | sort && ls -A /var/lib/apt/lists' \
@@ -336,15 +338,17 @@ preferences.d
 sources.list.d
 sources.list.d/ubuntu.sources
 EOF
-  sed '/^W: The repository .* is not signed\.$/d' <<< "$stderr" > "$tree/err.normal"
+  sed '/^W: The repository .* is not signed\.$/d' < "$tree/err" > "$tree/err.normal"
   diff /dev/null "$tree/err.normal"
 }
 
 @test "it refuses a call without a package" {
+  local status=0
 
-  run -2 --separate-stderr env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$BATS_TEST_DIRNAME/sbin/install-ubuntu-packages" \
-    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/
+  env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$BATS_TEST_DIRNAME/sbin/install-ubuntu-packages" \
+    http://snapshot.ubuntu.com/ubuntu/20260101T000000Z/ > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
-  refute_output
-  assert_stderr 'usage: install-ubuntu-packages <snapshot URI> <package>=<version>...'
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'usage: install-ubuntu-packages <snapshot URI> <package>=<version>...'
 }

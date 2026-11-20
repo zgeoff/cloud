@@ -49,7 +49,7 @@ setup_test() {
 }
 
 # scan: the image's gitleaks over the case tree's /opt with the config under test; a case runs it
-# with `run`, and reads the report in $output and the log in $stderr
+# redirecting its report to "$tree/out" and its log to "$tree/err"
 scan() {
   docker run --rm --network none --entrypoint gitleaks -v "$tree/opt:/opt:ro" \
     -v "$config:/run/gitleaks.toml:ro" "$image" dir /opt --config /run/gitleaks.toml --no-banner \
@@ -61,12 +61,12 @@ scan() {
   printf '{"rules":[{"id":"aws-amazon-bedrock-api-key-short-lived","pattern":{"source":"%s","flags":"","engine":"js"}}]}' \
     "$BEDROCK_PATTERN" > "$tree/opt/auto-mode/dist/secret-rules.json"
 
-  run -0 --separate-stderr scan
+  scan > "$tree/out" 2> "$tree/err"
 
-  jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" > "$tree/findings"
+  jq -c '.[] | {RuleID, File, StartLine}' < "$tree/out" > "$tree/findings"
   diff /dev/null "$tree/findings"
   sed -E 's/^[0-9]+:[0-9]{2}[AP]M //; s/scanned ~[0-9]+ bytes \([^)]*\) in .*$/scanned SIZE in T/' \
-    <<< "$stderr" > "$tree/err.normal"
+    < "$tree/err" > "$tree/err.normal"
   diff - "$tree/err.normal" << 'EOF'
 INF scanned SIZE in T
 INF no leaks found
@@ -78,12 +78,12 @@ EOF
   printf 'const rules = [{\n\tid: "aws-amazon-bedrock-api-key-short-lived",\n\tpattern: {\n\t\t"source": "%s",\n\t},\n}];\n' \
     "$BEDROCK_PATTERN" > "$tree/opt/auto-mode/dist/classify-edit-B10-ua5i.js"
 
-  run -0 --separate-stderr scan
+  scan > "$tree/out" 2> "$tree/err"
 
-  jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" > "$tree/findings"
+  jq -c '.[] | {RuleID, File, StartLine}' < "$tree/out" > "$tree/findings"
   diff /dev/null "$tree/findings"
   sed -E 's/^[0-9]+:[0-9]{2}[AP]M //; s/scanned ~[0-9]+ bytes \([^)]*\) in .*$/scanned SIZE in T/' \
-    <<< "$stderr" > "$tree/err.normal"
+    < "$tree/err" > "$tree/err.normal"
   diff - "$tree/err.normal" << 'EOF'
 INF scanned SIZE in T
 INF no leaks found
@@ -91,6 +91,7 @@ EOF
 }
 
 @test "it fails the bedrock rule pattern in secret rules json outside auto mode dist" {
+  local status=0
   setup_test
   mkdir -p "$tree/opt/auto-mode/lib" "$tree/opt/other"
   printf '{"rules":[{"id":"aws-amazon-bedrock-api-key-short-lived","pattern":{"source":"%s","flags":"","engine":"js"}}]}' \
@@ -98,15 +99,16 @@ EOF
   printf '{"rules":[{"id":"aws-amazon-bedrock-api-key-short-lived","pattern":{"source":"%s","flags":"","engine":"js"}}]}' \
     "$BEDROCK_PATTERN" > "$tree/opt/other/secret-rules.json"
 
-  run -1 --separate-stderr scan
+  scan > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" | LC_ALL=C sort > "$tree/findings"
+  jq -c '.[] | {RuleID, File, StartLine}' < "$tree/out" | LC_ALL=C sort > "$tree/findings"
   diff - "$tree/findings" << 'EOF'
 {"RuleID":"aws-amazon-bedrock-api-key-short-lived","File":"/opt/auto-mode/lib/secret-rules.json","StartLine":1}
 {"RuleID":"aws-amazon-bedrock-api-key-short-lived","File":"/opt/other/secret-rules.json","StartLine":1}
 EOF
   sed -E 's/^[0-9]+:[0-9]{2}[AP]M //; s/scanned ~[0-9]+ bytes \([^)]*\) in .*$/scanned SIZE in T/' \
-    <<< "$stderr" > "$tree/err.normal"
+    < "$tree/err" > "$tree/err.normal"
   diff - "$tree/err.normal" << 'EOF'
 INF scanned SIZE in T
 WRN leaks found: 2
@@ -114,18 +116,20 @@ EOF
 }
 
 @test "it fails a github token beside the bedrock rule pattern in secret rules json" {
+  local status=0
   setup_test
   printf '{"rules":[{"id":"aws-amazon-bedrock-api-key-short-lived","pattern":{"source":"%s","flags":"","engine":"js"}}]}\n{"token":"%s"}\n' \
     "$BEDROCK_PATTERN" "$GITHUB_TOKEN" > "$tree/opt/auto-mode/dist/secret-rules.json"
 
-  run -1 --separate-stderr scan
+  scan > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" > "$tree/findings"
+  jq -c '.[] | {RuleID, File, StartLine}' < "$tree/out" > "$tree/findings"
   diff - "$tree/findings" << 'EOF'
 {"RuleID":"github-pat","File":"/opt/auto-mode/dist/secret-rules.json","StartLine":2}
 EOF
   sed -E 's/^[0-9]+:[0-9]{2}[AP]M //; s/scanned ~[0-9]+ bytes \([^)]*\) in .*$/scanned SIZE in T/' \
-    <<< "$stderr" > "$tree/err.normal"
+    < "$tree/err" > "$tree/err.normal"
   diff - "$tree/err.normal" << 'EOF'
 INF scanned SIZE in T
 WRN leaks found: 1
@@ -133,18 +137,20 @@ EOF
 }
 
 @test "it fails a github token beside the bedrock rule pattern in a classify edit bundle" {
+  local status=0
   setup_test
   printf 'const rules = [{\n\tid: "aws-amazon-bedrock-api-key-short-lived",\n\tpattern: {\n\t\t"source": "%s",\n\t},\n}];\nconst token = "%s";\n' \
     "$BEDROCK_PATTERN" "$GITHUB_TOKEN" > "$tree/opt/auto-mode/dist/classify-edit-B10-ua5i.js"
 
-  run -1 --separate-stderr scan
+  scan > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" > "$tree/findings"
+  jq -c '.[] | {RuleID, File, StartLine}' < "$tree/out" > "$tree/findings"
   diff - "$tree/findings" << 'EOF'
 {"RuleID":"github-pat","File":"/opt/auto-mode/dist/classify-edit-B10-ua5i.js","StartLine":7}
 EOF
   sed -E 's/^[0-9]+:[0-9]{2}[AP]M //; s/scanned ~[0-9]+ bytes \([^)]*\) in .*$/scanned SIZE in T/' \
-    <<< "$stderr" > "$tree/err.normal"
+    < "$tree/err" > "$tree/err.normal"
   diff - "$tree/err.normal" << 'EOF'
 INF scanned SIZE in T
 WRN leaks found: 1
@@ -156,12 +162,12 @@ EOF
   printf '{\n  "key": "%s",\n  "manifest_version": 3\n}\n' "$CHROME_KEY" \
     > "$tree/opt/chrome/resources/accessibility/reading_mode_gdocs_helper_manifest.json"
 
-  run -0 --separate-stderr scan
+  scan > "$tree/out" 2> "$tree/err"
 
-  jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" > "$tree/findings"
+  jq -c '.[] | {RuleID, File, StartLine}' < "$tree/out" > "$tree/findings"
   diff /dev/null "$tree/findings"
   sed -E 's/^[0-9]+:[0-9]{2}[AP]M //; s/scanned ~[0-9]+ bytes \([^)]*\) in .*$/scanned SIZE in T/' \
-    <<< "$stderr" > "$tree/err.normal"
+    < "$tree/err" > "$tree/err.normal"
   diff - "$tree/err.normal" << 'EOF'
 INF scanned SIZE in T
 INF no leaks found
@@ -169,18 +175,20 @@ EOF
 }
 
 @test "it fails the extension key in another chrome manifest" {
+  local status=0
   setup_test
   printf '{\n  "key": "%s",\n  "manifest_version": 3\n}\n' "$CHROME_KEY" \
     > "$tree/opt/chrome/resources/accessibility/other_manifest.json"
 
-  run -1 --separate-stderr scan
+  scan > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" > "$tree/findings"
+  jq -c '.[] | {RuleID, File, StartLine}' < "$tree/out" > "$tree/findings"
   diff - "$tree/findings" << 'EOF'
 {"RuleID":"generic-api-key","File":"/opt/chrome/resources/accessibility/other_manifest.json","StartLine":2}
 EOF
   sed -E 's/^[0-9]+:[0-9]{2}[AP]M //; s/scanned ~[0-9]+ bytes \([^)]*\) in .*$/scanned SIZE in T/' \
-    <<< "$stderr" > "$tree/err.normal"
+    < "$tree/err" > "$tree/err.normal"
   diff - "$tree/err.normal" << 'EOF'
 INF scanned SIZE in T
 WRN leaks found: 1
@@ -188,18 +196,20 @@ EOF
 }
 
 @test "it fails a github token beside the extension key in chromes reading mode manifest" {
+  local status=0
   setup_test
   printf '{\n  "key": "%s",\n  "token": "%s"\n}\n' "$CHROME_KEY" "$GITHUB_TOKEN" \
     > "$tree/opt/chrome/resources/accessibility/reading_mode_gdocs_helper_manifest.json"
 
-  run -1 --separate-stderr scan
+  scan > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  jq -c '.[] | {RuleID, File, StartLine}' <<< "$output" > "$tree/findings"
+  jq -c '.[] | {RuleID, File, StartLine}' < "$tree/out" > "$tree/findings"
   diff - "$tree/findings" << 'EOF'
 {"RuleID":"github-pat","File":"/opt/chrome/resources/accessibility/reading_mode_gdocs_helper_manifest.json","StartLine":3}
 EOF
   sed -E 's/^[0-9]+:[0-9]{2}[AP]M //; s/scanned ~[0-9]+ bytes \([^)]*\) in .*$/scanned SIZE in T/' \
-    <<< "$stderr" > "$tree/err.normal"
+    < "$tree/err" > "$tree/err.normal"
   diff - "$tree/err.normal" << 'EOF'
 INF scanned SIZE in T
 WRN leaks found: 1

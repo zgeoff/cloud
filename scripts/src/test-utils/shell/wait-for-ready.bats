@@ -60,10 +60,10 @@ setup_test() {
   start_gateway "$name" "$tree" "$FIXTURE_GATEWAY_IMAGE"
   docker restart "$name" > /dev/null
 
-  run -0 --separate-stderr wait_for_ready "$name" 30
+  wait_for_ready "$name" 30 > "$tree/out" 2> "$tree/err"
 
-  refute_output
-  refute_stderr
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
   docker logs "$name" > "$tree/log.out" 2> "$tree/log.err"
   diff - "$tree/log.out" << 'EOF'
 atc-gateway: serving https://atc.fixture.invalid/mcp, listening on http://0.0.0.0:8414
@@ -81,16 +81,18 @@ EOF
 # pause instead of after a real second. Docker keeps no order between a container's stdout
 # and stderr lines, so the case compares the log lines after the timeout as a sorted set.
 @test "it fails wait for ready with the containers logs when readyz never answers" {
+  local status=0
   docker run -d --name "$name" -p 127.0.0.1::8414 --entrypoint /bin/sh "$FIXTURE_BACKUP_IMAGE" \
     -c 'echo a log line on stdout; echo a log line on stderr >&2; exec sleep 300' > /dev/null
   create_stub_clock "$tree"
 
   WAIT_FOR_CLOCK="$tree/clock" WAIT_FOR_SLEEP="$tree/sleep" \
-    run -1 --separate-stderr wait_for_ready "$name" 1
+    wait_for_ready "$name" 1 > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  refute_output
-  head -n 1 <<< "$stderr" > "$tree/err-first"
-  tail -n +2 <<< "$stderr" | sort > "$tree/err-logs"
+  diff /dev/null "$tree/out"
+  head -n 1 "$tree/err" > "$tree/err-first"
+  tail -n +2 "$tree/err" | sort > "$tree/err-logs"
   diff - "$tree/err-first" <<< "timed out after 1s waiting for $name to answer /readyz with 200"
   diff - "$tree/err-logs" << 'EOF'
 a log line on stderr
@@ -103,17 +105,19 @@ EOF
 # first poll, with no pause, instead of polling a port that is gone until the 30-second
 # deadline.
 @test "it fails wait for ready with the containers logs as soon as the container stops" {
+  local status=0
   docker run -d --name "$name" -p 127.0.0.1::8414 --entrypoint /bin/sh "$FIXTURE_BACKUP_IMAGE" \
     -c 'echo a log line on stdout; echo a log line on stderr >&2; exit 3' > /dev/null
   docker wait "$name" > /dev/null
   create_stub_clock "$tree"
 
   WAIT_FOR_CLOCK="$tree/clock" WAIT_FOR_SLEEP="$tree/sleep" \
-    run -1 --separate-stderr wait_for_ready "$name" 30
+    wait_for_ready "$name" 30 > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  refute_output
-  head -n 1 <<< "$stderr" > "$tree/err-first"
-  tail -n +2 <<< "$stderr" | sort > "$tree/err-logs"
+  diff /dev/null "$tree/out"
+  head -n 1 "$tree/err" > "$tree/err-first"
+  tail -n +2 "$tree/err" | sort > "$tree/err-logs"
   diff - "$tree/err-first" <<< "$name stopped before it answered /readyz with 200"
   diff - "$tree/err-logs" << 'EOF'
 a log line on stderr

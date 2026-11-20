@@ -38,11 +38,11 @@ setup_test() {
   echo '3 packages installed' > "$tree/bun-answers/1.out"
 
   cd "$tree"
-  run -0 --separate-stderr env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree" TMPDIR="$tree" \
-    CLAUDE_PROJECT_DIR="$tree/repo" sh "$script" < /dev/null
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree" TMPDIR="$tree" \
+    CLAUDE_PROJECT_DIR="$tree/repo" sh "$script" < /dev/null > "$tree/out" 2> "$tree/err"
 
-  refute_output
-  assert_stderr '3 packages installed'
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< '3 packages installed'
   diff - "$tree/bun.log" <<< "{\"cwd\":\"$tree/repo\",\"argv\":[\"bun\",\"install\",\"--frozen-lockfile\"]}"
 }
 
@@ -52,11 +52,11 @@ setup_test() {
   mkdir "$tree/repo/node_modules"
 
   cd "$tree"
-  run -0 --separate-stderr env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree" TMPDIR="$tree" \
-    CLAUDE_PROJECT_DIR="$tree/repo" sh "$script" < /dev/null
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree" TMPDIR="$tree" \
+    CLAUDE_PROJECT_DIR="$tree/repo" sh "$script" < /dev/null > "$tree/out" 2> "$tree/err"
 
-  refute_output
-  refute_stderr
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
   refute [ -e "$tree/bun.log" ]
   refute [ -L "$tree/bun.log" ]
 }
@@ -66,11 +66,11 @@ setup_test() {
   echo '{}' > "$tree/repo/package.json"
 
   cd "$tree"
-  run -0 --separate-stderr env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree" TMPDIR="$tree" \
-    CLAUDE_PROJECT_DIR="$tree/repo" sh "$script" < /dev/null
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree" TMPDIR="$tree" \
+    CLAUDE_PROJECT_DIR="$tree/repo" sh "$script" < /dev/null > "$tree/out" 2> "$tree/err"
 
-  refute_output
-  refute_stderr
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
   refute [ -e "$tree/bun.log" ]
   refute [ -L "$tree/bun.log" ]
 }
@@ -80,11 +80,11 @@ setup_test() {
   echo '{}' > "$tree/repo/bun.lock"
 
   cd "$tree/repo"
-  run -0 --separate-stderr env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree" TMPDIR="$tree" \
-    sh "$script" < /dev/null
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree" TMPDIR="$tree" \
+    sh "$script" < /dev/null > "$tree/out" 2> "$tree/err"
 
-  refute_output
-  refute_stderr
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
   refute [ -e "$tree/bun.log" ]
   refute [ -L "$tree/bun.log" ]
 }
@@ -96,10 +96,10 @@ setup_test() {
   echo 1 > "$tree/bun-answers/1.status"
 
   cd "$tree"
-  run -0 --separate-stderr env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree" TMPDIR="$tree" \
-    CLAUDE_PROJECT_DIR="$tree/repo" sh "$script" < /dev/null
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree" TMPDIR="$tree" \
+    CLAUDE_PROJECT_DIR="$tree/repo" sh "$script" < /dev/null > "$tree/out" 2> "$tree/err"
 
-  assert_output "install-checkout-packages: \`bun install --frozen-lockfile\` failed in $tree/repo, so its hooks may import other package versions than its bun.lock pins; run the install before you rely on them."
-  assert_stderr 'error: lockfile had changes, but lockfile is frozen'
+  diff - "$tree/out" <<< "install-checkout-packages: \`bun install --frozen-lockfile\` failed in $tree/repo, so its hooks may import other package versions than its bun.lock pins; run the install before you rely on them."
+  diff - "$tree/err" <<< 'error: lockfile had changes, but lockfile is frozen'
   diff - "$tree/bun.log" <<< "{\"cwd\":\"$tree/repo\",\"argv\":[\"bun\",\"install\",\"--frozen-lockfile\"]}"
 }

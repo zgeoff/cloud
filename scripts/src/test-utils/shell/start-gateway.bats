@@ -55,10 +55,10 @@ setup_test() {
 @test "it starts the gateway container with the configuration the deployment sets" {
   setup_test
 
-  run -0 --separate-stderr start_gateway "$name" "$tree" "$FIXTURE_GATEWAY_IMAGE"
+  start_gateway "$name" "$tree" "$FIXTURE_GATEWAY_IMAGE" > "$tree/out" 2> "$tree/err"
 
-  refute_output
-  refute_stderr
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
   # docker keeps no order in the binds or the env it reports, so both are sorted
   docker inspect "$name" | jq -S '.[0] | {
     ReadonlyRootfs: .HostConfig.ReadonlyRootfs, SecurityOpt: .HostConfig.SecurityOpt,
@@ -118,10 +118,10 @@ EOF
 @test "it returns from start gateway only once readyz answers 200" {
   setup_test
 
-  run -0 --separate-stderr start_gateway "$name" "$tree" "$FIXTURE_GATEWAY_IMAGE"
+  start_gateway "$name" "$tree" "$FIXTURE_GATEWAY_IMAGE" > "$tree/out" 2> "$tree/err"
 
-  refute_output
-  refute_stderr
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
   docker logs "$name" > "$tree/log.out" 2> "$tree/log.err"
   diff - "$tree/log.out" <<< 'atc-gateway: serving https://atc.fixture.invalid/mcp, listening on http://0.0.0.0:8414'
   sed -E 's/ [0-9.]+ms$/ Tms/' "$tree/log.err" > "$tree/requests"

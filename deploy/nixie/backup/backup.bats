@@ -156,10 +156,10 @@ run_shell() {
   setup_test "$name" "$image"
   stage_sets "$name" "$image" 1:scheduled
 
-  run -0 --separate-stderr run_job "$name" "$image"
+  run_job "$name" "$image" > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
-  sed -E 's/"time":"[^"]+",//' <<< "$output" > "$tree/out.normal"
+  diff /dev/null "$tree/err"
+  sed -E 's/"time":"[^"]+",//' < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 {"event":"backup.set_published","sequence":1}
 EOF
@@ -190,10 +190,10 @@ EOF
   run_job "$name" "$image" > /dev/null
   stage_sets "$name" "$image" 2:forget
 
-  run -0 --separate-stderr run_job "$name" "$image"
+  run_job "$name" "$image" > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
-  sed -E 's/"time":"[^"]+",//' <<< "$output" > "$tree/out.normal"
+  diff /dev/null "$tree/err"
+  sed -E 's/"time":"[^"]+",//' < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 {"event":"backup.set_published","sequence":2}
 EOF
@@ -210,26 +210,26 @@ EOF
 # repo that refuses writes fails the set's receipt and the run, and a second run skips that set and
 # exits 0, so a retried Job would end as a success.
 @test "it fails a run whose set fails and passes its rerun with the receipt unchanged" {
-  local first_output first_stderr
+  local status=0
   setup_test "$name" "$image"
   stage_sets "$name" "$image" 1:scheduled
   run_shell "$name" "$image" <<< 'chmod 0500 /repos/keys'
-  run -1 --separate-stderr run_job "$name" "$image"
-  first_output="$output"
-  first_stderr="$stderr"
+  run_job "$name" "$image" > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
+  mv "$tree/out" "$tree/out.first"
+  mv "$tree/err" "$tree/err.first"
   run_shell "$name" "$image" > "$tree/receipt-before" <<< 'cat /state/backup/000000000001/receipt.json'
 
-  run -0 --separate-stderr run_job "$name" "$image"
+  run_job "$name" "$image" > "$tree/out" 2> "$tree/err"
 
   # restic creates the repo's folders in parallel, so the first refused one varies
-  sed -E 's/"time":"[^"]+",//; s#mkdir /repos/keys/[a-z]+:#mkdir /repos/keys/FOLDER:#' <<< "$first_output" > \
-    "$tree/out.normal"
+  sed -E 's/"time":"[^"]+",//; s#mkdir /repos/keys/[a-z]+:#mkdir /repos/keys/FOLDER:#' < "$tree/out.first" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 {"event":"backup.set_failed","level":"error","sequence":1,"failure":"restic init in the key repo exited 1: Fatal: Fatal: create repository at /repos/keys failed: mkdir /repos/keys/FOLDER: permission denied"}
 EOF
-  assert_equal "$first_stderr" ""
-  refute_output
-  refute_stderr
+  diff /dev/null "$tree/err.first"
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
   run_shell "$name" "$image" > "$tree/receipt-after" <<< 'cat /state/backup/000000000001/receipt.json'
   diff "$tree/receipt-before" "$tree/receipt-after"
   jq -c '{status}' "$tree/receipt-after" > "$tree/receipt"
@@ -250,10 +250,10 @@ echo 'nixie.db of set 3' | RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fi
   restic backup -q --host nixie --tag set-3 --tag kind-scheduled --stdin --stdin-filename nixie.db
 EOF
 
-  run -0 --separate-stderr run_restore "$name" "$image" "$script" restore
+  run_restore "$name" "$image" "$script" restore > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
-  normalize_restic_output <<< "$output" > "$tree/out.normal"
+  diff /dev/null "$tree/err"
+  normalize_restic_output < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 restoring snapshot ID of [/keys.db] at NOW +0000 UTC by nixie@nixie to /tmp/nixie-backup
 Summary: Restored 1 files/dirs (SIZE) in T
@@ -289,9 +289,9 @@ for sequence in 2 10; do
 done
 EOF
 
-  run -0 --separate-stderr run_restore "$name" "$image" "$script" restore
+  run_restore "$name" "$image" "$script" restore > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
+  diff /dev/null "$tree/err"
   run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
   diff - "$tree/copy" << 'EOF'
 nixie.db of set 10
@@ -309,9 +309,9 @@ echo 'a note' | RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only \
   restic backup -q --host set-99 --stdin --stdin-filename set-99
 EOF
 
-  run -0 --separate-stderr run_restore "$name" "$image" "$script" restore
+  run_restore "$name" "$image" "$script" restore > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
+  diff /dev/null "$tree/err"
   run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
   diff - "$tree/copy" << 'EOF'
 nixie.db of set 1
@@ -340,10 +340,10 @@ echo 'keys.db of set 3' | keys backup -q --host nixie --tag set-3 --tag kind-sch
 keys forget -q --keep-last 1 --prune > /dev/null
 EOF
 
-  run -0 --separate-stderr run_restore "$name" "$image" "$script" -v "$tree/bin/restic:/usr/local/sbin/restic:ro" \
-    -v "$tree/race.sh:/opt/race/race.sh:ro" restore
+  run_restore "$name" "$image" "$script" -v "$tree/bin/restic:/usr/local/sbin/restic:ro" \
+    -v "$tree/race.sh:/opt/race/race.sh:ro" restore > "$tree/out" 2> "$tree/err"
 
-  assert_stderr - << 'EOF'
+  diff - "$tree/err" << 'EOF'
 Fatal: failed to find snapshot: snapshot filter (Paths:[] Tags:[[set-2, publish-2]] Hosts:[]): no snapshot found
 EOF
   run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
@@ -364,9 +364,9 @@ EOF
   read_repos "$name" "$image" "$tree"
   older="$(jq -r .dataSnapshotID "$tree/receipt-1")"
 
-  run -0 --separate-stderr run_restore "$name" "$image" "$script" -e "SNAPSHOT=$older" restore
+  run_restore "$name" "$image" "$script" -e "SNAPSHOT=$older" restore > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
+  diff /dev/null "$tree/err"
   run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
   diff - "$tree/copy" << 'EOF'
 nixie.db of set 1
@@ -386,9 +386,9 @@ EOF
   stage_sets "$name" "$image" 2:scheduled
   run_job "$name" "$image" > /dev/null
 
-  run -0 --separate-stderr run_restore "$name" "$image" "$script" -e "SNAPSHOT=$earlier" restore
+  run_restore "$name" "$image" "$script" -e "SNAPSHOT=$earlier" restore > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
+  diff /dev/null "$tree/err"
   run_shell "$name" "$image" > "$tree/copy" <<< 'cat /tmp/nixie-backup/nixie.db /tmp/nixie-backup/keys.db'
   diff - "$tree/copy" << 'EOF'
 nixie.db of set 5
@@ -398,6 +398,7 @@ EOF
 
 # set 2's data snapshot landed and its key snapshot did not, so set 2's records have no keys
 @test "it refuses a SNAPSHOT whose set is newer than the key repos" {
+  local status=0
   local newer
   setup_test "$name" "$image"
   stage_sets "$name" "$image" 1:scheduled
@@ -410,10 +411,11 @@ echo 'nixie.db of set 2' | RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fi
 EOF
   )"
 
-  run -1 --separate-stderr run_restore "$name" "$image" "$script" -e "SNAPSHOT=$newer" restore
+  run_restore "$name" "$image" "$script" -e "SNAPSHOT=$newer" restore > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  assert_stderr "the data snapshot $newer holds set-2, newer than the key repo's set-1,publish-1"
-  refute_output
+  diff - "$tree/err" <<< "the data snapshot $newer holds set-2, newer than the key repo's set-1,publish-1"
+  diff /dev/null "$tree/out"
   run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup'
   diff /dev/null "$tree/copy"
 }
@@ -421,6 +423,7 @@ EOF
 # a snapshot with no set tag, such as one tagged nixie that holds both databases, pairs with no
 # key snapshot
 @test "it refuses a SNAPSHOT that holds no backup set" {
+  local status=0
   local old
   setup_test "$name" "$image"
   stage_sets "$name" "$image" 1:scheduled
@@ -433,25 +436,28 @@ cd /tmp/old && RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only \
 EOF
   )"
 
-  run -1 --separate-stderr run_restore "$name" "$image" "$script" -e "SNAPSHOT=$old" restore
+  run_restore "$name" "$image" "$script" -e "SNAPSHOT=$old" restore > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  assert_stderr "the data snapshot $old holds no backup set"
-  refute_output
+  diff - "$tree/err" <<< "the data snapshot $old holds no backup set"
+  diff /dev/null "$tree/out"
   run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup'
   diff /dev/null "$tree/copy"
 }
 
 # a copy directory that holds files already would mix them into the restore
 @test "it refuses a restore into a copy directory that is not empty" {
+  local status=0
   setup_test "$name" "$image"
   stage_sets "$name" "$image" 1:scheduled
   run_job "$name" "$image" > /dev/null
   run_shell "$name" "$image" <<< "echo 'already here' > /tmp/nixie-backup/nixie.db"
 
-  run -1 --separate-stderr run_restore "$name" "$image" "$script" restore
+  run_restore "$name" "$image" "$script" restore > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  assert_stderr '/tmp/nixie-backup is not empty'
-  refute_output
+  diff - "$tree/err" <<< '/tmp/nixie-backup is not empty'
+  diff /dev/null "$tree/out"
   run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup; cat /tmp/nixie-backup/nixie.db'
   diff - "$tree/copy" << 'EOF'
 nixie.db
@@ -461,16 +467,18 @@ EOF
 
 # before the job's first set, the key repo holds no keys.db to pair with any nixie.db
 @test "it refuses a restore while the key repo holds no snapshot" {
+  local status=0
   setup_test "$name" "$image"
   run_shell "$name" "$image" << 'EOF'
 RESTIC_REPOSITORY=/repos/data RESTIC_PASSWORD=data-fixture-only restic init -q
 RESTIC_REPOSITORY=/repos/keys RESTIC_PASSWORD=key-fixture-only restic init -q
 EOF
 
-  run -1 --separate-stderr run_restore "$name" "$image" "$script" restore
+  run_restore "$name" "$image" "$script" restore > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 1
 
-  assert_stderr 'the key repo holds no snapshot of a backup set'
-  refute_output
+  diff - "$tree/err" <<< 'the key repo holds no snapshot of a backup set'
+  diff /dev/null "$tree/out"
   run_shell "$name" "$image" > "$tree/copy" <<< 'ls -A /tmp/nixie-backup'
   diff /dev/null "$tree/copy"
 }
@@ -481,10 +489,10 @@ EOF
   stage_sets "$name" "$image" 1:forget
   run_job "$name" "$image" > /dev/null
 
-  run -0 --separate-stderr run_restore "$name" "$image" "$script" ls
+  run_restore "$name" "$image" "$script" ls > "$tree/out" 2> "$tree/err"
 
-  refute_stderr
-  normalize_restic_output <<< "$output" > "$tree/out.normal"
+  diff /dev/null "$tree/err"
+  normalize_restic_output < "$tree/out" > "$tree/out.normal"
   diff - "$tree/out.normal" << 'EOF'
 data repo:
 ID        Time                 Host        Tags                         Paths      Size
@@ -504,10 +512,12 @@ EOF
 }
 
 @test "it rejects an unknown mode with its usage" {
+  local status=0
   setup_test "$name" "$image"
 
-  run -2 --separate-stderr run_restore "$name" "$image" "$script" backup
+  run_restore "$name" "$image" "$script" backup > "$tree/out" 2> "$tree/err" || status=$?
+  assert_equal "$status" 2
 
-  assert_stderr 'usage: nixie-restore restore|ls'
-  refute_output
+  diff - "$tree/err" <<< 'usage: nixie-restore restore|ls'
+  diff /dev/null "$tree/out"
 }
