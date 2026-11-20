@@ -62,7 +62,7 @@ nixie_ready='{"status":"ready","parts":{"store":{"isReady":true},"imp_host":{"is
 # the calls check-atc-secret-kinds.sh makes for impd 3.4.0's stored kinds and atc 2.26.2's accepted
 # kinds, and the line it prints, from the recordings setup_test serves for them
 kinds_calls='["gh","api","-H","Accept: application/vnd.github.raw","repos/zgeoff/impz/contents/packages/api/src/schemas/secret-schema.ts?ref=v3.4.0"]
-["gh","api","-H","Accept: application/vnd.github.raw","repos/zgeoff/atc/contents/packages/plugin-api/src/credential-broker.ts?ref=%40zgeoff/atc%402.26.2"]'
+["gh","api","-H","Accept: application/vnd.github.raw","repos/zgeoff/atc/contents/packages/plugin-api/src/credentials/credential-broker.ts?ref=%40zgeoff/atc%402.26.2"]'
 kinds_line='== impd 3.4.0 stores the secret kinds github, anthropic, npm, custom, oauth, which atc 2.26.2 accepts'
 # the image listing check-impd-image-dirs.sh runs after nixie reports ready
 images_call='["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz image ls --json"]'
