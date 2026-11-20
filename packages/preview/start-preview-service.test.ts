@@ -20,7 +20,7 @@ async function setupTest() {
 
   return {
     directory,
-    impd: await startPreviewImpd(),
+    impd: startPreviewImpd(),
     stubPath: join(import.meta.dir, 'src', 'test-utils', 'run-stub-counting-proxy.ts'),
   };
 }

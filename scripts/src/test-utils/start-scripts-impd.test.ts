@@ -2,16 +2,15 @@ import { expect, test } from 'bun:test';
 import { createImpClient } from '@impz/client';
 import { startScriptsImpd } from './start-scripts-impd.ts';
 
-async function setupTest() {
-  const impd = await startScriptsImpd();
-
+function setupTest() {
+  const impd = startScriptsImpd();
   const client = createImpClient({ url: impd.url, token: impd.token });
 
   return { impd, client };
 }
 
 test('it lists each call a test makes, with the name and ref of an add', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.client.images.list();
 
@@ -33,7 +32,8 @@ test('it lists each call a test makes, with the name and ref of an add', async (
 test.each(['first', 'second'])(
   'it starts the %s of two tests with no image, fault or call from the other',
   async () => {
-    const ctx = await setupTest();
+    const ctx = setupTest();
+
     const before = await ctx.client.images.list();
 
     await ctx.impd.seedImage('nixie-fetch');
@@ -46,7 +46,7 @@ test.each(['first', 'second'])(
 );
 
 test('it answers a fault the test sets', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   ctx.impd.fail('images/list', { code: 'FORBIDDEN', status: 403 });
 

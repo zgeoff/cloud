@@ -262,7 +262,8 @@ test('it posts failure and removes the imp when the run passes its time limit', 
 });
 
 test('it posts pending with the reason, starts no imp, and leaves the preview awake when a preview used within the idle time holds every slot', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17', image: 'pv-base', grants: ['gh'] });
@@ -306,7 +307,8 @@ test('it posts pending with the reason, starts no imp, and leaves the preview aw
 });
 
 test('it posts nothing new when a retry still finds every slot taken', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17', image: 'pv-base', grants: ['gh'] });
@@ -383,7 +385,8 @@ test('it puts a preview unused for the idle time to sleep, however busy its stac
 });
 
 test('it keeps the run waiting and starts no imp when impd refuses to sleep the idle preview', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17', image: 'pv-base', grants: ['gh'] });
@@ -474,7 +477,8 @@ test('it runs a waiting run once a slot is free', async () => {
 });
 
 test('it starts nothing for a run that already ended', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   ctx.store.claimContractRun({
@@ -506,7 +510,8 @@ test('it starts nothing for a run that already ended', async () => {
 });
 
 test('it removes an imp that a stopped service left behind and runs on a new one', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   await ctx.impd.seedImp({
@@ -535,7 +540,8 @@ test('it removes an imp that a stopped service left behind and runs on a new one
 });
 
 test('it posts an error status when impd refuses to start the imp', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   ctx.store.claimContractRun({
@@ -577,7 +583,8 @@ test('it posts an error status when impd refuses to start the imp', async () => 
 });
 
 test('it ends a queued run with an error and removes its imp once the contract settings are gone', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   await ctx.impd.seedImp({
@@ -662,7 +669,8 @@ test('it keeps the result settling when GitHub answers the final status with a s
 });
 
 test('it ends a settling run with the refusal and posts no status again when GitHub refuses the final status for good', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   ctx.store.claimContractRun({
@@ -721,7 +729,8 @@ test('it ends a settling run with the refusal and posts no status again when Git
 });
 
 test('it keeps the result settling and the status unset when impd fails to remove the imp', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   await ctx.impd.seedImp({
@@ -762,7 +771,8 @@ test('it keeps the result settling and the status unset when impd fails to remov
 });
 
 test('it settles a settling run on its next try: removes the imp, posts the stored result, and ends it', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   await ctx.impd.seedImp({

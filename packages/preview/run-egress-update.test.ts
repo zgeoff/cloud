@@ -23,8 +23,7 @@ async function setupTest() {
     store.close();
   });
 
-  const impd = await startPreviewImpd();
-
+  const impd = startPreviewImpd();
   const log = mock<(message: string) => void>();
   const sleeps: number[] = [];
 

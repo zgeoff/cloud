@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll } from 'bun:test';
 import { server } from './server.ts';
-import { stopScriptsImpd } from './start-scripts-impd.ts';
+import { startSharedScriptsImpd, stopScriptsImpd } from './start-scripts-impd.ts';
 
 // A script can turn a failed request into a result, so an unhandled request could still pass its
 // test. Each unhandled request is recorded, and the test that sent it fails.
@@ -30,7 +30,10 @@ afterEach(() => {
   }
 });
 
-// the impd that a test started stops with its file; a file that started none stops nothing
+// each file gets one impd that its tests share, started here so the start stays out of the first
+// test's time limit, and stopped with the file
+beforeAll(startSharedScriptsImpd);
+
 afterAll(async () => {
   await stopScriptsImpd();
 

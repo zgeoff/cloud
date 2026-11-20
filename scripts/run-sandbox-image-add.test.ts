@@ -6,15 +6,15 @@ import { server } from './src/test-utils/server.ts';
 import { startScriptsImpd } from './src/test-utils/start-scripts-impd.ts';
 import { startStubImpdImages } from './src/test-utils/start-stub-impd-images.ts';
 
-async function setupTest() {
+function setupTest() {
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
 
-  return { printOut, printErr, impd: await startScriptsImpd() };
+  return { printOut, printErr, impd: startScriptsImpd() };
 }
 
 test('it adds each manifest image that impd lacks, skips one it holds, and never prints the token', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   const impd = startStubImpdImages({
     url: 'https://impd.test',
@@ -85,7 +85,7 @@ test('it adds each manifest image that impd lacks, skips one it holds, and never
 });
 
 test('it exits 1 and names the image when impd refuses an add', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   ctx.impd.fail('images/add', {
     code: 'FORBIDDEN',
@@ -137,7 +137,7 @@ test('it exits 1 and names the image when impd refuses an add', async () => {
 });
 
 test('it exits 1 with no add when impd holds a manifest name at another digest', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.impd.seedImage('nixie-fetch-77aa88bb99cc');
 
@@ -179,7 +179,7 @@ test('it exits 1 with no add when impd holds a manifest name at another digest',
 });
 
 test('it exits 1 with no impd call when sops cannot read the token', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   // sops 3.x's answer to a file that no age identity it holds decrypts
   const runner = buildStubRunner((call) =>
@@ -207,7 +207,7 @@ test('it exits 1 with no impd call when sops cannot read the token', async () =>
 });
 
 test('it exits 1 with no add when impd refuses to list its images', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   // oRPC's answer to a procedure that threw an undefined error
   ctx.impd.fail('images/list', {
@@ -255,7 +255,7 @@ test('it exits 1 with no add when impd refuses to list its images', async () => 
 });
 
 test('it exits 1 with no impd call when nixie cannot print its sandbox manifest', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   const runner = buildStubRunner(
     (call) => (call.argv[0] === 'sops' ? { stdout: ctx.impd.token } : undefined),
@@ -284,7 +284,7 @@ test('it exits 1 with no impd call when nixie cannot print its sandbox manifest'
 });
 
 test("it exits 1 with no impd call when the manifest holds a ref outside nixie's registry path", async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   const runner = buildStubRunner(
     (call) => (call.argv[0] === 'sops' ? { stdout: ctx.impd.token } : undefined),
@@ -320,8 +320,7 @@ test("it exits 1 with no impd call when the manifest holds a ref outside nixie's
 });
 
 test('it exits 2 when the Job leaves out its environment', async () => {
-  const ctx = await setupTest();
-
+  const ctx = setupTest();
   const runner = buildStubRunner();
 
   const exitCode = await runSandboxImageAdd({

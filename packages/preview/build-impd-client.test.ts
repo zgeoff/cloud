@@ -3,16 +3,15 @@ import { buildImpdClient } from './build-impd-client.ts';
 import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 
-async function setupTest() {
-  const impd = await startPreviewImpd();
-
+function setupTest() {
+  const impd = startPreviewImpd();
   const client = buildImpdClient(impd.url, impd.token);
 
   return { impd, client };
 }
 
 test('#createImp creates an elastic imp outside every backup, with the memory and HTTP port it names', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.client.createImp({
     name: 'pv-0a1b2c3d-7',
@@ -44,7 +43,7 @@ test('#createImp creates an elastic imp outside every backup, with the memory an
 });
 
 test('#createImp creates the imp under the public egress policy, which keeps its guest off private addresses', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.client.createImp({
     name: 'pv-0a1b2c3d-7',
@@ -60,7 +59,7 @@ test('#createImp creates the imp under the public egress policy, which keeps its
 });
 
 test('#updatePublicEgress puts an existing imp under the public egress policy', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7', httpPort: 3000, state: 'sleeping' });
   await ctx.client.updatePublicEgress('pv-0a1b2c3d-7');
@@ -71,7 +70,7 @@ test('#updatePublicEgress puts an existing imp under the public egress policy', 
 });
 
 test('#readImp reads an imp with no proxied request, as an impd before 6.4.0 reports it, as last used at its last activity', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7' });
 
@@ -113,37 +112,37 @@ test('#readImp reads an imp as last used at its last proxied request, whatever i
 });
 
 test('#readImp returns null for an imp impd does not know', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
+
   const result = await ctx.client.readImp('pv-0a1b2c3d-7');
 
   expect(result).toBeNull();
 });
 
 test('#sleepImp rejects with impd error code for an imp impd does not know', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
-  expect(ctx.client.sleepImp('pv-0a1b2c3d-7')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  await expect(ctx.client.sleepImp('pv-0a1b2c3d-7')).rejects.toMatchObject({ code: 'NOT_FOUND' });
 });
 
 test('#sleepImp names impd and its error code in the message of a refusal', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
-  expect(ctx.client.sleepImp('pv-0a1b2c3d-7')).rejects.toThrowWithMessage(
+  await expect(ctx.client.sleepImp('pv-0a1b2c3d-7')).rejects.toThrowWithMessage(
     Error,
     'impd NOT_FOUND: imp pv-0a1b2c3d-7 not found',
   );
 });
 
 test('#readImps rejects with UNAUTHORIZED when impd refuses the token', async () => {
-  const ctx = await setupTest();
-
+  const ctx = setupTest();
   const client = buildImpdClient(ctx.impd.url, 'imp_wrong.token');
 
-  expect(client.readImps()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  await expect(client.readImps()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
 });
 
 test('#installGrant adds the secret to an imp that lacks it', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7' });
   await ctx.impd.seedSecret('gh');
@@ -155,7 +154,7 @@ test('#installGrant adds the secret to an imp that lacks it', async () => {
 });
 
 test('#installGrant leaves an imp that holds the secret without a second grant', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7', grants: ['gh'] });
   await ctx.client.installGrant('pv-0a1b2c3d-7', 'gh');
@@ -164,7 +163,7 @@ test('#installGrant leaves an imp that holds the secret without a second grant',
 });
 
 test('#removeGrantsExcept removes every grant of the imp outside the kept secrets', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.impd.seedImp({
     name: 'pv-0a1b2c3d-7',
@@ -179,7 +178,7 @@ test('#removeGrantsExcept removes every grant of the imp outside the kept secret
 });
 
 test('#removeGrantsExcept leaves an imp that holds only kept secrets without a removal', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7', grants: ['gh'] });
   await ctx.client.removeGrantsExcept('pv-0a1b2c3d-7', ['gh', 'model-sonnet-counted']);
@@ -188,7 +187,7 @@ test('#removeGrantsExcept leaves an imp that holds only kept secrets without a r
 });
 
 test('#installPathGrant narrows a grant the imp already holds to the paths it names', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7', grants: ['preview-model-counted'] });
 
@@ -200,7 +199,9 @@ test('#installPathGrant narrows a grant the imp already holds to the paths it na
 
   expect(grants).toStrictEqual(['preview-model-counted']);
 
-  expect(ctx.impd.readGrantPaths()).toStrictEqual(
+  const paths = await ctx.impd.readGrantPaths();
+
+  expect(paths).toStrictEqual(
     new Map([['pv-0a1b2c3d-7 preview-model-counted', ['/pv-0a1b2c3d-7/**']]]),
   );
 });
@@ -266,7 +267,7 @@ test('#runCommand returns the output of both streams in the order impd sent them
 });
 
 test('#runCommand starts no command once its signal has aborted', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7' });
 
@@ -278,9 +279,9 @@ test('#runCommand starts no command once its signal has aborted', async () => {
 });
 
 test('#runCommand rejects with impd error code for an imp impd does not know', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
-  expect(ctx.client.runCommand('pv-0a1b2c3d-7', ['true'])).rejects.toMatchObject({
+  await expect(ctx.client.runCommand('pv-0a1b2c3d-7', ['true'])).rejects.toMatchObject({
     code: 'NOT_FOUND',
   });
 });

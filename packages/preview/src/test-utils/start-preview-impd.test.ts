@@ -1,14 +1,14 @@
 import { expect, test } from 'bun:test';
 import { startPreviewImpd } from './start-preview-impd.ts';
 
-async function setupTest() {
-  const impd = await startPreviewImpd();
+function setupTest() {
+  const impd = startPreviewImpd();
 
   return { impd };
 }
 
 test('it leaves the seeds out of the calls and lists the calls a test makes, with each imp name', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7' });
   await ctx.impd.client.imps.sleep({ name: 'pv-0a1b2c3d-7' });
@@ -20,7 +20,8 @@ test('it leaves the seeds out of the calls and lists the calls a test makes, wit
 test.each(['first', 'second'])(
   'it starts the %s of two tests with no imp, secret or call from the other',
   async () => {
-    const ctx = await setupTest();
+    const ctx = setupTest();
+
     const before = await ctx.impd.client.imps.list({});
     const secretsBefore = await ctx.impd.client.secrets.list({});
 
@@ -33,7 +34,7 @@ test.each(['first', 'second'])(
 );
 
 test('it leaves a call with the wrong token out of the calls', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   const response = await fetch(`${ctx.impd.url}/rpc/imps/list`, {
     method: 'POST',
@@ -46,7 +47,7 @@ test('it leaves a call with the wrong token out of the calls', async () => {
 });
 
 test('it reads the egress mode of each imp, open for one created with no policy', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7' });
 
@@ -68,7 +69,7 @@ test('it reads the egress mode of each imp, open for one created with no policy'
 });
 
 test('it grants each seeded secret to its imp, and reads the paths of a filtered grant', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-7', grants: ['gh', 'model'] });
 
@@ -82,7 +83,7 @@ test('it grants each seeded secret to its imp, and reads the paths of a filtered
 
   expect(grants).toStrictEqual(['gh', 'model']);
 
-  expect(ctx.impd.readGrantPaths()).toStrictEqual(
-    new Map([['pv-0a1b2c3d-7 model', ['/pv-0a1b2c3d-7/**']]]),
-  );
+  const paths = await ctx.impd.readGrantPaths();
+
+  expect(paths).toStrictEqual(new Map([['pv-0a1b2c3d-7 model', ['/pv-0a1b2c3d-7/**']]]));
 });

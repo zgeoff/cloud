@@ -38,9 +38,8 @@ export interface PreviewImpd {
   // its default, open
   readonly readEgressModes: () => Promise<Map<string, string>>;
 
-  // the path filter that the last grant call of each filtered grant sent, as `<imp> <secret>`:
-  // impd's answer to a grants.list names the secrets and no filter
-  readonly readGrantPaths: () => Map<string, readonly string[]>;
+  // the path filter that impd stores for each filtered grant, by `<imp> <secret>`
+  readonly readGrantPaths: () => Promise<Map<string, readonly string[]>>;
 }
 
 interface SharedImpd {
@@ -51,17 +50,24 @@ interface SharedImpd {
   readonly token: string;
 }
 
-// the impd of this test file: the first test starts it and the preload stops it once the file ends,
-// so each file pays for one start; each test's cleanup empties it
-const shared: { impd: Promise<SharedImpd> | undefined } = { impd: undefined };
+// the impd of this test file: the preload's beforeAll starts it and its afterAll stops it, so each
+// file pays for one start outside its tests; each test's cleanup empties it
+const shared: { impd: SharedImpd | undefined } = { impd: undefined };
 
-// the preload imports this file, so the package loads on the first call, and no other file pays
-export async function startPreviewImpd(): Promise<PreviewImpd> {
+// the preload starts the impd before each file's tests; the preload imports this file, so the
+// package loads there
+export async function startSharedPreviewImpd(): Promise<void> {
   const testing = await import('@impz/testing');
 
-  shared.impd ??= startSharedImpd(testing.startTestImpd);
+  shared.impd = await startSharedImpd(testing.startTestImpd);
+}
 
-  const sharedImpd = await shared.impd;
+export function startPreviewImpd(): PreviewImpd {
+  const sharedImpd = shared.impd;
+
+  if (sharedImpd === undefined) {
+    throw new Error('the preload has not started the impd');
+  }
 
   const impd = sharedImpd.impd;
   const token = sharedImpd.token;
@@ -137,18 +143,18 @@ export async function startPreviewImpd(): Promise<PreviewImpd> {
 
       return new Map(modes);
     },
-    readGrantPaths: () => {
+    readGrantPaths: async () => {
       const paths = new Map<string, readonly string[]>();
 
-      for (const call of impd.calls.slice(first)) {
-        if (call.authorization !== `Bearer ${token}`) {
-          continue;
-        }
+      const imps = await impd.client.imps.list({});
 
-        const filter = readGrantFilter(call.procedure, call.input);
+      for (const imp of imps) {
+        const grants = await impd.client.grants.details({ name: imp.name });
 
-        if (filter !== undefined) {
-          paths.set(filter.key, filter.paths);
+        for (const grant of grants) {
+          if (grant.filter?.paths !== undefined) {
+            paths.set(`${imp.name} ${grant.secret}`, grant.filter.paths);
+          }
         }
       }
 
@@ -157,15 +163,13 @@ export async function startPreviewImpd(): Promise<PreviewImpd> {
   };
 }
 
-// stops the impd of the file that has just ended; the next file's first test starts another
+// stops the impd of the file that has just ended; the preload starts another before the next file
 export async function stopPreviewImpd(): Promise<void> {
   const started = shared.impd;
 
   shared.impd = undefined;
 
-  const sharedImpd = await started;
-
-  await sharedImpd?.impd.stop();
+  await started?.impd.stop();
 }
 
 const images = ['base', 'pv-base'];
@@ -209,25 +213,4 @@ async function addSecret(impd: TestImpd, name: string): Promise<void> {
     replace: true,
     rules: [{ host: `${name}.example.test`, header: 'authorization', scheme: 'bearer' }],
   });
-}
-
-const grantFilterSchema = z.object({ paths: z.array(z.string()).optional() });
-
-const grantInputSchema = z.object({
-  name: z.string(),
-  secret: z.string(),
-  filter: grantFilterSchema.optional(),
-});
-
-function readGrantFilter(
-  procedure: string,
-  input: unknown,
-): { readonly key: string; readonly paths: readonly string[] } | undefined {
-  const parsed = grantInputSchema.safeParse(input);
-
-  if (procedure !== 'grants/add' || !parsed.success || parsed.data.filter?.paths === undefined) {
-    return undefined;
-  }
-
-  return { key: `${parsed.data.name} ${parsed.data.secret}`, paths: parsed.data.filter.paths };
 }

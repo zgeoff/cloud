@@ -201,7 +201,8 @@ test("it starts the stack with compose.yaml and compose.broker.yaml, with the br
 });
 
 test('it grants the model secret beside the GitHub secret, so the stack reaches the broker', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   await impd.seedSecret('gh');
@@ -861,7 +862,8 @@ test('it rebuilds an existing imp in place and takes the port of the new commit'
 });
 
 test('it puts a sleeping existing imp under the public egress policy before it wakes the imp', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   composeFiles.set(
@@ -965,7 +967,8 @@ test('it adds the grant to an existing imp that lacks it, even after an earlier 
 });
 
 test('it leaves a preview ended when its pull request closed during the boot', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
@@ -993,7 +996,8 @@ test('it leaves a preview ended when its pull request closed during the boot', a
 });
 
 test('it removes the imp it started when the pull request closed before the imp existed', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   await impd.seedSecret('gh');
@@ -1022,10 +1026,12 @@ test('it removes the imp it started when the pull request closed before the imp 
   const heldImps = await ctx.impd.client.imps.list({});
 
   expect(heldImps).toStrictEqual([]);
+  expect(ctx.impd.calls.filter((call) => call.startsWith('exec/'))).toStrictEqual([]);
 });
 
 test('it fails the boot when the head commit has no preview/compose.yaml', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   ctx.store.upsertHead({

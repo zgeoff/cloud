@@ -24,17 +24,24 @@ interface SharedImpd {
   readonly token: string;
 }
 
-// the impd of this test file: the first test starts it and the preload stops it once the file ends,
-// so each file pays for one start; each test's cleanup empties it
-const shared: { impd: Promise<SharedImpd> | undefined } = { impd: undefined };
+// the impd of this test file: the preload's beforeAll starts it and its afterAll stops it, so each
+// file pays for one start outside its tests; each test's cleanup empties it
+const shared: { impd: SharedImpd | undefined } = { impd: undefined };
 
-// the preload imports this file, so the package loads on the first call, and no other file pays
-export async function startScriptsImpd(): Promise<ScriptsImpd> {
+// the preload starts the impd before each file's tests; the preload imports this file, so the
+// package loads there
+export async function startSharedScriptsImpd(): Promise<void> {
   const testing = await import('@impz/testing');
 
-  shared.impd ??= startSharedImpd(testing.startTestImpd);
+  shared.impd = await startSharedImpd(testing.startTestImpd);
+}
 
-  const sharedImpd = await shared.impd;
+export function startScriptsImpd(): ScriptsImpd {
+  const sharedImpd = shared.impd;
+
+  if (sharedImpd === undefined) {
+    throw new Error('the preload has not started the impd');
+  }
 
   const impd = sharedImpd.impd;
   const token = sharedImpd.token;
@@ -66,15 +73,13 @@ export async function startScriptsImpd(): Promise<ScriptsImpd> {
   };
 }
 
-// stops the impd of the file that has just ended; the next file's first test starts another
+// stops the impd of the file that has just ended; the preload starts another before the next file
 export async function stopScriptsImpd(): Promise<void> {
   const started = shared.impd;
 
   shared.impd = undefined;
 
-  const sharedImpd = await started;
-
-  await sharedImpd?.impd.stop();
+  await started?.impd.stop();
 }
 
 async function startSharedImpd(startTestImpd: typeof StartTestImpd): Promise<SharedImpd> {

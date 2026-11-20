@@ -67,7 +67,8 @@ async function setupTest<Impd extends { readonly url: string; readonly token: st
 }
 
 test('it sleeps the preview unused for the idle timeout and keeps the one in use', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17', grants: ['gh'] });
@@ -158,7 +159,8 @@ test('it keeps a preview awake after a request through the proxy resets its idle
 });
 
 test('it waits for a running boot to settle before it sleeps an idle preview', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17', grants: ['gh'] });
@@ -188,7 +190,8 @@ test('it waits for a running boot to settle before it sleeps an idle preview', a
 });
 
 test('it sleeps the other idle previews when impd refuses one', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17', grants: ['gh'] });
@@ -218,7 +221,8 @@ test('it sleeps the other idle previews when impd refuses one', async () => {
 });
 
 test('it logs a failed sweep instead of throwing', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   const deps = {

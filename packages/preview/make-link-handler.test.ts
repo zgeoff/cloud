@@ -72,7 +72,8 @@ async function setupTest<Impd extends { readonly url: string; readonly token: st
 }
 
 test('it sleeps the running preview when a second one opens with one slot', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   ctx.store.upsertHead({
@@ -111,7 +112,8 @@ test('it sleeps the running preview when a second one opens with one slot', asyn
 });
 
 test('it runs one preview when two first opens with one slot arrive at once', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   await ctx.impd.seedSecret('gh');
@@ -250,7 +252,8 @@ test('it answers a first open with the booting page and boots the head commit', 
 });
 
 test('it answers a ready preview with a waiting page while another preview boots', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   ctx.store.upsertHead({
@@ -483,7 +486,8 @@ test('it rebuilds a ready preview once a push moved its head', async () => {
 });
 
 test('it says the preview ended once its pull request closed', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   ctx.store.upsertHead({
@@ -503,7 +507,8 @@ test('it says the preview ended once its pull request closed', async () => {
 });
 
 test('it shows a failed boot with a retry link and boots nothing', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   ctx.store.upsertHead({
@@ -600,7 +605,8 @@ test('it shows the failure page and boots nothing more when the booting page rel
 });
 
 test('it answers 404 for a pull request the service has not seen', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
   const response = await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/99'));
   const text = await response.text();
@@ -610,7 +616,8 @@ test('it answers 404 for a pull request the service has not seen', async () => {
 });
 
 test('it answers 404 for a path that names no pull request', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
   const response = await ctx.handler(new Request('http://geoffcloud:8417/acme'));
 

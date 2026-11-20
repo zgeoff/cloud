@@ -137,7 +137,8 @@ test("it resolves unhealthy with the proxy's last answer when the app listens on
 });
 
 test("it resolves unhealthy with the error when the imp's name never answers", async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   server.use(
@@ -158,7 +159,8 @@ test("it resolves unhealthy with the error when the imp's name never answers", a
 });
 
 test('it counts a redirect from the health path as healthy, as curl --fail did', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   server.use(
@@ -181,7 +183,8 @@ test('it counts a redirect from the health path as healthy, as curl --fail did',
 });
 
 test('it keeps the status and the text of a plain answer that is not healthy', async () => {
-  const impd = await startPreviewImpd();
+  const impd = startPreviewImpd();
+
   const ctx = await setupTest(impd);
 
   server.use(
