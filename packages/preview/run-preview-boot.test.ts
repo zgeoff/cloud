@@ -201,7 +201,11 @@ test("it starts the stack with compose.yaml and compose.broker.yaml, with the br
 });
 
 test('it grants the model secret beside the GitHub secret, so the stack reaches the broker', async () => {
-  const ctx = await setupTest(startStubImpd());
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
+
+  await impd.seedSecret('gh');
+  await impd.seedSecret('preview-model');
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
 
@@ -227,7 +231,9 @@ test('it grants the model secret beside the GitHub secret, so the stack reaches 
     },
   );
 
-  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['gh', 'preview-model']);
+  const grants = await ctx.impd.client.grants.list({ name: 'pv-0a1b2c3d-17' });
+
+  expect(grants).toStrictEqual(['gh', 'preview-model']);
 });
 
 test('it grants the model secret for the preview own route only, and passes the route to the stack, when the previews have counting proxies', async () => {
@@ -855,7 +861,8 @@ test('it rebuilds an existing imp in place and takes the port of the new commit'
 });
 
 test('it puts a sleeping existing imp under the public egress policy before it wakes the imp', async () => {
-  const ctx = await setupTest(startStubImpd());
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   composeFiles.set(
     'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -871,16 +878,10 @@ test('it puts a sleeping existing imp under the public egress policy before it w
 
   ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
 
-  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+  await ctx.impd.seedImp({
     name: 'pv-0a1b2c3d-17',
     state: 'sleeping',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
     httpPort: 3000,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
     grants: ['gh'],
   });
 
@@ -902,7 +903,9 @@ test('it puts a sleeping existing imp under the public egress policy before it w
     'imps/wake pv-0a1b2c3d-17',
   ]);
 
-  expect(ctx.impd.egressModes).toStrictEqual(new Map([['pv-0a1b2c3d-17', 'public']]));
+  const modes = await ctx.impd.readEgressModes();
+
+  expect(modes).toStrictEqual(new Map([['pv-0a1b2c3d-17', 'public']]));
 });
 
 test('it adds the grant to an existing imp that lacks it, even after an earlier build', async () => {

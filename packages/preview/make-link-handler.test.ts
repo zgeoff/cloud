@@ -72,7 +72,8 @@ async function setupTest<Impd extends { readonly url: string; readonly token: st
 }
 
 test('it sleeps the running preview when a second one opens with one slot', async () => {
-  const ctx = await setupTest(startStubImpd());
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -88,18 +89,7 @@ test('it sleeps the running preview when a second one opens with one slot', asyn
     builtSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  ctx.impd.imps.set('pv-0a1b2c3d-17', {
-    name: 'pv-0a1b2c3d-17',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:55:00.000Z',
-    lastRequestAt: '2026-10-15T08:55:00.000Z',
-    httpPort: 8080,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: ['gh'],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17', grants: ['gh'] });
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -113,12 +103,18 @@ test('it sleeps the running preview when a second one opens with one slot', asyn
   await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/18'));
   await Promise.all(ctx.pendingBoots);
 
-  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('sleeping');
-  expect(ctx.impd.imps.get('pv-0a1b2c3d-18')?.state).toBe('running');
+  const slept = await ctx.impd.client.imps.get({ name: 'pv-0a1b2c3d-17' });
+  const opened = await ctx.impd.client.imps.get({ name: 'pv-0a1b2c3d-18' });
+
+  expect(slept.state).toBe('sleeping');
+  expect(opened.state).toBe('running');
 });
 
 test('it runs one preview when two first opens with one slot arrive at once', async () => {
-  const ctx = await setupTest(startStubImpd());
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
+
+  await ctx.impd.seedSecret('gh');
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -144,7 +140,9 @@ test('it runs one preview when two first opens with one slot arrive at once', as
 
   await Promise.all(ctx.pendingBoots);
 
-  const running = [...ctx.impd.imps.values()].filter((imp) => imp.state === 'running');
+  const imps = await ctx.impd.client.imps.list({});
+
+  const running = imps.filter((imp) => imp.state === 'running');
 
   expect(running).toBeArrayOfSize(1);
 });
