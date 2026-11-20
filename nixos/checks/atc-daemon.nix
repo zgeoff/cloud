@@ -482,7 +482,7 @@ let
         '';
     }
     {
-      title = "it links geoffcloud a config.json whose target names the agent image and its atc, boots each imp elastic at 1024 MiB up to 2048 MiB, and rebinds a session whose profiles changed, whose claude and boxxy sign in through the broker profiles, whose pepys-telemetry profile alone turns on telemetry and sets no variable, whose entries set no OpenTelemetry variable, whose boxxy loads the hook plug-in, the boxxy profile and the codex sign-in and commits as the owner, whose codex signs in through the ChatGPT subscription and selects the pepys-telemetry profile, whose boxxy-review loads the plug-in and takes the read-only clone token as its one GitHub profile, whose boxxy service client may use the target, and which gets the pr-evidence file host address and the token path with no op:// prefix";
+      title = "it links geoffcloud a config.json whose target names the agent image and its atc, boots each imp elastic at 1024 MiB up to 2048 MiB, and rebinds a session whose profiles changed, whose claude and boxxy sign in through the broker profiles, whose pepys-telemetry profile alone turns on telemetry and sets no variable, whose entries set no OpenTelemetry variable, whose boxxy loads the hook plug-in, the boxxy profile and the codex sign-in and commits as the owner, whose codex signs in through the ChatGPT subscription and selects the pepys-telemetry profile, whose boxxy-review loads the plug-in and takes the read-only clone token as its one GitHub profile, whose boxxy service client may use the target, and which gets the verify upload address and the op:// reference of the upload token";
       script = ''
         jq -S . > expected <<'EOF'
         {
@@ -498,8 +498,8 @@ let
                 "GIT_AUTHOR_NAME": "zgeoff",
                 "GIT_COMMITTER_EMAIL": "3013783+zgeoff@users.noreply.github.com",
                 "GIT_COMMITTER_NAME": "zgeoff",
-                "PR_EVIDENCE_TOKEN_PATH": "imp/files-upload-token/credential",
-                "PR_EVIDENCE_URL": "https://files.geoff.cloud/api/files"
+                "VERIFY_UPLOAD_TOKEN_REF": "op://imp/files-upload-token/credential",
+                "VERIFY_UPLOAD_URL": "https://files.geoff.cloud/api/files"
               },
               "kind": "claude"
             },
@@ -514,8 +514,8 @@ let
                 "profiles": ["claude", "github", "linear", "op-connect", "pepys-telemetry"]
               },
               "env": {
-                "PR_EVIDENCE_TOKEN_PATH": "imp/files-upload-token/credential",
-                "PR_EVIDENCE_URL": "https://files.geoff.cloud/api/files"
+                "VERIFY_UPLOAD_TOKEN_REF": "op://imp/files-upload-token/credential",
+                "VERIFY_UPLOAD_URL": "https://files.geoff.cloud/api/files"
               }
             },
             "codex": { "auth": { "profiles": ["codex", "github", "pepys-telemetry"] } }
