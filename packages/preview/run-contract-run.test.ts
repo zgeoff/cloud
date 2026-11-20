@@ -12,11 +12,14 @@ import { runContractRun } from './run-contract-run.ts';
 import { commitStatuses } from './src/test-utils/constants.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
 import { server } from './src/test-utils/server.ts';
+import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
 import type { PreviewDeps } from './types.ts';
 
-async function setupTest() {
+async function setupTest<Impd extends { readonly url: string; readonly token: string }>(
+  impd: Impd,
+) {
   const directory = await mkdtemp(join(tmpdir(), 'preview-contract-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
@@ -27,8 +30,6 @@ async function setupTest() {
     store.close();
   });
 
-  const impd = startStubImpd();
-
   const deps: PreviewDeps = {
     settings: {
       baseURL: 'http://geoffcloud:8417',
@@ -37,7 +38,7 @@ async function setupTest() {
       // one slot, which a running preview or another run takes
       slots: 1,
       idleMs: 1_800_000,
-      impDomain: impd.impDomain,
+      impDomain: 'imps.example.test',
       impImage: 'pv-base',
       impMemoryMib: 1024,
       impMaxMemoryMib: 2048,
@@ -72,7 +73,7 @@ async function setupTest() {
 }
 
 test('it runs the suite in a new imp with the model grant, posts success, and removes the imp', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.store.claimContractRun({
     repo: 'acme/greenhouse',
@@ -123,7 +124,7 @@ test('it runs the suite in a new imp with the model grant, posts success, and re
 });
 
 test('it runs the suite in an elastic imp of the memory the settings name', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.store.claimContractRun({
     repo: 'acme/greenhouse',
@@ -151,7 +152,7 @@ test('it runs the suite in an elastic imp of the memory the settings name', asyn
 });
 
 test("it runs the suite at the head commit under the guest's time limit, with the broker and the model placeholder", async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.store.claimContractRun({
     repo: 'acme/greenhouse',
@@ -187,7 +188,7 @@ test("it runs the suite at the head commit under the guest's time limit, with th
 });
 
 test('it posts failure with the counts when a probe fails, and removes the imp', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.store.claimContractRun({
     repo: 'acme/greenhouse',
@@ -215,7 +216,7 @@ test('it posts failure with the counts when a probe fails, and removes the imp',
 });
 
 test('it posts failure and removes the imp when the run passes its time limit', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.store.claimContractRun({
     repo: 'acme/greenhouse',
@@ -261,20 +262,10 @@ test('it posts failure and removes the imp when the run passes its time limit', 
 });
 
 test('it posts pending with the reason, starts no imp, and leaves the preview awake when a preview used within the idle time holds every slot', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
-  ctx.impd.imps.set('pv-0a1b2c3d-17', {
-    name: 'pv-0a1b2c3d-17',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:59:00.000Z',
-    lastRequestAt: '2026-10-15T08:59:00.000Z',
-    httpPort: 8080,
-    image: 'pv-base',
-    memoryMib: 4096,
-    backup: false,
-    grants: ['gh'],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17', image: 'pv-base', grants: ['gh'] });
 
   ctx.store.claimContractRun({
     repo: 'acme/greenhouse',
@@ -284,7 +275,7 @@ test('it posts pending with the reason, starts no imp, and leaves the preview aw
   });
 
   await runContractRun(
-    { ...ctx.deps, now: () => new Date('2026-10-15T09:00:00Z') },
+    { ...ctx.deps, now: () => new Date() },
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
   );
 
@@ -298,8 +289,13 @@ test('it posts pending with the reason, starts no imp, and leaves the preview aw
     },
   ]);
 
-  expect([...ctx.impd.imps.keys()]).toStrictEqual(['pv-0a1b2c3d-17']);
-  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
+  const heldImps = await ctx.impd.client.imps.list({});
+
+  expect(heldImps.map((imp) => imp.name)).toStrictEqual(['pv-0a1b2c3d-17']);
+
+  const heldImp = await ctx.impd.client.imps.get({ name: 'pv-0a1b2c3d-17' });
+
+  expect(heldImp.state).toBe('running');
 
   expect(
     ctx.store.findContractRun({
@@ -310,20 +306,10 @@ test('it posts pending with the reason, starts no imp, and leaves the preview aw
 });
 
 test('it posts nothing new when a retry still finds every slot taken', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
-  ctx.impd.imps.set('pv-0a1b2c3d-17', {
-    name: 'pv-0a1b2c3d-17',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:59:00.000Z',
-    lastRequestAt: '2026-10-15T08:59:00.000Z',
-    httpPort: 8080,
-    image: 'pv-base',
-    memoryMib: 4096,
-    backup: false,
-    grants: ['gh'],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17', image: 'pv-base', grants: ['gh'] });
 
   ctx.store.claimContractRun({
     repo: 'acme/greenhouse',
@@ -339,7 +325,7 @@ test('it posts nothing new when a retry still finds every slot taken', async () 
   );
 
   await runContractRun(
-    { ...ctx.deps, now: () => new Date('2026-10-15T09:00:00Z') },
+    { ...ctx.deps, now: () => new Date() },
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
   );
 
@@ -347,7 +333,7 @@ test('it posts nothing new when a retry still finds every slot taken', async () 
 });
 
 test('it puts a preview unused for the idle time to sleep, however busy its stack, and runs a waiting run in its slot', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
@@ -397,20 +383,10 @@ test('it puts a preview unused for the idle time to sleep, however busy its stac
 });
 
 test('it keeps the run waiting and starts no imp when impd refuses to sleep the idle preview', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
-  ctx.impd.imps.set('pv-0a1b2c3d-17', {
-    name: 'pv-0a1b2c3d-17',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'pv-base',
-    memoryMib: 4096,
-    backup: false,
-    grants: ['gh'],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17', image: 'pv-base', grants: ['gh'] });
 
   ctx.store.claimContractRun({
     repo: 'acme/greenhouse',
@@ -419,31 +395,26 @@ test('it keeps the run waiting and starts no imp when impd refuses to sleep the 
     imp: 'pv-sdk-0123456789abcdef',
   });
 
-  server.use(
-    http.post(`${ctx.impd.url}/rpc/imps/sleep`, () =>
-      HttpResponse.json(
-        {
-          json: {
-            defined: true,
-            code: 'CONFLICT',
-            status: 409,
-            message: 'pv-0a1b2c3d-17 holds a lease',
-          },
-        },
-        { status: 409 },
-      ),
-    ),
-  );
+  ctx.impd.fail('imps/sleep', {
+    code: 'CONFLICT',
+    status: 409,
+    message: 'pv-0a1b2c3d-17 holds a lease',
+  });
 
   const log = mock<(line: string) => void>();
 
   await runContractRun(
-    { ...ctx.deps, now: () => new Date('2026-10-15T09:00:00Z'), log },
+    { ...ctx.deps, now: () => new Date(Date.now() + 3_600_000), log },
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
   );
 
-  expect([...ctx.impd.imps.keys()]).toStrictEqual(['pv-0a1b2c3d-17']);
-  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
+  const heldImps = await ctx.impd.client.imps.list({});
+
+  expect(heldImps.map((imp) => imp.name)).toStrictEqual(['pv-0a1b2c3d-17']);
+
+  const heldImp = await ctx.impd.client.imps.get({ name: 'pv-0a1b2c3d-17' });
+
+  expect(heldImp.state).toBe('running');
 
   expect(commitStatuses.map((status) => status.description)).toStrictEqual([
     'Waiting for a free preview slot',
@@ -464,7 +435,7 @@ test('it keeps the run waiting and starts no imp when impd refuses to sleep the 
 });
 
 test('it runs a waiting run once a slot is free', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
@@ -503,7 +474,8 @@ test('it runs a waiting run once a slot is free', async () => {
 });
 
 test('it starts nothing for a run that already ended', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   ctx.store.claimContractRun({
     repo: 'acme/greenhouse',
@@ -534,18 +506,12 @@ test('it starts nothing for a run that already ended', async () => {
 });
 
 test('it removes an imp that a stopped service left behind and runs on a new one', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
-  ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
+  await ctx.impd.seedImp({
     name: 'pv-sdk-0123456789abcdef',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
     image: 'pv-base',
-    memoryMib: 4096,
-    backup: false,
     grants: ['model-haiku', 'gh'],
   });
 
@@ -569,7 +535,8 @@ test('it removes an imp that a stopped service left behind and runs on a new one
 });
 
 test('it posts an error status when impd refuses to start the imp', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   ctx.store.claimContractRun({
     repo: 'acme/greenhouse',
@@ -578,22 +545,12 @@ test('it posts an error status when impd refuses to start the imp', async () => 
     imp: 'pv-sdk-0123456789abcdef',
   });
 
-  // impd's oRPC error body for a create that its memory budget refuses
-  server.use(
-    http.post(`${ctx.impd.url}/rpc/imps/create`, () =>
-      HttpResponse.json(
-        {
-          json: {
-            defined: true,
-            code: 'INSUFFICIENT_MEMORY',
-            status: 507,
-            message: 'the memory budget is spent',
-          },
-        },
-        { status: 507 },
-      ),
-    ),
-  );
+  // impd's answer to a create that its memory budget refuses
+  ctx.impd.fail('imps/create', {
+    code: 'INSUFFICIENT_MEMORY',
+    status: 507,
+    message: 'the memory budget is spent',
+  });
 
   await runContractRun(ctx.deps, {
     repo: 'acme/greenhouse',
@@ -620,18 +577,12 @@ test('it posts an error status when impd refuses to start the imp', async () => 
 });
 
 test('it ends a queued run with an error and removes its imp once the contract settings are gone', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
-  ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
+  await ctx.impd.seedImp({
     name: 'pv-sdk-0123456789abcdef',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
     image: 'pv-base',
-    memoryMib: 4096,
-    backup: false,
     grants: ['model-haiku', 'gh'],
   });
 
@@ -647,8 +598,10 @@ test('it ends a queued run with an error and removes its imp once the contract s
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
   );
 
-  expect(ctx.impd.imps.has('pv-sdk-0123456789abcdef')).toBeFalse();
-  expect(ctx.impd.commands).toStrictEqual([]);
+  const heldImps = await ctx.impd.client.imps.list({});
+
+  expect(heldImps).toStrictEqual([]);
+  expect(ctx.impd.calls.filter((call) => call.startsWith('exec/'))).toStrictEqual([]);
 
   expect(commitStatuses).toStrictEqual([
     {
@@ -669,7 +622,7 @@ test('it ends a queued run with an error and removes its imp once the contract s
 });
 
 test('it keeps the result settling when GitHub answers the final status with a server error', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.store.claimContractRun({
     repo: 'acme/greenhouse',
@@ -709,7 +662,8 @@ test('it keeps the result settling when GitHub answers the final status with a s
 });
 
 test('it ends a settling run with the refusal and posts no status again when GitHub refuses the final status for good', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   ctx.store.claimContractRun({
     repo: 'acme/greenhouse',
@@ -767,18 +721,12 @@ test('it ends a settling run with the refusal and posts no status again when Git
 });
 
 test('it keeps the result settling and the status unset when impd fails to remove the imp', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
-  ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
+  await ctx.impd.seedImp({
     name: 'pv-sdk-0123456789abcdef',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
     image: 'pv-base',
-    memoryMib: 4096,
-    backup: false,
     grants: ['model-haiku', 'gh'],
   });
 
@@ -800,7 +748,9 @@ test('it keeps the result settling and the status unset when impd fails to remov
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
   );
 
-  expect(ctx.impd.imps.has('pv-sdk-0123456789abcdef')).toBeTrue();
+  const heldImps = await ctx.impd.client.imps.list({});
+
+  expect(heldImps.map((imp) => imp.name)).toStrictEqual(['pv-sdk-0123456789abcdef']);
   expect(commitStatuses).toStrictEqual([]);
 
   expect(
@@ -812,18 +762,12 @@ test('it keeps the result settling and the status unset when impd fails to remov
 });
 
 test('it settles a settling run on its next try: removes the imp, posts the stored result, and ends it', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
-  ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
+  await ctx.impd.seedImp({
     name: 'pv-sdk-0123456789abcdef',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
     image: 'pv-base',
-    memoryMib: 4096,
-    backup: false,
     grants: ['model-haiku', 'gh'],
   });
 
@@ -845,8 +789,10 @@ test('it settles a settling run on its next try: removes the imp, posts the stor
     headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  expect(ctx.impd.imps.has('pv-sdk-0123456789abcdef')).toBeFalse();
-  expect(ctx.impd.commands).toStrictEqual([]);
+  const heldImps = await ctx.impd.client.imps.list({});
+
+  expect(heldImps).toStrictEqual([]);
+  expect(ctx.impd.calls.filter((call) => call.startsWith('exec/'))).toStrictEqual([]);
 
   expect(commitStatuses).toStrictEqual([
     {

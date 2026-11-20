@@ -9,11 +9,14 @@ import { makeLinkHandler } from './make-link-handler.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { composeFiles } from './src/test-utils/constants.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
+import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
 import type { PreviewDeps } from './types.ts';
 
-async function setupTest() {
+async function setupTest<Impd extends { readonly url: string; readonly token: string }>(
+  impd: Impd,
+) {
   const directory = await mkdtemp(join(tmpdir(), 'preview-link-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
@@ -23,8 +26,6 @@ async function setupTest() {
   onTestFinished(() => {
     store.close();
   });
-
-  const impd = startStubImpd();
 
   const pendingBoots = new Set<Promise<void>>();
 
@@ -71,7 +72,7 @@ async function setupTest() {
 }
 
 test('it sleeps the running preview when a second one opens with one slot', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -117,7 +118,7 @@ test('it sleeps the running preview when a second one opens with one slot', asyn
 });
 
 test('it runs one preview when two first opens with one slot arrive at once', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -149,7 +150,7 @@ test('it runs one preview when two first opens with one slot arrive at once', as
 });
 
 test('it keeps both previews running when two slots fit them', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
@@ -214,7 +215,7 @@ test('it keeps both previews running when two slots fit them', async () => {
 });
 
 test('it answers a first open with the booting page and boots the head commit', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -251,7 +252,8 @@ test('it answers a first open with the booting page and boots the head commit', 
 });
 
 test('it answers a ready preview with a waiting page while another preview boots', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -267,18 +269,7 @@ test('it answers a ready preview with a waiting page while another preview boots
     builtSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  ctx.impd.imps.set('pv-0a1b2c3d-17', {
-    name: 'pv-0a1b2c3d-17',
-    state: 'sleeping',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: ['gh'],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17', state: 'sleeping', grants: ['gh'] });
 
   const otherBoot = Promise.withResolvers<void>();
 
@@ -293,11 +284,14 @@ test('it answers a ready preview with a waiting page while another preview boots
 
   expect(response.status).toBe(202);
   expect(text).toInclude('Another preview is booting.');
-  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('sleeping');
+
+  const heldImp = await ctx.impd.client.imps.get({ name: 'pv-0a1b2c3d-17' });
+
+  expect(heldImp.state).toBe('sleeping');
 });
 
 test('it wakes a sleeping ready preview, checks its health and redirects to its imp', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   composeFiles.set(
     'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -345,7 +339,7 @@ test('it wakes a sleeping ready preview, checks its health and redirects to its 
 test.each(['running', 'sleeping'] as const)(
   'it puts a %s ready preview under the public egress policy before it redirects or wakes it',
   async (state) => {
-    const ctx = await setupTest();
+    const ctx = await setupTest(startStubImpd());
 
     composeFiles.set(
       'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -395,7 +389,7 @@ test.each(['running', 'sleeping'] as const)(
 );
 
 test('it boots a woken preview again when its stack never answers', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   composeFiles.set(
     'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -440,7 +434,7 @@ test('it boots a woken preview again when its stack never answers', async () => 
 });
 
 test('it rebuilds a ready preview once a push moved its head', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -491,7 +485,8 @@ test('it rebuilds a ready preview once a push moved its head', async () => {
 });
 
 test('it says the preview ended once its pull request closed', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -510,7 +505,8 @@ test('it says the preview ended once its pull request closed', async () => {
 });
 
 test('it shows a failed boot with a retry link and boots nothing', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -535,7 +531,7 @@ test('it shows a failed boot with a retry link and boots nothing', async () => {
 });
 
 test('it boots a failed preview again when the retry link opens', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -561,7 +557,7 @@ test('it boots a failed preview again when the retry link opens', async () => {
 });
 
 test('it shows the failure page and boots nothing more when the booting page reloads after a failed retry', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
 
@@ -606,7 +602,8 @@ test('it shows the failure page and boots nothing more when the booting page rel
 });
 
 test('it answers 404 for a pull request the service has not seen', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
   const response = await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/99'));
   const text = await response.text();
 
@@ -615,7 +612,8 @@ test('it answers 404 for a pull request the service has not seen', async () => {
 });
 
 test('it answers 404 for a path that names no pull request', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
   const response = await ctx.handler(new Request('http://geoffcloud:8417/acme'));
 
   expect(response.status).toBe(404);

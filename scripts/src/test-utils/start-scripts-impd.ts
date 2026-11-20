@@ -1,5 +1,5 @@
 import { onTestFinished } from 'bun:test';
-import type { TestImpd } from '@impz/testing';
+import type { startTestImpd as StartTestImpd, TestImpd } from '@impz/testing';
 import { http, passthrough } from 'msw';
 import { z } from 'zod';
 import { server } from './server.ts';
@@ -16,18 +16,28 @@ export interface ScriptsImpd {
   readonly seedImage: TestImpd['seedImage'];
 }
 
+interface SharedImpd {
+  readonly impd: TestImpd;
+
+  // the secret of a token the test impd mints for the code under test, so a call that the test's
+  // own setup makes with the root token stays out of the calls
+  readonly token: string;
+}
+
 // the impd of this test file: the first test starts it and the preload stops it once the file ends,
 // so each file pays for one start; each test's cleanup empties it
-const shared: { impd: Promise<TestImpd> | undefined } = { impd: undefined };
+const shared: { impd: Promise<SharedImpd> | undefined } = { impd: undefined };
 
 // the preload imports this file, so the package loads on the first call, and no other file pays
 export async function startScriptsImpd(): Promise<ScriptsImpd> {
   const testing = await import('@impz/testing');
 
-  shared.impd ??= testing.startTestImpd();
+  shared.impd ??= startSharedImpd(testing.startTestImpd);
 
-  const impd = await shared.impd;
+  const sharedImpd = await shared.impd;
 
+  const impd = sharedImpd.impd;
+  const token = sharedImpd.token;
   const first = impd.calls.length;
 
   // the preload resets MSW's handlers after each test, so each test allows loopback again
@@ -45,13 +55,11 @@ export async function startScriptsImpd(): Promise<ScriptsImpd> {
 
   return {
     url: impd.url,
-    token: testing.TEST_TOKEN,
+    token,
     fail: (...args) => impd.fail(...args),
     get calls() {
       return impd.calls
-        .filter(
-          (call, index) => index >= first && call.authorization === `Bearer ${testing.TEST_TOKEN}`,
-        )
+        .filter((call, index) => index >= first && call.authorization === `Bearer ${token}`)
         .map((call) => formatCall(call.procedure, call.input));
     },
     seedImage: (name) => impd.seedImage(name),
@@ -64,9 +72,20 @@ export async function stopScriptsImpd(): Promise<void> {
 
   shared.impd = undefined;
 
-  const impd = await started;
+  const sharedImpd = await started;
 
-  await impd?.stop();
+  await sharedImpd?.impd.stop();
+}
+
+async function startSharedImpd(startTestImpd: typeof StartTestImpd): Promise<SharedImpd> {
+  const impd = await startTestImpd();
+
+  // the mint is real loopback traffic too
+  allowLoopback(impd);
+
+  const minted = await impd.client.tokens.create({ name: 'scripts-test', scope: 'manage' });
+
+  return { impd, token: minted.secret };
 }
 
 // the script's fetch to impd is real loopback traffic, which MSW lets through

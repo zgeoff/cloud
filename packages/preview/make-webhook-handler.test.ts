@@ -17,11 +17,14 @@ import {
   pullRequestFiles,
 } from './src/test-utils/constants.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
+import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
 import type { PreviewDeps } from './types.ts';
 
-async function setupTest() {
+async function setupTest<Impd extends { readonly url: string; readonly token: string }>(
+  impd: Impd,
+) {
   const directory = await mkdtemp(join(tmpdir(), 'preview-webhook-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
@@ -31,8 +34,6 @@ async function setupTest() {
   onTestFinished(() => {
     store.close();
   });
-
-  const impd = startStubImpd();
 
   const deps: PreviewDeps = {
     settings: {
@@ -80,7 +81,8 @@ async function setupTest() {
 }
 
 test('it posts one comment with the tailnet link when a pull request opens', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   composeFiles.set(
     'acme/greenhouse@4d2a7c1e9b0f3a5d6c8e7f1a2b3c4d5e6f7a8b9c',
@@ -124,7 +126,8 @@ test('it posts one comment with the tailnet link when a pull request opens', asy
 });
 
 test('it edits the same comment when a push moves the head of the pull request', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
   composeFiles.set('acme/greenhouse@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'services: {}\n');
@@ -187,7 +190,8 @@ test('it edits the same comment when a push moves the head of the pull request',
 });
 
 test('it keeps a preview ended when a push arrives after its pull request closed', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   composeFiles.set('acme/greenhouse@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'services: {}\n');
 
@@ -232,7 +236,8 @@ test('it keeps a preview ended when a push arrives after its pull request closed
 });
 
 test('it keeps the newer head when an older push still reads GitHub as a newer one arrives', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
   composeFiles.set('acme/greenhouse@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'services: {}\n');
@@ -325,7 +330,8 @@ test('it keeps the newer head when an older push still reads GitHub as a newer o
 });
 
 test('it keeps a pull request ended when a push arrives after a close it saw before any head', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   composeFiles.set('acme/greenhouse@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'services: {}\n');
 
@@ -380,7 +386,8 @@ test('it keeps a pull request ended when a push arrives after a close it saw bef
 });
 
 test('it posts the ended comment again when GitHub redelivers a close', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -427,7 +434,8 @@ test('it posts the ended comment again when GitHub redelivers a close', async ()
 });
 
 test('it refuses an unsigned delivery', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   composeFiles.set('acme/greenhouse@4d2a7c1e9b0f3a5d6c8e7f1a2b3c4d5e6f7a8b9c', 'services: {}\n');
 
@@ -455,7 +463,8 @@ test('it refuses an unsigned delivery', async () => {
 });
 
 test('it refuses a delivery signed with another secret', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   composeFiles.set('acme/greenhouse@4d2a7c1e9b0f3a5d6c8e7f1a2b3c4d5e6f7a8b9c', 'services: {}\n');
 
@@ -488,7 +497,8 @@ test('it refuses a delivery signed with another secret', async () => {
 });
 
 test('it refuses a delivery whose body changed after it was signed', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   composeFiles.set('acme/greenhouse@4d2a7c1e9b0f3a5d6c8e7f1a2b3c4d5e6f7a8b9c', 'services: {}\n');
 
@@ -520,7 +530,8 @@ test('it refuses a delivery whose body changed after it was signed', async () =>
 });
 
 test('it posts nothing for a repository the service does not list', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   composeFiles.set('acme/orchard@4d2a7c1e9b0f3a5d6c8e7f1a2b3c4d5e6f7a8b9c', 'services: {}\n');
 
@@ -552,7 +563,8 @@ test('it posts nothing for a repository the service does not list', async () => 
 });
 
 test('it posts the link for a repository its owner wildcard lists', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   composeFiles.set('nursery/seedlings@4d2a7c1e9b0f3a5d6c8e7f1a2b3c4d5e6f7a8b9c', 'services: {}\n');
 
@@ -591,7 +603,8 @@ test('it posts the link for a repository its owner wildcard lists', async () => 
 });
 
 test('it posts nothing for a pull request from a fork', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   composeFiles.set('acme/greenhouse@4d2a7c1e9b0f3a5d6c8e7f1a2b3c4d5e6f7a8b9c', 'services: {}\n');
 
@@ -622,7 +635,8 @@ test('it posts nothing for a pull request from a fork', async () => {
 });
 
 test('it posts nothing for a head commit without preview/compose.yaml', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   const body = JSON.stringify({
     action: 'opened',
@@ -651,7 +665,8 @@ test('it posts nothing for a head commit without preview/compose.yaml', async ()
 });
 
 test('it removes the imp and says the preview ended when the pull request closes', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -660,18 +675,7 @@ test('it removes the imp and says the preview ended when the pull request closes
     headSHA: '4d2a7c1e9b0f3a5d6c8e7f1a2b3c4d5e6f7a8b9c',
   });
 
-  ctx.impd.imps.set('pv-0bcd7c17-17', {
-    name: 'pv-0bcd7c17-17',
-    state: 'running',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: ['gh'],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0bcd7c17-17', grants: ['gh'] });
 
   const body = JSON.stringify({
     action: 'closed',
@@ -696,7 +700,9 @@ test('it removes the imp and says the preview ended when the pull request closes
     }),
   );
 
-  expect(ctx.impd.imps.has('pv-0bcd7c17-17')).toBeFalse();
+  const heldImps = await ctx.impd.client.imps.list({});
+
+  expect(heldImps).toStrictEqual([]);
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ended');
 
   expect(issueComments).toStrictEqual([
@@ -711,7 +717,8 @@ test('it removes the imp and says the preview ended when the pull request closes
 });
 
 test('it removes the counting proxy and its count with the imp when the pull request closes', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   const removeProxy = mock(async () => {});
 
@@ -759,20 +766,10 @@ test('it removes the counting proxy and its count with the imp when the pull req
 });
 
 test('it removes the imp of a closed pull request it holds no record of, and posts nothing', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
-  ctx.impd.imps.set('pv-0bcd7c17-17', {
-    name: 'pv-0bcd7c17-17',
-    state: 'sleeping',
-    createdAt: '2026-09-01T00:00:00.000Z',
-    lastActiveAt: '2026-10-15T08:00:00.000Z',
-    lastRequestAt: '2026-10-15T08:00:00.000Z',
-    httpPort: 8080,
-    image: 'base',
-    memoryMib: 2048,
-    backup: false,
-    grants: ['gh'],
-  });
+  await ctx.impd.seedImp({ name: 'pv-0bcd7c17-17', state: 'sleeping', grants: ['gh'] });
 
   const body = JSON.stringify({
     action: 'closed',
@@ -797,12 +794,15 @@ test('it removes the imp of a closed pull request it holds no record of, and pos
     }),
   );
 
-  expect(ctx.impd.imps.has('pv-0bcd7c17-17')).toBeFalse();
+  const heldImps = await ctx.impd.client.imps.list({});
+
+  expect(heldImps).toStrictEqual([]);
   expect(issueComments).toStrictEqual([]);
 });
 
 test('it answers a ping with no change', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   const body = JSON.stringify({ zen: 'Keep it logically awesome.', hook_id: 1 });
 
@@ -822,7 +822,8 @@ test('it answers a ping with no change', async () => {
 });
 
 test("it answers the App's installation delivery with no change and mints no token", async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   // GitHub sends every App this event when an account installs it, whatever events it subscribes to
   const body = JSON.stringify({
@@ -847,7 +848,7 @@ test("it answers the App's installation delivery with no change and mints no tok
 });
 
 test('it runs the SDK contract suite once for a pull request that changes the SDK pin', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   pullRequestFiles.set('acme/greenhouse#21', [
     {
@@ -907,7 +908,8 @@ test('it runs the SDK contract suite once for a pull request that changes the SD
 });
 
 test('it runs no SDK contract suite for a pull request that leaves the SDK pin alone', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   pullRequestFiles.set('acme/greenhouse#21', [
     {
@@ -953,7 +955,7 @@ test('it runs no SDK contract suite for a pull request that leaves the SDK pin a
 });
 
 test('it starts no second SDK contract run for a second delivery of the same head commit', async () => {
-  const ctx = await setupTest();
+  const ctx = await setupTest(startStubImpd());
 
   pullRequestFiles.set('acme/greenhouse#21', [{ filename: 'bun.lock' }]);
 
@@ -1014,7 +1016,8 @@ test('it starts no second SDK contract run for a second delivery of the same hea
 });
 
 test('it runs no SDK contract suite for a pull request from a fork', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   pullRequestFiles.set('acme/greenhouse#21', [{ filename: 'bun.lock' }]);
 
@@ -1048,7 +1051,8 @@ test('it runs no SDK contract suite for a pull request from a fork', async () =>
 });
 
 test('it runs no SDK contract suite for a listed repository that the contract settings leave out', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
 
   pullRequestFiles.set('nursery/seedlings#21', [{ filename: 'bun.lock' }]);
 
@@ -1082,7 +1086,8 @@ test('it runs no SDK contract suite for a listed repository that the contract se
 });
 
 test('it answers 404 on any path but /webhook', async () => {
-  const ctx = await setupTest();
+  const impd = await startPreviewImpd();
+  const ctx = await setupTest(impd);
   const response = await ctx.handler(new Request('http://preview.test/acme/greenhouse/17'));
 
   expect(response.status).toBe(404);

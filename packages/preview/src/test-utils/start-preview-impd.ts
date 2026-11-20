@@ -1,4 +1,5 @@
 import { onTestFinished } from 'bun:test';
+import { createImpClient } from '@impz/client';
 import type { startTestImpd as StartTestImpd, TestImpd } from '@impz/testing';
 import { http, passthrough } from 'msw';
 import { z } from 'zod';
@@ -42,9 +43,17 @@ export interface PreviewImpd {
   readonly readGrantPaths: () => Map<string, readonly string[]>;
 }
 
+interface SharedImpd {
+  readonly impd: TestImpd;
+
+  // the secret of a token the test impd mints for the code under test, so a call that the test's
+  // own setup makes with the root token stays out of the calls
+  readonly token: string;
+}
+
 // the impd of this test file: the first test starts it and the preload stops it once the file ends,
 // so each file pays for one start; each test's cleanup empties it
-const shared: { impd: Promise<TestImpd> | undefined } = { impd: undefined };
+const shared: { impd: Promise<SharedImpd> | undefined } = { impd: undefined };
 
 // the preload imports this file, so the package loads on the first call, and no other file pays
 export async function startPreviewImpd(): Promise<PreviewImpd> {
@@ -52,12 +61,15 @@ export async function startPreviewImpd(): Promise<PreviewImpd> {
 
   shared.impd ??= startSharedImpd(testing.startTestImpd);
 
-  const impd = await shared.impd;
+  const sharedImpd = await shared.impd;
+
+  const impd = sharedImpd.impd;
+  const token = sharedImpd.token;
 
   // the preload resets MSW's handlers after each test, so each test allows loopback again
   allowLoopback(impd);
 
-  const state = { first: impd.calls.length, arranged: new Set<number>() };
+  const first = impd.calls.length;
 
   onTestFinished(async () => {
     allowLoopback(impd);
@@ -74,23 +86,12 @@ export async function startPreviewImpd(): Promise<PreviewImpd> {
     }
   });
 
-  // a read or a write that arranges the test's start, not a call the unit made
-  const arrange = async <T>(run: () => Promise<T>): Promise<T> => {
-    const first = impd.calls.length;
-
-    try {
-      return await run();
-    } finally {
-      for (let index = first; index < impd.calls.length; index += 1) {
-        state.arranged.add(index);
-      }
-    }
-  };
-
+  // the test arranges its start with the root client, and the unit and the test's own reads use the
+  // minted token's
   return {
     url: impd.url,
-    token: testing.TEST_TOKEN,
-    client: impd.client,
+    token,
+    client: createImpClient({ url: impd.url, token }),
     fail: (...args) => impd.fail(...args),
     freeze: () => {
       impd.freeze();
@@ -100,53 +101,50 @@ export async function startPreviewImpd(): Promise<PreviewImpd> {
     },
     get calls() {
       return impd.calls
-        .filter(
-          (call, index) =>
-            index >= state.first &&
-            !state.arranged.has(index) &&
-            call.authorization === `Bearer ${testing.TEST_TOKEN}`,
-        )
+        .filter((call, index) => index >= first && call.authorization === `Bearer ${token}`)
         .map((call) => formatCall(call.procedure, call.input));
     },
-    seedImp: (options) =>
-      arrange(async () => {
-        await impd.client.imps.create({
-          name: options.name,
-          image: options.image ?? 'base',
-          memoryMib: 2048,
-          httpPort: options.httpPort ?? 8080,
-          backup: false,
-        });
+    seedImp: async (options) => {
+      await impd.client.imps.create({
+        name: options.name,
+        image: options.image ?? 'base',
+        memoryMib: 2048,
+        httpPort: options.httpPort ?? 8080,
+        backup: false,
+      });
 
-        for (const secret of options.grants ?? []) {
-          await addSecret(impd, secret);
+      for (const secret of options.grants ?? []) {
+        await addSecret(impd, secret);
 
-          await impd.client.grants.add({ name: options.name, secret });
-        }
+        await impd.client.grants.add({ name: options.name, secret });
+      }
 
-        if (options.state === 'sleeping') {
-          await impd.client.imps.sleep({ name: options.name });
-        }
-      }),
-    seedSecret: (name) => arrange(() => addSecret(impd, name)),
-    readEgressModes: () =>
-      arrange(async () => {
-        const imps = await impd.client.imps.list({});
+      if (options.state === 'sleeping') {
+        await impd.client.imps.sleep({ name: options.name });
+      }
+    },
+    seedSecret: (name) => addSecret(impd, name),
+    readEgressModes: async () => {
+      const imps = await impd.client.imps.list({});
 
-        const modes = await Promise.all(
-          imps.map(async (imp) => {
-            const policy = await impd.client.imps.policy({ name: imp.name });
+      const modes = await Promise.all(
+        imps.map(async (imp) => {
+          const policy = await impd.client.imps.policy({ name: imp.name });
 
-            return [imp.name, policy.mode] as const;
-          }),
-        );
+          return [imp.name, policy.mode] as const;
+        }),
+      );
 
-        return new Map(modes);
-      }),
+      return new Map(modes);
+    },
     readGrantPaths: () => {
       const paths = new Map<string, readonly string[]>();
 
-      for (const call of impd.calls.slice(state.first)) {
+      for (const call of impd.calls.slice(first)) {
+        if (call.authorization !== `Bearer ${token}`) {
+          continue;
+        }
+
         const filter = readGrantFilter(call.procedure, call.input);
 
         if (filter !== undefined) {
@@ -165,21 +163,26 @@ export async function stopPreviewImpd(): Promise<void> {
 
   shared.impd = undefined;
 
-  const impd = await started;
+  const sharedImpd = await started;
 
-  await impd?.stop();
+  await sharedImpd?.impd.stop();
 }
 
 const images = ['base', 'pv-base'];
 
-async function startSharedImpd(startTestImpd: typeof StartTestImpd): Promise<TestImpd> {
+async function startSharedImpd(startTestImpd: typeof StartTestImpd): Promise<SharedImpd> {
   const impd = await startTestImpd({ features: { execRequire: true } });
 
   for (const image of images) {
     await impd.seedImage(image);
   }
 
-  return impd;
+  // the mint is real loopback traffic too
+  allowLoopback(impd);
+
+  const minted = await impd.client.tokens.create({ name: 'preview-test', scope: 'manage' });
+
+  return { impd, token: minted.secret };
 }
 
 // the service's fetch to impd is real loopback traffic, which MSW lets through
