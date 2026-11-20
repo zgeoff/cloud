@@ -495,11 +495,12 @@ in
       # the Linear MCP server and the variables of a Claude session, shared by the claude and boxxy
       # entries so a boxxy session behaves like a Claude session.
       #
-      # The pr-evidence skill uploads to the files service with PR_EVIDENCE_*: its API address, and
-      # the vault/item/field path of its agent token, which the skill reads with `op read` through
-      # the op-connect profile. The path has no op:// prefix, because `op run` resolves every op://
-      # value in its environment and fails on one its token can't read. They sit on the entry
-      # because atc takes only the profile's own host as a profile URL.
+      # The pr-evidence skill and `bun verify publish` upload to the files service with
+      # VERIFY_UPLOAD_*: its API address, and the op:// reference of its agent token in the imp vault,
+      # which the skill reads with `op read` through the op-connect profile. Nothing runs `op run`
+      # over a session's environment, so the reference stays a plain string. They sit on the entry
+      # because atc takes only the profile's own host as a profile URL. Every target of this daemon
+      # is an imp, so the entry can carry the imp vault's reference.
       #
       # No entry sets an OpenTelemetry variable: the pepys-telemetry profile's telemetry item sets
       # up the export of each session that selects it, and atc refuses an entry that sets one of
@@ -512,8 +513,8 @@ in
         };
       };
       claudeEnv = {
-        PR_EVIDENCE_URL = "https://${filesExposure.hostname}/api/files";
-        PR_EVIDENCE_TOKEN_PATH = "imp/files-upload-token/credential";
+        VERIFY_UPLOAD_URL = "https://${filesExposure.hostname}/api/files";
+        VERIFY_UPLOAD_TOKEN_REF = "op://imp/files-upload-token/credential";
       };
       # the plug-in folder in the agent image that a boxxy session's hooks run from
       boxxyPluginArgs = [

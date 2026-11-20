@@ -22,9 +22,8 @@ Each repo's agents have an agent token of their own, in the item `files-upload-t
 own vault, such as `nixie`. Agents on an imp use the copy in the `imp` vault. The cloud repo holds
 no copy of these tokens: stack config `files.agentTokenDigests` names each one with its SHA-256
 digest. On an imp, the atc daemon's `claude` entry sets two variables in each Claude session:
-`PR_EVIDENCE_URL`, the service's `/api/files` address, and `PR_EVIDENCE_TOKEN_PATH`, the `imp`
-token's `<vault>/<item>/<field>` path. The path has no `op://` prefix, because `op run` resolves
-every `op://` value in its environment and fails on one its token can't read.
+`VERIFY_UPLOAD_URL`, the service's `/api/files` address, and `VERIFY_UPLOAD_TOKEN_REF`, the `imp`
+token's full `op://<vault>/<item>/<field>` reference.
 
 ## Deploy the first time
 
@@ -89,8 +88,8 @@ change until the owner approves it, as [the prod apply job](./prod-apply.md) des
 An agent on an imp uploads with `curl`, which sends the token as a bearer token:
 
 ```bash
-FILES_TOKEN="$(op read "op://$PR_EVIDENCE_TOKEN_PATH")"
-curl -sS --oauth2-bearer "$FILES_TOKEN" -F file=@shot.png -F expires=7d "$PR_EVIDENCE_URL"
+FILES_TOKEN="$(op read "$VERIFY_UPLOAD_TOKEN_REF")"
+curl -sS --oauth2-bearer "$FILES_TOKEN" -F file=@shot.png -F expires=7d "$VERIFY_UPLOAD_URL"
 ```
 
 Expect a JSON body with the file's `url`. `expires` takes `7d` (the default), `30d`, a date such as
