@@ -272,6 +272,8 @@ gates:
       - workers/health-check/**
       - scripts/e2e/journey-atc-sign-in-alerts.sh
       - scripts/src/test-utils/shell/**
+      - scripts/src/test-utils/bats/**
+      - scripts/run-bats.sh
       - scripts/run-shell-suites.sh
       - bun.lock
       - .bun-version

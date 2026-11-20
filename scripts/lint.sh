@@ -10,7 +10,7 @@
 #
 # The files are the ones git tracks, or that are untracked and not ignored, so a new file is
 # linted before it is committed; .claude/ is left out, because repo-sync owns those files. The
-# shell files are every *.sh and every extensionless file whose first line is a sh or bash
+# shell files are every *.sh and *.bats and every extensionless file whose first line is a sh or bash
 # shebang. The repo mounts read-only at /src, so no tool can change a file. The Docker volume
 # LINT_STORE_VOLUME (default cloud-lint-store) keeps the Nix store, and so the tools, between runs.
 # It runs every tool of the kind, then exits 1 when any of them failed.
@@ -42,7 +42,7 @@ list_files() {
 }
 
 list_shell_files() {
-  list_files ':(glob)**/*.sh'
+  list_files ':(glob)**/*.sh' ':(glob)**/*.bats'
   list_files . | grep -v '\.[^/]*$' | while IFS= read -r file; do
     if head -n 1 "$file" | grep -qE '^#!.*[/ ](ba)?sh$'; then
       printf '%s\n' "$file"

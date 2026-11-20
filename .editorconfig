@@ -12,8 +12,8 @@ trim_trailing_whitespace = true
 max_line_length = off
 trim_trailing_whitespace = false
 
-# shfmt reads these; scripts/lint.sh passes it no printer flags
-[*.sh]
+# shfmt reads these (a .bats file takes the .sh style); scripts/lint.sh passes it no printer flags
+[*.{sh,bats}]
 switch_case_indent = true
 space_redirects = true
 
