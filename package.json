@@ -141,7 +141,7 @@
     "@commitlint/cli": "21.2.4",
     "@faker-js/faker": "10.6.0",
     "@heynixie/contract": "0.87.0",
-    "@impz/client": "7.6.0",
+    "@impz/client": "7.6.1",
     "@mswjs/interceptors": "0.45.11",
     "@orpc/client": "1.16.2",
     "@stylistic/eslint-plugin": "5.10.0",
