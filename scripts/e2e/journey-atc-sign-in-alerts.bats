@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
+# bats file_tags=suite:alert-rules
 # Journey for the atc sign-in alerts, end to end in the real engines: a gateway container log in
 # the case tree, written in the kubelet's CRI format and stamped at now; the pinned Alloy running
 # the pipeline build-atc-security-pipeline.ts builds; the pinned Prometheus scraping Alloy and
@@ -10,25 +11,40 @@
 # alert, Alertmanager's log, or Alloy's metrics. The second checks that the owner's activity alone
 # still reaches Discord. infra/observability/atc-sign-in-alerts.bats tests each stage on its own.
 #
-#   bash scripts/run-shell-suites.sh alert-rules   # the only suite left in the group on this runner; bun run test:alert-rules runs it after the bats suites
-#   CASE='journey' bash scripts/e2e/journey-atc-sign-in-alerts.sh
-#
-# shell-suite: alert-rules
-# shellcheck source-path=SCRIPTDIR
-set -euo pipefail
-# fixed, so the files the cases write do not depend on the caller's umask
-umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/wait-for.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/pick-port.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/has-metric.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/start-alloy.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/start-alertmanager.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../src/test-utils/shell/start-stub-discord-webhook.sh"
+#   bash scripts/run-bats.sh alert-rules
+#   CASE='journey' bash scripts/run-bats.sh alert-rules
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-prometheus_image='quay.io/prometheus/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e'
-log_dir='logs/atc_atc-gateway-5d8f9c7b4-x2k9q_0f4e/atc-gateway'
+# a case waits for Alloy, Prometheus and Alertmanager to deliver, and the first one pulls the images
+export BATS_TEST_TIMEOUT=600
+
+setup_file() {
+  load '../../scripts/src/test-utils/bats/setup'
+}
+
+setup() {
+  load '../../scripts/src/test-utils/bats/setup'
+  load '../../scripts/src/test-utils/shell/wait-for.sh'
+  load '../../scripts/src/test-utils/shell/pick-port.sh'
+  load '../../scripts/src/test-utils/shell/has-metric.sh'
+  load '../../scripts/src/test-utils/shell/start-alloy.sh'
+  load '../../scripts/src/test-utils/shell/start-alertmanager.sh'
+  load '../../scripts/src/test-utils/shell/start-stub-discord-webhook.sh'
+  # fixed, so the files the cases write do not depend on the caller's umask
+  umask 022
+  repo="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+  tree="$BATS_TEST_TMPDIR"
+  prometheus_image='quay.io/prometheus/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e'
+  log_dir='logs/atc_atc-gateway-5d8f9c7b4-x2k9q_0f4e/atc-gateway'
+}
+
+# each step safe when setup_test stopped before it
+teardown() {
+  stop_timeout_watchdog
+  if [ -n "${prometheus:-}" ]; then docker rm -f "$prometheus" > /dev/null 2>&1 || true; fi
+  docker rm -f "$(cat "$tree/alertmanager/container" 2> /dev/null)" > /dev/null 2>&1 || true
+  docker rm -f "$(cat "$tree/alloy/container" 2> /dev/null)" > /dev/null 2>&1 || true
+  kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true
+}
 
 # setup_test <tree>: the configs as the repo's builders write them beside the chart's inhibition,
 # the Discord stand-in, and Alloy, Alertmanager and Prometheus on loopback ports, Prometheus
@@ -37,7 +53,7 @@ setup_test() {
   local tree="$1" port
   mkdir -p "$tree/config" "$tree/$log_dir" "$tree/discord" "$tree/alloy" "$tree/alertmanager"
   : > "$tree/$log_dir/0.log"
-  start_stub_discord_webhook "$tree/discord"
+  start_stub_discord_webhook "$tree/discord" 3>&-
   printf 'http://127.0.0.1:%s/api/webhooks/1234/CANARY-WEBHOOK-TOKEN' "$(cat "$tree/discord/port")" > "$tree/config/webhook-url"
   (cd "$repo" && TREE="$tree" bun -e "
     import { buildATCSecurityPipeline } from './infra/observability/build-atc-security-pipeline.ts';
@@ -88,15 +104,6 @@ setup_test() {
   wait_for 60 "Prometheus" curl -fs -o /dev/null "$prometheus_url/-/ready"
 }
 
-# teardown: each step safe when setup_test stopped before it
-teardown() {
-  if [ -n "${prometheus:-}" ]; then docker rm -f "$prometheus" > /dev/null 2>&1 || true; fi
-  docker rm -f "$(cat "$tree/alertmanager/container" 2> /dev/null)" > /dev/null 2>&1 || true
-  docker rm -f "$(cat "$tree/alloy/container" 2> /dev/null)" > /dev/null 2>&1 || true
-  kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true
-  rm -rf "$tree" || true
-}
-
 # the condition a case waits on: Alertmanager's Discord posts that succeeded number at least $2,
 # from its metrics at $1
 # shellcheck disable=SC2016 # the bash -c that runs the condition expands it
@@ -105,10 +112,8 @@ delivered='curl -fsS "$1/metrics" 2> /dev/null | awk -v want="$2" '"'"'
   /^alertmanager_notification_requests_failed_total\{integration="discord"/ { failed = $2 }
   END { exit !(sent - failed >= want) }'"'"
 
-it_journeys_from_the_gateways_log_to_one_discord_message_per_category_with_no_canary_anywhere() {
+@test "it journeys from the gateways log to one discord message per category with no canary anywhere" {
   local now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   echo 500 > "$tree/discord/status"
   now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
@@ -151,10 +156,8 @@ EOF
   diff /dev/null "$tree/leaks"
 }
 
-it_delivers_an_owners_sign_in_with_no_other_alert_firing_past_the_charts_info_inhibitor() {
+@test "it delivers an owners sign in with no other alert firing past the charts info inhibitor" {
   local now
-  tree="$(mktemp -d)"
-  trap teardown EXIT
   setup_test "$tree"
   now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
 
@@ -172,5 +175,3 @@ EOF
 [FIRING:1] ATCGatewaySignInStarted (/oauth2/authorize notice)
 EOF
 }
-
-run_cases
