@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { resolveProgram } from '@zgeoff/rig/e2e';
 import { run, start } from '@zgeoff/testing/process';
 import { runProcess } from '../run-process.ts';
-import { createGitOrigin } from '../src/test-utils/create-git-origin.ts';
+import { createSeededGitOrigin } from '../src/test-utils/create-seeded-git-origin.ts';
 import { createStubAgentImageCheck } from '../src/test-utils/create-stub-agent-image-check.ts';
 import { createStubImpCLI } from '../src/test-utils/create-stub-imp-cli.ts';
 
@@ -14,7 +14,7 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const repo = await createGitOrigin(directory);
+  const repo = await createSeededGitOrigin(directory);
 
   const temporary = join(directory, 'tmp');
   const fifo = join(directory, 'check-started');

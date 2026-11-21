@@ -6,14 +6,14 @@ import { runAgentImageBuild } from './run-agent-image-build.ts';
 import { buildRealProgramHandler } from './src/test-utils/build-real-program-handler.ts';
 import { buildStubImp } from './src/test-utils/build-stub-imp.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
-import { createGitOrigin } from './src/test-utils/create-git-origin.ts';
+import { createSeededGitOrigin } from './src/test-utils/create-seeded-git-origin.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-agent-image-build-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const repo = await createGitOrigin(directory);
+  const repo = await createSeededGitOrigin(directory);
 
   const work = join(directory, 'work');
 
