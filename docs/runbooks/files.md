@@ -21,9 +21,10 @@ under the same name.
 Each repo's agents have an agent token of their own, in the item `files-upload-token` in the repo's
 own vault, such as `nixie`. Agents on an imp use the copy in the `imp` vault. The cloud repo holds
 no copy of these tokens: stack config `files.agentTokenDigests` names each one with its SHA-256
-digest. On an imp, the atc daemon's `claude` entry sets two variables in each Claude session:
-`CLOUD_FILES_URL`, the service's `/api/files` address, and `CLOUD_FILES_TOKEN_REF`, the `imp`
-token's full `op://<vault>/<item>/<field>` reference.
+digest. On an imp, the atc daemon's `claude` and `boxxy` entries, in
+[`configuration.nix`](../../nixos/hosts/geoffcloud/configuration.nix), set two variables in each
+session: `CLOUD_FILES_URL`, the service's `/api/files` address, and `CLOUD_FILES_TOKEN_REF`, the
+`op://` reference of `files-upload-token` in the `imp` vault.
 
 ## Deploy the first time
 
