@@ -493,12 +493,12 @@ let
                 "profiles": ["claude", "github", "linear", "op-connect", "pepys-telemetry", "boxxy", "codex"]
               },
               "env": {
+                "CLOUD_FILES_TOKEN_REF": "op://imp/files-upload-token/credential",
+                "CLOUD_FILES_URL": "https://files.geoff.cloud/api/files",
                 "GIT_AUTHOR_EMAIL": "3013783+zgeoff@users.noreply.github.com",
                 "GIT_AUTHOR_NAME": "zgeoff",
                 "GIT_COMMITTER_EMAIL": "3013783+zgeoff@users.noreply.github.com",
-                "GIT_COMMITTER_NAME": "zgeoff",
-                "VERIFY_UPLOAD_TOKEN_REF": "op://imp/files-upload-token/credential",
-                "VERIFY_UPLOAD_URL": "https://files.geoff.cloud/api/files"
+                "GIT_COMMITTER_NAME": "zgeoff"
               },
               "kind": "claude"
             },
@@ -513,8 +513,8 @@ let
                 "profiles": ["claude", "github", "linear", "op-connect", "pepys-telemetry"]
               },
               "env": {
-                "VERIFY_UPLOAD_TOKEN_REF": "op://imp/files-upload-token/credential",
-                "VERIFY_UPLOAD_URL": "https://files.geoff.cloud/api/files"
+                "CLOUD_FILES_TOKEN_REF": "op://imp/files-upload-token/credential",
+                "CLOUD_FILES_URL": "https://files.geoff.cloud/api/files"
               }
             },
             "codex": { "auth": { "profiles": ["codex", "github", "pepys-telemetry"] } }

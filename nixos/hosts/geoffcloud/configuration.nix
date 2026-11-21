@@ -496,8 +496,9 @@ in
       # entries so a boxxy session behaves like a Claude session.
       #
       # The pr-evidence skill and `bun verify publish` upload to the files service with
-      # VERIFY_UPLOAD_*: its API address, and the op:// reference of its agent token in the imp vault,
-      # which the skill reads with `op read` through the op-connect profile. Nothing runs `op run`
+      # CLOUD_FILES_URL, its API address, and CLOUD_FILES_TOKEN_REF, the op:// reference of its
+      # agent token in the imp vault, which the skill reads with `op read` through the op-connect
+      # profile. Nothing runs `op run`
       # over a session's environment, so the reference stays a plain string. They sit on the entry
       # because atc takes only the profile's own host as a profile URL. Every target of this daemon
       # is an imp, so the entry can carry the imp vault's reference.
@@ -513,8 +514,8 @@ in
         };
       };
       claudeEnv = {
-        VERIFY_UPLOAD_URL = "https://${filesExposure.hostname}/api/files";
-        VERIFY_UPLOAD_TOKEN_REF = "op://imp/files-upload-token/credential";
+        CLOUD_FILES_URL = "https://${filesExposure.hostname}/api/files";
+        CLOUD_FILES_TOKEN_REF = "op://imp/files-upload-token/credential";
       };
       # the plug-in folder in the agent image that a boxxy session's hooks run from
       boxxyPluginArgs = [
