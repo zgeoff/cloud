@@ -17,8 +17,9 @@ These rules add to [NixOS testing](../../testing/references/nixos.md) for the ch
   too.
 - Render a module check's cases through
   [`render-cases.nix`](../../../../nixos/checks/test-utils/render-cases.nix) into the `.bats` file
-  that the check runs with bats. Each case runs in a subshell of its own, with errexit, nounset and
-  pipefail, so a case may set an EXIT trap.
+  that the check runs with bats, as [`preview.nix`](../../../../nixos/checks/preview.nix) does.
+  Give each case a `title` and a `script`. Each script runs in a subshell of its own, with errexit,
+  nounset and pipefail, so it may set an EXIT trap.
 - Put a shared Nix helper or stand-in in
   [`nixos/checks/test-utils/`](../../../../nixos/checks/test-utils/), one export per file, with a
   test in [`test-utils-check.nix`](../../../../nixos/checks/test-utils-check.nix). Import that check

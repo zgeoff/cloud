@@ -30,7 +30,7 @@ metadata:
 - Test a shell script with a `<name>.bats` suite beside it, which
   [`run-bats.sh`](../../../scripts/run-bats.sh) runs. [Shell testing](../testing/references/shell.md)
   asks for a `<name>.test.ts` file instead. The suites share shell stand-ins, and the NixOS checks
-  use bats too, so a TypeScript harness would leave cloud with two.
+  use bats too, so a TypeScript harness would give cloud a second one.
 - Assert a Go test with testify's `assert` and `require`.
   [Go assertions](../testing/references/go.md#assertions) asks for gotest.tools or go-cmp. Every
   provider test uses testify, and a second library would split the suite.
@@ -71,8 +71,7 @@ only.
   `setup_test`, which fails the case when a call would fall through to `/usr/bin`.
 - Hand a call to the real tool only for a loopback destination. In each ssh stand-in, include the
   lines that [`print_ssh_pass_through`](../../../scripts/src/test-utils/shell/print-ssh-pass-through.sh)
-  prints. Hand docker only a `unix://` socket inside the case tree, the temporary folder that
-  `create_case_tree` makes for each case.
+  prints. Hand docker only a `unix://` socket inside the case tree, `$BATS_TEST_TMPDIR`.
 - Produce a failure from real state on loopback when real state can produce it, such as a dead port
   (`127.0.0.1:1`) or a missing socket.
 - Run a read or write that a file mode should refuse through
@@ -140,20 +139,22 @@ in `scripts/host/`.
 - Name each case `@test "it <words>"`. Run the cases whose title holds a phrase with
   `CASE='<phrase>' bash scripts/run-bats.sh <group>`.
 - Load [`setup.bash`](../../../scripts/src/test-utils/bats/setup.bash) from both `setup_file` and
-  `setup`, and call `stop_timeout_watchdog` first in every `teardown`.
-- In `setup`, load the helpers, set `umask 022`, and set `tree="$BATS_TEST_TMPDIR"`, the case tree.
+  `setup`, and call `stop_timeout_watchdog` first in every `teardown`, as `setup.bash` explains.
+- In `setup`, load the stand-in scripts the suite uses, set `umask 022`, and set
+  `tree="$BATS_TEST_TMPDIR"`, the case tree.
 - Write one `setup_test` per suite, which each case calls first. It wires the stand-ins every case
   needs and holds no scenario data.
-- Run the script under test with `env -i` and an explicit `PATH`, `HOME` and `TMPDIR` in the case
-  tree.
-- Compare the whole stdout, the whole stderr and the stand-in call log. Use `run -<status> --separate-stderr` with `assert_output` and `assert_stderr`, and `diff` the
-  call log against a heredoc. `run` drops trailing newlines, so when a case pins exact bytes, write
-  the output to a file and compare it with `cmp`.
+- Run the script under test with `env -i` and a `PATH`, `HOME` and `TMPDIR` in the case tree, with
+  `$tree/bin`, the case's `bin` folder, first on `PATH`.
+- Compare the whole stdout, stderr and stand-in call log. Use `run -<status> --separate-stderr`
+  with `assert_output` and `assert_stderr`, and `diff` the call log against a heredoc. To pin exact
+  bytes, such as a trailing newline that `run` drops, write the output to a file and `cmp` it.
 - Poll with `wait_for` from [`wait-for.sh`](../../../scripts/src/test-utils/shell/wait-for.sh), and step time
   with [`create_stub_clock`](../../../scripts/src/test-utils/shell/create-stub-clock.sh).
 
-A NixOS check's cases can call `wait_for` but no other helper here, because
-`build-shell-lib-source.nix` copies only `wait-for.sh` into the checks.
+A NixOS check's cases can call only `wait_for` of the shell helpers, because
+[`build-shell-lib-source.nix`](../../../nixos/checks/test-utils/build-shell-lib-source.nix) copies
+only `wait-for.sh` into the checks.
 
 ## Shell stand-ins
 
