@@ -1,3 +1,4 @@
+import type { Clock } from '@zgeoff/std';
 import type { GitHubClient } from './build-github-client.ts';
 import type { ImpdClient } from './build-impd-client.ts';
 import type { PreviewStore } from './create-preview-store.ts';
@@ -103,6 +104,6 @@ export interface PreviewDeps {
 
   readonly withSlotLock: <T>(run: () => Promise<T>) => Promise<T>;
   readonly now: () => Date;
-  readonly sleep: (durationMs: number) => Promise<void>;
+  readonly sleep: Clock['sleep'];
   readonly log: (line: string) => void;
 }
