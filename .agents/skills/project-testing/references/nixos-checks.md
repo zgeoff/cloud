@@ -16,7 +16,7 @@ These rules add to [NixOS testing](../../testing/references/nixos.md) for the ch
   [`build-shell-lib-source.nix`](../../../../nixos/checks/test-utils/build-shell-lib-source.nix)
   too.
 - Render a module check's cases through
-  [`render-cases.nix`](../../../../nixos/checks/test-utils/render-cases.nix) into `run_cases` calls.
+  [`render-cases.nix`](../../../../nixos/checks/test-utils/render-cases.nix) into a `.bats` file that a bats call in the check runs.
 - Put a shared Nix helper or stand-in in
   [`nixos/checks/test-utils/`](../../../../nixos/checks/test-utils/), one export per file, with a
   test in [`test-utils-check.nix`](../../../../nixos/checks/test-utils-check.nix). Import that check

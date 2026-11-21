@@ -27,23 +27,23 @@ metadata:
 
 ## Departures
 
-- Test a shell script with a `test-<name>.sh` suite beside it, which runs its cases through
-  [`run_cases`](../../../scripts/src/test-utils/shell/run-cases.sh). [Shell testing](../testing/references/shell.md)
-  asks for a `<name>.test.ts` file instead. The NixOS checks run shell suites inside their VMs,
-  through the helpers that [Shell suites](#shell-suites) lists. A TypeScript harness beside the
-  shell one would leave cloud with two.
+- Test a shell script with a `<name>.bats` suite beside it, which
+  [`run-bats.sh`](../../../scripts/run-bats.sh) runs. [Shell testing](../testing/references/shell.md)
+  asks for a `<name>.test.ts` file instead. The NixOS checks run their cases through bats inside
+  their VMs, rendered by `render-cases.nix`. A TypeScript harness beside the bats one would leave
+  cloud with two.
 - Assert a Go test with testify's `assert` and `require`.
   [Go assertions](../testing/references/go.md#assertions) asks for gotest.tools or go-cmp. Every
   provider test uses testify, and a second library would split the suite.
 
 ## Suites in CI
 
-- Add a `test-*.sh` suite by creating the file.
-  [`run-shell-suites.sh`](../../../scripts/run-shell-suites.sh) runs every `test-*.sh` that git
-  tracks or sees as untracked.
-- Give a Docker suite a `# shell-suite: <group>` line in the comment block at its top, with the
-  group of the `test:*` script that runs it, such as `alert-rules` for `test:alert-rules`. Leave the
-  line out of a suite that needs no Docker, so that `bun run test:scripts` runs it.
+- Add a suite by creating a `.bats` file.
+  [`run-bats.sh`](../../../scripts/run-bats.sh) runs every `.bats` file that git tracks or sees as
+  untracked, by group.
+- Give each suite a `# bats file_tags=suite:<group>` line after its shebang, with the group of the
+  `test:*` script that runs it, such as `alert-rules` for `test:alert-rules`. A suite in the
+  `scripts` group runs under `bun run test:scripts`.
 - When a suite starts to read a new file, add that file's path to the suite's gate in
   [`gates.yml`](../../../.github/gates.yml), if it has one. A gate lists the paths whose change makes
   CI run a check. CI skips the suite when only an unlisted file changes.
@@ -69,7 +69,7 @@ only.
   [`create_stub_remote_tools`](../../../scripts/src/test-utils/shell/create-stub-remote-tools.sh) for the ones
   no other stand-in covers. Then call
   [`require_remote_tool_stubs`](../../../scripts/src/test-utils/shell/require-remote-tool-stubs.sh) in
-  `setup_test`, which fails the case when a call would fall through to `/usr/bin`.
+  `setup`, which fails the case when a call would fall through to `/usr/bin`.
 - Hand a call to the real tool only for a loopback destination. In each ssh stand-in, include the
   lines that [`print_ssh_pass_through`](../../../scripts/src/test-utils/shell/print-ssh-pass-through.sh)
   prints. Hand docker only a `unix://` socket inside the case tree, the temporary folder that
@@ -138,44 +138,42 @@ in `scripts/host/`.
 
 ## Shell suites
 
-- Name each case as a function `it_<words>`. Its title is the whole name with spaces for
-  underscores, `it` included. Run the cases whose title holds a phrase with
-  `CASE='<phrase>' bash <suite>`.
-- Write one `setup_test` per suite, which wires the stand-ins every case needs and holds no scenario
+- Name each case `@test "it <words>"`. Run the cases whose title holds a phrase with
+  `CASE='<phrase>' bash scripts/run-bats.sh <group>`.
+- Load [`setup.bash`](../../../scripts/src/test-utils/bats/setup.bash) from both `setup_file` and
+  `setup`, and call `stop_timeout_watchdog` first in every `teardown`.
+- Write one `setup` per suite, which wires the stand-ins every case needs and holds no scenario
   data.
-- Make each case's temporary folder with one
-  [`create_case_tree`](../../../scripts/src/test-utils/shell/create-case-tree.sh) call, and pass the case's
-  cleanup to it. The call sets the case's one EXIT trap, so never set a second trap.
+- Use `$BATS_TEST_TMPDIR` as each case's temporary folder, and build its layout with
+  [`create_case_tree`](../../../scripts/src/test-utils/shell/create-case-tree.sh).
 - Run the script under test with `env -i` and an explicit `PATH`, `HOME` and `TMPDIR` in the case
   tree. Start each suite with `umask 022`.
-- Compare the whole stdout, the whole stderr and the stand-in call log, with `diff` against a
-  heredoc or with the `assert_*` helpers. Check the exact exit code with
-  [`assert_status`](../../../scripts/src/test-utils/shell/assert-status.sh).
+- Compare the whole stdout, the whole stderr and the stand-in call log, through `run --separate-stderr`
+  with `assert_output` and `assert_stderr`. Check the exact exit code with `run -<status>`.
 - Poll with `wait_for` from [`wait-for.sh`](../../../scripts/src/test-utils/shell/wait-for.sh), and step time
   with [`create_stub_clock`](../../../scripts/src/test-utils/shell/create-stub-clock.sh).
 
-In a suite that a NixOS check runs, source only the helpers that `build-shell-lib-source.nix`
-selects: `run_cases`, the `assert_*` helpers and `wait_for`. `create_case_tree` and `assert_status`
-are not among them.
+In a NixOS check, the rendered `.bats` file loads bats-support and bats-assert, and sources only the
+helpers that `build-shell-lib-source.nix` selects, which is `wait_for`. `create_case_tree` is not
+among them.
 
 ## Shell stand-ins
 
 - Put each script that writes or starts a stand-in in `scripts/src/test-utils/shell/`, with its own
-  `test-<file>.sh`, never inline in a suite.
+  `<file>.bats`, never inline in a suite.
   Name it `create-stub-<thing>.sh` when it writes an executable, and `start-stub-<thing>.sh` when it
   runs a process.
 - Make a tool stand-in log its argv as one JSON line, match the real tool's exit codes and messages,
   and end with `*) echo "unexpected: $*" >&2; exit 97`. When the real output differs between CI's
-  version and a developer's, check both through
-  [`assert_one_of_outputs`](../../../scripts/src/test-utils/shell/assert-one-of-outputs.sh).
+  version and a developer's, check both in the case, with one `assert_output` for each.
 - Stand in for gh only through [`create-stub-gh.sh`](../../../scripts/src/test-utils/shell/create-stub-gh.sh). Write
   each response in the case, for the exact argv the script sends, and cite its source. Put a long
   body that several suites replay in [`gh-recordings/`](../../../scripts/src/test-utils/shell/gh-recordings/).
 - When you check a stand-in against docs instead of the real tool, as
   [`create-stub-op.sh`](../../../scripts/src/test-utils/shell/create-stub-op.sh) is, record the pages, the tool
   version and the date in its header.
-- When a `test:scripts` suite needs a tool that a developer's host may lack, check for it before
-  `run_cases`. Print `skip` and exit 0, or exit 1 when `CI` is set. Never skip a Docker suite.
+- When a `test:scripts` suite needs a tool that a developer's host may lack, check for it in
+  `setup`. Call `skip` when it is missing, and fail when `CI` is set. Never skip a Docker suite.
 - Run a Docker suite under
   [`with-fixture-images.sh`](../../../scripts/src/test-utils/shell/with-fixture-images.sh). Put `$FIXTURE_RUN`
   in every container and volume name, and remove the containers before the volumes. Run each image
