@@ -2,6 +2,7 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createFakeClock } from '@zgeoff/testing/clock';
 import { buildStubImp } from './src/test-utils/build-stub-imp.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 import { switchAgentImage } from './switch-agent-image.ts';
@@ -41,7 +42,7 @@ test('it backs up the config, then points the cloud target at the image and keep
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234', config],
     home: ctx.home,
-    now: () => Date.parse('2026-10-10T05:06:07.123Z'),
+    now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07.123Z') }).now,
     run: stub.run,
     printOut,
     printErr,
@@ -91,7 +92,7 @@ test('it switches the config in its home by default', async () => {
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => Date.parse('2026-10-10T05:06:07Z'),
+    now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
     printErr: () => {},
@@ -122,7 +123,7 @@ test('it leaves a config that already runs the image alone, without asking the i
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => Date.parse('2026-10-10T05:06:07Z'),
+    now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut,
     printErr: () => {},
@@ -151,7 +152,7 @@ test('it sets guestATC when the config names the image without it', async () => 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => Date.parse('2026-10-10T05:06:07Z'),
+    now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut,
     printErr: () => {},
@@ -189,7 +190,7 @@ test('it says the cloud target had no image before', async () => {
   await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => Date.parse('2026-10-10T05:06:07Z'),
+    now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut,
     printErr: () => {},
@@ -215,7 +216,7 @@ test('it refuses an image the imp host lacks, and changes nothing', async () => 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => Date.parse('2026-10-10T05:06:07Z'),
+    now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
     printErr,
@@ -243,7 +244,7 @@ test('it stops with imp’s own exit code when the imp host cannot list its imag
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => Date.parse('2026-10-10T05:06:07Z'),
+    now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
     printErr,
@@ -271,7 +272,7 @@ test.each([
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => Date.parse('2026-10-10T05:06:07Z'),
+    now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
     printErr,
@@ -298,7 +299,7 @@ test('it refuses a missing config', async () => {
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => Date.parse('2026-10-10T05:06:07Z'),
+    now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
     printErr,
@@ -324,7 +325,7 @@ test.each([
   const exitCode = await switchAgentImage({
     args,
     home: ctx.home,
-    now: () => Date.parse('2026-10-10T05:06:07Z'),
+    now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
     printErr,

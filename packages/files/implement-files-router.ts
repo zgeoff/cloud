@@ -2,6 +2,7 @@ import { rmSync } from 'node:fs';
 import { rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ORPCError, implement } from '@orpc/server';
+import type { Clock } from '@zgeoff/std';
 import type { UploadStore } from './create-upload-store.ts';
 import { decideExpiry } from './decide-expiry.ts';
 import { filesContract } from './files-contract.ts';
@@ -15,7 +16,7 @@ import type { Role, Upload } from './types.ts';
 // space an upload leaves free, for the metadata file and its write-ahead log
 const reserveBytes = 64 * 1024 * 1024;
 
-export interface FilesRouterInputs {
+export interface FilesRouterInputs extends Pick<Clock, 'now'> {
   readonly store: UploadStore;
   readonly filesDir: string;
 
@@ -23,7 +24,6 @@ export interface FilesRouterInputs {
 
   // the public origin, such as https://files.geoff.cloud, with no trailing slash
   readonly publicURL: string;
-  readonly now: () => Date;
   readonly readFreeBytes: () => number;
 
   // writes an upload's bytes to a path on the volume, as Bun.write does
@@ -54,7 +54,8 @@ export function implementFilesRouter(inputs: FilesRouterInputs) {
 
       requireUploadAllowed(input.file, filename);
 
-      const now = inputs.now();
+      const now = new Date(inputs.now());
+
       const expiresAt = requireExpiry(input.expires ?? '7d', options.context.role, now);
 
       if (inputs.readFreeBytes() < input.file.size + reserveBytes) {
@@ -89,7 +90,7 @@ export function implementFilesRouter(inputs: FilesRouterInputs) {
       const uploads = inputs.store.readUploads({
         ...(options.context.role === 'agent' ? { uploader: 'agent' as const } : {}),
         includeExpired: options.input.includeExpired ?? false,
-        now: inputs.now(),
+        now: new Date(inputs.now()),
       });
 
       return uploads.map((upload) => buildUploadOutput(upload, inputs.publicURL));
@@ -105,7 +106,12 @@ export function implementFilesRouter(inputs: FilesRouterInputs) {
       }
 
       const upload = requireVisibleUpload(inputs.store, options.input.id, options.context.role);
-      const expiresAt = requireExpiry(options.input.expires, options.context.role, inputs.now());
+
+      const expiresAt = requireExpiry(
+        options.input.expires,
+        options.context.role,
+        new Date(inputs.now()),
+      );
 
       inputs.store.updateExpiry(upload.id, expiresAt);
 

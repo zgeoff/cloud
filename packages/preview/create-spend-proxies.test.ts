@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createFakeClock } from '@zgeoff/testing/clock';
 import { buildSpendProxyIO } from './build-spend-proxy-io.ts';
 import { createSpendProxies } from './create-spend-proxies.ts';
 import { readProcessStatus } from './src/test-utils/read-process-status.ts';
@@ -12,7 +13,7 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const clock = { now: new Date('2026-10-15T09:00:00Z').getTime() };
+  const clock = createFakeClock({ startMs: Date.parse('2026-10-15T09:00:00Z') });
   const lines: string[] = [];
 
   return {
@@ -21,7 +22,7 @@ async function setupTest() {
     lines,
     stubPath: join(import.meta.dir, 'src', 'test-utils', 'run-stub-counting-proxy.ts'),
     deps: {
-      now: () => new Date(clock.now),
+      now: clock.now,
       log: (line: string) => {
         lines.push(line);
       },
@@ -315,8 +316,7 @@ test('it stops a proxy unused for the idle time and keeps its count', async () =
   const idle = await proxies.holdProxy('pv-0a1b2c3d-7');
 
   idle.release();
-
-  ctx.clock.now += 1_200_000;
+  ctx.clock.advance(1_200_000);
 
   const used = await proxies.holdProxy('pv-0a1b2c3d-8');
 
@@ -327,7 +327,7 @@ test('it stops a proxy unused for the idle time and keeps its count', async () =
     '{"dollars":1,"tokens":9}',
   );
 
-  ctx.clock.now += 1_200_000;
+  ctx.clock.advance(1_200_000);
 
   await proxies.removeIdle();
 
@@ -360,7 +360,7 @@ test('it keeps a proxy that holds a call past the idle time', async () => {
 
   const streaming = await proxies.holdProxy('pv-0a1b2c3d-7');
 
-  ctx.clock.now += 2_400_000;
+  ctx.clock.advance(2_400_000);
 
   await proxies.removeIdle();
 
@@ -389,7 +389,7 @@ test('it keeps a proxy that a call asked for before an idle sweep, while its sta
 
   const holding = proxies.holdProxy('pv-0a1b2c3d-7');
 
-  ctx.clock.now += 2_400_000;
+  ctx.clock.advance(2_400_000);
 
   await proxies.removeIdle();
 
@@ -449,8 +449,7 @@ test('it starts the proxy for a call that arrives during an idle stop only after
   const first = await proxies.holdProxy('pv-0a1b2c3d-7');
 
   first.release();
-
-  ctx.clock.now += 2_400_000;
+  ctx.clock.advance(2_400_000);
 
   // a stopped process holds its SIGTERM until it continues, so the old proxy stays up while the
   // second call asks for one
@@ -527,8 +526,7 @@ test('it removes the files of a proxy whose idle stop is under way only after it
   const first = await proxies.holdProxy('pv-0a1b2c3d-7');
 
   first.release();
-
-  ctx.clock.now += 2_400_000;
+  ctx.clock.advance(2_400_000);
 
   // a stopped process holds its SIGTERM until it continues, so the idle stop stays under way
   // while the preview closes
@@ -655,8 +653,7 @@ test('it stops every proxy on shutdown, an idle stop under way included, before 
   const first = await proxies.holdProxy('pv-0a1b2c3d-7');
 
   first.release();
-
-  ctx.clock.now += 2_400_000;
+  ctx.clock.advance(2_400_000);
 
   // a stopped process holds its SIGTERM until it continues, so the idle stop stays under way
   // while the shutdown starts

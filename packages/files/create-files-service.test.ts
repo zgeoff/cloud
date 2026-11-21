@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createFakeClock } from '@zgeoff/testing/clock';
 import { z } from 'zod';
 import { createFilesService } from './create-files-service.ts';
 import { createUploadStore } from './create-upload-store.ts';
@@ -22,7 +23,7 @@ async function setupTest() {
     store.close();
   });
 
-  const clock = { now: new Date() };
+  const clock = createFakeClock({ startMs: Date.parse('2026-01-01T00:00:00Z') });
 
   const service = createFilesService({
     store,
@@ -32,18 +33,25 @@ async function setupTest() {
       owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
     },
     publicURL: 'https://files.example.com',
-    now: () => clock.now,
+    now: clock.now,
     readFreeBytes: () => Number.MAX_SAFE_INTEGER,
     writeBytes: (path, file) => Bun.write(path, file),
   });
 
-  return { dataDir, store, clock, service };
+  // the fake clock only moves forward, so each test sets it to a later time than its start
+  const setClock = (isoTime: string): void => {
+    clock.advance(Date.parse(isoTime) - clock.now());
+  };
+
+  const readUploads = () => store.readUploads({ includeExpired: true, now: new Date(clock.now()) });
+
+  return { dataDir, store, clock, setClock, readUploads, service };
 }
 
 test('it records an agent upload with the server-set fields and a 7-day expiry', async () => {
   const ctx = await setupTest();
 
-  ctx.clock.now = new Date('2026-05-01T12:00:00Z');
+  ctx.setClock('2026-05-01T12:00:00Z');
 
   const bytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x0d]);
 
@@ -196,7 +204,7 @@ test('it answers 404 with no-store for a file once its expiry has passed', async
 
   await writeFile(join(ctx.dataDir, 'files', 'Exp1redExp1redExp1redE'), 'png bytes');
 
-  ctx.clock.now = new Date('2026-05-08T12:00:00Z');
+  ctx.setClock('2026-05-08T12:00:00Z');
 
   const response = await ctx.service.handle(
     new Request('http://localhost/Exp1redExp1redExp1redE/old.png'),
@@ -220,7 +228,7 @@ test('it serves a file until its expiry', async () => {
 
   await writeFile(join(ctx.dataDir, 'files', 'L1veL1veL1veL1veL1veL1'), 'png bytes');
 
-  ctx.clock.now = new Date('2026-05-08T11:59:59.999Z');
+  ctx.setClock('2026-05-08T11:59:59.999Z');
 
   const response = await ctx.service.handle(
     new Request('http://localhost/L1veL1veL1veL1veL1veL1/live.png'),
@@ -291,10 +299,7 @@ test.each([
   const response = await ctx.service.handle(new Request(`http://localhost${path}`, init));
 
   expect(response.status).toBe(401);
-
-  expect(ctx.store.readUploads({ includeExpired: true, now: ctx.clock.now })).toStrictEqual([
-    upload,
-  ]);
+  expect(ctx.readUploads()).toStrictEqual([upload]);
 });
 
 test.each([
@@ -367,10 +372,7 @@ test.each([
     ]);
 
     expect(responses.map((response) => response.status)).toStrictEqual([401, 401, 401, 401, 401]);
-
-    expect(ctx.store.readUploads({ includeExpired: true, now: ctx.clock.now })).toStrictEqual([
-      upload,
-    ]);
+    expect(ctx.readUploads()).toStrictEqual([upload]);
   },
 );
 
@@ -385,7 +387,7 @@ test.each([
   async (expires) => {
     const ctx = await setupTest();
 
-    ctx.clock.now = new Date('2026-05-01T12:00:00Z');
+    ctx.setClock('2026-05-01T12:00:00Z');
 
     const response = await ctx.service.handle(
       buildUploadRequest({
@@ -400,14 +402,14 @@ test.each([
     const files = await readdir(join(ctx.dataDir, 'files'));
 
     expect(files).toBeEmpty();
-    expect(ctx.store.readUploads({ includeExpired: true, now: ctx.clock.now })).toBeEmpty();
+    expect(ctx.readUploads()).toBeEmpty();
   },
 );
 
 test('it lets an agent upload expire in 30 days', async () => {
   const ctx = await setupTest();
 
-  ctx.clock.now = new Date('2026-05-01T12:00:00Z');
+  ctx.setClock('2026-05-01T12:00:00Z');
 
   const response = await ctx.service.handle(
     buildUploadRequest({
@@ -493,7 +495,7 @@ test('it refuses an upload with 507 when the volume is full', async () => {
       owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
     },
     publicURL: 'https://files.example.com',
-    now: () => ctx.clock.now,
+    now: ctx.clock.now,
     readFreeBytes: () => 1_000_000,
     writeBytes: (path, file) => Bun.write(path, file),
   });
@@ -538,7 +540,7 @@ test('it lists only agent uploads for the agent token', async () => {
 test('it lists every uploader for the owner token, with the expired uploads when asked', async () => {
   const ctx = await setupTest();
 
-  ctx.clock.now = new Date('2026-05-10T00:00:00Z');
+  ctx.setClock('2026-05-10T00:00:00Z');
 
   ctx.store.writeUpload(
     buildMockUpload({
@@ -725,7 +727,7 @@ test.each([
   async (expires, uploader) => {
     const ctx = await setupTest();
 
-    ctx.clock.now = new Date('2026-05-01T12:00:00Z');
+    ctx.setClock('2026-05-01T12:00:00Z');
 
     const upload = buildMockUpload({ id: 'Ag3ntAg3ntAg3ntAg3ntAg', uploader });
 
@@ -758,7 +760,7 @@ test('it removes a file that a stopped run left half written', async () => {
       owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
     },
     publicURL: 'https://files.example.com',
-    now: () => ctx.clock.now,
+    now: ctx.clock.now,
     readFreeBytes: () => Number.MAX_SAFE_INTEGER,
     writeBytes: (path, file) => Bun.write(path, file),
   });
@@ -784,7 +786,7 @@ test('it removes a file that a stopped run placed without its row, and keeps eac
       owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
     },
     publicURL: 'https://files.example.com',
-    now: () => ctx.clock.now,
+    now: ctx.clock.now,
     readFreeBytes: () => Number.MAX_SAFE_INTEGER,
     writeBytes: (path, file) => Bun.write(path, file),
   });
@@ -812,7 +814,7 @@ test('it answers 500 and leaves no staged file and no row when the move into pla
   const incoming = await readdir(join(ctx.dataDir, 'incoming'));
 
   expect(incoming).toBeEmpty();
-  expect(ctx.store.readUploads({ includeExpired: true, now: ctx.clock.now })).toBeEmpty();
+  expect(ctx.readUploads()).toBeEmpty();
 });
 
 test('it answers 507 and leaves no staged file, placed file or row when the file write fills the volume', async () => {
@@ -826,7 +828,7 @@ test('it answers 507 and leaves no staged file, placed file or row when the file
       owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
     },
     publicURL: 'https://files.example.com',
-    now: () => ctx.clock.now,
+    now: ctx.clock.now,
     readFreeBytes: () => Number.MAX_SAFE_INTEGER,
     writeBytes: buildStubFullVolumeWrite(),
   });
@@ -845,7 +847,7 @@ test('it answers 507 and leaves no staged file, placed file or row when the file
 
   expect(incoming).toBeEmpty();
   expect(files).toBeEmpty();
-  expect(ctx.store.readUploads({ includeExpired: true, now: ctx.clock.now })).toBeEmpty();
+  expect(ctx.readUploads()).toBeEmpty();
 });
 
 test('it answers 507 and removes the placed file when the metadata write finds the database full', async () => {
@@ -875,7 +877,7 @@ test('it answers 507 and removes the placed file when the metadata write finds t
       owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
     },
     publicURL: 'https://files.example.com',
-    now: () => ctx.clock.now,
+    now: ctx.clock.now,
     readFreeBytes: () => Number.MAX_SAFE_INTEGER,
     writeBytes: (path, file) => Bun.write(path, file),
   });

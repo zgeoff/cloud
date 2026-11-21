@@ -1,6 +1,7 @@
 import { mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { OpenAPIHandler } from '@orpc/openapi/fetch';
+import type { Clock } from '@zgeoff/std';
 import { Elysia } from 'elysia';
 import { buildFileHeaders } from './build-file-headers.ts';
 import type { UploadStore } from './create-upload-store.ts';
@@ -9,7 +10,7 @@ import type { TokenHashes } from './find-token-role.ts';
 import { implementFilesRouter, maxFileBytes } from './implement-files-router.ts';
 import { fileIDLength } from './mint-file-id.ts';
 
-export interface FilesServiceInputs {
+export interface FilesServiceInputs extends Pick<Clock, 'now'> {
   readonly store: UploadStore;
 
   // the volume: each upload's file under files/, and a file being written under incoming/
@@ -18,7 +19,6 @@ export interface FilesServiceInputs {
 
   // the public origin, such as https://files.geoff.cloud, with no trailing slash
   readonly publicURL: string;
-  readonly now: () => Date;
   readonly readFreeBytes: () => number;
 
   // writes an upload's bytes to a path on the volume, as Bun.write does
@@ -111,7 +111,7 @@ async function readFileResponse(inputs: FileReadInputs, params: FileParams): Pro
   if (
     upload === null ||
     upload.filename !== params.filename ||
-    (upload.expiresAt !== null && upload.expiresAt.getTime() <= inputs.now().getTime()) ||
+    (upload.expiresAt !== null && upload.expiresAt.getTime() <= inputs.now()) ||
     !(await file.exists())
   ) {
     return new Response('NOT_FOUND', { status: 404 });

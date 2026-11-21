@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import type { Clock } from '@zgeoff/std';
 import type { Actor } from 'xstate';
 import { createActor } from 'xstate';
 import { z } from 'zod';
@@ -27,8 +28,7 @@ export interface SpendProxies {
   readonly removeAll: () => Promise<void>;
 }
 
-export interface SpendProxyDeps {
-  readonly now: () => Date;
+export interface SpendProxyDeps extends Pick<Clock, 'now'> {
   readonly log: (line: string) => void;
   readonly io: SpendProxyIO;
 }
@@ -76,7 +76,7 @@ export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps
       const actor = readActor(imp);
       const waiter = Promise.withResolvers<RunningProxy>();
 
-      actor.send({ type: 'hold', waiter, nowMs: deps.now().getTime() });
+      actor.send({ type: 'hold', waiter, nowMs: deps.now() });
 
       const running = await waiter.promise;
 
@@ -91,7 +91,7 @@ export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps
 
           released = true;
 
-          actor.send({ type: 'release', nowMs: deps.now().getTime() });
+          actor.send({ type: 'release', nowMs: deps.now() });
         },
       };
     },
@@ -105,7 +105,7 @@ export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps
       );
     },
     removeIdle: async () => {
-      const cutoffMs = deps.now().getTime() - settings.idleMs;
+      const cutoffMs = deps.now() - settings.idleMs;
 
       await Promise.all(
         [...actors.values()].map(async (actor) => {

@@ -125,7 +125,7 @@ async function startContractImp(
   const evictions = planContractEvictions(imps, run.imp, {
     slots: deps.settings.slots,
     idleMs: contract.idleMs,
-    now: deps.now(),
+    now: new Date(deps.now()),
   });
 
   if (evictions === null || !(await trySleepIdlePreviews(deps, run, evictions))) {

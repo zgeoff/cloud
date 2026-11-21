@@ -86,7 +86,7 @@ export interface SpendPrices extends SpendRates {
   readonly long_prompt?: (SpendRates & { readonly over_tokens: number }) | undefined;
 }
 
-export interface PreviewDeps {
+export interface PreviewDeps extends Pick<Clock, 'now' | 'sleep'> {
   readonly settings: PreviewSettings;
 
   // the counting proxies on each preview's model route; null runs the previews without a spend cap
@@ -103,7 +103,5 @@ export interface PreviewDeps {
   readonly pendingRuns: Set<Promise<void>>;
 
   readonly withSlotLock: <T>(run: () => Promise<T>) => Promise<T>;
-  readonly now: () => Date;
-  readonly sleep: Clock['sleep'];
   readonly log: (line: string) => void;
 }
