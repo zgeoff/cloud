@@ -27,10 +27,6 @@ metadata:
 
 ## Departures
 
-- Test a shell script with a `<name>.bats` suite beside it, which
-  [`run-bats.sh`](../../../scripts/run-bats.sh) runs. [Shell testing](../testing/references/shell.md)
-  asks for a `<name>.test.ts` file instead. The suites share shell stand-ins, and the NixOS checks
-  use bats too, so a TypeScript harness would give cloud a second one.
 - Assert a Go test with testify's `assert` and `require`.
   [Go assertions](../testing/references/go.md#assertions) asks for gotest.tools or go-cmp. Every
   provider test uses testify, and a second library would split the suite.
