@@ -127,7 +127,7 @@ in `scripts/host/`.
   real tool's exit codes and messages, and cite the docs or code you took them from.
 - Run a local tool that touches only the case's files, such as git or tar, through
   [`buildRealProgramHandler`](../../../scripts/src/test-utils/build-real-program-handler.ts). Run git
-  with the environment that [`createGitOrigin`](../../../scripts/src/test-utils/create-git-origin.ts)
+  with the environment that [`createSeededGitOrigin`](../../../scripts/src/test-utils/create-seeded-git-origin.ts)
   returns.
 - Test a script in `scripts/host/`, which travels on ssh's stdin, with real bash against loopback
   stand-ins, such as [`startStubImpd`](../../../scripts/src/test-utils/start-stub-impd.ts).
