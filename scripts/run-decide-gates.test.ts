@@ -6,14 +6,14 @@ import { runDecideGates } from './run-decide-gates.ts';
 import { runProcess } from './run-process.ts';
 import { buildRealProgramHandler } from './src/test-utils/build-real-program-handler.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
-import { createGitOrigin } from './src/test-utils/create-git-origin.ts';
+import { createSeededGitOrigin } from './src/test-utils/create-seeded-git-origin.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-decide-gates-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const repo = await createGitOrigin(directory);
+  const repo = await createSeededGitOrigin(directory);
 
   const runner = buildStubRunner(buildRealProgramHandler(['git'], repo.env));
   const printOut = mock<(text: string) => void>();

@@ -2,8 +2,8 @@ import { onTestFinished } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import type { GitOrigin } from './create-git-origin.ts';
-import { createGitOrigin } from './create-git-origin.ts';
+import type { GitOrigin } from './create-seeded-git-origin.ts';
+import { createSeededGitOrigin } from './create-seeded-git-origin.ts';
 
 export interface CloudCheckout extends GitOrigin {
   readonly clone: string;
@@ -17,7 +17,7 @@ export async function createCloudCheckout(
   // the directory goes when the test finishes, so this must run inside a test
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const origin = await createGitOrigin(directory);
+  const origin = await createSeededGitOrigin(directory);
 
   const clone = join(directory, 'clone');
 

@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { buildRealProgramHandler } from '../src/test-utils/build-real-program-handler.ts';
 import { buildStubReleaseGH } from '../src/test-utils/build-stub-release-gh.ts';
 import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
-import { createGitOrigin } from '../src/test-utils/create-git-origin.ts';
+import { createSeededGitOrigin } from '../src/test-utils/create-seeded-git-origin.ts';
 import { openReleaseBumpPR } from './open-release-bump-pr.ts';
 
 async function setupTest() {
@@ -15,7 +15,7 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const origin = await createGitOrigin(directory);
+  const origin = await createSeededGitOrigin(directory);
 
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();

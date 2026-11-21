@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildRealProgramHandler } from '../src/test-utils/build-real-program-handler.ts';
 import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
-import { createGitOrigin } from '../src/test-utils/create-git-origin.ts';
+import { createSeededGitOrigin } from '../src/test-utils/create-seeded-git-origin.ts';
 import { runWorkflowLint } from './run-workflow-lint.ts';
 
 async function setupTest() {
@@ -12,7 +12,7 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const tools = await createGitOrigin(join(directory, 'tools'));
+  const tools = await createSeededGitOrigin(join(directory, 'tools'));
 
   const root = join(directory, 'repo');
   const cacheDirectory = join(directory, 'cache');
