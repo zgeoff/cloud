@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'bun:test';
-import { HttpResponse, http, passthrough } from 'msw';
+import { HttpResponse, http } from 'msw';
 import { checkNixieAPI } from './check-nixie-api.ts';
-import { server } from './src/test-utils/server.ts';
+import { network } from './src/test-utils/network.ts';
 import { startStubNixieAPI } from './src/test-utils/start-stub-nixie-api.ts';
 
 function setupTest() {
@@ -57,7 +57,7 @@ test('it fails on a procedure that nixie no longer serves', async () => {
 
   // nixie 0.39.1's API app (modules/api/src/create-api-app.ts) answers a path that matches no
   // procedure itself, in plain text
-  server.use(
+  network.use(
     http.post(
       'https://nixie.test/rpc/sessions/list',
       () => new HttpResponse('not found', { status: 404 }),
@@ -89,7 +89,7 @@ test('it fails on a procedure that nixie no longer serves', async () => {
 test('it fails on a call that nixie answers without a session, and never prints the output', async () => {
   const ctx = setupTest();
 
-  server.use(
+  network.use(
     http.post('https://nixie.test/rpc/sessions/list', () =>
       HttpResponse.json({ json: { sessions: [] } }),
     ),
@@ -115,7 +115,7 @@ test("it fails on a 401 that the proxy gives instead of nixie's own refusal", as
   const ctx = setupTest();
 
   // the Status object that the Kubernetes API server answers a request it cannot authenticate with
-  server.use(
+  network.use(
     http.post('https://nixie.test/rpc/sessions/list', () =>
       HttpResponse.json(
         {
@@ -149,8 +149,6 @@ test("it fails on a 401 that the proxy gives instead of nixie's own refusal", as
 
 test('it fails on a call that reaches no server', async () => {
   const ctx = setupTest();
-
-  server.use(http.post('http://127.0.0.1:1/rpc/sessions/list', () => passthrough()));
 
   const exitCode = await checkNixieAPI({
     url: 'http://127.0.0.1:1',

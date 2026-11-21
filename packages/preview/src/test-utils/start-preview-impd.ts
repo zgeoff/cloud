@@ -1,9 +1,7 @@
 import { onTestFinished } from 'bun:test';
 import { createImpClient } from '@impz/client';
 import type { startTestImpd as StartTestImpd, TestImpd } from '@impz/testing';
-import { http, passthrough } from 'msw';
 import { z } from 'zod';
-import { server as mockServer } from './server.ts';
 
 interface PreviewImpSeed {
   readonly name: string;
@@ -71,15 +69,9 @@ export function startPreviewImpd(): PreviewImpd {
 
   const impd = sharedImpd.impd;
   const token = sharedImpd.token;
-
-  // the preload resets MSW's handlers after each test, so each test allows loopback again
-  allowLoopback(impd);
-
   const first = impd.calls.length;
 
   onTestFinished(async () => {
-    allowLoopback(impd);
-
     impd.clearFaults();
     impd.thaw();
 
@@ -181,20 +173,9 @@ async function startSharedImpd(startTestImpd: typeof StartTestImpd): Promise<Sha
     await impd.seedImage(image);
   }
 
-  // the mint is real loopback traffic too
-  allowLoopback(impd);
-
   const minted = await impd.client.tokens.create({ name: 'preview-test', scope: 'manage' });
 
   return { impd, token: minted.secret };
-}
-
-// the service's fetch to impd is real loopback traffic, which MSW lets through
-function allowLoopback(impd: TestImpd): void {
-  mockServer.use(
-    http.all(`${impd.url}/*`, () => passthrough()),
-    http.all(`${impd.impdUrl}/*`, () => passthrough()),
-  );
 }
 
 const namedInputSchema = z.object({ name: z.string() });

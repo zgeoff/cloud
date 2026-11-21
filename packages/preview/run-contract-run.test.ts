@@ -11,7 +11,7 @@ import { makeSlotLock } from './make-slot-lock.ts';
 import { runContractRun } from './run-contract-run.ts';
 import { commitStatuses } from './src/test-utils/constants.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
-import { server } from './src/test-utils/server.ts';
+import { network } from './src/test-utils/network.ts';
 import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
@@ -641,7 +641,7 @@ test('it keeps the result settling when GitHub answers the final status with a s
   ctx.impd.answerCommand = () => ({ code: 0, stdout: ' 18 pass\n 0 fail\n' });
 
   // GitHub's answer to a status while it is down, for every status but the pending ones
-  server.use(
+  network.use(
     http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, async (info) => {
       const body = await info.request.clone().json();
 
@@ -691,7 +691,7 @@ test('it ends a settling run with the refusal and posts no status again when Git
 
   // GitHub's answer to an App without Commit statuses write (docs.github.com/en/rest:
   // authentication/permissions-required-for-github-apps)
-  server.use(
+  network.use(
     http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, (info) => {
       recordStatusPost(String(info.params['sha']));
 

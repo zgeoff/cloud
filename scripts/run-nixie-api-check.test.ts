@@ -1,8 +1,6 @@
 import { expect, mock, test } from 'bun:test';
-import { http, passthrough } from 'msw';
 import { runNixieAPICheck } from './run-nixie-api-check.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
-import { server } from './src/test-utils/server.ts';
 import { startStubNixieAPI } from './src/test-utils/start-stub-nixie-api.ts';
 import type { KubectlProxyStart } from './start-kubectl-proxy.ts';
 
@@ -18,7 +16,7 @@ test('it checks nixie through the service proxy once the rollout finishes, then 
   const ctx = setupTest();
 
   const stub = startStubNixieAPI({
-    url: 'http://127.0.0.1:41873/api/v1/namespaces/nixie/services/http:nixie:http/proxy',
+    url: 'http://proxy.example.test:41873/api/v1/namespaces/nixie/services/http:nixie:http/proxy',
     enrolCodes: [],
     sequences: [],
     keepaliveMs: null,
@@ -38,7 +36,7 @@ test('it checks nixie through the service proxy once the rollout finishes, then 
     startProxy: () =>
       Promise.resolve<KubectlProxyStart>({
         ok: true,
-        proxy: { url: 'http://127.0.0.1:41873', stop: ctx.stop },
+        proxy: { url: 'http://proxy.example.test:41873', stop: ctx.stop },
       }),
     printOut: ctx.printOut,
     printErr: ctx.printErr,
@@ -62,7 +60,7 @@ test('it fails without a call to nixie when the rollout does not finish', async 
   const ctx = setupTest();
 
   const stub = startStubNixieAPI({
-    url: 'http://127.0.0.1:41873/api/v1/namespaces/nixie/services/http:nixie:http/proxy',
+    url: 'http://proxy.example.test:41873/api/v1/namespaces/nixie/services/http:nixie:http/proxy',
     enrolCodes: [],
     sequences: [],
     keepaliveMs: null,
@@ -104,7 +102,7 @@ test('it fails without a call to nixie when the proxy does not start', async () 
   const ctx = setupTest();
 
   const stub = startStubNixieAPI({
-    url: 'http://127.0.0.1:41873/api/v1/namespaces/nixie/services/http:nixie:http/proxy',
+    url: 'http://proxy.example.test:41873/api/v1/namespaces/nixie/services/http:nixie:http/proxy',
     enrolCodes: [],
     sequences: [],
     keepaliveMs: null,
@@ -140,9 +138,6 @@ test('it fails without a call to nixie when the proxy does not start', async () 
 
 test('it fails and still stops the proxy when nixie fails the check', async () => {
   const ctx = setupTest();
-
-  // nothing listens on port 1, so each call fails to connect
-  server.use(http.post(/^http:\/\/127\.0\.0\.1:1\//u, () => passthrough()));
 
   const runner = buildStubRunner((call) =>
     call.argv.join(' ') ===

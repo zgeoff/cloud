@@ -1,10 +1,8 @@
 import { expect, mock, test } from 'bun:test';
-import { http, passthrough } from 'msw';
 import { makeScheduledHandler } from './make-scheduled-handler.ts';
 import { alertWebhookURL } from './src/test-utils/alert-webhook-url.ts';
 import { buildStubR2Bucket } from './src/test-utils/build-stub-r2-bucket.ts';
 import { sentAlerts } from './src/test-utils/sent-alerts.ts';
-import { server } from './src/test-utils/server.ts';
 import { targetStatuses } from './src/test-utils/target-statuses.ts';
 
 function setupTest() {
@@ -41,8 +39,6 @@ test('it records a target where nothing listens as unreachable', async () => {
   const ctx = setupTest();
 
   // a real connection to a port where nothing listens, not a mocked failure
-  server.use(http.get('http://127.0.0.1:1/', () => passthrough()));
-
   const bucket = buildStubR2Bucket();
 
   await ctx.scheduled(undefined, {

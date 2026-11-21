@@ -2,13 +2,13 @@ import { expect, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
 import { getReleaseRecord } from '../src/test-utils/get-release-record.ts';
-import { server } from '../src/test-utils/server.ts';
+import { network } from '../src/test-utils/network.ts';
 import { readNPMTarballValues } from './read-npm-tarball-values.ts';
 
 test('it fails without a tarball read when npm lacks the version', async () => {
   const stub = buildStubRunner();
 
-  server.use(
+  network.use(
     http.get('https://registry.npmjs.org/auto-mode/2.1.0', () =>
       HttpResponse.json({ error: 'version not found: 2.1.0' }, { status: 404 }),
     ),
@@ -27,7 +27,7 @@ test('it fails without a tarball read when npm lacks the version', async () => {
 test('it refuses a tarball away from where the agent image fetches it', async () => {
   const stub = buildStubRunner();
 
-  server.use(
+  network.use(
     http.get('https://registry.npmjs.org/auto-mode/2.1.0', () =>
       HttpResponse.json({
         name: 'auto-mode',
@@ -55,7 +55,7 @@ test('it refuses a tarball away from where the agent image fetches it', async ()
 test('it refuses a tarball that does not match its dist integrity', async () => {
   const stub = buildStubRunner();
 
-  server.use(
+  network.use(
     http.get('https://registry.npmjs.org/auto-mode/2.1.0', () =>
       HttpResponse.json({
         name: 'auto-mode',

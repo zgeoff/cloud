@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
-import { HttpResponse, http, passthrough } from 'msw';
+import { HttpResponse, http } from 'msw';
 import { findJSONField } from './find-json-field.ts';
 import { sendNixieRPC } from './send-nixie-rpc.ts';
-import { server } from './src/test-utils/server.ts';
+import { network } from './src/test-utils/network.ts';
 import { startStubNixieAPI } from './src/test-utils/start-stub-nixie-api.ts';
 
 test('it returns the output from the json field of the answer', async () => {
@@ -62,8 +62,6 @@ test('it reports the status and the code of an error nixie defines', async () =>
 });
 
 test('it reports a call that reaches no server', async () => {
-  server.use(http.post('http://127.0.0.1:1/rpc/sessions/enrol', () => passthrough()));
-
   const result = await sendNixieRPC({
     url: 'http://127.0.0.1:1',
     token: null,
@@ -112,7 +110,7 @@ test('it reports an output that lacks what the call reads, and never prints the 
 });
 
 test('it reports a body that breaks off after the headers', async () => {
-  server.use(
+  network.use(
     http.post('https://nixie.test/rpc/conversation/read', () => {
       const body = new ReadableStream({
         // a start that rejects errors the body, as a connection closed mid-body does
@@ -138,7 +136,7 @@ test('it reports a body that breaks off after the headers', async () => {
 });
 
 test('it reports an error status without the body when nixie defines no code', async () => {
-  server.use(
+  network.use(
     http.post('https://nixie.test/rpc/conversation/read', () =>
       HttpResponse.text('<html>bad gateway, token a7c3e9f1</html>', { status: 502 }),
     ),

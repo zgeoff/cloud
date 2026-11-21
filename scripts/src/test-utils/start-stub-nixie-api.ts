@@ -2,7 +2,7 @@ import { onTestFinished } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { findJSONField } from '../../find-json-field.ts';
 import { buildStubNixieRecord } from './build-stub-nixie-record.ts';
-import { server } from './server.ts';
+import { network } from './network.ts';
 import type { StubStream } from './start-stub-nixie-stream.ts';
 import { startStubNixieStream } from './start-stub-nixie-stream.ts';
 
@@ -55,7 +55,7 @@ export function startStubNixieAPI(options: StubNixieAPIOptions): StubNixieAPI {
     }
   });
 
-  server.use(...declareRoutes(state));
+  network.use(...declareRoutes(state));
 
   return {
     get sessions() {

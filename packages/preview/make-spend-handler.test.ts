@@ -2,21 +2,16 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { http, passthrough } from 'msw';
 import { buildSpendProxyIO } from './build-spend-proxy-io.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { createSpendProxies } from './create-spend-proxies.ts';
 import { makeSpendHandler } from './make-spend-handler.ts';
-import { server as mockServer } from './src/test-utils/server.ts';
 import { waitForCondition } from './src/test-utils/wait-for-condition.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'spend-handler-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
-
-  // each proxy's port comes from the kernel, so every loopback port passes through
-  mockServer.use(http.all(/^http:\/\/127\.0\.0\.1:\d+\//u, () => passthrough()));
 
   const store = createPreviewStore(join(directory, 'previews.sqlite'));
 

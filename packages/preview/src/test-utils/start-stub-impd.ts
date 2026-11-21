@@ -1,11 +1,11 @@
 import { onTestFinished } from 'bun:test';
 import type { ServerWebSocket } from 'bun';
-import { http, passthrough } from 'msw';
+import { http } from 'msw';
 import { match } from 'ts-pattern';
 import { z } from 'zod';
 import type { StubApp } from './build-stub-proxy-response.ts';
 import { buildStubProxyResponse } from './build-stub-proxy-response.ts';
-import { server as mockServer } from './server.ts';
+import { network as mockNetwork } from './network.ts';
 
 // impd's API on loopback, as zgeoff/impz v2.3.0 serves @impz/client 2.3.0: oRPC procedures
 // with each Date in `meta`, and /exec opened by a single-use exec.ticket or the bearer token. Tests
@@ -156,9 +156,7 @@ export function startStubImpd(options: StubImpdOptions = {}): StubImpd {
 
   const url = `http://127.0.0.1:${server.port}`;
 
-  // the service's fetch to the stub is real loopback traffic, which MSW lets through
-  mockServer.use(
-    http.all(`${url}/*`, () => passthrough()),
+  mockNetwork.use(
     http.all(`https://*.${stub.impDomain}/*`, (info) => buildStubProxyResponse(stub, info.request)),
   );
 

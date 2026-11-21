@@ -1,8 +1,6 @@
 import { onTestFinished } from 'bun:test';
 import type { startTestImpd as StartTestImpd, TestImpd } from '@impz/testing';
-import { http, passthrough } from 'msw';
 import { z } from 'zod';
-import { server } from './server.ts';
 
 export interface ScriptsImpd {
   readonly url: string;
@@ -47,12 +45,7 @@ export function startScriptsImpd(): ScriptsImpd {
   const token = sharedImpd.token;
   const first = impd.calls.length;
 
-  // the preload resets MSW's handlers after each test, so each test allows loopback again
-  allowLoopback(impd);
-
   onTestFinished(async () => {
-    allowLoopback(impd);
-
     impd.clearFaults();
 
     for (const image of await impd.client.images.list()) {
@@ -84,21 +77,9 @@ export async function stopScriptsImpd(): Promise<void> {
 
 async function startSharedImpd(startTestImpd: typeof StartTestImpd): Promise<SharedImpd> {
   const impd = await startTestImpd();
-
-  // the mint is real loopback traffic too
-  allowLoopback(impd);
-
   const minted = await impd.client.tokens.create({ name: 'scripts-test', scope: 'manage' });
 
   return { impd, token: minted.secret };
-}
-
-// the script's fetch to impd is real loopback traffic, which MSW lets through
-function allowLoopback(impd: TestImpd): void {
-  server.use(
-    http.all(`${impd.url}/*`, () => passthrough()),
-    http.all(`${impd.impdUrl}/*`, () => passthrough()),
-  );
 }
 
 const addInputSchema = z.object({ name: z.string(), ref: z.string() });

@@ -8,7 +8,7 @@ import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
-import { server } from './src/test-utils/server.ts';
+import { network } from './src/test-utils/network.ts';
 import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
@@ -141,7 +141,7 @@ test("it resolves unhealthy with the error when the imp's name never answers", a
 
   const ctx = await setupTest(impd);
 
-  server.use(
+  network.use(
     http.get('https://pv-0a1b2c3d-17.imps.example.test/healthz', () => HttpResponse.error()),
   );
 
@@ -163,7 +163,7 @@ test('it counts a redirect from the health path as healthy, as curl --fail did',
 
   const ctx = await setupTest(impd);
 
-  server.use(
+  network.use(
     http.get('https://pv-0a1b2c3d-17.imps.example.test/healthz', () =>
       HttpResponse.redirect('https://pv-0a1b2c3d-17.imps.example.test/login', 302),
     ),
@@ -187,7 +187,7 @@ test('it keeps the status and the text of a plain answer that is not healthy', a
 
   const ctx = await setupTest(impd);
 
-  server.use(
+  network.use(
     http.get('https://pv-0a1b2c3d-17.imps.example.test/healthz', () =>
       HttpResponse.text('  still seeding\n  the invented orders\n', { status: 503 }),
     ),

@@ -9,7 +9,7 @@ import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
 import { createCloudCheckout } from '../src/test-utils/create-cloud-checkout.ts';
 import { createNPMTarball } from '../src/test-utils/create-npm-tarball.ts';
 import { createRestoreJobFiles } from '../src/test-utils/create-restore-job-files.ts';
-import { server } from '../src/test-utils/server.ts';
+import { network } from '../src/test-utils/network.ts';
 import { runReleaseBump } from './run-release-bump.ts';
 
 async function setupTest() {
@@ -378,7 +378,7 @@ test('it opens an auto mode patch bump that merges on its own', async () => {
 
   const tarball = await createNPMTarball({ name: 'auto-mode', version: '0.19.4' });
 
-  server.use(...buildStubNPMRegistry({ 'auto-mode': { '0.19.4': { tarball } } }));
+  network.use(...buildStubNPMRegistry({ 'auto-mode': { '0.19.4': { tarball } } }));
 
   const stub = buildStubRunner(
     buildStubReleaseGH({}),
@@ -433,7 +433,7 @@ test('it pins the auto mode tarball sum that the registry serves', async () => {
 
   const tarball = await createNPMTarball({ name: 'auto-mode', version: '0.19.4' });
 
-  server.use(...buildStubNPMRegistry({ 'auto-mode': { '0.19.4': { tarball } } }));
+  network.use(...buildStubNPMRegistry({ 'auto-mode': { '0.19.4': { tarball } } }));
 
   const stub = buildStubRunner(
     buildStubReleaseGH({}),
@@ -460,7 +460,7 @@ test('it pins the auto mode tarball sum that the registry serves', async () => {
 test('it fails without a pull request when npm lacks the auto mode release', async () => {
   const ctx = await setupTest();
 
-  server.use(...buildStubNPMRegistry({}));
+  network.use(...buildStubNPMRegistry({}));
 
   const stub = buildStubRunner(buildStubReleaseGH({}));
 
@@ -482,7 +482,7 @@ test('it fails without a pull request when npm lacks the auto mode release', asy
 test('it refuses an auto mode tarball away from where the image fetches it', async () => {
   const ctx = await setupTest();
 
-  server.use(
+  network.use(
     ...buildStubNPMRegistry({
       'auto-mode': {
         '0.19.4': {

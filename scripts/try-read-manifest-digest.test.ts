@@ -1,12 +1,12 @@
 import { expect, test } from 'bun:test';
-import { HttpResponse, http, passthrough } from 'msw';
-import { server } from './src/test-utils/server.ts';
+import { HttpResponse, http } from 'msw';
+import { network } from './src/test-utils/network.ts';
 import { tryReadManifestDigest } from './try-read-manifest-digest.ts';
 
 test('it reads the digest a tag names, asking for an index or a manifest in either media type', async () => {
   const accepts: (string | null)[] = [];
 
-  server.use(
+  network.use(
     http.head('https://ghcr.io/v2/zgeoff/backup/manifests/1.0.0-r2', (info) => {
       accepts.push(info.request.headers.get('accept'));
 
@@ -27,7 +27,7 @@ test('it reads the digest a tag names, asking for an index or a manifest in eith
 });
 
 test('it reads a manifest by its digest', async () => {
-  server.use(
+  network.use(
     http.head(
       `https://gcr.io/v2/distroless/cc/manifests/sha256:${'6'.repeat(64)}`,
       () =>
@@ -44,7 +44,7 @@ test('it reads a manifest by its digest', async () => {
 });
 
 test('it answers missing when the registry serves no such manifest', async () => {
-  server.use(
+  network.use(
     http.head(`https://gcr.io/v2/distroless/cc/manifests/sha256:${'6'.repeat(64)}`, () =>
       HttpResponse.json(
         { errors: [{ code: 'MANIFEST_UNKNOWN', message: 'manifest unknown' }] },
@@ -59,7 +59,7 @@ test('it answers missing when the registry serves no such manifest', async () =>
 });
 
 test("it takes an anonymous pull token from the registry's Bearer challenge", async () => {
-  server.use(
+  network.use(
     http.head('https://registry-1.docker.io/v2/example/builder/manifests/2.30.0', (info) =>
       info.request.headers.get('authorization') === 'Bearer pull-token-7'
         ? new HttpResponse(null, {
@@ -92,7 +92,7 @@ test("it takes an anonymous pull token from the registry's Bearer challenge", as
 test("it pays for ghcr.io's pull token with the GitHub token, which reads a private package", async () => {
   const realmAuthorizations: (string | null)[] = [];
 
-  server.use(
+  network.use(
     http.head('https://ghcr.io/v2/zgeoff/atc-gateway/manifests/2.27.0', (info) =>
       info.request.headers.get('authorization') === 'Bearer pull-token-9'
         ? new HttpResponse(null, {
@@ -127,7 +127,7 @@ test("it pays for ghcr.io's pull token with the GitHub token, which reads a priv
 test("it never sends the GitHub token to another registry's realm", async () => {
   const realmAuthorizations: (string | null)[] = [];
 
-  server.use(
+  network.use(
     http.head('https://registry-1.docker.io/v2/example/builder/manifests/2.30.0', (info) =>
       info.request.headers.get('authorization') === 'Bearer pull-token-8'
         ? new HttpResponse(null, {
@@ -158,7 +158,7 @@ test("it never sends the GitHub token to another registry's realm", async () => 
 test("it never pays for a pull token with the GitHub token when another registry names ghcr.io's realm", async () => {
   const realmAuthorizations: (string | null)[] = [];
 
-  server.use(
+  network.use(
     http.head(
       'https://registry.example/v2/image/manifests/1.0.0',
       () =>
@@ -186,7 +186,7 @@ test("it never pays for a pull token with the GitHub token when another registry
 test('it never sends the GitHub token to a ghcr.io realm over plain HTTP', async () => {
   const realmAuthorizations: (string | null)[] = [];
 
-  server.use(
+  network.use(
     http.head(
       'https://ghcr.io/v2/zgeoff/atc-gateway/manifests/2.27.0',
       () =>
@@ -212,7 +212,7 @@ test('it never sends the GitHub token to a ghcr.io realm over plain HTTP', async
 });
 
 test('it says the credential cannot read a manifest the registry refuses with its token', async () => {
-  server.use(
+  network.use(
     http.head(
       'https://ghcr.io/v2/zgeoff/atc-gateway/manifests/2.27.0',
       () => new HttpResponse(null, { status: 403 }),
@@ -227,7 +227,7 @@ test('it says the credential cannot read a manifest the registry refuses with it
 });
 
 test("it asks Docker Hub's library namespace for an official image", async () => {
-  server.use(
+  network.use(
     http.head(
       'https://registry-1.docker.io/v2/library/alpine/manifests/3.20',
       () =>
@@ -244,7 +244,7 @@ test("it asks Docker Hub's library namespace for an official image", async () =>
 });
 
 test('it answers with the status when the registry answers with an error', async () => {
-  server.use(
+  network.use(
     http.head(
       'https://gcr.io/v2/distroless/cc/manifests/nonroot',
       () => new HttpResponse(null, { status: 503 }),
@@ -257,8 +257,6 @@ test('it answers with the status when the registry answers with an error', async
 });
 
 test('it answers with the error when it cannot reach the registry', async () => {
-  server.use(http.head('https://127.0.0.1:1/*', () => passthrough()));
-
   const answer = await tryReadManifestDigest('127.0.0.1:1/zgeoff/backup', '1.0.0');
 
   expect(answer).toStrictEqual({ error: expect.toSatisfy((text: string) => text !== '') });

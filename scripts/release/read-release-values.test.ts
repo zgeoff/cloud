@@ -4,7 +4,7 @@ import { buildStubReleaseDocker } from '../src/test-utils/build-stub-release-doc
 import { buildStubReleaseGH } from '../src/test-utils/build-stub-release-gh.ts';
 import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
 import { getReleaseRecord } from '../src/test-utils/get-release-record.ts';
-import { server } from '../src/test-utils/server.ts';
+import { network } from '../src/test-utils/network.ts';
 import { readReleaseValues } from './read-release-values.ts';
 
 test('it reads an atc release SHA256SUMS for a sums source', async () => {
@@ -118,7 +118,7 @@ test('it reads the nixie digests and flags from the notes for a release-notes so
 test('it reads the auto-mode package from the npm registry for an npm-tarball source', async () => {
   const stub = buildStubRunner();
 
-  server.use(
+  network.use(
     http.get(
       'https://registry.npmjs.org/auto-mode/2.1.0',
       () => new HttpResponse('Not Found', { status: 404 }),

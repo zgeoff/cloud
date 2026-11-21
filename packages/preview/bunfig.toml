@@ -1,8 +1,10 @@
 [test]
-# registers jest-extended matchers, seeds faker and runs the preview service's MSW server; the
-# root preload never loads here
+# registers jest-extended matchers, seeds faker, restores env overrides, runs the preview service's
+# test network and keeps its stand-in state per test; the root preload never loads here
 preload = [
   "@zgeoff/bun-test-extended",
   "./src/test-utils/pin-faker-seed.ts",
-  "./src/test-utils/register-mock-server.ts",
+  "@zgeoff/testing/preload",
+  "./src/test-utils/network.ts",
+  "./src/test-utils/register-test-state.ts",
 ]

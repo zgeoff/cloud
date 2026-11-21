@@ -1,3 +1,9 @@
 [test]
-# registers jest-extended matchers and runs the worker's MSW server; infra's preload never loads here
-preload = ["@zgeoff/bun-test-extended", "./src/test-utils/register-mock-server.ts"]
+# registers jest-extended matchers, restores env overrides, runs the worker's test network and keeps
+# its stand-in state per test; infra's preload never loads here
+preload = [
+  "@zgeoff/bun-test-extended",
+  "@zgeoff/testing/preload",
+  "./src/test-utils/network.ts",
+  "./src/test-utils/register-test-state.ts",
+]

@@ -1,4 +1,4 @@
 [test]
-# registers jest-extended matchers; the root preload never loads here, so the root unit run's MSW
-# server and faker seed stay out of the journeys
-preload = ["@zgeoff/bun-test-extended"]
+# registers jest-extended matchers and restores env overrides; the root preload never loads here, so
+# the root unit run's test network and faker seed stay out of the journeys
+preload = ["@zgeoff/bun-test-extended", "@zgeoff/testing/preload"]

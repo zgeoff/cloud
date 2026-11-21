@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
 import { checkImagePins } from './check-image-pins.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
-import { server } from './src/test-utils/server.ts';
+import { network } from './src/test-utils/network.ts';
 
 async function setupTest() {
   const root = await mkdtemp(join(tmpdir(), 'check-image-pins-'));
@@ -75,7 +75,7 @@ test('it passes when a release tag names its pinned digest, asking once for a pi
 
   let requests = 0;
 
-  server.use(
+  network.use(
     http.head('https://ghcr.io/v2/zgeoff/backup/manifests/1.0.0-r2', () => {
       requests += 1;
 
@@ -111,7 +111,7 @@ test('it fails a release pin whose tag names another digest at the registry', as
     `FROM ghcr.io/zgeoff/base:2.0.0@sha256:${'2'.repeat(64)}\n`,
   );
 
-  server.use(
+  network.use(
     http.head(
       'https://ghcr.io/v2/zgeoff/base/manifests/2.0.0',
       () =>
@@ -146,7 +146,7 @@ test('it reads a pin from a TypeScript key that ends in Image', async () => {
     `export const pepysImages = {\n  storeImage: 'ghcr.io/zgeoff/store:1.4.0@sha256:${'5'.repeat(64)}',\n} as const;\n`,
   );
 
-  server.use(
+  network.use(
     http.head(
       'https://ghcr.io/v2/zgeoff/store/manifests/1.4.0',
       () =>
@@ -179,7 +179,7 @@ test('it fails a release pin whose tag the registry does not have', async () => 
     `FROM ghcr.io/zgeoff/base:2.0.0@sha256:${'2'.repeat(64)}\n`,
   );
 
-  server.use(
+  network.use(
     http.head('https://ghcr.io/v2/zgeoff/base/manifests/2.0.0', () =>
       HttpResponse.json(
         { errors: [{ code: 'MANIFEST_UNKNOWN', message: 'manifest unknown' }] },
@@ -211,7 +211,7 @@ test('it passes an upstream pin whose tag moved, while the registry still serves
   );
 
   // the publisher rebuilt nonroot, so the tag names a newer digest than the pin
-  server.use(
+  network.use(
     http.head(
       'https://gcr.io/v2/distroless/cc/manifests/nonroot',
       () =>
@@ -254,7 +254,7 @@ test('it fails an upstream pin whose digest the registry no longer serves', asyn
     `BASE_IMAGE=gcr.io/distroless/cc:nonroot@sha256:${'6'.repeat(64)}\n`,
   );
 
-  server.use(
+  network.use(
     http.head(`https://gcr.io/v2/distroless/cc/manifests/sha256:${'6'.repeat(64)}`, () =>
       HttpResponse.json(
         { errors: [{ code: 'MANIFEST_UNKNOWN', message: 'manifest unknown' }] },
@@ -287,7 +287,7 @@ test('it fails a pin whose registry answers with an error', async () => {
     `    image = "gcr.io/distroless/cc:nonroot@sha256:${'6'.repeat(64)}";\n`,
   );
 
-  server.use(
+  network.use(
     http.head(
       `https://gcr.io/v2/distroless/cc/manifests/sha256:${'6'.repeat(64)}`,
       () => new HttpResponse(null, { status: 503 }),
@@ -449,7 +449,7 @@ test('it reads a quoted Nix image and a tag-only key, which is not an image refe
     'GATEWAY_IMAGE_TAG=4.0.0\n',
   );
 
-  server.use(
+  network.use(
     http.head(
       `https://example.org:5000/v2/team/host/manifests/sha256:${'5'.repeat(64)}`,
       () =>

@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { checkNixieStream } from './check-nixie-stream.ts';
-import { server } from './src/test-utils/server.ts';
+import { network } from './src/test-utils/network.ts';
 import { startStubNixieAPI } from './src/test-utils/start-stub-nixie-api.ts';
 
 test('it holds the stream open, reads the same record count before and after, and revokes its session', async () => {
@@ -233,7 +233,7 @@ test('it revokes its session when a read breaks off after the headers', async ()
     closeAfterMs: null,
   });
 
-  server.use(
+  network.use(
     http.post('https://nixie.test/rpc/conversation/read', () => {
       const body = new ReadableStream({
         // a start that rejects errors the body, as a connection closed mid-body does

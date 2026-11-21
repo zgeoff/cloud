@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { checkGatewayImage } from './check-gateway-image.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
-import { server } from './src/test-utils/server.ts';
+import { network } from './src/test-utils/network.ts';
 
 function setupTest() {
   return buildStubRunner((call) =>
@@ -16,7 +16,7 @@ test('it finds the private image with a pull token the GitHub token pays for', a
   const stub = setupTest();
   const seen: (string | null)[] = [];
 
-  server.use(
+  network.use(
     http.get('https://ghcr.io/token', (info) => {
       seen.push(
         new URL(info.request.url).searchParams.get('scope'),
@@ -61,7 +61,7 @@ test('it fails, naming the missing credential, without asking ghcr when there is
 test('it fails when ghcr refuses the GitHub token at the tag list', async () => {
   const stub = setupTest();
 
-  server.use(
+  network.use(
     http.get('https://ghcr.io/token', () => HttpResponse.json({ token: 'ghcr-t1' })),
     http.get(
       'https://ghcr.io/v2/zgeoff/atc-gateway/tags/list',
@@ -80,7 +80,7 @@ test('it fails when ghcr refuses the GitHub token at the tag list', async () => 
 test('it fails when ghcr refuses the GitHub token at its token realm', async () => {
   const stub = setupTest();
 
-  server.use(http.get('https://ghcr.io/token', () => new HttpResponse(null, { status: 401 })));
+  network.use(http.get('https://ghcr.io/token', () => new HttpResponse(null, { status: 401 })));
 
   const line = await checkGatewayImage(stub.run);
 
@@ -93,7 +93,7 @@ test('it fails when ghcr refuses the GitHub token at its token realm', async () 
 test('it reports the image missing when the tag list answers 404', async () => {
   const stub = setupTest();
 
-  server.use(
+  network.use(
     http.get('https://ghcr.io/token', () => HttpResponse.json({ token: 'ghcr-t1' })),
     http.get(
       'https://ghcr.io/v2/zgeoff/atc-gateway/tags/list',
@@ -109,7 +109,7 @@ test('it reports the image missing when the tag list answers 404', async () => {
 test('it reports the image missing when ghcr hands out no token', async () => {
   const stub = setupTest();
 
-  server.use(http.get('https://ghcr.io/token', () => HttpResponse.json({ errors: [] })));
+  network.use(http.get('https://ghcr.io/token', () => HttpResponse.json({ errors: [] })));
 
   const line = await checkGatewayImage(stub.run);
 
@@ -119,7 +119,7 @@ test('it reports the image missing when ghcr hands out no token', async () => {
 test('it reports the image missing when ghcr does not answer', async () => {
   const stub = setupTest();
 
-  server.use(http.get('https://ghcr.io/token', () => HttpResponse.error()));
+  network.use(http.get('https://ghcr.io/token', () => HttpResponse.error()));
 
   const line = await checkGatewayImage(stub.run);
 

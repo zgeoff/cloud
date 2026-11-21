@@ -2,20 +2,15 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { http, passthrough } from 'msw';
 import { buildSpendProxyIO } from './build-spend-proxy-io.ts';
 import { createSpendProxies } from './create-spend-proxies.ts';
 import { readProcessStatus } from './src/test-utils/read-process-status.ts';
-import { server as mockServer } from './src/test-utils/server.ts';
 import { waitForCondition } from './src/test-utils/wait-for-condition.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'spend-proxies-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
-
-  // each proxy's port comes from the kernel, so every loopback port passes through
-  mockServer.use(http.all(/^http:\/\/127\.0\.0\.1:\d+\//u, () => passthrough()));
 
   const clock = { now: new Date('2026-10-15T09:00:00Z').getTime() };
   const lines: string[] = [];

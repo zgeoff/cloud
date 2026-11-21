@@ -3,12 +3,12 @@ import { HttpResponse, http } from 'msw';
 import { checkGatewayRoute } from './check-gateway-route.ts';
 import { buildStubGetent } from './src/test-utils/build-stub-getent.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
-import { server } from './src/test-utils/server.ts';
+import { network } from './src/test-utils/network.ts';
 
 test('it passes the route when its metadata answers 200', async () => {
   const stub = buildStubRunner(buildStubGetent({ 'atc.geoff.cloud': '104.21.32.1' }));
 
-  server.use(
+  network.use(
     http.get('https://atc.geoff.cloud/.well-known/oauth-protected-resource/mcp', () =>
       HttpResponse.json({ resource: 'https://atc.geoff.cloud/mcp' }),
     ),
@@ -25,7 +25,7 @@ test('it passes the route when its metadata answers 200', async () => {
 test('it reads a redirect as its own status, not the target’s', async () => {
   const stub = buildStubRunner(buildStubGetent({ 'atc.geoff.cloud': '104.21.32.1' }));
 
-  server.use(
+  network.use(
     http.get(
       'https://atc.geoff.cloud/.well-known/oauth-protected-resource/mcp',
       () =>

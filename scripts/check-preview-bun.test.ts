@@ -2,10 +2,10 @@ import { expect, test } from 'bun:test';
 import { buildBunPinCheck } from '@zgeoff/cloud-preview/build-bun-pin-check.ts';
 import { HttpResponse, http } from 'msw';
 import { checkPreviewBun } from './check-preview-bun.ts';
-import { server } from './src/test-utils/server.ts';
+import { network } from './src/test-utils/network.ts';
 
 test('it passes a script that downloads, checks and pins the release before the install, whose tarball matches its sha256', async () => {
-  server.use(
+  network.use(
     http.get(
       'https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-7.3.1.tgz',
       () => new HttpResponse('stand-in bun tarball'),
@@ -35,7 +35,7 @@ bun install --frozen-lockfile
 });
 
 test('it fails a release whose tarball has another sha256 than the pin', async () => {
-  server.use(
+  network.use(
     http.get(
       'https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-7.3.1.tgz',
       () => new HttpResponse('another bun tarball'),
@@ -70,7 +70,7 @@ bun install --frozen-lockfile
 });
 
 test('it fails a release that the registry does not serve', async () => {
-  server.use(
+  network.use(
     http.get('https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-7.3.1.tgz', () =>
       HttpResponse.json({ error: 'Not found' }, { status: 404 }),
     ),
@@ -104,7 +104,7 @@ bun install --frozen-lockfile
 });
 
 test('it fails a script that installs the dependencies before it checks the repository pin', async () => {
-  server.use(
+  network.use(
     http.get(
       'https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-7.3.1.tgz',
       () => new HttpResponse('stand-in bun tarball'),
@@ -139,7 +139,7 @@ ${buildBunPinCheck('7.3.1')}
 });
 
 test('it fails a script that checks the repository pin against another release than it downloads', async () => {
-  server.use(
+  network.use(
     http.get(
       'https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-7.3.1.tgz',
       () => new HttpResponse('stand-in bun tarball'),

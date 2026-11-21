@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { createImpClient } from '@impz/client';
-import { server } from './server.ts';
+import { network } from './network.ts';
 import { startStubImpdImages } from './start-stub-impd-images.ts';
 
 test("it lists its images to imp's typed client, with each record's created time as a Date", async () => {
@@ -16,7 +16,7 @@ test("it lists its images to imp's typed client, with each record's created time
     ],
   });
 
-  server.use(...impd.handlers);
+  network.use(...impd.handlers);
 
   const client = createImpClient({ url: 'https://impd.test', token: 'impd-token-for-tests' });
 
@@ -43,7 +43,7 @@ test('it holds an added image and records the add', async () => {
     images: [],
   });
 
-  server.use(...impd.handlers);
+  network.use(...impd.handlers);
 
   const client = createImpClient({ url: 'https://impd.test', token: 'impd-token-for-tests' });
 
@@ -89,7 +89,7 @@ test.each([
       images: [],
     });
 
-    server.use(...impd.handlers);
+    network.use(...impd.handlers);
 
     const response = await fetch(`https://impd.test/rpc/${path}`, {
       method: 'POST',
@@ -116,7 +116,7 @@ test('it refuses a call with another token as unauthorized', () => {
     images: [],
   });
 
-  server.use(...impd.handlers);
+  network.use(...impd.handlers);
 
   const client = createImpClient({ url: 'https://impd.test', token: 'another-token' });
 
