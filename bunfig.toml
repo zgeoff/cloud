@@ -64,7 +64,8 @@ minimumReleaseAgeExcludes = [
 
 [test]
 # The root run covers infra and scripts: it registers jest-extended matchers, seeds faker once
-# for the run, and runs the scripts' MSW server. The health-check worker is its own package with
+# for the run, restores env overrides, runs the shared test network, and starts a shared impd per
+# file. The health-check worker is its own package with
 # its own preload, so `bun run test:health-check` runs it from its directory, and the preview
 # service and the files service likewise run their own, with `bun run test:preview` and
 # `bun run test:files`. The TypeScript journeys in scripts/e2e/ are a lane, not part of the unit run, so
@@ -72,7 +73,9 @@ minimumReleaseAgeExcludes = [
 preload = [
   "@zgeoff/bun-test-extended",
   "./infra/src/test-utils/pin-faker-seed.ts",
-  "./scripts/src/test-utils/register-mock-server.ts",
+  "@zgeoff/testing/preload",
+  "./scripts/src/test-utils/network.ts",
+  "./scripts/src/test-utils/register-shared-impd.ts",
 ]
 # rig's ignore patterns replace this list in the unit run, so the ignore list in rig.config.ts names
 # these folders again

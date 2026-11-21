@@ -2,12 +2,11 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { http, passthrough } from 'msw';
+import { createFakeClock } from '@zgeoff/testing/clock';
 import { buildSpendProxyIO } from './build-spend-proxy-io.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { createSpendProxies } from './create-spend-proxies.ts';
 import { makeSpendHandler } from './make-spend-handler.ts';
-import { server as mockServer } from './src/test-utils/server.ts';
 import { waitForCondition } from './src/test-utils/wait-for-condition.ts';
 
 async function setupTest() {
@@ -15,16 +14,13 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  // each proxy's port comes from the kernel, so every loopback port passes through
-  mockServer.use(http.all(/^http:\/\/127\.0\.0\.1:\d+\//u, () => passthrough()));
-
   const store = createPreviewStore(join(directory, 'previews.sqlite'));
 
   onTestFinished(() => {
     store.close();
   });
 
-  const clock = { now: new Date('2026-10-15T09:00:00Z').getTime() };
+  const clock = createFakeClock({ startMs: Date.parse('2026-10-15T09:00:00Z') });
   const lines: string[] = [];
 
   return {
@@ -34,7 +30,7 @@ async function setupTest() {
     lines,
     stubPath: join(import.meta.dir, 'src', 'test-utils', 'run-stub-counting-proxy.ts'),
     deps: {
-      now: () => new Date(clock.now),
+      now: clock.now,
       log: (line: string) => {
         lines.push(line);
       },
@@ -82,7 +78,7 @@ test('it keeps a preview proxy through an idle sweep while the proxy reply is un
     }),
   );
 
-  ctx.clock.now += 2_400_000;
+  ctx.clock.advance(2_400_000);
 
   await proxies.removeIdle();
 
@@ -133,7 +129,7 @@ test('it lets an idle sweep stop a preview proxy once the proxy reply is read', 
 
   await response.text();
 
-  ctx.clock.now += 2_400_000;
+  ctx.clock.advance(2_400_000);
 
   await proxies.removeIdle();
 

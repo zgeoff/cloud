@@ -2,17 +2,12 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { http, passthrough } from 'msw';
 import { z } from 'zod';
-import { server as mockServer } from './server.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'stub-counting-proxy-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
-
-  // the stub's port comes from the kernel, so every loopback port passes through
-  mockServer.use(http.all(/^http:\/\/127\.0\.0\.1:\d+\//u, () => passthrough()));
 
   return { directory, stubPath: join(import.meta.dir, 'run-stub-counting-proxy.ts') };
 }

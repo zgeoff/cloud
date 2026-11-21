@@ -25,7 +25,7 @@ test('it creates a seed whose pushes reach the bare origin on main', async () =>
   const seedHead = await repo.git(['-C', repo.seed, 'rev-parse', 'HEAD']);
   const origin = await repo.git(['-C', repo.origin, 'log', '-1', '--format=%H %an <%ae>', 'main']);
 
-  expect(origin).toBe(`${seedHead} test <test@example.invalid>`);
+  expect(origin).toBe(`${seedHead} Test <test@example.com>`);
 });
 
 test('it runs git without the user’s global config', async () => {
@@ -62,6 +62,6 @@ test('it throws with git’s message when a git call fails', async () => {
   const repo = await createSeededGitOrigin(ctx.directory);
 
   expect(repo.git(['-C', repo.seed, 'rev-parse', '--verify', 'nowhere'])).rejects.toThrow(
-    `git -C ${repo.seed} rev-parse --verify nowhere exited 128: fatal: Needed a single revision\n`,
+    `git -C ${repo.seed} rev-parse --verify nowhere failed: fatal: Needed a single revision\n`,
   );
 });

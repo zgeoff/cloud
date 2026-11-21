@@ -1,6 +1,6 @@
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { runProcess } from '../../run-process.ts';
+import { createGitOrigin, readGitEnv, runGit } from '@zgeoff/testing/git';
 
 export interface GitOrigin {
   readonly origin: string;
@@ -11,52 +11,29 @@ export interface GitOrigin {
   readonly git: (args: readonly string[]) => Promise<string>;
 }
 
+// The kit's empty bare origin, plus a seed repository whose `origin` remote is that origin and a
+// runner for git calls in the kit's isolated git environment.
 export async function createSeededGitOrigin(directory: string): Promise<GitOrigin> {
   const home = join(directory, 'home');
+  const gitEnv = readGitEnv(home);
 
-  const env = {
-    PATH: process.env['PATH'] ?? '/usr/bin:/bin',
-    HOME: home,
-    GIT_CONFIG_GLOBAL: '/dev/null',
-    GIT_CONFIG_NOSYSTEM: '1',
-    GIT_AUTHOR_NAME: 'test',
-    GIT_AUTHOR_EMAIL: 'test@example.invalid',
-    GIT_COMMITTER_NAME: 'test',
-    GIT_COMMITTER_EMAIL: 'test@example.invalid',
+  const env = Object.fromEntries(
+    Object.entries(gitEnv).flatMap(([name, value]) => (value === undefined ? [] : [[name, value]])),
+  );
 
-    // no auto maintenance: a commit's or a fetch's detached repack could still write into a
-    // repository while the test's cleanup removes it
-    GIT_CONFIG_COUNT: '1',
-    GIT_CONFIG_KEY_0: 'maintenance.auto',
-    GIT_CONFIG_VALUE_0: 'false',
+  const git = async (args: readonly string[]) => {
+    const output = await runGit(directory, gitEnv, args);
+
+    return output.trim();
   };
 
-  const git = makeGit(env);
-  const origin = join(directory, 'origin.git');
+  const origin = await createGitOrigin(gitEnv);
+
   const seed = join(directory, 'seed');
 
   await mkdir(home, { recursive: true });
-  await git(['init', '-q', '--bare', '-b', 'main', origin]);
-
-  // a push to a local origin drops the GIT_CONFIG_* variables, so the origin keeps the setting in
-  // its own config
-  await git(['-C', origin, 'config', 'maintenance.auto', 'false']);
   await git(['init', '-q', '-b', 'main', seed]);
-  await git(['-C', seed, 'remote', 'add', 'origin', origin]);
+  await git(['-C', seed, 'remote', 'add', 'origin', origin.path]);
 
-  return { origin, seed, env, git };
-}
-
-function makeGit(env: Readonly<Record<string, string>>) {
-  return async (args: readonly string[]) => {
-    const result = await runProcess(['git', ...args], { env });
-
-    if (result.exitCode !== 0) {
-      throw new Error(
-        `git ${args.join(' ')} exited ${result.exitCode}: ${result.stderr.toString()}`,
-      );
-    }
-
-    return result.stdout.toString().trim();
-  };
+  return { origin: origin.path, seed, env, git };
 }

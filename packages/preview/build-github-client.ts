@@ -1,5 +1,6 @@
 import type { KeyObject } from 'node:crypto';
 import { sign } from 'node:crypto';
+import type { Clock } from '@zgeoff/std';
 import { z } from 'zod';
 import { GitHubRequestError } from './github-request-error.ts';
 
@@ -43,7 +44,7 @@ export interface GitHubApp {
 
 type SendGitHubRequest = (request: GitHubRequest) => Promise<Response>;
 
-export function buildGitHubClient(apiURL: string, app: GitHubApp, now: () => Date): GitHubClient {
+export function buildGitHubClient(apiURL: string, app: GitHubApp, now: Clock['now']): GitHubClient {
   const sendAsApp: SendGitHubRequest = (request) =>
     sendGitHubRequest(apiURL, buildAppJWT(app, now()), request);
 
@@ -107,8 +108,8 @@ export function buildGitHubClient(apiURL: string, app: GitHubApp, now: () => Dat
 // GitHub refuses a JWT that expires more than 10 minutes ahead, and backdating the issue time
 // covers a clock that runs ahead of GitHub's
 // (docs.github.com/en/apps: generating-a-json-web-token-jwt-for-a-github-app)
-function buildAppJWT(app: GitHubApp, now: Date): string {
-  const issuedAt = Math.floor(now.getTime() / 1000) - 60;
+function buildAppJWT(app: GitHubApp, nowMs: number): string {
+  const issuedAt = Math.floor(nowMs / 1000) - 60;
   const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
 
   const claims = Buffer.from(

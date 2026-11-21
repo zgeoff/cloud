@@ -1,5 +1,7 @@
-import { expect, mock, onTestFinished, test } from 'bun:test';
+import { expect, mock, test } from 'bun:test';
 import { verify } from 'node:crypto';
+import { systemClock } from '@zgeoff/std';
+import { createFakeClock } from '@zgeoff/testing/clock';
 import { HttpResponse, http } from 'msw';
 import { buildGitHubClient, previewCommentMarker } from './build-github-client.ts';
 import {
@@ -11,7 +13,7 @@ import {
   uninstalledRepos,
 } from './src/test-utils/constants.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
-import { server } from './src/test-utils/server.ts';
+import { network } from './src/test-utils/network.ts';
 import { stubApp, stubAppPublicKey } from './src/test-utils/stub-app.ts';
 
 test('it mints a new installation token for each call, so no token outlives its call', async () => {
@@ -19,15 +21,14 @@ test('it mints a new installation token for each call, so no token outlives its 
 
   const recordAuthorization = mock((authorization: string | null) => authorization);
 
-  server.events.on('request:start', (event) => {
-    recordAuthorization(event.request.headers.get('authorization'));
-  });
+  // an answer of nothing passes the request on to the stand-in's own handler
+  network.use(
+    http.all('*', (info) => {
+      recordAuthorization(info.request.headers.get('authorization'));
+    }),
+  );
 
-  onTestFinished(() => {
-    server.events.removeAllListeners('request:start');
-  });
-
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   await client.readComposeFile('acme/greenhouse', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
   await client.readComposeFile('acme/greenhouse', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
@@ -42,7 +43,7 @@ test('it mints a new installation token for each call, so no token outlives its 
 });
 
 test('it scopes each installation token to the one repository the call touches', async () => {
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   await client.readPullRequestFiles('nursery/seedlings', 4);
 
@@ -52,18 +53,17 @@ test('it scopes each installation token to the one repository the call touches',
 });
 
 test("it signs the App's JWT with its key, issued by its client ID from a minute before now to nine minutes after", async () => {
-  const now = new Date(Math.floor(Date.now() / 1000) * 1000);
-
+  const clock = createFakeClock({ startMs: Math.floor(systemClock.now() / 1000) * 1000 });
   const recordJWT = mock((authorization: string) => authorization);
 
   // an answer of nothing passes the request on to the stand-in's own handler
-  server.use(
+  network.use(
     http.get(`${githubAPIURL}/repos/acme/greenhouse/installation`, (info) => {
       recordJWT(info.request.headers.get('authorization') ?? '');
     }),
   );
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => now);
+  const client = buildGitHubClient(githubAPIURL, stubApp, clock.now);
 
   await client.readComposeFile('acme/greenhouse', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
 
@@ -76,8 +76,8 @@ test("it signs the App's JWT with its key, issued by its client ID from a minute
   });
 
   expect(JSON.parse(Buffer.from(claims, 'base64url').toString())).toStrictEqual({
-    iat: now.getTime() / 1000 - 60,
-    exp: now.getTime() / 1000 + 540,
+    iat: clock.now() / 1000 - 60,
+    exp: clock.now() / 1000 + 540,
     iss: 'Iv23liStubPreviewApp',
   });
 
@@ -92,13 +92,13 @@ test("it signs the App's JWT with its key, issued by its client ID from a minute
 });
 
 test('it rejects an installation answer whose ID is not a number', () => {
-  server.use(
+  network.use(
     http.get(`${githubAPIURL}/repos/acme/greenhouse/installation`, () =>
       HttpResponse.json({ id: '7001', account: { login: 'acme' } }),
     ),
   );
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   expect(
     client.readComposeFile('acme/greenhouse', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
@@ -106,13 +106,13 @@ test('it rejects an installation answer whose ID is not a number', () => {
 });
 
 test('it rejects an access token answer without a token', () => {
-  server.use(
+  network.use(
     http.post(`${githubAPIURL}/app/installations/:id/access_tokens`, () =>
       HttpResponse.json({}, { status: 201 }),
     ),
   );
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   expect(
     client.readComposeFile('acme/greenhouse', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
@@ -122,7 +122,7 @@ test('it rejects an access token answer without a token', () => {
 test('it rejects a call to a repository the App is not installed on', () => {
   uninstalledRepos.add('acme/greenhouse');
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   expect(
     client.readComposeFile('acme/greenhouse', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
@@ -138,7 +138,7 @@ test('#readComposeFile reads preview/compose.yaml at the commit', async () => {
     'services:\n  web: {}\n',
   );
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   const result = await client.readComposeFile(
     'acme/greenhouse',
@@ -149,7 +149,7 @@ test('#readComposeFile reads preview/compose.yaml at the commit', async () => {
 });
 
 test('#readComposeFile returns null for a commit without the file', async () => {
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   const result = await client.readComposeFile(
     'acme/greenhouse',
@@ -160,13 +160,13 @@ test('#readComposeFile returns null for a commit without the file', async () => 
 });
 
 test('#readComposeFile rejects when GitHub fails', () => {
-  server.use(
+  network.use(
     http.get(`${githubAPIURL}/repos/acme/greenhouse/contents/preview/compose.yaml`, () =>
       HttpResponse.json({ message: 'Bad credentials' }, { status: 401 }),
     ),
   );
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   expect(
     client.readComposeFile('acme/greenhouse', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
@@ -177,14 +177,14 @@ test('#readComposeFile rejects when GitHub fails', () => {
 });
 
 test('#readComposeFile rejects with the bare status when GitHub fails with a body that is not JSON', () => {
-  server.use(
+  network.use(
     http.get(
       `${githubAPIURL}/repos/acme/greenhouse/contents/preview/compose.yaml`,
       () => new HttpResponse('<html>Bad gateway</html>', { status: 502 }),
     ),
   );
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   expect(
     client.readComposeFile('acme/greenhouse', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
@@ -195,7 +195,7 @@ test('#readComposeFile rejects with the bare status when GitHub fails with a bod
 });
 
 test('#updatePreviewComment posts a comment that starts with the marker', async () => {
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   await client.updatePreviewComment({ repo: 'acme/greenhouse', number: 17, body: 'first' });
 
@@ -219,7 +219,7 @@ test("#updatePreviewComment posts its own comment when another user's comment ca
     body: `${previewCommentMarker}\nquoted from the preview`,
   });
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   await client.updatePreviewComment({ repo: 'acme/greenhouse', number: 17, body: 'first' });
 
@@ -259,7 +259,7 @@ test('#updatePreviewComment edits the marked comment past the first page of comm
     },
   );
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   await client.updatePreviewComment({ repo: 'acme/greenhouse', number: 17, body: 'second' });
 
@@ -279,7 +279,7 @@ test('#readPullRequestFiles reads every changed file past the first page, with n
     { filename: 'bun.lock' },
   ]);
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   const result = await client.readPullRequestFiles('acme/greenhouse', 17);
 
@@ -288,7 +288,7 @@ test('#readPullRequestFiles reads every changed file past the first page, with n
 });
 
 test('#updateCommitStatus posts the state, the context and the description on the commit', async () => {
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   await client.updateCommitStatus({
     repo: 'acme/greenhouse',
@@ -310,7 +310,7 @@ test('#updateCommitStatus posts the state, the context and the description on th
 });
 
 test('#updateCommitStatus cuts a description to the 140 characters GitHub accepts', async () => {
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   await client.updateCommitStatus({
     repo: 'acme/greenhouse',
@@ -324,13 +324,13 @@ test('#updateCommitStatus cuts a description to the 140 characters GitHub accept
 });
 
 test('#updateCommitStatus rejects with the bare status when the refusal body holds no message', () => {
-  server.use(
+  network.use(
     http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, () =>
       HttpResponse.json({ errors: [{ code: 'custom' }] }, { status: 422 }),
     ),
   );
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   expect(
     client.updateCommitStatus({
@@ -347,7 +347,7 @@ test('#updateCommitStatus rejects with the bare status when the refusal body hol
 });
 
 test('#updateCommitStatus rejects with the status and the permission when the refusal body breaks off', () => {
-  server.use(
+  network.use(
     http.post(
       `${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`,
       () =>
@@ -362,7 +362,7 @@ test('#updateCommitStatus rejects with the status and the permission when the re
     ),
   );
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   expect(
     client.updateCommitStatus({
@@ -384,7 +384,7 @@ test("#updateCommitStatus sends an installation token minted for the call to the
     authorization: request.headers.get('authorization'),
   }));
 
-  server.use(
+  network.use(
     http.post(`${githubAPIURL}/repos/:owner/:name/statuses/:sha`, (info) => {
       recordRequest(info.request);
 
@@ -392,7 +392,7 @@ test("#updateCommitStatus sends an installation token minted for the call to the
     }),
   );
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   await client.updateCommitStatus({
     repo: 'acme/greenhouse',
@@ -416,7 +416,7 @@ test("#updateCommitStatus sends an installation token minted for the call to the
 test('#updateCommitStatus rejects with the permission GitHub names when the App cannot write statuses', () => {
   // GitHub's answer to an App without Commit statuses write (docs.github.com/en/rest:
   // authentication/permissions-required-for-github-apps)
-  server.use(
+  network.use(
     http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, () =>
       HttpResponse.json(
         { message: 'Resource not accessible by integration', status: '403' },
@@ -425,7 +425,7 @@ test('#updateCommitStatus rejects with the permission GitHub names when the App 
     ),
   );
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   expect(
     client.updateCommitStatus({
@@ -482,7 +482,7 @@ test.each([
 ])(
   '#updateCommitStatus rejects $label with its status and permanent set to $permanent',
   (refusal) => {
-    server.use(
+    network.use(
       http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, () =>
         HttpResponse.json(
           { message: refusal.message },
@@ -491,7 +491,7 @@ test.each([
       ),
     );
 
-    const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+    const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
     expect(
       client.updateCommitStatus({
@@ -510,13 +510,13 @@ test.each([
 );
 
 test('#readComposeFile rejects a contents answer whose content is not a string', () => {
-  server.use(
+  network.use(
     http.get(`${githubAPIURL}/repos/acme/greenhouse/contents/preview/compose.yaml`, () =>
       HttpResponse.json({ type: 'file', encoding: 'base64', content: 42 }),
     ),
   );
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   expect(
     client.readComposeFile('acme/greenhouse', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
@@ -524,9 +524,9 @@ test('#readComposeFile rejects a contents answer whose content is not a string',
 });
 
 test('#updatePreviewComment rejects an App answer without a slug', () => {
-  server.use(http.get(`${githubAPIURL}/app`, () => HttpResponse.json({ name: 'Acme previews' })));
+  network.use(http.get(`${githubAPIURL}/app`, () => HttpResponse.json({ name: 'Acme previews' })));
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   expect(
     client.updatePreviewComment({ repo: 'acme/greenhouse', number: 17, body: 'first' }),
@@ -534,13 +534,13 @@ test('#updatePreviewComment rejects an App answer without a slug', () => {
 });
 
 test('#updatePreviewComment rejects a comments page whose comment has no ID', () => {
-  server.use(
+  network.use(
     http.get(`${githubAPIURL}/repos/acme/greenhouse/issues/17/comments`, () =>
       HttpResponse.json([{ body: 'hello', user: { login: 'acme-previews[bot]' } }]),
     ),
   );
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   expect(
     client.updatePreviewComment({ repo: 'acme/greenhouse', number: 17, body: 'first' }),
@@ -548,13 +548,13 @@ test('#updatePreviewComment rejects a comments page whose comment has no ID', ()
 });
 
 test('#readPullRequestFiles rejects a files page whose file has no filename', () => {
-  server.use(
+  network.use(
     http.get(`${githubAPIURL}/repos/acme/greenhouse/pulls/17/files`, () =>
       HttpResponse.json([{ patch: '@@ -1 +1 @@' }]),
     ),
   );
 
-  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+  const client = buildGitHubClient(githubAPIURL, stubApp, systemClock.now);
 
   expect(client.readPullRequestFiles('acme/greenhouse', 17)).rejects.toMatchObject({
     name: 'ZodError',

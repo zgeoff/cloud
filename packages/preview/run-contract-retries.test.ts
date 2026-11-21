@@ -2,6 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { systemClock } from '@zgeoff/std';
+import { createFakeClock } from '@zgeoff/testing/clock';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
@@ -25,6 +27,7 @@ async function setupTest() {
   });
 
   const impd = startStubImpd();
+  const clock = createFakeClock({ startMs: Date.parse('2026-10-15T09:00:00Z') });
 
   const deps: PreviewDeps = {
     settings: {
@@ -53,15 +56,15 @@ async function setupTest() {
     spendProxies: null,
     store,
     impd: buildImpdClient(impd.url, impd.token),
-    github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
+    github: buildGitHubClient(githubAPIURL, stubApp, systemClock.now),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
     pendingRuns: new Set(),
     withSlotLock: makeSlotLock(),
-    now: () => new Date('2026-10-15T09:00:00Z'),
+    now: clock.now,
 
     // a run's deadline never passes, so each run ends with its guest command
-    sleep: () => Promise.withResolvers<void>().promise,
+    sleep: clock.sleep,
     log: () => {},
   };
 

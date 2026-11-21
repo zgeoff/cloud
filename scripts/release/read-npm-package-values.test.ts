@@ -2,13 +2,13 @@ import { expect, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
 import { getReleaseRecord } from '../src/test-utils/get-release-record.ts';
-import { server } from '../src/test-utils/server.ts';
+import { network } from '../src/test-utils/network.ts';
 import { readNPMPackageValues } from './read-npm-package-values.ts';
 
 test('it fails when npm lacks the version', async () => {
   const stub = buildStubRunner();
 
-  server.use(
+  network.use(
     http.get('https://registry.npmjs.org/@noslop/cli/0.5.0', () =>
       HttpResponse.json({ error: 'version not found: 0.5.0' }, { status: 404 }),
     ),
@@ -27,7 +27,7 @@ test('it fails when npm lacks the version', async () => {
 test('it reads no value once npm lists the version', async () => {
   const stub = buildStubRunner();
 
-  server.use(
+  network.use(
     http.get('https://registry.npmjs.org/@noslop/cli/0.5.0', () =>
       HttpResponse.json({ name: '@noslop/cli', version: '0.5.0' }),
     ),

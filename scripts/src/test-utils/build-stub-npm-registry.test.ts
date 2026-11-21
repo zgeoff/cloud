@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 import { buildStubNPMRegistry } from './build-stub-npm-registry.ts';
-import { server } from './server.ts';
+import { network } from './network.ts';
 
 test('it lists a version with its tarball and its sha512 integrity', async () => {
-  server.use(
+  network.use(
     ...buildStubNPMRegistry({
       'example-mod': { '1.4.2': { tarball: new TextEncoder().encode('tarball bytes') } },
     }),
@@ -23,7 +23,7 @@ test('it lists a version with its tarball and its sha512 integrity', async () =>
 });
 
 test('it lists the tarball where the scenario says it is', async () => {
-  server.use(
+  network.use(
     ...buildStubNPMRegistry({
       'example-mod': {
         '1.4.2': {
@@ -43,7 +43,7 @@ test('it lists the tarball where the scenario says it is', async () => {
 });
 
 test('it serves the tarball bytes', async () => {
-  server.use(
+  network.use(
     ...buildStubNPMRegistry({
       'example-mod': { '1.4.2': { tarball: new TextEncoder().encode('tarball bytes') } },
     }),
@@ -56,7 +56,7 @@ test('it serves the tarball bytes', async () => {
 });
 
 test('it answers 404 for a version it lacks', async () => {
-  server.use(...buildStubNPMRegistry({}));
+  network.use(...buildStubNPMRegistry({}));
 
   const response = await fetch('https://registry.npmjs.org/example-mod/1.4.2');
   const body: unknown = await response.json();

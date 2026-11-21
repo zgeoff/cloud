@@ -6,7 +6,7 @@ export default defineRig({
   // bunfig.toml's pathIgnorePatterns, less scripts/e2e, which rig's e2e lane runs
   ignore: ['workers/**', 'packages/preview/**', 'packages/files/**'],
 
-  // the e2e journeys run without the root preload's MSW server and faker seed
+  // the e2e journeys run without the root preload's test network and faker seed
   bunfigs: [{ path: 'scripts/e2e/bunfig.toml', files: ['scripts/e2e/**'] }],
   programs: {
     'build-agent-image': {

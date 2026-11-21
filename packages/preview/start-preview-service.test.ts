@@ -2,9 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { http, passthrough } from 'msw';
 import { createPreviewStore } from './create-preview-store.ts';
-import { server as mockServer } from './src/test-utils/server.ts';
 import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
 import { waitForCondition } from './src/test-utils/wait-for-condition.ts';
@@ -14,9 +12,6 @@ async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'preview-service-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
-
-  // the listeners and each proxy take loopback ports, so every loopback port passes through
-  mockServer.use(http.all(/^http:\/\/127\.0\.0\.1:\d+\//u, () => passthrough()));
 
   return {
     directory,

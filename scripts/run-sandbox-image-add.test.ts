@@ -2,7 +2,7 @@ import { expect, mock, test } from 'bun:test';
 import { createImpClient } from '@impz/client';
 import { runSandboxImageAdd } from './run-sandbox-image-add.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
-import { server } from './src/test-utils/server.ts';
+import { network } from './src/test-utils/network.ts';
 import { startScriptsImpd } from './src/test-utils/start-scripts-impd.ts';
 import { startStubImpdImages } from './src/test-utils/start-stub-impd-images.ts';
 
@@ -28,7 +28,7 @@ test('it adds each manifest image that impd lacks, skips one it holds, and never
     ],
   });
 
-  server.use(...impd.handlers);
+  network.use(...impd.handlers);
 
   const runner = buildStubRunner(
     (call) => (call.argv[0] === 'sops' ? { stdout: 'nixie-impd-token-for-tests' } : undefined),

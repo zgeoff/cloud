@@ -1,3 +1,8 @@
 [test]
-# registers jest-extended matchers and seeds faker; the root preload never loads here
-preload = ["@zgeoff/bun-test-extended", "./src/test-utils/pin-faker-seed.ts"]
+# registers jest-extended matchers, seeds faker and restores env overrides; the root preload never
+# loads here
+preload = [
+  "@zgeoff/bun-test-extended",
+  "./src/test-utils/pin-faker-seed.ts",
+  "@zgeoff/testing/preload",
+]

@@ -5,7 +5,7 @@ import { buildStubGetent } from './src/test-utils/build-stub-getent.ts';
 import { buildStubGHAuthToken } from './src/test-utils/build-stub-gh-auth-token.ts';
 import { buildStubReadinessHost } from './src/test-utils/build-stub-readiness-host.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
-import { server } from './src/test-utils/server.ts';
+import { network } from './src/test-utils/network.ts';
 
 function setupTest() {
   const out: string[] = [];
@@ -44,7 +44,7 @@ test('it reports every check ok and exits 0 once the gateway is deployed', async
 
   const bearers: (string | null)[] = [];
 
-  server.use(
+  network.use(
     http.get('https://ghcr.io/token', () => HttpResponse.json({ token: 'ghcr-t1' })),
 
     http.get('https://ghcr.io/v2/zgeoff/atc-gateway/tags/list', (info) => {
@@ -189,7 +189,7 @@ test('it reports what the deploy creates as missing, and exits 0, before the dep
     buildStubGetent({}),
   );
 
-  server.use(
+  network.use(
     http.get('https://ghcr.io/token', () => HttpResponse.json({ token: 'ghcr-t1' })),
     http.get(
       'https://ghcr.io/v2/zgeoff/atc-gateway/tags/list',
@@ -242,7 +242,7 @@ test('it fails the four host checks and exits 4 when the host does not answer', 
     buildStubGetent({}),
   );
 
-  server.use(http.get('https://ghcr.io/token', () => HttpResponse.error()));
+  network.use(http.get('https://ghcr.io/token', () => HttpResponse.error()));
 
   const exitCode = await checkATCGatewayReadiness({
     args: [],
@@ -287,7 +287,7 @@ test('it fails the node check when the node is not Ready, and the memory check b
     buildStubGetent({}),
   );
 
-  server.use(http.get('https://ghcr.io/token', () => HttpResponse.error()));
+  network.use(http.get('https://ghcr.io/token', () => HttpResponse.error()));
 
   const exitCode = await checkATCGatewayReadiness({
     args: [],
@@ -324,7 +324,7 @@ test('it passes the memory check at exactly 1024 MiB available', async () => {
     buildStubGetent({}),
   );
 
-  server.use(http.get('https://ghcr.io/token', () => HttpResponse.error()));
+  network.use(http.get('https://ghcr.io/token', () => HttpResponse.error()));
 
   const exitCode = await checkATCGatewayReadiness({
     args: [],
@@ -357,7 +357,7 @@ test('it fails the impd check with impd’s status when impd is not ready', asyn
     buildStubGetent({}),
   );
 
-  server.use(http.get('https://ghcr.io/token', () => HttpResponse.error()));
+  network.use(http.get('https://ghcr.io/token', () => HttpResponse.error()));
 
   const exitCode = await checkATCGatewayReadiness({
     args: [],
@@ -389,7 +389,7 @@ test('it fails the public route when its metadata answers another status', async
     buildStubGetent({ 'atc.geoff.cloud': '104.21.32.1' }),
   );
 
-  server.use(
+  network.use(
     http.get('https://ghcr.io/token', () => HttpResponse.error()),
     http.get(
       'https://atc.geoff.cloud/.well-known/oauth-protected-resource/mcp',
@@ -427,7 +427,7 @@ test('it fails the public route with 000 when its metadata gets no answer', asyn
     buildStubGetent({ 'atc.geoff.cloud': '104.21.32.1' }),
   );
 
-  server.use(
+  network.use(
     http.get('https://ghcr.io/token', () => HttpResponse.error()),
     http.get('https://atc.geoff.cloud/.well-known/oauth-protected-resource/mcp', () =>
       HttpResponse.error(),
@@ -464,7 +464,7 @@ test('it fails the in-cluster check when the gateway answers another status', as
     buildStubGetent({}),
   );
 
-  server.use(http.get('https://ghcr.io/token', () => HttpResponse.error()));
+  network.use(http.get('https://ghcr.io/token', () => HttpResponse.error()));
 
   const exitCode = await checkATCGatewayReadiness({
     args: [],
@@ -496,7 +496,7 @@ test('it checks the named host', async () => {
     buildStubGetent({}),
   );
 
-  server.use(http.get('https://ghcr.io/token', () => HttpResponse.error()));
+  network.use(http.get('https://ghcr.io/token', () => HttpResponse.error()));
 
   const exitCode = await checkATCGatewayReadiness({
     args: ['geoffcloud-2'],

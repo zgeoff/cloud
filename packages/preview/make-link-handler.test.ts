@@ -2,6 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { systemClock } from '@zgeoff/std';
+import { createFakeClock } from '@zgeoff/testing/clock';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
@@ -9,6 +11,7 @@ import { makeLinkHandler } from './make-link-handler.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { composeFiles } from './src/test-utils/constants.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
+import { runUntilSettled } from './src/test-utils/run-until-settled.ts';
 import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
@@ -29,7 +32,7 @@ async function setupTest<Impd extends { readonly url: string; readonly token: st
 
   const pendingBoots = new Set<Promise<void>>();
 
-  const clock = { now: new Date('2026-10-15T09:00:00Z').getTime() };
+  const clock = createFakeClock({ startMs: Date.parse('2026-10-15T09:00:00Z') });
 
   const deps: PreviewDeps = {
     settings: {
@@ -54,21 +57,17 @@ async function setupTest<Impd extends { readonly url: string; readonly token: st
     spendProxies: null,
     store,
     impd: buildImpdClient(impd.url, impd.token),
-    github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
+    github: buildGitHubClient(githubAPIURL, stubApp, systemClock.now),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots,
     pendingRuns: new Set(),
     withSlotLock: makeSlotLock(),
-    now: () => new Date(clock.now),
-    sleep: (durationMs) => {
-      clock.now += durationMs;
-
-      return Promise.resolve();
-    },
+    now: clock.now,
+    sleep: clock.sleep,
     log: () => {},
   };
 
-  return { handler: makeLinkHandler(deps), store, impd, pendingBoots };
+  return { handler: makeLinkHandler(deps), store, impd, pendingBoots, clock };
 }
 
 test('it sleeps the running preview when a second one opens with one slot', async () => {
@@ -102,7 +101,8 @@ test('it sleeps the running preview when a second one opens with one slot', asyn
   composeFiles.set('acme/greenhouse@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'services: {}\n');
 
   await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/18'));
-  await Promise.all(ctx.pendingBoots);
+
+  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
 
   const slept = await ctx.impd.client.imps.get({ name: 'pv-0a1b2c3d-17' });
   const opened = await ctx.impd.client.imps.get({ name: 'pv-0a1b2c3d-18' });
@@ -140,7 +140,7 @@ test('it runs one preview when two first opens with one slot arrive at once', as
     ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/18')),
   ]);
 
-  await Promise.all(ctx.pendingBoots);
+  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
 
   const imps = await ctx.impd.client.imps.list({});
 
@@ -197,19 +197,18 @@ test('it keeps both previews running when two slots fit them', async () => {
     spendProxies: null,
     store: ctx.store,
     impd: buildImpdClient(ctx.impd.url, ctx.impd.token),
-    github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
+    github: buildGitHubClient(githubAPIURL, stubApp, systemClock.now),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: ctx.pendingBoots,
     pendingRuns: new Set(),
     withSlotLock: makeSlotLock(),
-    now: () => new Date('2026-10-15T09:00:00Z'),
-    sleep: async () => {},
+    now: ctx.clock.now,
+    sleep: ctx.clock.sleep,
     log: () => {},
   });
 
   await handler(new Request('http://geoffcloud:8417/acme/greenhouse/18'));
-
-  await Promise.all(ctx.pendingBoots);
+  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
 
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
 });
@@ -233,7 +232,7 @@ test('it answers a first open with the booting page and boots the head commit', 
 
   const response = await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/18'));
 
-  await Promise.all(ctx.pendingBoots);
+  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
 
   const text = await response.text();
 
@@ -426,9 +425,13 @@ test('it boots a woken preview again when its stack never answers', async () => 
 
   // a cold boot left the stack down, so no app answers impd's proxy
 
-  const response = await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17'));
+  const response = await runUntilSettled(
+    ctx.clock,
+    ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17')),
+    { maxMs: 3_600_000 },
+  );
 
-  await Promise.all(ctx.pendingBoots);
+  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
 
   expect(response.status).toBe(202);
   expect(ctx.impd.commands.map((command) => command.argv[0])).toContain('timeout');
@@ -476,7 +479,7 @@ test('it rebuilds a ready preview once a push moved its head', async () => {
 
   const response = await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17'));
 
-  await Promise.all(ctx.pendingBoots);
+  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
 
   expect(response.status).toBe(202);
 
@@ -554,7 +557,8 @@ test('it boots a failed preview again when the retry link opens', async () => {
   ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
 
   await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17?retry=1'));
-  await Promise.all(ctx.pendingBoots);
+
+  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
 
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ready');
 });
@@ -586,7 +590,7 @@ test('it shows the failure page and boots nothing more when the booting page rel
 
   const retriedText = await retried.text();
 
-  await Promise.all(ctx.pendingBoots);
+  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
 
   // a browser reloads the refresh's URL, or the page's own URL when the refresh names none
   const reloadPath =
@@ -597,7 +601,7 @@ test('it shows the failure page and boots nothing more when the booting page rel
 
   const reloaded = await ctx.handler(new Request(`http://geoffcloud:8417${reloadPath}`));
 
-  await Promise.all(ctx.pendingBoots);
+  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
 
   expect(reloaded.status).toBe(502);
   expect(ctx.pendingBoots.size).toBe(0);

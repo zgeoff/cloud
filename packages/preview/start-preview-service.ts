@@ -1,3 +1,4 @@
+import { systemClock } from '@zgeoff/std';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { buildSpendProxyIO } from './build-spend-proxy-io.ts';
@@ -27,7 +28,7 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
     config.spend === null
       ? null
       : createSpendProxies(config.spend.settings, {
-          now: readNow,
+          now: systemClock.now,
           log: writeLog,
           io: buildSpendProxyIO(),
         });
@@ -37,13 +38,13 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
     spendProxies,
     store,
     impd: buildImpdClient(config.impdURL, config.impdToken),
-    github: buildGitHubClient('https://api.github.com', config.githubApp, () => new Date()),
+    github: buildGitHubClient('https://api.github.com', config.githubApp, systemClock.now),
     webhookSecret: config.webhookSecret,
     pendingBoots: new Set(),
     pendingRuns: new Set(),
     withSlotLock: makeSlotLock(),
-    now: readNow,
-    sleep: (durationMs) => Bun.sleep(durationMs),
+    now: systemClock.now,
+    sleep: systemClock.sleep,
     log: writeLog,
   };
 
@@ -83,10 +84,6 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
       store.close();
     },
   };
-}
-
-function readNow(): Date {
-  return new Date();
 }
 
 function writeLog(line: string): void {

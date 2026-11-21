@@ -6,7 +6,7 @@ import { HttpResponse, http } from 'msw';
 import { createAgentImageCheckDir } from './create-agent-image-check-dir.ts';
 import { buildRealProgramHandler } from './src/test-utils/build-real-program-handler.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
-import { server } from './src/test-utils/server.ts';
+import { network } from './src/test-utils/network.ts';
 import { startStubGitleaksRelease } from './src/test-utils/start-stub-gitleaks-release.ts';
 
 async function setupTest() {
@@ -69,7 +69,7 @@ test('it stops before extracting a tarball whose sum the Dockerfile does not pin
 test('it stops when the release download fails', async () => {
   const ctx = await setupTest();
 
-  server.use(
+  network.use(
     http.get(
       'https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz',
       () => new HttpResponse('Not Found', { status: 404 }),

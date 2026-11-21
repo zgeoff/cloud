@@ -2,14 +2,18 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { systemClock } from '@zgeoff/std';
+import { createFakeClock } from '@zgeoff/testing/clock';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { runEgressUpdate } from './run-egress-update.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
+import { runUntilSettled } from './src/test-utils/run-until-settled.ts';
 import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
+import { waitForCondition } from './src/test-utils/wait-for-condition.ts';
 import type { PreviewDeps } from './types.ts';
 
 async function setupTest() {
@@ -25,7 +29,7 @@ async function setupTest() {
 
   const impd = startPreviewImpd();
   const log = mock<(message: string) => void>();
-  const sleeps: number[] = [];
+  const clock = createFakeClock({ startMs: Date.parse('2026-10-15T09:00:00Z') });
 
   const deps: PreviewDeps = {
     settings: {
@@ -47,21 +51,17 @@ async function setupTest() {
     spendProxies: null,
     store,
     impd: buildImpdClient(impd.url, impd.token),
-    github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
+    github: buildGitHubClient(githubAPIURL, stubApp, systemClock.now),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
     pendingRuns: new Set(),
     withSlotLock: makeSlotLock(),
-    now: () => new Date('2026-10-15T09:00:00Z'),
-    sleep: (durationMs) => {
-      sleeps.push(durationMs);
-
-      return Promise.resolve();
-    },
+    now: clock.now,
+    sleep: clock.sleep,
     log,
   };
 
-  return { deps, impd, log, sleeps, signal: new AbortController().signal };
+  return { deps, impd, log, clock, signal: new AbortController().signal };
 }
 
 test('it puts every imp impd lists, running or sleeping, under the public egress policy', async () => {
@@ -70,7 +70,9 @@ test('it puts every imp impd lists, running or sleeping, under the public egress
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17' });
   await ctx.impd.seedImp({ name: 'pv-4e5f6a7b-3', httpPort: 3000, state: 'sleeping' });
 
-  const updated = await runEgressUpdate(ctx.deps, ctx.signal);
+  const updated = await runUntilSettled(ctx.clock, runEgressUpdate(ctx.deps, ctx.signal), {
+    maxMs: 60_000,
+  });
 
   expect(updated).toBeTrue();
 
@@ -95,14 +97,16 @@ test('it tries again after impd refuses the list, and updates every imp once the
     { times: 1 },
   );
 
-  const updated = await runEgressUpdate(ctx.deps, ctx.signal);
+  const updated = await runUntilSettled(ctx.clock, runEgressUpdate(ctx.deps, ctx.signal), {
+    maxMs: 60_000,
+  });
 
   expect(updated).toBeTrue();
 
   const modes = await ctx.impd.readEgressModes();
 
   expect(modes).toStrictEqual(new Map([['pv-0a1b2c3d-17', 'public']]));
-  expect(ctx.sleeps).toStrictEqual([5000]);
+  expect(ctx.clock.delays).toStrictEqual([5000]);
 
   expect(ctx.log.mock.calls).toStrictEqual([
     ['the egress update failed: ImpdError: impd SERVICE_UNAVAILABLE: impd is starting'],
@@ -133,7 +137,9 @@ test('it updates the other imps, then tries again the imp whose update impd refu
     },
   );
 
-  const updated = await runEgressUpdate(ctx.deps, ctx.signal);
+  const updated = await runUntilSettled(ctx.clock, runEgressUpdate(ctx.deps, ctx.signal), {
+    maxMs: 60_000,
+  });
 
   expect(updated).toBeTrue();
 
@@ -146,7 +152,7 @@ test('it updates the other imps, then tries again the imp whose update impd refu
     ]),
   );
 
-  expect(ctx.sleeps).toStrictEqual([5000]);
+  expect(ctx.clock.delays).toStrictEqual([5000]);
 
   expect(ctx.log.mock.calls).toStrictEqual([
     [
@@ -171,14 +177,15 @@ test('it stops trying and returns false when the signal aborts during the wait f
   const deps: PreviewDeps = {
     ...ctx.deps,
     impd: buildImpdClient(ctx.impd.url, 'imp_stubpreview.wrong-secret'),
-    sleep: () => {
-      stop.abort();
-
-      return Promise.resolve();
-    },
   };
 
-  const updated = await runEgressUpdate(deps, stop.signal);
+  const running = runEgressUpdate(deps, stop.signal);
+
+  await waitForCondition(() => ctx.clock.countPending() === 1);
+
+  stop.abort();
+
+  const updated = await runUntilSettled(ctx.clock, running, { maxMs: 60_000 });
 
   expect(updated).toBeFalse();
   expect(ctx.impd.calls).toStrictEqual([]);

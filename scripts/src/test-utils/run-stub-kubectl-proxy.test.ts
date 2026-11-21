@@ -1,7 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { join } from 'node:path';
-import { http, passthrough } from 'msw';
-import { server } from './server.ts';
 
 test('it prints the serving line with the port it listens on', async () => {
   const subprocess = Bun.spawn(
@@ -23,8 +21,6 @@ test('it prints the serving line with the port it listens on', async () => {
   const line = new TextDecoder().decode(chunk.value);
 
   const port = /^Starting to serve on 127\.0\.0\.1:(?<port>\d+)\n$/u.exec(line)?.groups?.['port'];
-
-  server.use(http.get(`http://127.0.0.1:${port ?? '1'}/*`, () => passthrough()));
 
   const response = await fetch(`http://127.0.0.1:${port ?? '1'}/api/v1/namespaces`);
   const body = await response.text();

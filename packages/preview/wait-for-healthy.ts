@@ -16,14 +16,14 @@ export interface HealthResult {
 }
 
 export async function waitForHealthy(deps: PreviewDeps, wait: HealthWait): Promise<HealthResult> {
-  const deadline = deps.now().getTime() + wait.windowMs;
+  const deadline = deps.now() + wait.windowMs;
 
   // impd's proxy takes this route after the redirect, so an app on the guest's loopback alone
   // fails here instead of answering 502 there
   const url = buildHealthURL(deps.settings.impDomain, wait.imp, wait.contract);
   const state: { lastAnswer: string | null } = { lastAnswer: null };
 
-  while (deps.now().getTime() < deadline) {
+  while (deps.now() < deadline) {
     const answer = await tryReadHealth(url);
 
     if (answer === null) {

@@ -2,6 +2,8 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { systemClock } from '@zgeoff/std';
+import { createFakeClock } from '@zgeoff/testing/clock';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
@@ -17,7 +19,7 @@ import type { PreviewDeps } from './types.ts';
 async function setupTest<Impd extends { readonly url: string; readonly token: string }>(
   impd: Impd,
 ) {
-  const nowAt = new Date('2026-10-15T09:00:00Z');
+  const clock = createFakeClock({ startMs: Date.parse('2026-10-15T09:00:00Z') });
 
   const directory = await mkdtemp(join(tmpdir(), 'preview-sweep-'));
 
@@ -52,14 +54,14 @@ async function setupTest<Impd extends { readonly url: string; readonly token: st
     spendProxies: null,
     store,
     impd: buildImpdClient(impd.url, impd.token),
-    github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
+    github: buildGitHubClient(githubAPIURL, stubApp, systemClock.now),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
     pendingRuns: new Set(),
     withSlotLock: makeSlotLock(),
 
-    now: () => nowAt,
-    sleep: async () => {},
+    now: clock.now,
+    sleep: clock.sleep,
     log,
   };
 
@@ -80,9 +82,11 @@ test('it sleeps the preview unused for the idle timeout and keeps the one in use
 
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-18', grants: ['gh'] });
 
-  const nowAt = new Date(first.lastActiveAt.getTime() + ctx.deps.settings.idleMs + 1);
+  const later = createFakeClock({
+    startMs: first.lastActiveAt.getTime() + ctx.deps.settings.idleMs + 1,
+  });
 
-  await runIdleSweep({ ...ctx.deps, now: () => nowAt });
+  await runIdleSweep({ ...ctx.deps, now: later.now });
 
   const states = await ctx.impd.client.imps.list({});
 
@@ -167,7 +171,11 @@ test('it waits for a running boot to settle before it sleeps an idle preview', a
 
   const gate = Promise.withResolvers<void>();
   const held = ctx.deps.withSlotLock(() => gate.promise);
-  const sweep = runIdleSweep({ ...ctx.deps, now: () => new Date(Date.now() + 3_600_000) });
+
+  const sweep = runIdleSweep({
+    ...ctx.deps,
+    now: createFakeClock({ startMs: systemClock.now() + 3_600_000 }).now,
+  });
 
   // two impd round trips while the lock is held give an unlocked sweep time to list and sleep
   await ctx.deps.impd.readImps();
@@ -203,7 +211,10 @@ test('it sleeps the other idle previews when impd refuses one', async () => {
     { when: (input) => JSON.stringify(input).includes('pv-0a1b2c3d-17') },
   );
 
-  await runIdleSweep({ ...ctx.deps, now: () => new Date(Date.now() + 3_600_000) });
+  await runIdleSweep({
+    ...ctx.deps,
+    now: createFakeClock({ startMs: systemClock.now() + 3_600_000 }).now,
+  });
 
   const states = await ctx.impd.client.imps.list({});
 

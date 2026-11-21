@@ -2,6 +2,8 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { systemClock } from '@zgeoff/std';
+import { createFakeClock } from '@zgeoff/testing/clock';
 import { HttpResponse, http } from 'msw';
 import { z } from 'zod';
 import { buildGitHubClient } from './build-github-client.ts';
@@ -11,7 +13,8 @@ import { makeSlotLock } from './make-slot-lock.ts';
 import { runContractRun } from './run-contract-run.ts';
 import { commitStatuses } from './src/test-utils/constants.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
-import { server } from './src/test-utils/server.ts';
+import { network } from './src/test-utils/network.ts';
+import { runUntilSettled } from './src/test-utils/run-until-settled.ts';
 import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
@@ -29,6 +32,8 @@ async function setupTest<Impd extends { readonly url: string; readonly token: st
   onTestFinished(() => {
     store.close();
   });
+
+  const clock = createFakeClock({ startMs: Date.parse('2026-10-15T09:00:00Z') });
 
   const deps: PreviewDeps = {
     settings: {
@@ -57,19 +62,19 @@ async function setupTest<Impd extends { readonly url: string; readonly token: st
     spendProxies: null,
     store,
     impd: buildImpdClient(impd.url, impd.token),
-    github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
+    github: buildGitHubClient(githubAPIURL, stubApp, systemClock.now),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
     pendingRuns: new Set(),
     withSlotLock: makeSlotLock(),
-    now: () => new Date('2026-10-15T09:00:00Z'),
+    now: clock.now,
 
-    // the host's deadline never passes unless a test passes another sleep
-    sleep: () => Promise.withResolvers<void>().promise,
+    // the host's deadline never passes unless a test steps the clock
+    sleep: clock.sleep,
     log: () => {},
   };
 
-  return { deps, store, impd };
+  return { deps, store, impd, clock };
 }
 
 test('it runs the suite in a new imp with the model grant, posts success, and removes the imp', async () => {
@@ -227,21 +232,16 @@ test('it posts failure and removes the imp when the run passes its time limit', 
 
   ctx.impd.answerCommand = () => ({ code: null, hold: true });
 
-  const sleeps: number[] = [];
-
-  await runContractRun(
-    {
-      ...ctx.deps,
-      sleep: (durationMs) => {
-        sleeps.push(durationMs);
-
-        return Promise.resolve();
-      },
-    },
-    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+  await runUntilSettled(
+    ctx.clock,
+    runContractRun(ctx.deps, {
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    }),
+    { maxMs: 3_600_000 },
   );
 
-  expect(sleeps).toStrictEqual([690_000]);
+  expect(ctx.clock.delays).toStrictEqual([690_000]);
 
   expect(commitStatuses.at(-1)).toStrictEqual({
     repo: 'acme/greenhouse',
@@ -276,7 +276,7 @@ test('it posts pending with the reason, starts no imp, and leaves the preview aw
   });
 
   await runContractRun(
-    { ...ctx.deps, now: () => new Date() },
+    { ...ctx.deps, now: systemClock.now },
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
   );
 
@@ -327,7 +327,7 @@ test('it posts nothing new when a retry still finds every slot taken', async () 
   );
 
   await runContractRun(
-    { ...ctx.deps, now: () => new Date() },
+    { ...ctx.deps, now: systemClock.now },
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
   );
 
@@ -368,7 +368,7 @@ test('it puts a preview unused for the idle time to sleep, however busy its stac
   const log = mock<(line: string) => void>();
 
   await runContractRun(
-    { ...ctx.deps, now: () => new Date('2026-10-15T09:00:00Z'), log },
+    { ...ctx.deps, log },
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
   );
 
@@ -407,7 +407,7 @@ test('it keeps the run waiting and starts no imp when impd refuses to sleep the 
   const log = mock<(line: string) => void>();
 
   await runContractRun(
-    { ...ctx.deps, now: () => new Date(Date.now() + 3_600_000), log },
+    { ...ctx.deps, now: createFakeClock({ startMs: systemClock.now() + 3_600_000 }).now, log },
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
   );
 
@@ -641,7 +641,7 @@ test('it keeps the result settling when GitHub answers the final status with a s
   ctx.impd.answerCommand = () => ({ code: 0, stdout: ' 18 pass\n 0 fail\n' });
 
   // GitHub's answer to a status while it is down, for every status but the pending ones
-  server.use(
+  network.use(
     http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, async (info) => {
       const body = await info.request.clone().json();
 
@@ -691,7 +691,7 @@ test('it ends a settling run with the refusal and posts no status again when Git
 
   // GitHub's answer to an App without Commit statuses write (docs.github.com/en/rest:
   // authentication/permissions-required-for-github-apps)
-  server.use(
+  network.use(
     http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, (info) => {
       recordStatusPost(String(info.params['sha']));
 

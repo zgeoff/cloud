@@ -2,6 +2,8 @@
 // passed" for the image.
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import type { Clock } from '@zgeoff/std';
+import { systemClock } from '@zgeoff/std';
 import { ExitError } from './exit-error.ts';
 import { findRecord } from './find-record.ts';
 import { loadImpJSON } from './imp-cli.ts';
@@ -11,12 +13,10 @@ import { runProcess } from './run-process.ts';
 import { withExitCode } from './with-exit-code.ts';
 import { writeCloudTargetImage } from './write-cloud-target-image.ts';
 
-export interface SwitchAgentImageOptions extends ScriptIO {
+export interface SwitchAgentImageOptions extends ScriptIO, Pick<Clock, 'now'> {
   readonly args: readonly string[];
 
   readonly home: string;
-
-  readonly now: () => number;
 }
 
 const guestATC = '/usr/local/bin/atc';
@@ -73,7 +73,7 @@ if (import.meta.main) {
   process.exitCode = await switchAgentImage({
     args: process.argv.slice(2),
     home: homedir(),
-    now: () => Date.now(),
+    now: systemClock.now,
     run: runProcess,
     printOut: (text) => {
       process.stdout.write(text);

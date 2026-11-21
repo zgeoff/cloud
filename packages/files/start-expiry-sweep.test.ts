@@ -2,6 +2,7 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createFakeClock } from '@zgeoff/testing/clock';
 import { createUploadStore } from './create-upload-store.ts';
 import { buildMockUpload } from './src/test-utils/build-mock-upload.ts';
 import { startExpirySweep } from './start-expiry-sweep.ts';
@@ -38,7 +39,7 @@ test('it removes an upload that expired before the start, file and row, at once'
   startExpirySweep({
     store: ctx.store,
     filesDir: ctx.filesDir,
-    now: () => new Date('2026-05-02T00:00:00Z'),
+    now: createFakeClock({ startMs: Date.parse('2026-05-02T00:00:00Z') }).now,
     print,
     schedule: () => () => {},
   });
@@ -58,7 +59,7 @@ test('it schedules the next sweeps an hour apart', async () => {
   startExpirySweep({
     store: ctx.store,
     filesDir: ctx.filesDir,
-    now: () => new Date('2026-05-02T00:00:00Z'),
+    now: createFakeClock({ startMs: Date.parse('2026-05-02T00:00:00Z') }).now,
     print: () => {},
     schedule,
   });
@@ -75,13 +76,13 @@ test('it removes an upload that expires after the start when the scheduled sweep
 
   await writeFile(join(ctx.filesDir, 'Late0Late0Late0Late0La'), 'later');
 
-  const clock = { now: new Date('2026-05-02T00:00:00Z') };
+  const clock = createFakeClock({ startMs: Date.parse('2026-05-02T00:00:00Z') });
   const schedule = mock<(run: () => void, intervalMs: number) => () => void>(() => () => {});
 
   startExpirySweep({
     store: ctx.store,
     filesDir: ctx.filesDir,
-    now: () => clock.now,
+    now: clock.now,
     print: () => {},
     schedule,
   });
@@ -92,7 +93,7 @@ test('it removes an upload that expires after the start when the scheduled sweep
     throw new Error('the sweep scheduled no run');
   }
 
-  clock.now = new Date('2026-05-02T01:00:00Z');
+  clock.advance(3_600_000);
 
   scheduledRun();
 
@@ -117,7 +118,7 @@ test('it keeps an upload that has not expired, and one that never expires', asyn
   startExpirySweep({
     store: ctx.store,
     filesDir: ctx.filesDir,
-    now: () => new Date('2026-05-02T00:00:00Z'),
+    now: createFakeClock({ startMs: Date.parse('2026-05-02T00:00:00Z') }).now,
     print: () => {},
     schedule: () => () => {},
   });

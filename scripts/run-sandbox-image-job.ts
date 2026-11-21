@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { nixieSandboxImagesPayloadSchema } from '@zgeoff/cloud-topology';
 import type { NixieSandboxImagesPayload } from '@zgeoff/cloud-topology';
+import type { Clock } from '@zgeoff/std';
+import { systemClock } from '@zgeoff/std';
 import { z } from 'zod';
 import { readSandboxImageScript } from './read-sandbox-image-script.ts';
 import { runProcess } from './run-process.ts';
@@ -14,8 +16,7 @@ export interface SandboxImageJobOptions {
   readonly run: Runner;
   readonly readScript: () => Promise<string>;
   readonly tempRoot: string;
-  readonly now: () => number;
-  readonly sleep: (delayMs: number) => Promise<void>;
+  readonly clock: Pick<Clock, 'now' | 'sleep'>;
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 }
@@ -199,10 +200,10 @@ async function waitForJob(
   options: Readonly<SandboxImageJobOptions>,
   readJob: (args: readonly string[]) => ReturnType<Kubectl>,
 ): Promise<JobOutcome> {
-  const deadline = options.now() + waitMs;
+  const deadline = options.clock.now() + waitMs;
   let failedReads = 0;
 
-  while (options.now() < deadline) {
+  while (options.clock.now() < deadline) {
     const result = await readJob(['get', '--output', 'json']);
 
     if (result.exitCode === 0) {
@@ -225,7 +226,7 @@ async function waitForJob(
       }
     }
 
-    await options.sleep(pollMs);
+    await options.clock.sleep(pollMs);
   }
 
   return { isComplete: false, text: `did not finish in ${String(waitMs / 1000)} s` };
@@ -265,8 +266,7 @@ if (import.meta.main) {
     run: runProcess,
     readScript: readSandboxImageScript,
     tempRoot: tmpdir(),
-    now: Date.now,
-    sleep: Bun.sleep,
+    clock: systemClock,
     printOut: (text) => {
       process.stdout.write(text);
     },

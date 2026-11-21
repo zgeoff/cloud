@@ -11,7 +11,7 @@ async function trySleepIdlePreviews(deps: PreviewDeps): Promise<void> {
     // impd lists only the token's imps
     const imps = await deps.impd.readImps();
 
-    for (const name of planIdleSleeps(imps, deps.settings.idleMs, deps.now())) {
+    for (const name of planIdleSleeps(imps, deps.settings.idleMs, new Date(deps.now()))) {
       await trySleepImp(deps, name);
     }
   } catch (error) {

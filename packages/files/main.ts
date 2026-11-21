@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { systemClock } from '@zgeoff/std';
 import { createFilesService } from './create-files-service.ts';
 import { createUploadStore } from './create-upload-store.ts';
 import { loadFilesConfig } from './load-files-config.ts';
@@ -13,7 +14,7 @@ const service = createFilesService({
   dataDir: config.dataDir,
   tokenHashes: config.tokenHashes,
   publicURL: config.publicURL,
-  now: () => new Date(),
+  now: systemClock.now,
   readFreeBytes: () => readFreeBytes(config.dataDir),
   writeBytes: (path, file) => Bun.write(path, file),
 }).listen({ port: config.port, hostname: '0.0.0.0' });
@@ -21,7 +22,7 @@ const service = createFilesService({
 const stopSweep = startExpirySweep({
   store,
   filesDir: join(config.dataDir, 'files'),
-  now: () => new Date(),
+  now: systemClock.now,
   print: (line) => {
     console.log(line);
   },

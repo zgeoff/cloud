@@ -3,7 +3,7 @@ import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/pro
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
-import { server } from '../src/test-utils/server.ts';
+import { network } from '../src/test-utils/network.ts';
 import { tryReadManifestDigest } from '../try-read-manifest-digest.ts';
 import { runDecideGatewayPublish } from './run-decide-gateway-publish.ts';
 
@@ -48,7 +48,7 @@ test('it publishes for a push to main whose gateway tag the registry lacks', asy
     `config:\n  geoff-cloud:atcGateway:\n    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2@sha256:${'3'.repeat(64)}\n`,
   );
 
-  server.use(
+  network.use(
     http.head(
       'https://ghcr.io/v2/zgeoff/atc-gateway/manifests/7.2.0',
       () => new HttpResponse(null, { status: 404 }),
@@ -96,7 +96,7 @@ test('it skips a push to main whose tags the registry holds and the stack config
     `config:\n  geoff-cloud:atcGateway:\n    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'2'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2@sha256:${'3'.repeat(64)}\n`,
   );
 
-  server.use(
+  network.use(
     http.head(
       'https://ghcr.io/v2/zgeoff/atc-gateway/manifests/7.1.0',
       () =>
@@ -150,7 +150,7 @@ test('it publishes again for a re-run whose pushed tags the stack config does no
     `config:\n  geoff-cloud:atcGateway:\n    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2@sha256:${'3'.repeat(64)}\n`,
   );
 
-  server.use(
+  network.use(
     http.head(
       'https://ghcr.io/v2/zgeoff/atc-gateway/manifests/7.2.0',
       () =>
@@ -203,7 +203,7 @@ test("it reads a private package's tags with the GitHub token it is given", asyn
     `config:\n  geoff-cloud:atcGateway:\n    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'2'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2@sha256:${'3'.repeat(64)}\n`,
   );
 
-  server.use(
+  network.use(
     http.head('https://ghcr.io/v2/zgeoff/:name/manifests/:tag', (info) =>
       info.request.headers.get('authorization') === 'Bearer pull-token-5'
         ? new HttpResponse(null, {
@@ -258,7 +258,7 @@ test('it fails a push when the registry cannot answer for a tag, and writes no o
     `config:\n  geoff-cloud:atcGateway:\n    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2@sha256:${'3'.repeat(64)}\n`,
   );
 
-  server.use(
+  network.use(
     http.head(
       'https://ghcr.io/v2/zgeoff/atc-gateway/manifests/7.2.0',
       () => new HttpResponse(null, { status: 404 }),

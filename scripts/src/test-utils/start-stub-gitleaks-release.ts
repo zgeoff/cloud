@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
 import { runProcess } from '../../run-process.ts';
-import { server } from './server.ts';
+import { network } from './network.ts';
 
 export async function startStubGitleaksRelease(version: string, content: string): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), 'stub-gitleaks-release-'));
@@ -18,7 +18,7 @@ export async function startStubGitleaksRelease(version: string, content: string)
 
   const url = `https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz`;
 
-  server.use(http.get(url, () => HttpResponse.arrayBuffer(new Uint8Array(tarball).buffer)));
+  network.use(http.get(url, () => HttpResponse.arrayBuffer(new Uint8Array(tarball).buffer)));
 
   return new Bun.CryptoHasher('sha256').update(tarball).digest('hex');
 }
