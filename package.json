@@ -158,7 +158,7 @@
     "@zgeoff/diet": "0.3.0",
     "@zgeoff/format-codemod": "0.3.6",
     "@zgeoff/oxlint-config": "0.11.1",
-    "@zgeoff/rig": "0.2.6",
+    "@zgeoff/rig": "0.3.0",
     "@zgeoff/testing": "0.4.0",
     "bats": "catalog:",
     "bats-assert": "catalog:",
