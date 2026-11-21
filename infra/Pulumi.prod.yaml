@@ -21,9 +21,9 @@ config:
       wringer-ro: 103b0b349a550d29ba54f9f0a4d16efc66c661f9f073198e0ff9675d3d45ef30
   geoff-cloud:discordAlerts: 'true'
   geoff-cloud:nixie:
-    image: ghcr.io/zgeoff/nixie:0.90.0@sha256:35ac227ff5abbc80a818946651647cdd4122b311cbd8ee624a821eb9ff7bb2ea
-    webImage: ghcr.io/zgeoff/nixie-web:0.90.0@sha256:7d4fc77dec34bdfc5cb8edb66b501b149c5599bf6ce36629407b3548c4c5761e
-    backupImage: ghcr.io/zgeoff/nixie-backup:0.90.0@sha256:e310a7ce086f46fbe0f55441d06e6d8042e5a9bcb40306651aba4fa3cc1df2d9
+    image: ghcr.io/zgeoff/nixie:0.91.0@sha256:c8197a90884847191c462373282245012bac71eea46ce89da16984127474f985
+    webImage: ghcr.io/zgeoff/nixie-web:0.91.0@sha256:899fa5b1b38054499bd361e59fcca21da6a6cd7cc801560f7842f89867f2618c
+    backupImage: ghcr.io/zgeoff/nixie-backup:0.91.0@sha256:6b1959d4c43af9fc81cd4396734174c086e6d3c106e7fcd405746875e53e45f0
     hostname: nixie.geoff.cloud
   geoff-cloud:files:
     image: ghcr.io/zgeoff/cloud-files:14e4a70e35d5ef66b443efeb4de4ff9668d46783@sha256:012c1f1f7a08bf6f1c792b4f883396dc1b0592e3f3405d59278c7c1622af0171
