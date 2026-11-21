@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildRealProgramHandler } from '../src/test-utils/build-real-program-handler.ts';
 import { buildStubRunner } from '../src/test-utils/build-stub-runner.ts';
-import { createGitOrigin } from '../src/test-utils/create-git-origin.ts';
+import { createSeededGitOrigin } from '../src/test-utils/create-seeded-git-origin.ts';
 import { runGitSteps } from './run-git-steps.ts';
 
 async function setupTest() {
@@ -12,7 +12,7 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const origin = await createGitOrigin(directory);
+  const origin = await createSeededGitOrigin(directory);
 
   const stub = buildStubRunner(buildRealProgramHandler(['git'], origin.env));
 

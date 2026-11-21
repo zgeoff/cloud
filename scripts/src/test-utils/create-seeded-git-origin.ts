@@ -11,7 +11,7 @@ export interface GitOrigin {
   readonly git: (args: readonly string[]) => Promise<string>;
 }
 
-export async function createGitOrigin(directory: string): Promise<GitOrigin> {
+export async function createSeededGitOrigin(directory: string): Promise<GitOrigin> {
   const home = join(directory, 'home');
 
   const env = {
