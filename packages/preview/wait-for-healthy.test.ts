@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { systemClock } from '@zgeoff/std';
-import { createFakeClock } from '@zgeoff/testing/clock';
+import { createFakeClock, runClockUntil } from '@zgeoff/testing/clock';
 import { HttpResponse, http } from 'msw';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
@@ -11,7 +11,6 @@ import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
 import { network } from './src/test-utils/network.ts';
-import { runUntilSettled } from './src/test-utils/run-until-settled.ts';
 import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
@@ -85,15 +84,28 @@ test("it resolves healthy at the first probe through impd's proxy that the healt
 
   ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 3000 });
 
-  const health = await runUntilSettled(
-    ctx.clock,
-    waitForHealthy(ctx.deps, {
-      imp: 'pv-0a1b2c3d-17',
-      contract: { port: 3000, healthPath: '/healthz' },
-      windowMs: 3000,
-    }),
-    { maxMs: 60_000 },
-  );
+  const healthJob = waitForHealthy(ctx.deps, {
+    imp: 'pv-0a1b2c3d-17',
+    contract: { port: 3000, healthPath: '/healthz' },
+    windowMs: 3000,
+  });
+
+  let healthSettled = false;
+
+  const healthWatch = (async () => {
+    try {
+      await healthJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    healthSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => healthSettled, { maxMs: 60_000 });
+  await healthWatch;
+
+  const health = await healthJob;
 
   expect(health).toStrictEqual({
     healthy: true,
@@ -123,15 +135,28 @@ test("it resolves unhealthy with the proxy's last answer when the app listens on
 
   ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '127.0.0.1', port: 3000 });
 
-  const health = await runUntilSettled(
-    ctx.clock,
-    waitForHealthy(ctx.deps, {
-      imp: 'pv-0a1b2c3d-17',
-      contract: { port: 3000, healthPath: '/healthz' },
-      windowMs: 3000,
-    }),
-    { maxMs: 60_000 },
-  );
+  const healthJob = waitForHealthy(ctx.deps, {
+    imp: 'pv-0a1b2c3d-17',
+    contract: { port: 3000, healthPath: '/healthz' },
+    windowMs: 3000,
+  });
+
+  let healthSettled = false;
+
+  const healthWatch = (async () => {
+    try {
+      await healthJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    healthSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => healthSettled, { maxMs: 60_000 });
+  await healthWatch;
+
+  const health = await healthJob;
 
   expect(health).toStrictEqual({
     healthy: false,
@@ -152,15 +177,28 @@ test("it resolves unhealthy with the error when the imp's name never answers", a
     http.get('https://pv-0a1b2c3d-17.imps.example.test/healthz', () => HttpResponse.error()),
   );
 
-  const health = await runUntilSettled(
-    ctx.clock,
-    waitForHealthy(ctx.deps, {
-      imp: 'pv-0a1b2c3d-17',
-      contract: { port: 3000, healthPath: '/healthz' },
-      windowMs: 1000,
-    }),
-    { maxMs: 60_000 },
-  );
+  const healthJob = waitForHealthy(ctx.deps, {
+    imp: 'pv-0a1b2c3d-17',
+    contract: { port: 3000, healthPath: '/healthz' },
+    windowMs: 1000,
+  });
+
+  let healthSettled = false;
+
+  const healthWatch = (async () => {
+    try {
+      await healthJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    healthSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => healthSettled, { maxMs: 60_000 });
+  await healthWatch;
+
+  const health = await healthJob;
 
   expect(health).toStrictEqual({
     healthy: false,
@@ -180,15 +218,28 @@ test('it counts a redirect from the health path as healthy, as curl --fail did',
     ),
   );
 
-  const health = await runUntilSettled(
-    ctx.clock,
-    waitForHealthy(ctx.deps, {
-      imp: 'pv-0a1b2c3d-17',
-      contract: { port: 3000, healthPath: '/healthz' },
-      windowMs: 1000,
-    }),
-    { maxMs: 60_000 },
-  );
+  const healthJob = waitForHealthy(ctx.deps, {
+    imp: 'pv-0a1b2c3d-17',
+    contract: { port: 3000, healthPath: '/healthz' },
+    windowMs: 1000,
+  });
+
+  let healthSettled = false;
+
+  const healthWatch = (async () => {
+    try {
+      await healthJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    healthSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => healthSettled, { maxMs: 60_000 });
+  await healthWatch;
+
+  const health = await healthJob;
 
   expect(health).toStrictEqual({
     healthy: true,
@@ -208,15 +259,28 @@ test('it keeps the status and the text of a plain answer that is not healthy', a
     ),
   );
 
-  const health = await runUntilSettled(
-    ctx.clock,
-    waitForHealthy(ctx.deps, {
-      imp: 'pv-0a1b2c3d-17',
-      contract: { port: 3000, healthPath: '/healthz' },
-      windowMs: 1000,
-    }),
-    { maxMs: 60_000 },
-  );
+  const healthJob = waitForHealthy(ctx.deps, {
+    imp: 'pv-0a1b2c3d-17',
+    contract: { port: 3000, healthPath: '/healthz' },
+    windowMs: 1000,
+  });
+
+  let healthSettled = false;
+
+  const healthWatch = (async () => {
+    try {
+      await healthJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    healthSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => healthSettled, { maxMs: 60_000 });
+  await healthWatch;
+
+  const health = await healthJob;
 
   expect(health).toStrictEqual({
     healthy: false,

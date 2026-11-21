@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { systemClock } from '@zgeoff/std';
-import { createFakeClock } from '@zgeoff/testing/clock';
+import { createFakeClock, runClockUntil } from '@zgeoff/testing/clock';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
@@ -13,7 +13,6 @@ import { composeFiles } from './src/test-utils/constants.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
 import { processDeps } from './src/test-utils/process-deps.ts';
 import { runBoundedProcess } from './src/test-utils/run-bounded-process.ts';
-import { runUntilSettled } from './src/test-utils/run-until-settled.ts';
 import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
@@ -96,19 +95,31 @@ test('it creates the imp with the contract port and the grant, then builds and p
   // the app listens on the imp's own address, so impd's proxy reaches it
   ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 3000 });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(ctx.deps, {
-      repo: 'acme/greenhouse',
-      number: 17,
-      imp: 'pv-0a1b2c3d-17',
-      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      builtSHA: null,
-      phase: 'booting',
-      detail: null,
-    }),
-    { maxMs: 3_600_000 },
-  );
+  const pendingJob = runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: null,
+    phase: 'booting',
+    detail: null,
+  });
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')).toStrictEqual({
     name: 'pv-0a1b2c3d-17',
@@ -162,19 +173,31 @@ test("it starts the stack with compose.yaml and compose.broker.yaml, with the br
 
   ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(ctx.deps, {
-      repo: 'acme/greenhouse',
-      number: 17,
-      imp: 'pv-0a1b2c3d-17',
-      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      builtSHA: null,
-      phase: 'booting',
-      detail: null,
-    }),
-    { maxMs: 3_600_000 },
-  );
+  const pendingJob = runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: null,
+    phase: 'booting',
+    detail: null,
+  });
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.impd.commands).toStrictEqual([
     {
@@ -226,22 +249,34 @@ test('it grants the model secret beside the GitHub secret, so the stack reaches 
 
   ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(
-      { ...ctx.deps, settings: { ...ctx.deps.settings, impModelSecret: 'preview-model' } },
-      {
-        repo: 'acme/greenhouse',
-        number: 17,
-        imp: 'pv-0a1b2c3d-17',
-        headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        builtSHA: null,
-        phase: 'booting',
-        detail: null,
-      },
-    ),
-    { maxMs: 3_600_000 },
+  const pendingJob = runPreviewBoot(
+    { ...ctx.deps, settings: { ...ctx.deps.settings, impModelSecret: 'preview-model' } },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      builtSHA: null,
+      phase: 'booting',
+      detail: null,
+    },
   );
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   const grants = await ctx.impd.client.grants.list({ name: 'pv-0a1b2c3d-17' });
 
@@ -262,31 +297,43 @@ test('it grants the model secret for the preview own route only, and passes the 
 
   ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(
-      {
-        ...ctx.deps,
-        settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
-        spendProxies: {
-          holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
-          removeProxy: () => Promise.resolve(),
-          removeIdle: () => Promise.resolve(),
-          removeAll: () => Promise.resolve(),
-        },
+  const pendingJob = runPreviewBoot(
+    {
+      ...ctx.deps,
+      settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
+      spendProxies: {
+        holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
+        removeProxy: () => Promise.resolve(),
+        removeIdle: () => Promise.resolve(),
+        removeAll: () => Promise.resolve(),
       },
-      {
-        repo: 'acme/greenhouse',
-        number: 17,
-        imp: 'pv-0a1b2c3d-17',
-        headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        builtSHA: null,
-        phase: 'booting',
-        detail: null,
-      },
-    ),
-    { maxMs: 3_600_000 },
+    },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      builtSHA: null,
+      phase: 'booting',
+      detail: null,
+    },
   );
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual([
     'gh',
@@ -347,31 +394,43 @@ test('it swaps the uncounted model grant of an imp that booted before the counti
   ctx.impd.secretHosts.set('preview-model-counted', 'api.anthropic.com');
   ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(
-      {
-        ...ctx.deps,
-        settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
-        spendProxies: {
-          holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
-          removeProxy: () => Promise.resolve(),
-          removeIdle: () => Promise.resolve(),
-          removeAll: () => Promise.resolve(),
-        },
+  const pendingJob = runPreviewBoot(
+    {
+      ...ctx.deps,
+      settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
+      spendProxies: {
+        holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
+        removeProxy: () => Promise.resolve(),
+        removeIdle: () => Promise.resolve(),
+        removeAll: () => Promise.resolve(),
       },
-      {
-        repo: 'acme/greenhouse',
-        number: 17,
-        imp: 'pv-0a1b2c3d-17',
-        headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        builtSHA: 'cccccccccccccccccccccccccccccccccccccccc',
-        phase: 'booting',
-        detail: null,
-      },
-    ),
-    { maxMs: 3_600_000 },
+    },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      builtSHA: 'cccccccccccccccccccccccccccccccccccccccc',
+      phase: 'booting',
+      detail: null,
+    },
   );
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual([
     'gh',
@@ -416,22 +475,34 @@ test('it swaps the counted model grant of an imp for the uncounted one once the 
   ctx.impd.secretHosts.set('preview-model-counted', 'api.anthropic.com');
   ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(
-      { ...ctx.deps, settings: { ...ctx.deps.settings, impModelSecret: 'preview-model' } },
-      {
-        repo: 'acme/greenhouse',
-        number: 17,
-        imp: 'pv-0a1b2c3d-17',
-        headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        builtSHA: 'cccccccccccccccccccccccccccccccccccccccc',
-        phase: 'booting',
-        detail: null,
-      },
-    ),
-    { maxMs: 3_600_000 },
+  const pendingJob = runPreviewBoot(
+    { ...ctx.deps, settings: { ...ctx.deps.settings, impModelSecret: 'preview-model' } },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      builtSHA: 'cccccccccccccccccccccccccccccccccccccccc',
+      phase: 'booting',
+      detail: null,
+    },
   );
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['gh', 'preview-model']);
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ready');
@@ -473,31 +544,43 @@ test("it writes the route into the stack's .env after the commit's own lines, so
   ctx.store.upsertHead({ repo: 'acme/greenhouse', number: 17, imp: 'pv-0a1b2c3d-17', headSHA });
   ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(
-      {
-        ...ctx.deps,
-        settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
-        spendProxies: {
-          holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
-          removeProxy: () => Promise.resolve(),
-          removeIdle: () => Promise.resolve(),
-          removeAll: () => Promise.resolve(),
-        },
+  const pendingJob = runPreviewBoot(
+    {
+      ...ctx.deps,
+      settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
+      spendProxies: {
+        holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
+        removeProxy: () => Promise.resolve(),
+        removeIdle: () => Promise.resolve(),
+        removeAll: () => Promise.resolve(),
       },
-      {
-        repo: 'acme/greenhouse',
-        number: 17,
-        imp: 'pv-0a1b2c3d-17',
-        headSHA,
-        builtSHA: null,
-        phase: 'booting',
-        detail: null,
-      },
-    ),
-    { maxMs: 3_600_000 },
+    },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA,
+      builtSHA: null,
+      phase: 'booting',
+      detail: null,
+    },
   );
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   const guest = await runBoundedProcess(processDeps, {
     name: "the boot's guest script",
@@ -555,31 +638,43 @@ test.skipIf(Bun.which('docker') === null)(
       phase: 'booting',
     });
 
-    await runUntilSettled(
-      ctx.clock,
-      runPreviewBoot(
-        {
-          ...ctx.deps,
-          settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
-          spendProxies: {
-            holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
-            removeProxy: () => Promise.resolve(),
-            removeIdle: () => Promise.resolve(),
-            removeAll: () => Promise.resolve(),
-          },
+    const pending2Job = runPreviewBoot(
+      {
+        ...ctx.deps,
+        settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
+        spendProxies: {
+          holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
+          removeProxy: () => Promise.resolve(),
+          removeIdle: () => Promise.resolve(),
+          removeAll: () => Promise.resolve(),
         },
-        {
-          repo: 'acme/greenhouse',
-          number: 17,
-          imp: 'pv-0a1b2c3d-17',
-          headSHA,
-          builtSHA: null,
-          phase: 'booting',
-          detail: null,
-        },
-      ),
-      { maxMs: 3_600_000 },
+      },
+      {
+        repo: 'acme/greenhouse',
+        number: 17,
+        imp: 'pv-0a1b2c3d-17',
+        headSHA,
+        builtSHA: null,
+        phase: 'booting',
+        detail: null,
+      },
     );
+
+    let pending2Settled = false;
+
+    const pending2Watch = (async () => {
+      try {
+        await pending2Job;
+      } catch {
+        // the await of the job below throws it
+      }
+
+      pending2Settled = true;
+    })();
+
+    await runClockUntil(ctx.clock, () => pending2Settled, { maxMs: 3_600_000 });
+    await pending2Watch;
+    await pending2Job;
 
     // `docker compose config` has taken from 0.2 s to over 3.5 s on CI runners, and the guest
     // script's git work from under 0.1 s to over 0.5 s on a small host, so the two steps share one
@@ -647,22 +742,34 @@ test("it leaves no route in the stack's .env once the previews run without count
   ctx.store.upsertHead({ repo: 'acme/greenhouse', number: 17, imp: 'pv-0a1b2c3d-17', headSHA });
   ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(
-      { ...ctx.deps, settings: { ...ctx.deps.settings, impModelSecret: 'preview-model' } },
-      {
-        repo: 'acme/greenhouse',
-        number: 17,
-        imp: 'pv-0a1b2c3d-17',
-        headSHA,
-        builtSHA: null,
-        phase: 'booting',
-        detail: null,
-      },
-    ),
-    { maxMs: 3_600_000 },
+  const pendingJob = runPreviewBoot(
+    { ...ctx.deps, settings: { ...ctx.deps.settings, impModelSecret: 'preview-model' } },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA,
+      builtSHA: null,
+      phase: 'booting',
+      detail: null,
+    },
   );
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   const guest = await runBoundedProcess(processDeps, {
     name: "the boot's guest script",
@@ -691,25 +798,37 @@ test('it requires the broker for the build when the model secret is the only gra
 
   ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(
-      {
-        ...ctx.deps,
-        settings: { ...ctx.deps.settings, impGitHubSecret: null, impModelSecret: 'preview-model' },
-      },
-      {
-        repo: 'acme/greenhouse',
-        number: 17,
-        imp: 'pv-0a1b2c3d-17',
-        headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        builtSHA: null,
-        phase: 'booting',
-        detail: null,
-      },
-    ),
-    { maxMs: 3_600_000 },
+  const pendingJob = runPreviewBoot(
+    {
+      ...ctx.deps,
+      settings: { ...ctx.deps.settings, impGitHubSecret: null, impModelSecret: 'preview-model' },
+    },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      builtSHA: null,
+      phase: 'booting',
+      detail: null,
+    },
   );
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['preview-model']);
   expect(ctx.impd.commands).toPartiallyContain({ imp: 'pv-0a1b2c3d-17', require: ['broker'] });
@@ -734,19 +853,31 @@ test('it records the tail of the build output when the build fails', async () =>
     stdout: 'service "seed" didn\'t complete successfully: exit 1\n',
   });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(ctx.deps, {
-      repo: 'acme/greenhouse',
-      number: 17,
-      imp: 'pv-0a1b2c3d-17',
-      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      builtSHA: null,
-      phase: 'booting',
-      detail: null,
-    }),
-    { maxMs: 3_600_000 },
-  );
+  const pendingJob = runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: null,
+    phase: 'booting',
+    detail: null,
+  });
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })).toMatchObject({
     phase: 'failed',
@@ -781,19 +912,31 @@ test('it leaves a newer head waiting, not failed, when the older head it booted 
     return { code: 1 };
   };
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(ctx.deps, {
-      repo: 'acme/greenhouse',
-      number: 17,
-      imp: 'pv-0a1b2c3d-17',
-      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      builtSHA: null,
-      phase: 'booting',
-      detail: null,
-    }),
-    { maxMs: 3_600_000 },
-  );
+  const pendingJob = runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: null,
+    phase: 'booting',
+    detail: null,
+  });
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })).toStrictEqual({
     repo: 'acme/greenhouse',
@@ -826,19 +969,31 @@ test("it fails the boot, naming the port, when the app listens on the guest's lo
   // the build succeeds and the app answers inside the guest, but on 127.0.0.1 only
   ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '127.0.0.1', port: 3000 });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(ctx.deps, {
-      repo: 'acme/greenhouse',
-      number: 17,
-      imp: 'pv-0a1b2c3d-17',
-      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      builtSHA: null,
-      phase: 'booting',
-      detail: null,
-    }),
-    { maxMs: 3_600_000 },
-  );
+  const pendingJob = runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: null,
+    phase: 'booting',
+    detail: null,
+  });
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })).toStrictEqual({
     repo: 'acme/greenhouse',
@@ -887,19 +1042,31 @@ test('it rebuilds an existing imp in place and takes the port of the new commit'
     grants: ['gh'],
   });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(ctx.deps, {
-      repo: 'acme/greenhouse',
-      number: 17,
-      imp: 'pv-0a1b2c3d-17',
-      headSHA: 'cccccccccccccccccccccccccccccccccccccccc',
-      builtSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      phase: 'booting',
-      detail: null,
-    }),
-    { maxMs: 3_600_000 },
-  );
+  const pendingJob = runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'cccccccccccccccccccccccccccccccccccccccc',
+    builtSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    phase: 'booting',
+    detail: null,
+  });
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.impd.calls).toStrictEqual([
     'imps/get pv-0a1b2c3d-17',
@@ -942,19 +1109,31 @@ test('it puts a sleeping existing imp under the public egress policy before it w
     grants: ['gh'],
   });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(ctx.deps, {
-      repo: 'acme/greenhouse',
-      number: 17,
-      imp: 'pv-0a1b2c3d-17',
-      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      builtSHA: 'cccccccccccccccccccccccccccccccccccccccc',
-      phase: 'booting',
-      detail: null,
-    }),
-    { maxMs: 3_600_000 },
-  );
+  const pendingJob = runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: 'cccccccccccccccccccccccccccccccccccccccc',
+    phase: 'booting',
+    detail: null,
+  });
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.impd.calls.slice(0, 5)).toStrictEqual([
     'imps/get pv-0a1b2c3d-17',
@@ -999,19 +1178,31 @@ test('it adds the grant to an existing imp that lacks it, even after an earlier 
     grants: [],
   });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(ctx.deps, {
-      repo: 'acme/greenhouse',
-      number: 17,
-      imp: 'pv-0a1b2c3d-17',
-      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      builtSHA: 'cccccccccccccccccccccccccccccccccccccccc',
-      phase: 'booting',
-      detail: null,
-    }),
-    { maxMs: 3_600_000 },
-  );
+  const pendingJob = runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: 'cccccccccccccccccccccccccccccccccccccccc',
+    phase: 'booting',
+    detail: null,
+  });
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.impd.calls).toStrictEqual([
     'imps/get pv-0a1b2c3d-17',
@@ -1045,19 +1236,31 @@ test('it leaves a preview ended when its pull request closed during the boot', a
 
   ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'ended' });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(ctx.deps, {
-      repo: 'acme/greenhouse',
-      number: 17,
-      imp: 'pv-0a1b2c3d-17',
-      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      builtSHA: null,
-      phase: 'booting',
-      detail: null,
-    }),
-    { maxMs: 3_600_000 },
-  );
+  const pendingJob = runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: null,
+    phase: 'booting',
+    detail: null,
+  });
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ended');
 });
@@ -1080,19 +1283,31 @@ test('it removes the imp it started when the pull request closed before the imp 
 
   ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'ended' });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(ctx.deps, {
-      repo: 'acme/greenhouse',
-      number: 17,
-      imp: 'pv-0a1b2c3d-17',
-      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      builtSHA: null,
-      phase: 'booting',
-      detail: null,
-    }),
-    { maxMs: 3_600_000 },
-  );
+  const pendingJob = runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: null,
+    phase: 'booting',
+    detail: null,
+  });
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   const heldImps = await ctx.impd.client.imps.list({});
 
@@ -1114,19 +1329,31 @@ test('it fails the boot when the head commit has no preview/compose.yaml', async
 
   ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
 
-  await runUntilSettled(
-    ctx.clock,
-    runPreviewBoot(ctx.deps, {
-      repo: 'acme/greenhouse',
-      number: 17,
-      imp: 'pv-0a1b2c3d-17',
-      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      builtSHA: null,
-      phase: 'booting',
-      detail: null,
-    }),
-    { maxMs: 3_600_000 },
-  );
+  const pendingJob = runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: null,
+    phase: 'booting',
+    detail: null,
+  });
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })).toMatchObject({
     phase: 'failed',
