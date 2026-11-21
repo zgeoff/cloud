@@ -157,7 +157,7 @@
     "@zgeoff/cloud-topology": "workspace:*",
     "@zgeoff/diet": "0.3.0",
     "@zgeoff/format-codemod": "0.3.6",
-    "@zgeoff/oxlint-config": "0.11.1",
+    "@zgeoff/oxlint-config": "0.11.3",
     "@zgeoff/rig": "0.3.0",
     "@zgeoff/std": "0.4.5",
     "@zgeoff/testing": "0.4.1",
