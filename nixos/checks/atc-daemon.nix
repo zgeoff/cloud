@@ -2,8 +2,7 @@
 # checks the service, the config.json it links and the module's assertions; one case reads the
 # config.json that geoffcloud's own config links instead. Each other case evaluates its own config
 # through test-utils/build-module-system.nix, most as buildDaemonSystem's valid config with the
-# options the case sets. Each runs on its own, in a fresh directory, under
-# scripts/src/test-utils/shell/run-cases.sh, which reports each case and fails the check when any case fails.
+# options the case sets. Each runs on its own, in a fresh directory, as a bats test, which reports each case and fails the check when any case fails.
 # No case starts atc, so a token file that atc refuses at start passes here: atc-daemon-vm starts
 # the daemon as the host does.
 # Run: bun run test:nixos atc-daemon
@@ -15,7 +14,6 @@
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
@@ -129,7 +127,7 @@ let
           }}
           EOF
 
-          assert_files_equal expected actual
+          diff -u expected actual
         '';
     }
     {
@@ -147,8 +145,9 @@ let
           rest=''${start#* }
           grep -q 'export ATC_GIT_CLONE_TOKEN=' "$wrapper"
           grep -q 'CREDENTIALS_DIRECTORY/env-ATC_GIT_CLONE_TOKEN' "$wrapper"
-          assert_equals '${atc}/bin/atc daemon --listen 100.64.0.1:8415 --token-file /run/atc-daemon/gateway-token' "$rest" "the atc command line"
-          assert_equals ${
+          assert_equal "$rest" '${atc}/bin/atc daemon --listen 100.64.0.1:8415 --token-file /run/atc-daemon/gateway-token'
+          # credentials
+          assert_equal ${lib.escapeShellArg (builtins.toJSON service.serviceConfig.LoadCredential)} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "gateway-token:/run/fixture/gateway-token"
@@ -156,7 +155,7 @@ let
                 "env-ATC_GIT_CLONE_TOKEN:/run/fixture/git-clone-token"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON service.serviceConfig.LoadCredential)} "credentials"
+          }
         '';
     }
     {
@@ -175,7 +174,7 @@ let
           printf 'fixture-value\n' > "$dir/env-value"
           actual=$(CREDENTIALS_DIRECTORY="$dir" "$wrapper" sh -c 'printf %s "''${value-absent}"')
 
-          assert_equals 'fixture-value' "$actual" "the value variable"
+          assert_equal "$actual" 'fixture-value'
         '';
     }
     {
@@ -187,13 +186,13 @@ let
           };
         in
         ''
-          assert_equals ${
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "services.atc-daemon.environmentCredentials names variables that are not valid environment variable names (^[A-Za-z_][A-Za-z0-9_]*$): BAD-NAME"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          }
         '';
     }
     {
@@ -205,7 +204,7 @@ let
         ''
           actual=$(PATH='${service.environment.PATH}' git --version)
 
-          assert_equals 'git version ${pkgs.git.version}' "$actual" "git on the service's PATH"
+          assert_equal "$actual" 'git version ${pkgs.git.version}'
         '';
     }
     {
@@ -217,7 +216,7 @@ let
         ''
           actual=$(PATH='${service.environment.PATH}' tar --version | head -n 1)
 
-          assert_equals 'tar (GNU tar) ${pkgs.gnutar.version}' "$actual" "tar on the service's PATH"
+          assert_equal "$actual" 'tar (GNU tar) ${pkgs.gnutar.version}'
         '';
     }
     {
@@ -271,8 +270,8 @@ let
           sed "s|$config|CONFIG|" "$script" > actual-script
           jq -S . "$config" > actual
 
-          assert_files_equal expected-script actual-script
-          assert_files_equal expected actual
+          diff -u expected-script actual-script
+          diff -u expected actual
         '';
     }
     {
@@ -323,7 +322,7 @@ let
           ${builtins.toJSON system.config.systemd.services.atc-daemon.serviceConfig}
           EOF
 
-          assert_files_equal expected actual
+          diff -u expected actual
         '';
     }
     {
@@ -350,8 +349,8 @@ let
           config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) .*$|\1|p' ${linkScriptOf system.config.systemd.services.atc-daemon})
           jq -S . "$config" > actual
 
-          assert_files_equal expected actual
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          diff -u expected actual
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} '[]'
         '';
     }
     {
@@ -361,7 +360,7 @@ let
           system = buildDaemonSystem { };
         in
         ''
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} '[]'
         '';
     }
     {
@@ -376,13 +375,13 @@ let
           };
         in
         ''
-          assert_equals ${
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "services.atc-daemon.principals grants targets that services.atc-daemon.targets does not define: fixture-client -> elsewhere"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          }
         '';
     }
     {
@@ -399,13 +398,13 @@ let
           };
         in
         ''
-          assert_equals ${
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "services.atc-daemon.principals grants targets that services.atc-daemon.targets does not define: alpha-client -> nowhere, beta-client -> elsewhere, beta-client -> faraway"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          }
         '';
     }
     {
@@ -415,13 +414,13 @@ let
           system = buildDaemonSystem { defaultTarget = "elsewhere"; };
         in
         ''
-          assert_equals ${
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "services.atc-daemon.defaultTarget must name one of services.atc-daemon.targets"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          }
         '';
     }
     {
@@ -444,13 +443,13 @@ let
           };
         in
         ''
-          assert_equals ${
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "services.atc-daemon.agents select auth profiles that services.atc-daemon.authProfiles does not define: claude -> claude, codex -> codex"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          }
         '';
     }
     {
@@ -472,13 +471,13 @@ let
           };
         in
         ''
-          assert_equals ${
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "services.atc-daemon.agents select auth profiles that services.atc-daemon.authProfiles does not define: claude mcpServers.linear -> linear"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          }
         '';
     }
     {
@@ -592,7 +591,7 @@ let
         config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) .*$|\1|p' ${linkScriptOf geoffcloud.config.systemd.services.atc-daemon})
         jq -S . "$config" > actual
 
-        assert_files_equal expected actual
+        diff -u expected actual
       '';
     }
     {
@@ -606,15 +605,8 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON {
-                service = false;
-                user = false;
-                group = false;
-              }
-            )
-          } ${
+          # what the module adds
+          assert_equal ${
             lib.escapeShellArg (
               builtins.toJSON {
                 service = system.config.systemd.services ? atc-daemon;
@@ -622,8 +614,17 @@ let
                 group = system.config.users.groups ? atc;
               }
             )
-          } "what the module adds"
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON {
+                service = false;
+                user = false;
+                group = false;
+              }
+            )
+          }
+          # failed assertions
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} '[]'
         '';
     }
   ];
@@ -631,6 +632,10 @@ in
 pkgs.runCommand "atc-daemon-check"
   {
     nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
       pkgs.diffutils
       pkgs.gnused
       pkgs.jq
@@ -639,10 +644,6 @@ pkgs.runCommand "atc-daemon-check"
     inherit testUtilsCheck;
   }
   ''
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${pkgs.writeText "atc-daemon-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "atc-daemon.bats" (renderCases cases)}
     touch $out
   ''

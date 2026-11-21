@@ -1,7 +1,7 @@
 # Reads the settings file that geoffcloud's imp-host unit hands impd, the file the imp module writes
 # from services.imp.settings and its env script exports as IMP_SETTINGS, and checks the settings the
 # host sets there, with the userfaultfd device that its huge pages need. Each case runs in a fresh
-# directory, under scripts/src/test-utils/shell/run-cases.sh.
+# directory, as a bats test.
 # Run: bun run test:nixos impd-settings
 {
   nixpkgs,
@@ -11,7 +11,6 @@
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
 
@@ -29,15 +28,15 @@ let
     {
       title = "it turns on huge pages of 2M for impd and passes imp-host the userfaultfd device";
       script = ''
-        assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
+        assert_equal ${toString (builtins.length envScripts)} 1
         settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
         grep '^IMP_HUGE_PAGES=' "$settings" > actual
         grep -o -- '--device /dev/userfaultfd' ${execStart} > device
 
-        assert_files_equal - actual <<'EOF'
+        diff -u - actual <<'EOF'
         IMP_HUGE_PAGES=2M
         EOF
-        assert_files_equal - device <<'EOF'
+        diff -u - device <<'EOF'
         --device /dev/userfaultfd
         EOF
       '';
@@ -45,11 +44,11 @@ let
     {
       title = "it caps the memory file that impd warms after a sleep at 256 MiB of data";
       script = ''
-        assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
+        assert_equal ${toString (builtins.length envScripts)} 1
         settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
         grep '^IMP_WARM_CAP_MIB=' "$settings" > actual
 
-        assert_files_equal - actual <<'EOF'
+        diff -u - actual <<'EOF'
         IMP_WARM_CAP_MIB=256
         EOF
       '';
@@ -57,11 +56,11 @@ let
     {
       title = "it hands impd both image eviction marks, 80 and 65 percent";
       script = ''
-        assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
+        assert_equal ${toString (builtins.length envScripts)} 1
         settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
         grep '^IMP_IMAGE_EVICT_' "$settings" | sort > actual
 
-        assert_files_equal - actual <<'EOF'
+        diff -u - actual <<'EOF'
         IMP_IMAGE_EVICT_HIGH_PERCENT=80
         IMP_IMAGE_EVICT_LOW_PERCENT=65
         EOF
@@ -70,11 +69,11 @@ let
     {
       title = "it keeps 3072 MiB of the impd budget for the imps whose names start with nixie-, none of it past the pool";
       script = ''
-        assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
+        assert_equal ${toString (builtins.length envScripts)} 1
         settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
         grep '^IMP_PRIORITY_' "$settings" | sort > actual
 
-        assert_files_equal - actual <<'EOF'
+        diff -u - actual <<'EOF'
         IMP_PRIORITY_IMPS=nixie-*
         IMP_PRIORITY_ORDINARY_RAM_MIB=0
         IMP_PRIORITY_RAM_MIB=3072
@@ -84,11 +83,11 @@ let
     {
       title = "it boots the image builders of impd elastic, at 1024 MiB and growing to 2048 MiB";
       script = ''
-        assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
+        assert_equal ${toString (builtins.length envScripts)} 1
         settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
         grep -E '^IMP_BUILD_(MAX_)?MEMORY_MIB=' "$settings" | sort > actual
 
-        assert_files_equal - actual <<'EOF'
+        diff -u - actual <<'EOF'
         IMP_BUILD_MAX_MEMORY_MIB=2048
         IMP_BUILD_MEMORY_MIB=1024
         EOF
@@ -97,11 +96,11 @@ let
     {
       title = "it names impd geoffcloud as the issuer of its imp identity tokens";
       script = ''
-        assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
+        assert_equal ${toString (builtins.length envScripts)} 1
         settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
         grep '^IMP_IDENTITY_' "$settings" > actual
 
-        assert_files_equal - actual <<'EOF'
+        diff -u - actual <<'EOF'
         IMP_IDENTITY_ISSUER=geoffcloud
         EOF
       '';
@@ -109,11 +108,11 @@ let
     {
       title = "it hands impd the public MCP origin https://imp.geoff.cloud and its listener port 7071";
       script = ''
-        assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
+        assert_equal ${toString (builtins.length envScripts)} 1
         settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
         grep '^IMP_MCP_PUBLIC_' "$settings" | sort > actual
 
-        assert_files_equal - actual <<'EOF'
+        diff -u - actual <<'EOF'
         IMP_MCP_PUBLIC_PORT=7071
         IMP_MCP_PUBLIC_URL=https://imp.geoff.cloud
         EOF
@@ -126,7 +125,7 @@ let
           etc = geoffcloud.config.environment.etc;
         in
         ''
-          assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
+          assert_equal ${toString (builtins.length envScripts)} 1
           settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
           grep '^IMP_MCP_SERVICE_' "$settings" | sort > actual
           jq -S . > expected-files <<'EOF'
@@ -158,11 +157,11 @@ let
             } \
             '{$modes, $tokenFile, $clientsFile}' > actual-files
 
-          assert_files_equal - actual <<'EOF'
+          diff -u - actual <<'EOF'
           IMP_MCP_SERVICE_CLIENTS_FILE=/etc/imp/service-clients.json
           IMP_MCP_SERVICE_TOKEN_FILE=/etc/imp/service-tokens.json
           EOF
-          assert_files_equal expected-files actual-files
+          diff -u expected-files actual-files
         '';
     }
   ];
@@ -170,6 +169,10 @@ in
 pkgs.runCommand "impd-settings-check"
   {
     nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
       pkgs.diffutils
       pkgs.gnugrep
       pkgs.gnused
@@ -179,10 +182,6 @@ pkgs.runCommand "impd-settings-check"
     inherit testUtilsCheck;
   }
   ''
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${pkgs.writeText "impd-settings-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "impd-settings.bats" (renderCases cases)}
     touch $out
   ''

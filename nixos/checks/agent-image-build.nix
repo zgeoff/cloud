@@ -4,13 +4,12 @@
 # test-utils/build-stub-agent-image-bun.nix for the build script's run, and the stand-in sleep of
 # test-utils/build-stub-sleep.nix for its pauses, with 3 tries for impd. Each case runs on its own,
 # in a fresh directory, with its own origin, impd state, credentials and state directory, and the
-# script under env -i with a HOME and TMPDIR of its own, under scripts/src/test-utils/shell/run-cases.sh.
+# script under env -i with a HOME and TMPDIR of its own, as a bats test.
 # Run: bun run test:nixos agent-image-build
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
@@ -131,7 +130,7 @@ let
           }}
           EOF
 
-          assert_files_equal expected actual
+          diff -u expected actual
         '';
     }
     {
@@ -143,14 +142,14 @@ let
             .config;
         in
         ''
-          assert_equals '{"service":false,"timer":false}' ${
+          assert_equal ${
             lib.escapeShellArg (
               builtins.toJSON {
                 service = config.systemd.services ? agent-image-build;
                 timer = config.systemd.timers ? agent-image-build;
               }
             )
-          } "what the module adds"
+          } '{"service":false,"timer":false}'
         '';
     }
     {
@@ -179,19 +178,19 @@ let
 
         run_build
 
-        assert_equals 0 "$status" "the script's exit status"
-        assert_files_equal - stdout <<EOF
+        assert_equal "$status" 0
+        diff -u - stdout <<EOF
         agent-image-build: building $image from $pin
         agent-image-build: $image imp-build-cc check passed
         EOF
-        assert_files_equal /dev/null stderr
+        diff -u /dev/null stderr
         jq -c . > expected <<EOF
         ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
         ["container","inspect","--format","{{.Id}}","imp-host"]
         ["exec","imp-host","stat","-c","%a","/usr/local/bin/impz"]
         ["exec","imp-host","cat","/usr/local/bin/impz"]
         EOF
-        assert_files_equal expected impd/calls
+        diff -u expected impd/calls
         jq -S . > expected <<EOF
         {
           "argv": ["scripts/build-agent-image.ts", "$pin"],
@@ -202,12 +201,17 @@ let
         }
         EOF
         jq -S . build/calls > actual
-        assert_files_equal expected actual
-        assert_files_equal impd/container/usr/local/bin/impz state/bin/impz
-        assert_equals 755 "$(stat -c %a state/bin/impz)" "the copied CLI's mode"
-        assert_equals impz "$(ls -A state/bin)" "the CLI directory"
-        assert_equals "$head" "$(git -C state/cloud rev-parse HEAD)" "the commit the build runs from"
-        assert_missing state/failed "the failed builds"
+        diff -u expected actual
+        diff -u impd/container/usr/local/bin/impz state/bin/impz
+        # the copied CLI's mode
+        assert_equal "$(stat -c %a state/bin/impz)" 755
+        # the CLI directory
+        assert_equal "$(ls -A state/bin)" impz
+        # the commit the build runs from
+        assert_equal "$(git -C state/cloud rev-parse HEAD)" "$head"
+        # the failed builds
+        assert [ ! -e state/failed ]
+        assert [ ! -L state/failed ]
       '';
     }
     {
@@ -223,7 +227,7 @@ let
         echo c0ffee01 > impd/container-ids
         printf 'imp_fixture_build_token' > credentials/imp-token
         run_build
-        assert_equals 0 "$status" "the earlier run's exit status"
+        assert_equal "$status" 0
         echo 'ARG ATC_VERSION=1.1.0' > origin/images/agent/Dockerfile
         git -C origin add -A && git -C origin commit -q -m "pin atc 1.1.0"
         pin=$(git -C origin rev-parse HEAD)
@@ -232,13 +236,14 @@ let
 
         run_build
 
-        assert_equals 0 "$status" "the script's exit status"
-        assert_files_equal - stdout <<EOF
+        assert_equal "$status" 0
+        diff -u - stdout <<EOF
         agent-image-build: building $image from $pin
         agent-image-build: $image imp-build-cc check passed
         EOF
-        assert_files_equal /dev/null stderr
-        assert_equals "[\"scripts/build-agent-image.ts\",\"$pin\"]" "$(jq -c .argv build/calls)" "the build's argv"
+        diff -u /dev/null stderr
+        # the build's argv
+        assert_equal "$(jq -c .argv build/calls)" "[\"scripts/build-agent-image.ts\",\"$pin\"]"
       '';
     }
     {
@@ -258,12 +263,18 @@ let
 
         run_build
 
-        assert_equals 0 "$status" "the script's exit status"
-        assert_equals "agent-image-build: impd holds $image, built from $pin; nothing to build" "$(cat stdout)" "the script's stdout"
-        assert_files_equal /dev/null stderr
-        assert_equals '["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]' "$(cat impd/calls)" "the podman calls"
-        assert_missing build/calls "the build calls"
-        assert_missing state/bin "the copied CLI"
+        assert_equal "$status" 0
+        # the script's stdout
+        assert_equal "$(cat stdout)" "agent-image-build: impd holds $image, built from $pin; nothing to build"
+        diff -u /dev/null stderr
+        # the podman calls
+        assert_equal "$(cat impd/calls)" '["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]'
+        # the build calls
+        assert [ ! -e build/calls ]
+        assert [ ! -L build/calls ]
+        # the copied CLI
+        assert [ ! -e state/bin ]
+        assert [ ! -L state/bin ]
       '';
     }
     {
@@ -278,11 +289,16 @@ let
 
         run_build
 
-        assert_equals 0 "$status" "the script's exit status"
-        assert_equals "agent-image-build: no commit on main changes images/agent; nothing to build" "$(cat stdout)" "the script's stdout"
-        assert_files_equal /dev/null stderr
-        assert_missing impd/calls "the podman calls"
-        assert_missing build/calls "the build calls"
+        assert_equal "$status" 0
+        # the script's stdout
+        assert_equal "$(cat stdout)" "agent-image-build: no commit on main changes images/agent; nothing to build"
+        diff -u /dev/null stderr
+        # the podman calls
+        assert [ ! -e impd/calls ]
+        assert [ ! -L impd/calls ]
+        # the build calls
+        assert [ ! -e build/calls ]
+        assert [ ! -L build/calls ]
       '';
     }
     {
@@ -303,12 +319,15 @@ let
 
         run_build
 
-        assert_equals 1 "$status" "the script's exit status"
-        assert_equals "agent-image-build: building $image from $pin" "$(cat stdout)" "the script's stdout"
-        assert_equals "agent-image-build: the build of $image from $pin failed with status 1: $image check failed; removed the image; remove $PWD/state/failed/$pin to build it again" \
-          "$(cat stderr)" "the script's stderr"
-        assert_between "$before" "$(date -u -d "$(cat "state/failed/$pin")" +%s)" "$after" "the failed build's time"
-        assert_equals "$pin" "$(ls state/failed)" "the failed builds"
+        assert_equal "$status" 1
+        # the script's stdout
+        assert_equal "$(cat stdout)" "agent-image-build: building $image from $pin"
+        # the script's stderr
+        assert_equal "$(cat stderr)" "agent-image-build: the build of $image from $pin failed with status 1: $image check failed; removed the image; remove $PWD/state/failed/$pin to build it again"
+        # the failed build's time
+        assert_within "$before" "$(date -u -d "$(cat "state/failed/$pin")" +%s)" "$after"
+        # the failed builds
+        assert_equal "$(ls state/failed)" "$pin"
       '';
     }
     {
@@ -329,13 +348,15 @@ let
 
         run_build
 
-        assert_equals 0 "$status" "the script's exit status"
-        assert_files_equal - stdout <<EOF
+        assert_equal "$status" 0
+        diff -u - stdout <<EOF
         agent-image-build: building $image from $pin
         agent-image-build: the build of $image from $pin failed with status 1 while imp-host went from container c0ffee01 to c0ffee02; the next run builds $image again
         EOF
-        assert_files_equal /dev/null stderr
-        assert_missing state/failed "the failed builds"
+        diff -u /dev/null stderr
+        # the failed builds
+        assert [ ! -e state/failed ]
+        assert [ ! -L state/failed ]
       '';
     }
     {
@@ -356,13 +377,15 @@ let
 
         run_build
 
-        assert_equals 0 "$status" "the script's exit status"
-        assert_files_equal - stdout <<EOF
+        assert_equal "$status" 0
+        diff -u - stdout <<EOF
         agent-image-build: building $image from $pin
         agent-image-build: the build of $image from $pin failed with status 1 while imp-host went from container c0ffee01 to none; the next run builds $image again
         EOF
-        assert_files_equal /dev/null stderr
-        assert_missing state/failed "the failed builds"
+        diff -u /dev/null stderr
+        # the failed builds
+        assert [ ! -e state/failed ]
+        assert [ ! -L state/failed ]
       '';
     }
     {
@@ -379,13 +402,19 @@ let
 
         run_build
 
-        assert_equals 0 "$status" "the script's exit status"
-        assert_equals "agent-image-build: imp-host went from the container that listed impd's images to none before the build of $image from $pin; the next run builds $image again" \
-          "$(cat stdout)" "the script's stdout"
-        assert_files_equal /dev/null stderr
-        assert_missing state/bin "the copied CLI"
-        assert_missing build/calls "the build calls"
-        assert_missing state/failed "the failed builds"
+        assert_equal "$status" 0
+        # the script's stdout
+        assert_equal "$(cat stdout)" "agent-image-build: imp-host went from the container that listed impd's images to none before the build of $image from $pin; the next run builds $image again"
+        diff -u /dev/null stderr
+        # the copied CLI
+        assert [ ! -e state/bin ]
+        assert [ ! -L state/bin ]
+        # the build calls
+        assert [ ! -e build/calls ]
+        assert [ ! -L build/calls ]
+        # the failed builds
+        assert [ ! -e state/failed ]
+        assert [ ! -L state/failed ]
       '';
     }
     {
@@ -403,13 +432,20 @@ let
 
         run_build
 
-        assert_equals 0 "$status" "the script's exit status"
-        assert_equals "agent-image-build: the copy of imp's CLI failed while imp-host went from container c0ffee01 to none; the next run builds $image again" \
-          "$(cat stdout)" "the script's stdout"
-        assert_equals "stat: cannot statx '/usr/local/bin/impz': No such file or directory" "$(cat stderr)" "the script's stderr"
-        assert_missing state/bin/impz.new "the partial copy"
-        assert_missing build/calls "the build calls"
-        assert_missing state/failed "the failed builds"
+        assert_equal "$status" 0
+        # the script's stdout
+        assert_equal "$(cat stdout)" "agent-image-build: the copy of imp's CLI failed while imp-host went from container c0ffee01 to none; the next run builds $image again"
+        # the script's stderr
+        assert_equal "$(cat stderr)" "stat: cannot statx '/usr/local/bin/impz': No such file or directory"
+        # the partial copy
+        assert [ ! -e state/bin/impz.new ]
+        assert [ ! -L state/bin/impz.new ]
+        # the build calls
+        assert [ ! -e build/calls ]
+        assert [ ! -L build/calls ]
+        # the failed builds
+        assert [ ! -e state/failed ]
+        assert [ ! -L state/failed ]
       '';
     }
     {
@@ -425,12 +461,19 @@ let
 
         run_build
 
-        assert_equals 1 "$status" "the script's exit status"
-        assert_files_equal /dev/null stdout
-        assert_equals "stat: cannot statx '/usr/local/bin/impz': No such file or directory" "$(cat stderr)" "the script's stderr"
-        assert_missing state/bin/impz.new "the partial copy"
-        assert_missing build/calls "the build calls"
-        assert_missing state/failed "the failed builds"
+        assert_equal "$status" 1
+        diff -u /dev/null stdout
+        # the script's stderr
+        assert_equal "$(cat stderr)" "stat: cannot statx '/usr/local/bin/impz': No such file or directory"
+        # the partial copy
+        assert [ ! -e state/bin/impz.new ]
+        assert [ ! -L state/bin/impz.new ]
+        # the build calls
+        assert [ ! -e build/calls ]
+        assert [ ! -L build/calls ]
+        # the failed builds
+        assert [ ! -e state/failed ]
+        assert [ ! -L state/failed ]
       '';
     }
     {
@@ -448,12 +491,16 @@ let
 
         run_build
 
-        assert_equals 0 "$status" "the script's exit status"
-        assert_equals "agent-image-build: the build of $image from $pin failed at 2026-01-02T03:04:05Z; remove $PWD/state/failed/$pin to build it again" \
-          "$(cat stdout)" "the script's stdout"
-        assert_files_equal /dev/null stderr
-        assert_missing impd/calls "the podman calls"
-        assert_missing build/calls "the build calls"
+        assert_equal "$status" 0
+        # the script's stdout
+        assert_equal "$(cat stdout)" "agent-image-build: the build of $image from $pin failed at 2026-01-02T03:04:05Z; remove $PWD/state/failed/$pin to build it again"
+        diff -u /dev/null stderr
+        # the podman calls
+        assert [ ! -e impd/calls ]
+        assert [ ! -L impd/calls ]
+        # the build calls
+        assert [ ! -e build/calls ]
+        assert [ ! -L build/calls ]
       '';
     }
     {
@@ -473,18 +520,20 @@ let
 
         run_build
 
-        assert_equals 0 "$status" "the script's exit status"
-        assert_files_equal - stdout <<EOF
+        assert_equal "$status" 0
+        diff -u - stdout <<EOF
         agent-image-build: waiting for impd, try 1: Error: no container with name or ID "imp-host" found: no such container
         agent-image-build: waiting for impd, try 2: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>
         agent-image-build: impd holds $image, built from $pin; nothing to build
         EOF
-        assert_files_equal /dev/null stderr
-        assert_files_equal - sleep.log <<'EOF'
+        diff -u /dev/null stderr
+        diff -u - sleep.log <<'EOF'
         ["5"]
         ["5"]
         EOF
-        assert_missing build/calls "the build calls"
+        # the build calls
+        assert [ ! -e build/calls ]
+        assert [ ! -L build/calls ]
       '';
     }
     {
@@ -500,16 +549,22 @@ let
 
         run_build
 
-        assert_equals 0 "$status" "the script's exit status"
-        assert_files_equal - stdout <<'EOF'
+        assert_equal "$status" 0
+        diff -u - stdout <<'EOF'
         agent-image-build: waiting for impd, try 1: Error: no container with name or ID "imp-host" found: no such container
         agent-image-build: impd listed no images after 3 tries: Error: no container with name or ID "imp-host" found: no such container; the next run tries again
         EOF
-        assert_files_equal /dev/null stderr
-        assert_equals 3 "$(wc -l < impd/calls)" "the podman calls"
-        assert_equals 2 "$(wc -l < sleep.log)" "the pauses"
-        assert_missing build/calls "the build calls"
-        assert_missing state/failed "the failed builds"
+        diff -u /dev/null stderr
+        # the podman calls
+        assert_equal "$(wc -l < impd/calls)" 3
+        # the pauses
+        assert_equal "$(wc -l < sleep.log)" 2
+        # the build calls
+        assert [ ! -e build/calls ]
+        assert [ ! -L build/calls ]
+        # the failed builds
+        assert [ ! -e state/failed ]
+        assert [ ! -L state/failed ]
       '';
     }
   ];
@@ -517,6 +572,10 @@ in
 pkgs.runCommand "agent-image-build-check"
   {
     nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
       pkgs.coreutils
       pkgs.diffutils
       pkgs.git
@@ -528,12 +587,6 @@ pkgs.runCommand "agent-image-build-check"
   ''
     # fixed, so the modes the cases assert do not depend on the builder's umask
     umask 022
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${testLib}/assert-between.sh
-    source ${testLib}/assert-missing.sh
-    source ${pkgs.writeText "agent-image-build-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "agent-image-build.bats" (renderCases cases)}
     touch $out
   ''

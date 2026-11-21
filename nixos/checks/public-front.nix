@@ -1,8 +1,7 @@
 # Reads the Caddyfile that geoffcloud's own config gives the TLS front (modules/public-front.nix)
 # and checks it whole, then has the front's own Caddy build, which holds the rate limit handler,
 # validate it. public-front-vm boots the front with Caddy's local CA instead, so this check is the
-# one that covers the host's ACME issuer. Each case runs on its own, in a fresh directory, under
-# scripts/src/test-utils/shell/run-cases.sh.
+# one that covers the host's ACME issuer. Each case runs on its own, in a fresh directory, as a bats test.
 # Run: bun run test:nixos public-front
 {
   nixpkgs,
@@ -12,7 +11,6 @@
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   caddy = geoffcloud.config.services.caddy;
@@ -21,7 +19,7 @@ let
     {
       title = "it writes the Caddyfile of geoffcloud: the impd-mcp paths to the loopback listener of impd, a 404 for any other, and a certificate by TLS-ALPN-01 alone";
       script = ''
-        assert_files_equal - ${caddy.configFile} <<'EOF'
+        diff -u - ${caddy.configFile} <<'EOF'
         {
         	admin off
         	auto_https disable_redirects
@@ -70,23 +68,26 @@ let
         env -i HOME="$PWD/home" XDG_DATA_HOME="$PWD/home/data" XDG_CONFIG_HOME="$PWD/home/config" \
           ${lib.getExe caddy.package} validate --adapter caddyfile --config ${caddy.configFile} > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status of caddy validate"
-        assert_equals "Valid configuration" "$(cat out)" "the output of caddy validate"
+        assert_equal "$status" 0
+        # the output of caddy validate
+        assert_equal "$(cat out)" "Valid configuration"
       '';
     }
   ];
 in
 pkgs.runCommand "public-front-check"
   {
-    nativeBuildInputs = [ pkgs.diffutils ];
+    nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
+      pkgs.diffutils
+    ];
     # the shared test utilities pass their own tests before any case relies on them
     inherit testUtilsCheck;
   }
   ''
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${pkgs.writeText "public-front-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "public-front.bats" (renderCases cases)}
     touch $out
   ''

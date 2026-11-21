@@ -38,7 +38,7 @@
     "test:e2e": "rig e2e",
     "test:related": "bun scripts/run-related-tests.ts",
     "test:related-root": "rig related",
-    "test:scripts": "bash scripts/run-bats.sh scripts && bash scripts/run-shell-suites.sh",
+    "test:scripts": "bash scripts/run-bats.sh scripts",
     "test:alert-rules": "bash scripts/run-bats.sh alert-rules",
     "test:atc-gateway-fixture": "bash images/atc-gateway/run-fixture-tests.sh",
     "test:nixie-backup-fixture": "bash scripts/run-bats.sh nixie-backup-fixture",

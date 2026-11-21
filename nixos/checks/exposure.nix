@@ -4,8 +4,7 @@
 # longer matches, fails here instead of reaching the host. The cases first test the comparison:
 # each evaluates its own config through test-utils/build-module-system.nix, with
 # inet cloud_host's module and imp's module for their options, or extends geoffcloud's, compares
-# it with its own entries, and runs on its own, in a fresh directory, under
-# scripts/src/test-utils/shell/run-cases.sh.
+# it with its own entries, and runs on its own, in a fresh directory, as a bats test.
 # Run: bun run test:nixos exposure
 {
   nixpkgs,
@@ -15,7 +14,6 @@
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
@@ -65,7 +63,7 @@ let
           };
         in
         ''
-          assert_equals '[]' ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "tailscale";
@@ -97,7 +95,7 @@ let
                 scope = "tailnet";
               }
             ]
-          } "mismatches"
+          } '[]'
         '';
     }
     {
@@ -107,11 +105,7 @@ let
           system = buildModuleSystem firewallModules { networking.firewall.allowedTCPPorts = [ 8080 ]; };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [ "tcp 8080 is open on every interface with no registry entry" ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -120,7 +114,11 @@ let
                 scope = "public";
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [ "tcp 8080 is open on every interface with no registry entry" ]
+            )
+          }
         '';
     }
     {
@@ -130,13 +128,7 @@ let
           system = buildModuleSystem firewallModules { services.openssh.enable = true; };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "tcp 22 is open on every interface, but the registry's ssh entry has scope tailnet"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -152,7 +144,13 @@ let
                 scope = "tailnet";
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "tcp 22 is open on every interface, but the registry's ssh entry has scope tailnet"
+              ]
+            )
+          }
         '';
     }
     {
@@ -171,13 +169,7 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "sshd listens on tcp 2222 with no tailnet-scope or public registry entry"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -193,7 +185,13 @@ let
                 scope = "tailnet";
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "sshd listens on tcp 2222 with no tailnet-scope or public registry entry"
+              ]
+            )
+          }
         '';
     }
     {
@@ -203,14 +201,7 @@ let
           system = buildModuleSystem firewallModules { networking.firewall.allowPing = false; };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "the registry's tailscale entry is public, but udp 41641 is not open on every interface"
-                "the registry's icmp entry is public, but networking.firewall.allowPing is off"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "tailscale";
@@ -226,7 +217,14 @@ let
                 scope = "public";
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the registry's tailscale entry is public, but udp 41641 is not open on every interface"
+                "the registry's icmp entry is public, but networking.firewall.allowPing is off"
+              ]
+            )
+          }
         '';
     }
     {
@@ -236,11 +234,11 @@ let
           system = buildModuleSystem firewallModules { networking.firewall.allowPing = true; };
         in
         ''
-          assert_equals ${
+          assert_equal ${renderMismatches system.config [ ]} ${
             lib.escapeShellArg (
               builtins.toJSON [ "ping is allowed on every interface with no public icmp registry entry" ]
             )
-          } ${renderMismatches system.config [ ]} "mismatches"
+          }
         '';
     }
     {
@@ -258,14 +256,7 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "tcp 8080 is open on eth0, a public interface, with no public registry entry"
-                "the registry's web entry is host scope on eth0, but eth0 is a public interface"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -282,7 +273,14 @@ let
                 interface = "eth0";
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "tcp 8080 is open on eth0, a public interface, with no public registry entry"
+                "the registry's web entry is host scope on eth0, but eth0 is a public interface"
+              ]
+            )
+          }
         '';
     }
     {
@@ -298,7 +296,7 @@ let
           };
         in
         ''
-          assert_equals '[]' ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -314,7 +312,7 @@ let
                 scope = "public";
               }
             ]
-          } "mismatches"
+          } '[]'
         '';
     }
     {
@@ -371,13 +369,13 @@ let
           };
         in
         ''
-          assert_equals '[]' ${
+          assert_equal ${
             renderMismatches system.config [
               icmp
               podPath
               pcPath
             ]
-          } "mismatches"
+          } '[]'
         '';
     }
     {
@@ -425,18 +423,18 @@ let
           };
         in
         ''
-          assert_equals ${
+          assert_equal ${
+            renderMismatches system.config [
+              icmp
+              podPath
+            ]
+          } ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "inet cloud_host admits tcp 8415 on tailscale0 with no host-scope registry entry that marks the admission"
               ]
             )
-          } ${
-            renderMismatches system.config [
-              icmp
-              podPath
-            ]
-          } "mismatches"
+          }
         '';
     }
     {
@@ -461,14 +459,7 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "tcp 18081 is open on podman0 with no host-scope registry entry for podman0"
-                "inet cloud_host admits tcp 8415 on cni0 with no host-scope registry entry that marks the admission"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -485,7 +476,14 @@ let
                 interface = "cni0";
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "tcp 18081 is open on podman0 with no host-scope registry entry for podman0"
+                "inet cloud_host admits tcp 8415 on cni0 with no host-scope registry entry that marks the admission"
+              ]
+            )
+          }
         '';
     }
     {
@@ -497,15 +495,7 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "the registry's relay entry marks an admission, but inet cloud_host admits no tcp 18081 on podman0"
-                "the registry's atc-daemon entry is host scope on cni0, but nothing opens or admits tcp 8415 there"
-                "the registry's atc-daemon entry marks an admission, but inet cloud_host admits no tcp 8415 on cni0"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -532,7 +522,15 @@ let
                 admission = true;
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the registry's relay entry marks an admission, but inet cloud_host admits no tcp 18081 on podman0"
+                "the registry's atc-daemon entry is host scope on cni0, but nothing opens or admits tcp 8415 there"
+                "the registry's atc-daemon entry marks an admission, but inet cloud_host admits no tcp 8415 on cni0"
+              ]
+            )
+          }
         '';
     }
     {
@@ -552,21 +550,21 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "the registry's atc-daemon entry is host scope on cni0, and inet cloud_host admits tcp 8415 there, but nixos-fw drops it: cni0 is not trusted, and nixos-fw opens tcp 8415 neither there nor on every interface"
-                "the registry's preview-webhook entry is host scope on cni0, and inet cloud_host admits tcp 8418 there, but nixos-fw drops it: cni0 is not trusted, and nixos-fw opens tcp 8418 neither there nor on every interface"
-              ]
-            )
-          } ${
+          assert_equal ${
             lib.escapeShellArg (
               builtins.toJSON (collectExposureMismatches {
                 inherit (untrusted) config;
                 inherit ((import ../exposure.nix)) entries;
               })
             )
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the registry's atc-daemon entry is host scope on cni0, and inet cloud_host admits tcp 8415 there, but nixos-fw drops it: cni0 is not trusted, and nixos-fw opens tcp 8415 neither there nor on every interface"
+                "the registry's preview-webhook entry is host scope on cni0, and inet cloud_host admits tcp 8418 there, but nixos-fw drops it: cni0 is not trusted, and nixos-fw opens tcp 8418 neither there nor on every interface"
+              ]
+            )
+          }
         '';
     }
     {
@@ -589,13 +587,7 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "the registry's relay entry is host scope on podman0, and inet cloud_host admits tcp 18081 there, but nixos-fw drops it: podman0 is not trusted, and nixos-fw opens tcp 18081 neither there nor on every interface"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -613,7 +605,13 @@ let
                 admission = true;
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the registry's relay entry is host scope on podman0, and inet cloud_host admits tcp 18081 there, but nixos-fw drops it: podman0 is not trusted, and nixos-fw opens tcp 18081 neither there nor on every interface"
+              ]
+            )
+          }
         '';
     }
     {
@@ -649,13 +647,7 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "tcp 18000-18099 is open on podman0 as a range, which no registry entry can match"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -682,7 +674,13 @@ let
                 admission = true;
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "tcp 18000-18099 is open on podman0 as a range, which no registry entry can match"
+              ]
+            )
+          }
         '';
     }
     {
@@ -707,13 +705,7 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "the registry's podman-daemon entry is host scope on podman0, and nixos-fw opens tcp 8415 there, but inet cloud_host drops it: its admissions for tcp 8415 are on cni0"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -739,7 +731,13 @@ let
                 interface = "podman0";
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the registry's podman-daemon entry is host scope on podman0, and nixos-fw opens tcp 8415 there, but inet cloud_host drops it: its admissions for tcp 8415 are on cni0"
+              ]
+            )
+          }
         '';
     }
     {
@@ -763,13 +761,7 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "the registry's atc-public entry is public, but tcp 8415 is not open on every interface"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -794,7 +786,13 @@ let
                 admission = true;
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the registry's atc-public entry is public, but tcp 8415 is not open on every interface"
+              ]
+            )
+          }
         '';
     }
     {
@@ -812,15 +810,7 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "imp's publicPorts publishes 104.250.100.18:80:7480 (tcp 80) with no public registry entry"
-                "imp's publicPorts publishes 127.0.0.1:5353:53/udp (udp 5353) with no host-scope registry entry for lo"
-                "imp's publicPorts publishes 8000-8001:8000-8001, whose host port the exposure check cannot read"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -836,7 +826,15 @@ let
                 scope = "public";
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "imp's publicPorts publishes 104.250.100.18:80:7480 (tcp 80) with no public registry entry"
+                "imp's publicPorts publishes 127.0.0.1:5353:53/udp (udp 5353) with no host-scope registry entry for lo"
+                "imp's publicPorts publishes 8000-8001:8000-8001, whose host port the exposure check cannot read"
+              ]
+            )
+          }
         '';
     }
     {
@@ -849,13 +847,7 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "imp's publicPorts publishes 443, whose host port the exposure check cannot read"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -871,7 +863,13 @@ let
                 scope = "public";
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "imp's publicPorts publishes 443, whose host port the exposure check cannot read"
+              ]
+            )
+          }
         '';
     }
     {
@@ -881,7 +879,7 @@ let
           system = buildModuleSystem firewallModules { networking.firewall.allowedTCPPorts = [ 443 ]; };
         in
         ''
-          assert_equals '[]' ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -904,7 +902,7 @@ let
                 scope = "public";
               }
             ]
-          } "mismatches"
+          } '[]'
         '';
     }
     {
@@ -914,13 +912,7 @@ let
           system = buildModuleSystem firewallModules { };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "the registry's listener entry is host scope on lo, but nothing opens or admits tcp 7071 there"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -937,7 +929,13 @@ let
                 interface = "lo";
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the registry's listener entry is host scope on lo, but nothing opens or admits tcp 7071 there"
+              ]
+            )
+          }
         '';
     }
     {
@@ -967,7 +965,7 @@ let
           };
         in
         ''
-          assert_equals '[]' ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -1002,7 +1000,7 @@ let
                 scope = "public";
               }
             ]
-          } "mismatches"
+          } '[]'
         '';
     }
     {
@@ -1033,15 +1031,7 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "the TLS front serves mcp.example.test from 127.0.0.1:7070, with no host-scope registry entry for lo"
-                "the TLS front serves mcp.example.test to 127.0.0.1:7070, but the registry's mcp entry names 127.0.0.1:7071"
-                "the TLS front serves mcp.example.test for the paths /login /mcp /rpc, but the registry's mcp entry lists /login /mcp"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -1076,7 +1066,15 @@ let
                 scope = "public";
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the TLS front serves mcp.example.test from 127.0.0.1:7070, with no host-scope registry entry for lo"
+                "the TLS front serves mcp.example.test to 127.0.0.1:7070, but the registry's mcp entry names 127.0.0.1:7071"
+                "the TLS front serves mcp.example.test for the paths /login /mcp /rpc, but the registry's mcp entry lists /login /mcp"
+              ]
+            )
+          }
         '';
     }
     {
@@ -1103,14 +1101,7 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "the TLS front serves mcp.example.test with no public front-route registry entry"
-                "the registry's notes entry is a public front route, but the TLS front does not serve notes.example.test"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -1142,7 +1133,14 @@ let
                 scope = "public";
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the TLS front serves mcp.example.test with no public front-route registry entry"
+                "the registry's notes entry is a public front route, but the TLS front does not serve notes.example.test"
+              ]
+            )
+          }
         '';
     }
     {
@@ -1166,15 +1164,7 @@ let
           };
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "udp 60000-61000 is open on every interface as a range, which no registry entry can match"
-                "tcp 8000-8010 is open on podman0 as a range, which no registry entry can match"
-                "networking.firewall.extraInputRules is set, and the exposure check cannot read it: open the port through allowedTCPPorts or allowedUDPPorts instead"
-              ]
-            )
-          } ${
+          assert_equal ${
             renderMismatches system.config [
               {
                 name = "icmp";
@@ -1183,21 +1173,32 @@ let
                 scope = "public";
               }
             ]
-          } "mismatches"
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "udp 60000-61000 is open on every interface as a range, which no registry entry can match"
+                "tcp 8000-8010 is open on podman0 as a range, which no registry entry can match"
+                "networking.firewall.extraInputRules is set, and the exposure check cannot read it: open the port through allowedTCPPorts or allowedUDPPorts instead"
+              ]
+            )
+          }
         '';
     }
   ];
 in
 pkgs.runCommand "exposure-check"
   {
+    nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
+    ];
     # the shared test utilities pass their own tests before any case relies on them
     inherit testUtilsCheck;
   }
   ''
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${pkgs.writeText "exposure-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "exposure.bats" (renderCases cases)}
 
     mismatches=${lib.escapeShellArg (lib.concatLines hostMismatches)}
     if [ -n "$mismatches" ]; then

@@ -4,7 +4,7 @@
 # (test-utils/run-stub-model-api.py, started by test-utils/start-stub-server.sh) in the build
 # sandbox: the config moves only the model listener, the store, the override and the token file
 # into the case's directory, and points each route at the stand-in. Each case runs on its own, in
-# a fresh directory, under scripts/src/test-utils/shell/run-cases.sh.
+# a fresh directory, as a bats test.
 # Run: bun run test:nixos model-gateway
 {
   nixpkgs,
@@ -16,7 +16,13 @@ let
   lib = nixpkgs.lib;
   testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
-  renderCases = import ./test-utils/render-cases.nix { inherit lib; };
+  renderCases = import ./test-utils/render-cases.nix {
+    inherit lib;
+    sources = [
+      "${testLib}/wait-for.sh"
+      ./test-utils/start-stub-server.sh
+    ];
+  };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
   collectFailedAssertions = import ./test-utils/collect-failed-assertions.nix;
   # the unit cases only read the binary's path, so it never runs
@@ -204,7 +210,7 @@ let
             restartTriggers = map toString service.restartTriggers;
           }}
           EOF
-          assert_files_equal expected actual
+          diff -u expected actual
 
           jq -S . > expected-config <<'EOF'
           ${builtins.toJSON {
@@ -232,8 +238,8 @@ let
           }}
           EOF
           jq -S . ${configFile} > actual-config
-          assert_files_equal expected-config actual-config
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          diff -u expected-config actual-config
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} '[]'
         '';
     }
     {
@@ -317,7 +323,7 @@ let
             }
           }
           EOF
-          assert_files_equal expected actual
+          diff -u expected actual
         '';
     }
     {
@@ -343,7 +349,7 @@ let
           jq . > actual <<'EOF'
           ${builtins.toJSON (collectFailedAssertions system)}
           EOF
-          assert_files_equal expected actual
+          diff -u expected actual
         '';
     }
     {
@@ -421,7 +427,7 @@ let
             refused = collectFailedAssertions refused;
           }}
           EOF
-          assert_files_equal expected actual
+          diff -u expected actual
         '';
     }
     {
@@ -685,7 +691,7 @@ let
           }}
           EOF
           jq -S . ${gateway.configFile} > actual
-          assert_files_equal expected actual
+          diff -u expected actual
         '';
     }
     {
@@ -701,13 +707,17 @@ let
           -d '{"day":{"dollars":121,"tokens":80000000},"month":{"dollars":600,"tokens":600000000}}' \
           "$control/limits" > above-cap-status
 
-        assert_equals 401 "$(cat unauthorized-status)" "the tokenless status's code"
-        assert_equals 200 "$(cat status-status)" "the status's code"
-        assert_equals '{"zone":"Australia/Sydney","lost":false,"day":{"limit":null,"cap":{"dollars":120,"tokens":160000000}},"month":{"limit":null,"cap":{"dollars":1200,"tokens":1200000000}},"tripped":null}' \
-          "$(jq -c '{zone, lost, day: (.periods.day | {limit, cap}), month: (.periods.month | {limit, cap}), tripped}' status)" "the status"
-        assert_equals 409 "$(cat above-cap-status)" "the above-cap limit's code"
-        assert_equals '{"error":"above_cap","period":"day","cap":{"dollars":120,"tokens":160000000}}' "$(jq -c . above-cap)" "the refusal"
-        assert_files_equal /dev/null gateway.err
+        # the tokenless status's code
+        assert_equal "$(cat unauthorized-status)" 401
+        # the status's code
+        assert_equal "$(cat status-status)" 200
+        # the status
+        assert_equal "$(jq -c '{zone, lost, day: (.periods.day | {limit, cap}), month: (.periods.month | {limit, cap}), tripped}' status)" '{"zone":"Australia/Sydney","lost":false,"day":{"limit":null,"cap":{"dollars":120,"tokens":160000000}},"month":{"limit":null,"cap":{"dollars":1200,"tokens":1200000000}},"tripped":null}'
+        # the above-cap limit's code
+        assert_equal "$(cat above-cap-status)" 409
+        # the refusal
+        assert_equal "$(jq -c . above-cap)" '{"error":"above_cap","period":"day","cap":{"dollars":120,"tokens":160000000}}'
+        diff -u /dev/null gateway.err
       '';
     }
     {
@@ -723,10 +733,12 @@ let
         curl -s -o reply -w '%{http_code}' -X POST "http://127.0.0.1:$gateway_port/nixie-0a1b2c/fable-5-2/v1/messages" \
           -H 'content-type: application/json' -d ${lib.escapeShellArg fableRequest} > status
 
-        assert_equals 403 "$(cat status)" "the gateway's status"
-        assert_equals permission_error "$(jq -r .error.type reply)" "the error's type"
-        assert_files_equal /dev/null requests
-        assert_files_equal /dev/null gateway.err
+        # the gateway's status
+        assert_equal "$(cat status)" 403
+        # the error's type
+        assert_equal "$(jq -r .error.type reply)" permission_error
+        diff -u /dev/null requests
+        diff -u /dev/null gateway.err
       '';
     }
     {
@@ -743,12 +755,14 @@ let
           -H 'content-type: application/json' -d ${lib.escapeShellArg fableRequest} > status
         wait_for 10 "the reply's count" jq -e '.periods.day.tokens > 0' store.json
 
-        assert_equals 200 "$(cat status)" "the gateway's status"
+        # the gateway's status
+        assert_equal "$(cat status)" 200
         # 1,000 input tokens at $8 and 100 output tokens at $40 per million
-        assert_equals '{"day":{"dollars":0.012,"tokens":1100},"month":{"dollars":0.012,"tokens":1100},"sandbox":{"dollars":0.012,"tokens":1100}}' \
-          "$(jq -c '{day: (.periods.day | {dollars, tokens}), month: (.periods.month | {dollars, tokens}), sandbox: (.sandboxes["nixie-0a1b2c"] | {dollars, tokens})}' store.json)" "the count"
-        assert_equals "POST /v1/messages" "$(cat requests)" "the stand-in's requests"
-        assert_files_equal /dev/null gateway.err
+        # the count
+        assert_equal "$(jq -c '{day: (.periods.day | {dollars, tokens}), month: (.periods.month | {dollars, tokens}), sandbox: (.sandboxes["nixie-0a1b2c"] | {dollars, tokens})}' store.json)" '{"day":{"dollars":0.012,"tokens":1100},"month":{"dollars":0.012,"tokens":1100},"sandbox":{"dollars":0.012,"tokens":1100}}'
+        # the stand-in's requests
+        assert_equal "$(cat requests)" "POST /v1/messages"
+        diff -u /dev/null gateway.err
       '';
     }
     {
@@ -771,13 +785,18 @@ let
         curl -s -o no-login -w '%{http_code}' -X POST "http://127.0.0.1:$gateway_port/nixie-0a1b2c/gpt-6-luna/responses" \
           -H @route-key-header -H 'content-type: application/json' -d "$plan_request" > no-login-status
 
-        assert_equals 200 "$(cat logins-status)" "the logins' code"
-        assert_equals '["gpt-6-luna"]' "$(jq -c keys logins)" "the plan routes"
-        assert_equals '{"status":"needs_login","reason":null}' "$(jq -c '.["gpt-6-luna"] | {status, reason}' logins)" "the plan route's login"
-        assert_equals 403 "$(cat wrong-key-status)" "the code for another key"
-        assert_equals 401 "$(cat no-login-status)" "the code with no login"
-        assert_files_equal /dev/null requests
-        assert_files_equal /dev/null gateway.err
+        # the logins' code
+        assert_equal "$(cat logins-status)" 200
+        # the plan routes
+        assert_equal "$(jq -c keys logins)" '["gpt-6-luna"]'
+        # the plan route's login
+        assert_equal "$(jq -c '.["gpt-6-luna"] | {status, reason}' logins)" '{"status":"needs_login","reason":null}'
+        # the code for another key
+        assert_equal "$(cat wrong-key-status)" 403
+        # the code with no login
+        assert_equal "$(cat no-login-status)" 401
+        diff -u /dev/null requests
+        diff -u /dev/null gateway.err
       '';
     }
   ];
@@ -785,6 +804,10 @@ in
 pkgs.runCommand "model-gateway-check"
   {
     nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
       pkgs.curl
       pkgs.diffutils
       pkgs.gnugrep
@@ -795,12 +818,6 @@ pkgs.runCommand "model-gateway-check"
     inherit testUtilsCheck;
   }
   ''
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${testLib}/wait-for.sh
-    source ${./test-utils/start-stub-server.sh}
-    source ${pkgs.writeText "model-gateway-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "model-gateway.bats" (renderCases cases)}
     touch $out
   ''

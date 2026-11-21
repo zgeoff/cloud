@@ -3,7 +3,7 @@
 # sandbox against a cgroup tree that the case writes, since the sandbox has no /sys. One case
 # serves the written file through a real node-exporter's textfile collector on loopback. Each case
 # runs on its own, in a fresh directory, with its own tree and textfile directory, and the script
-# under env -i with a HOME and TMPDIR of its own, under scripts/src/test-utils/shell/run-cases.sh.
+# under env -i with a HOME and TMPDIR of its own, as a bats test.
 # checks/host-cgroup-cpu-vm.nix runs the service against a real cgroup tree.
 # Run: bun run test:nixos host-cgroup-cpu
 { nixpkgs, imp }:
@@ -12,7 +12,10 @@ let
   lib = nixpkgs.lib;
   testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
-  renderCases = import ./test-utils/render-cases.nix { inherit lib; };
+  renderCases = import ./test-utils/render-cases.nix {
+    inherit lib;
+    sources = [ "${testLib}/wait-for.sh" ];
+  };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
 
   defaultConfig =
@@ -105,7 +108,7 @@ let
         ${renderUnit defaultConfig}
         EOF
 
-        assert_files_equal expected actual
+        diff -u expected actual
       '';
     }
     {
@@ -123,7 +126,15 @@ let
           serviceConfig = config.systemd.services.host-cgroup-cpu.serviceConfig;
         in
         ''
-          assert_equals ${
+          # the unit's directory
+          assert_equal ${
+            lib.escapeShellArg (
+              builtins.toJSON {
+                environment = removeAttrs config.systemd.services.host-cgroup-cpu.environment [ "PATH" ];
+                inherit (serviceConfig) ReadWritePaths;
+              }
+            )
+          } ${
             lib.escapeShellArg (
               builtins.toJSON {
                 environment = {
@@ -132,15 +143,9 @@ let
                 ReadWritePaths = [ "/srv/textfile" ];
               }
             )
-          } ${
-            lib.escapeShellArg (
-              builtins.toJSON {
-                environment = removeAttrs config.systemd.services.host-cgroup-cpu.environment [ "PATH" ];
-                inherit (serviceConfig) ReadWritePaths;
-              }
-            )
-          } "the unit's directory"
-          assert_equals 1 "$(grep -c '^  sleep 60$' ${serviceConfig.ExecStart})" "the loop's pause"
+          }
+          # the loop's pause
+          assert_equal "$(grep -c '^  sleep 60$' ${serviceConfig.ExecStart})" 1
         '';
     }
     {
@@ -152,9 +157,7 @@ let
             .config;
         in
         ''
-          assert_equals false ${
-            lib.boolToString (config.systemd.services ? host-cgroup-cpu)
-          } "whether the module adds the unit"
+          assert_equal ${lib.boolToString (config.systemd.services ? host-cgroup-cpu)} false
         '';
     }
     {
@@ -166,16 +169,18 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
 
-        assert_equals 0 "$status" "the writer's exit status"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
-        assert_equals host_cgroup_cpu.prom "$(ls -A out)" "the textfile directory"
-        assert_equals 644 "$(stat -c %a out/host_cgroup_cpu.prom)" "the file's mode"
+        assert_equal "$status" 0
+        diff -u /dev/null stdout
+        diff -u /dev/null stderr
+        # the textfile directory
+        assert_equal "$(ls -A out)" host_cgroup_cpu.prom
+        # the file's mode
+        assert_equal "$(stat -c %a out/host_cgroup_cpu.prom)" 644
         cat > expected <<'EOF'
         ${treeMetrics}EOF
         # a directory's inode differs from run to run
         sed -E 's/^(# host_cgroup_cpu_id [^ ]+) [0-9]+$/\1 <id>/' out/host_cgroup_cpu.prom > actual
-        assert_files_equal expected actual
+        diff -u expected actual
       '';
     }
     {
@@ -189,9 +194,10 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
 
-        assert_equals 0 "$status" "the writer's exit status"
-        assert_files_equal /dev/null stderr
-        assert_equals "host_kernel_cpu_seconds_total 50.000000" "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "the kernel time"
+        assert_equal "$status" 0
+        diff -u /dev/null stderr
+        # the kernel time
+        assert_equal "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "host_kernel_cpu_seconds_total 50.000000"
       '';
     }
     {
@@ -205,9 +211,10 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
 
-        assert_equals 0 "$status" "the writer's exit status"
-        assert_files_equal /dev/null stderr
-        assert_equals "host_kernel_cpu_seconds_total 9.099750" "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "the kernel time"
+        assert_equal "$status" 0
+        diff -u /dev/null stderr
+        # the kernel time
+        assert_equal "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "host_kernel_cpu_seconds_total 9.099750"
       '';
     }
     {
@@ -222,10 +229,12 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
 
-        assert_equals 0 "$status" "the writer's exit status"
-        assert_files_equal /dev/null stderr
-        assert_equals "host_kernel_cpu_seconds_total 29.099750" "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "the kernel time"
-        assert_equals "# host_cgroup_cpu_removed_seconds 0.700000" "$(grep '^# host_cgroup_cpu_removed_seconds ' out/host_cgroup_cpu.prom)" "the removed cgroups' time"
+        assert_equal "$status" 0
+        diff -u /dev/null stderr
+        # the kernel time
+        assert_equal "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "host_kernel_cpu_seconds_total 29.099750"
+        # the removed cgroups' time
+        assert_equal "$(grep '^# host_cgroup_cpu_removed_seconds ' out/host_cgroup_cpu.prom)" "# host_cgroup_cpu_removed_seconds 0.700000"
       '';
     }
     {
@@ -243,10 +252,12 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
 
-        assert_equals 0 "$status" "the writer's exit status"
-        assert_files_equal /dev/null stderr
-        assert_equals "host_kernel_cpu_seconds_total 28.099750" "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "the kernel time"
-        assert_equals "# host_cgroup_cpu_removed_seconds 0.700000" "$(grep '^# host_cgroup_cpu_removed_seconds ' out/host_cgroup_cpu.prom)" "the removed cgroups' time"
+        assert_equal "$status" 0
+        diff -u /dev/null stderr
+        # the kernel time
+        assert_equal "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "host_kernel_cpu_seconds_total 28.099750"
+        # the removed cgroups' time
+        assert_equal "$(grep '^# host_cgroup_cpu_removed_seconds ' out/host_cgroup_cpu.prom)" "# host_cgroup_cpu_removed_seconds 0.700000"
       '';
     }
     {
@@ -260,11 +271,14 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
 
-        assert_equals 1 "$status" "the writer's exit status"
-        assert_files_equal /dev/null stdout
-        assert_equals "host-cgroup-cpu: no uptime, CPUs and btime in $PWD/proc" "$(cat stderr)" "the writer's stderr"
-        assert_equals host_cgroup_cpu.prom "$(ls -A out)" "the textfile directory"
-        assert_equals previous "$(cat out/host_cgroup_cpu.prom)" "the last file"
+        assert_equal "$status" 1
+        diff -u /dev/null stdout
+        # the writer's stderr
+        assert_equal "$(cat stderr)" "host-cgroup-cpu: no uptime, CPUs and btime in $PWD/proc"
+        # the textfile directory
+        assert_equal "$(ls -A out)" host_cgroup_cpu.prom
+        # the last file
+        assert_equal "$(cat out/host_cgroup_cpu.prom)" previous
       '';
     }
     {
@@ -276,11 +290,14 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
 
-        assert_equals 1 "$status" "the writer's exit status"
-        assert_files_equal /dev/null stdout
-        assert_equals "host-cgroup-cpu: no user_usec and system_usec in $PWD/cg/cpu.stat" "$(cat stderr)" "the writer's stderr"
-        assert_equals host_cgroup_cpu.prom "$(ls -A out)" "the textfile directory"
-        assert_equals previous "$(cat out/host_cgroup_cpu.prom)" "the last file"
+        assert_equal "$status" 1
+        diff -u /dev/null stdout
+        # the writer's stderr
+        assert_equal "$(cat stderr)" "host-cgroup-cpu: no user_usec and system_usec in $PWD/cg/cpu.stat"
+        # the textfile directory
+        assert_equal "$(ls -A out)" host_cgroup_cpu.prom
+        # the last file
+        assert_equal "$(cat out/host_cgroup_cpu.prom)" previous
       '';
     }
     {
@@ -291,10 +308,12 @@ let
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" TEXTFILE_DIR=out ${loop} > stdout 2> stderr || status=$?
 
-        assert_equals 1 "$status" "the loop's exit status"
-        assert_files_equal /dev/null stdout
-        assert_equals "host-cgroup-cpu: no user_usec and system_usec in $PWD/cg/cpu.stat" "$(cat stderr)" "the loop's stderr"
-        assert_equals "" "$(ls -A out)" "the textfile directory"
+        assert_equal "$status" 1
+        diff -u /dev/null stdout
+        # the loop's stderr
+        assert_equal "$(cat stderr)" "host-cgroup-cpu: no user_usec and system_usec in $PWD/cg/cpu.stat"
+        # the textfile directory
+        assert_equal "$(ls -A out)" ""
       '';
     }
     {
@@ -326,9 +345,11 @@ let
         host_cgroup_cpu_seconds_total{cgroup="/user.slice/odd\"name.scope",mode="system"} 4e-06
         host_cgroup_cpu_seconds_total{cgroup="/user.slice/odd\"name.scope",mode="user"} 3e-06
         EOF
-        assert_files_equal expected actual
-        assert_equals 9.09975 "$(sed -n 's/^host_kernel_cpu_seconds_total //p' metrics)" "the kernel time"
-        assert_equals 0 "$(sed -n 's/^node_textfile_scrape_error //p' metrics)" "the collector's scrape error"
+        diff -u expected actual
+        # the kernel time
+        assert_equal "$(sed -n 's/^host_kernel_cpu_seconds_total //p' metrics)" 9.09975
+        # the collector's scrape error
+        assert_equal "$(sed -n 's/^node_textfile_scrape_error //p' metrics)" 0
       '';
     }
   ];
@@ -336,6 +357,10 @@ in
 pkgs.runCommand "host-cgroup-cpu-check"
   {
     nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
       pkgs.coreutils
       pkgs.curl
       pkgs.diffutils
@@ -349,11 +374,6 @@ pkgs.runCommand "host-cgroup-cpu-check"
   ''
     # fixed, so the modes the cases assert do not depend on the builder's umask
     umask 022
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${testLib}/wait-for.sh
-    source ${pkgs.writeText "host-cgroup-cpu-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "host-cgroup-cpu.bats" (renderCases cases)}
     touch $out
   ''

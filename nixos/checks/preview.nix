@@ -3,13 +3,12 @@
 # (test-utils/build-stub-imp-host-podman.nix) and a stand-in sleep (test-utils/build-stub-sleep.nix),
 # and builds the package to check that it carries the service's modules and none of its tests,
 # and that its typed impd client loads from the dependencies it carries.
-# Each case runs on its own, in a fresh directory, under scripts/src/test-utils/shell/run-cases.sh.
+# Each case runs on its own, in a fresh directory, as a bats test.
 # Run: bun run test:nixos preview
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
@@ -162,8 +161,8 @@ let
           }}
           EOF
 
-          assert_files_equal expected actual
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          diff -u expected actual
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} '[]'
         '';
     }
     {
@@ -189,12 +188,14 @@ let
           };
         in
         ''
-          assert_equals false ${
+          # the grant's variable is set
+          assert_equal ${
             lib.boolToString (system.config.systemd.services.preview.environment ? PREVIEW_IMP_GITHUB_SECRET)
-          } "the grant's variable is set"
-          assert_equals false ${
+          } false
+          # the model grant's variable is set
+          assert_equal ${
             lib.boolToString (system.config.systemd.services.preview.environment ? PREVIEW_IMP_MODEL_SECRET)
-          } "the model grant's variable is set"
+          } false
         '';
     }
     {
@@ -248,8 +249,8 @@ let
           }}
           EOF
 
-          assert_files_equal expected actual
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          diff -u expected actual
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} '[]'
         '';
     }
     {
@@ -277,7 +278,7 @@ let
           names = builtins.attrNames system.config.systemd.services.preview.environment;
         in
         ''
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (builtins.filter (lib.hasPrefix "PREVIEW_CONTRACT_") names))} "the contract run's variables"
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (builtins.filter (lib.hasPrefix "PREVIEW_CONTRACT_") names))} '[]'
         '';
     }
     {
@@ -304,13 +305,13 @@ let
           };
         in
         ''
-          assert_equals ${
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "services.preview.contractModelSecret must name the model secret when contractRepos lists a repository."
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          }
         '';
     }
     {
@@ -381,8 +382,9 @@ let
           ${builtins.toJSON (lib.filterAttrs (name: _: lib.hasPrefix "PREVIEW_SPEND_" name) environment)}
           EOF
 
-          assert_files_equal expected actual
-          assert_equals ${
+          diff -u expected actual
+          # the cloud_host admissions
+          assert_equal ${lib.escapeShellArg (builtins.toJSON system.config.networking.cloudHost.admissions)} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 {
@@ -393,9 +395,11 @@ let
                 }
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON system.config.networking.cloudHost.admissions)} "the cloud_host admissions"
-          assert_equals '[18082]' ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces.podman0.allowedTCPPorts)} "the ports nixos-fw opens on podman0"
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          }
+          # the ports nixos-fw opens on podman0
+          assert_equal ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces.podman0.allowedTCPPorts)} '[18082]'
+          # failed assertions
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} '[]'
         '';
     }
     {
@@ -472,8 +476,8 @@ let
           ${system.config.systemd.services.preview.environment.PREVIEW_SPEND_PRICES}
           EOF
 
-          assert_files_equal expected actual
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          diff -u expected actual
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} '[]'
         '';
     }
     {
@@ -501,9 +505,12 @@ let
           names = builtins.attrNames system.config.systemd.services.preview.environment;
         in
         ''
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (builtins.filter (lib.hasPrefix "PREVIEW_SPEND_") names))} "the counting proxy's variables"
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON system.config.networking.cloudHost.admissions)} "the cloud_host admissions"
-          assert_equals '{}' ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces)} "the interfaces nixos-fw opens ports on"
+          # the counting proxy's variables
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (builtins.filter (lib.hasPrefix "PREVIEW_SPEND_") names))} '[]'
+          # the cloud_host admissions
+          assert_equal ${lib.escapeShellArg (builtins.toJSON system.config.networking.cloudHost.admissions)} '[]'
+          # the interfaces nixos-fw opens ports on
+          assert_equal ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces)} '{}'
         '';
     }
     {
@@ -549,13 +556,13 @@ let
           };
         in
         ''
-          assert_equals ${
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "services.preview.spendCap needs impModelSecret, whose upstream reaches the model route listener."
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          }
         '';
     }
     {
@@ -614,7 +621,7 @@ let
           }}
           EOF
 
-          assert_files_equal expected actual
+          diff -u expected actual
         '';
     }
     {
@@ -634,26 +641,28 @@ let
           };
         in
         ''
-          assert_equals pv-sandbox ${lib.escapeShellArg environments.preview-image.PREVIEW_IMAGE_NAME} "the name the unit adds"
-          assert_equals pv-sandbox ${lib.escapeShellArg environments.preview.PREVIEW_IMP_IMAGE} "the name the service boots"
+          # the name the unit adds
+          assert_equal ${lib.escapeShellArg environments.preview-image.PREVIEW_IMAGE_NAME} pv-sandbox
+          # the name the service boots
+          assert_equal ${lib.escapeShellArg environments.preview.PREVIEW_IMP_IMAGE} pv-sandbox
         '';
     }
     {
       title = "it refuses an image reference that no digest pins";
       script = ''
-        assert_equals false ${
+        assert_equal ${
           lib.boolToString
             (builtins.tryEval
               (buildImageSystem { impRegistryImage = "ghcr.io/example/imp-base:1.2.3"; })
               .config.systemd.services.preview-image.environment.PREVIEW_IMAGE_REF
             ).success
-        } "whether it evaluated"
+        } false
       '';
     }
     {
       title = "it carries in the preview-image script closure every store path the script names";
       script = ''
-        assert_files_equal /dev/null ${buildStorePathGaps imagePackage}
+        diff -u /dev/null ${buildStorePathGaps imagePackage}
       '';
     }
     {
@@ -669,22 +678,24 @@ let
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_files_equal - out <<'EOF'
+        assert_equal "$status" 0
+        diff -u - out <<'EOF'
         preview-image: adding ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} to impd as pv-base
         preview-image: pinning pv-base
         preview-image: impd holds pv-base at ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}, pinned
         EOF
-        assert_files_equal /dev/null err
-        assert_files_equal - impd/calls <<'EOF'
+        diff -u /dev/null err
+        diff -u - impd/calls <<'EOF'
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
         ["exec","-e","HOME=/root","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
         ["exec","-e","HOME=/root","imp-host","impz","image","pin","pv-base"]
         EOF
-        assert_equals '[["base","ghcr.io/example/imp-base:1.0.0",false],["pv-base","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}",true]]' \
-          "$(jq -c 'map([.name, .ref, .pinned == true])' impd/images.json)" "impd's images"
-        assert_missing sleep.log "the pauses"
+        # impd's images
+        assert_equal "$(jq -c 'map([.name, .ref, .pinned == true])' impd/images.json)" '[["base","ghcr.io/example/imp-base:1.0.0",false],["pv-base","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}",true]]'
+        # the pauses
+        assert [ ! -e sleep.log ]
+        assert [ ! -L sleep.log ]
       '';
     }
     {
@@ -699,19 +710,19 @@ let
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_files_equal - out <<'EOF'
+        assert_equal "$status" 0
+        diff -u - out <<'EOF'
         preview-image: adding ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} to impd as pv-base, in place of ghcr.io/example/imp-base:1.2.2@sha256:${lib.strings.replicate 64 "b"}
         preview-image: impd holds pv-base at ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}, pinned
         EOF
-        assert_files_equal /dev/null err
-        assert_files_equal - impd/calls <<'EOF'
+        diff -u /dev/null err
+        diff -u - impd/calls <<'EOF'
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
         ["exec","-e","HOME=/root","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
         EOF
-        assert_equals '[["pv-base","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}",true]]' \
-          "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" "impd's images"
+        # impd's images
+        assert_equal "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" '[["pv-base","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}",true]]'
       '';
     }
     {
@@ -727,14 +738,15 @@ let
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_equals "preview-image: impd holds pv-base at ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}, pinned" "$(cat out)" "the output"
-        assert_files_equal /dev/null err
-        assert_files_equal - impd/calls <<'EOF'
+        assert_equal "$status" 0
+        # the output
+        assert_equal "$(cat out)" "preview-image: impd holds pv-base at ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}, pinned"
+        diff -u /dev/null err
+        diff -u - impd/calls <<'EOF'
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
         EOF
-        assert_files_equal before.json impd/images.json
+        diff -u before.json impd/images.json
       '';
     }
     {
@@ -749,19 +761,19 @@ let
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_files_equal - out <<'EOF'
+        assert_equal "$status" 0
+        diff -u - out <<'EOF'
         preview-image: pinning pv-base
         preview-image: impd holds pv-base at ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}, pinned
         EOF
-        assert_files_equal /dev/null err
-        assert_files_equal - impd/calls <<'EOF'
+        diff -u /dev/null err
+        diff -u - impd/calls <<'EOF'
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
         ["exec","-e","HOME=/root","imp-host","impz","image","pin","pv-base"]
         EOF
-        assert_equals '[["pv-base","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}",true]]' \
-          "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" "impd's images"
+        # impd's images
+        assert_equal "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" '[["pv-base","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}",true]]'
       '';
     }
     {
@@ -777,13 +789,14 @@ let
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_equals 'preview-image: try 1: Error: no container with name or ID "imp-host" found: no such container' "$(cat err)" "the error"
-        assert_files_equal - sleep.log <<'EOF'
+        assert_equal "$status" 0
+        # the error
+        assert_equal "$(cat err)" 'preview-image: try 1: Error: no container with name or ID "imp-host" found: no such container'
+        diff -u - sleep.log <<'EOF'
         ["2"]
         ["2"]
         EOF
-        assert_files_equal - impd/calls <<'EOF'
+        diff -u - impd/calls <<'EOF'
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
@@ -815,13 +828,15 @@ let
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_files_equal - err <<EOF
+        assert_equal "$status" 0
+        diff -u - err <<EOF
         preview-image: try 1: Error: no container with name or ID "imp-host" found: no such container
         preview-image: try 3: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; impz's token file: inode $inode, modified 2026-10-29T18:54:30Z; impd 4242 started 2026-10-29T18:54:20Z
         EOF
-        assert_equals 4 "$(wc -l < sleep.log)" "the pauses"
-        assert_equals 0 "$(grep -c imp_fixture_root err)" "the token's appearances in the log"
+        # the pauses
+        assert_equal "$(wc -l < sleep.log)" 4
+        # the token's appearances in the log
+        assert_equal "$(grep -c imp_fixture_root err)" 0
       '';
     }
     {
@@ -840,10 +855,10 @@ let
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_equals "preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; impz's token file: missing" \
-          "$(cat err)" "the error"
-        assert_files_equal - impd/calls <<'EOF'
+        assert_equal "$status" 0
+        # the error
+        assert_equal "$(cat err)" "preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; impz's token file: missing"
+        diff -u - impd/calls <<'EOF'
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
         ["exec","-i","imp-host","sh","-s","--","/root/.config/impz/token","/proc"]
@@ -867,10 +882,11 @@ let
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_equals 'preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; the token-file check failed: Error: no container with name or ID "imp-host" found: no such container' \
-          "$(cat err)" "the error"
-        assert_equals '[["pv-base",true]]' "$(jq -c 'map([.name, .pinned])' impd/images.json)" "impd's images"
+        assert_equal "$status" 0
+        # the error
+        assert_equal "$(cat err)" 'preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; the token-file check failed: Error: no container with name or ID "imp-host" found: no such container'
+        # impd's images
+        assert_equal "$(jq -c 'map([.name, .pinned])' impd/images.json)" '[["pv-base",true]]'
       '';
     }
     {
@@ -895,10 +911,11 @@ let
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_equals "preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; impz's token file: inode $inode, modified 2026-10-29T18:54:30Z" \
-          "$(cat err)" "the error"
-        assert_equals '[["pv-base",true]]' "$(jq -c 'map([.name, .pinned])' impd/images.json)" "impd's images"
+        assert_equal "$status" 0
+        # the error
+        assert_equal "$(cat err)" "preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; impz's token file: inode $inode, modified 2026-10-29T18:54:30Z"
+        # impd's images
+        assert_equal "$(jq -c 'map([.name, .pinned])' impd/images.json)" '[["pv-base",true]]'
       '';
     }
     {
@@ -914,13 +931,14 @@ let
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_equals 'preview-image: try 1: impd is not ready: /health answered {"status":"ok","ready":false,"warnings":[]}' "$(cat err)" "the error"
-        assert_files_equal - sleep.log <<'EOF'
+        assert_equal "$status" 0
+        # the error
+        assert_equal "$(cat err)" 'preview-image: try 1: impd is not ready: /health answered {"status":"ok","ready":false,"warnings":[]}'
+        diff -u - sleep.log <<'EOF'
         ["2"]
         ["2"]
         EOF
-        assert_files_equal - impd/calls <<'EOF'
+        diff -u - impd/calls <<'EOF'
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
@@ -943,13 +961,15 @@ let
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
-        assert_equals 1 "$status" "the exit status"
-        assert_files_equal - err <<'EOF'
+        assert_equal "$status" 1
+        diff -u - err <<'EOF'
         preview-image: try 1: impd is not ready: /health answered {"status":"ok","ready":false,"warnings":[]}
         preview-image: impd listed no images after 300 tries: impd is not ready: /health answered {"status":"ok","ready":false,"warnings":[]}
         EOF
-        assert_equals 299 "$(wc -l < sleep.log)" "the pauses"
-        assert_equals 300 "$(wc -l < impd/calls)" "the calls"
+        # the pauses
+        assert_equal "$(wc -l < sleep.log)" 299
+        # the calls
+        assert_equal "$(wc -l < impd/calls)" 300
       '';
     }
     {
@@ -965,17 +985,18 @@ let
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
-        assert_equals 1 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_files_equal - err <<'EOF'
+        assert_equal "$status" 1
+        diff -u /dev/null out
+        diff -u - err <<'EOF'
         preview-image: try 1: Error: no container with name or ID "imp-host" found: no such container
         preview-image: impd listed no images after 3 tries: Error: no container with name or ID "imp-host" found: no such container
         EOF
-        assert_files_equal - sleep.log <<'EOF'
+        diff -u - sleep.log <<'EOF'
         ["2"]
         ["2"]
         EOF
-        assert_equals 3 "$(wc -l < impd/calls)" "the calls"
+        # the calls
+        assert_equal "$(wc -l < impd/calls)" 3
       '';
     }
     {
@@ -991,10 +1012,13 @@ let
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
-        assert_equals 1 "$status" "the exit status"
-        assert_equals "preview-image: adding ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} to impd as pv-base" "$(cat out)" "the output"
-        assert_equals "impz: image ghcr.io/example/imp-base:1.2.3: pull failed" "$(cat err)" "the error"
-        assert_equals '[]' "$(cat impd/images.json)" "impd's images"
+        assert_equal "$status" 1
+        # the output
+        assert_equal "$(cat out)" "preview-image: adding ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} to impd as pv-base"
+        # the error
+        assert_equal "$(cat err)" "impz: image ghcr.io/example/imp-base:1.2.3: pull failed"
+        # impd's images
+        assert_equal "$(cat impd/images.json)" '[]'
       '';
     }
     {
@@ -1051,7 +1075,7 @@ let
         src=$(sed -n 's|^exec bun --no-install run \(/nix/store/[^ ]*\)/main\.ts$|\1|p' ${package}/bin/preview-service)
         (cd "$src" && find . -path ./node_modules -prune -o -type f -print | LC_ALL=C sort) > actual
 
-        assert_files_equal expected actual
+        diff -u expected actual
       '';
     }
     {
@@ -1066,8 +1090,10 @@ let
 
         HOME="$PWD" ${pkgs.bun}/bin/bun --no-install run load.ts > out 2> err
 
-        assert_equals "createImp readImp readImps sleepImp wakeImp updateHTTPPort updatePublicEgress removeImp installGrant installPathGrant removeGrantsExcept runCommand" "$(cat out)" "the client's calls"
-        assert_equals "" "$(cat err)" "bun's errors"
+        # the client's calls
+        assert_equal "$(cat out)" "createImp readImp readImps sleepImp wakeImp updateHTTPPort updatePublicEgress removeImp installGrant installPathGrant removeGrantsExcept runCommand"
+        # bun's errors
+        assert_equal "$(cat err)" ""
       '';
     }
   ];
@@ -1075,6 +1101,10 @@ in
 pkgs.runCommand "preview-check"
   {
     nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
       pkgs.diffutils
       pkgs.gnused
       pkgs.findutils
@@ -1084,11 +1114,6 @@ pkgs.runCommand "preview-check"
     inherit testUtilsCheck;
   }
   ''
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${testLib}/assert-missing.sh
-    source ${pkgs.writeText "preview-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "preview.bats" (renderCases cases)}
     touch $out
   ''

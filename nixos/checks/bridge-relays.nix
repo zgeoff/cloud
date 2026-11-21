@@ -2,14 +2,13 @@
 # flake's pinned imp input), and checks the socket and the services each relay adds, the ports they
 # admit in inet cloud_host and open on imp-host's bridge, and the assertion of each. Each case evaluates
 # its own config through test-utils/build-module-system.nix and runs on its own, in a fresh
-# directory, under scripts/src/test-utils/shell/run-cases.sh, which reports each case and fails the check
+# directory, as a bats test, which reports each case and fails the check
 # when any case fails.
 # Run: bun run test:nixos bridge-relays
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
@@ -115,7 +114,7 @@ let
           }}
           EOF
 
-          assert_files_equal expected actual
+          diff -u expected actual
         '';
     }
     {
@@ -137,7 +136,8 @@ let
           };
         in
         ''
-          assert_equals ${
+          # the cloud_host admissions
+          assert_equal ${lib.escapeShellArg (builtins.toJSON system.config.networking.cloudHost.admissions)} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 (admission 18084)
@@ -145,8 +145,9 @@ let
                 (admission 18083)
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON system.config.networking.cloudHost.admissions)} "the cloud_host admissions"
-          assert_equals '[18081,18083,18084]' ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces.podman0.allowedTCPPorts)} "the ports nixos-fw opens on podman0"
+          }
+          # the ports nixos-fw opens on podman0
+          assert_equal ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces.podman0.allowedTCPPorts)} '[18081,18083,18084]'
         '';
     }
     {
@@ -200,7 +201,7 @@ let
           }}
           EOF
 
-          assert_files_equal expected actual
+          diff -u expected actual
         '';
     }
     {
@@ -215,8 +216,10 @@ let
           };
         in
         ''
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON system.config.networking.cloudHost.admissions)} "the cloud_host admissions"
-          assert_equals '{}' ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces)} "the interfaces nixos-fw opens ports on"
+          # the cloud_host admissions
+          assert_equal ${lib.escapeShellArg (builtins.toJSON system.config.networking.cloudHost.admissions)} '[]'
+          # the interfaces nixos-fw opens ports on
+          assert_equal ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces)} '{}'
         '';
     }
     {
@@ -232,7 +235,7 @@ let
           };
         in
         ''
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} '[]'
         '';
     }
     {
@@ -249,7 +252,7 @@ let
           };
         in
         ''
-          assert_equals ${
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} ${
             lib.escapeShellArg (
               builtins.toJSON [
                 "the relay boxxy-worker-relay assumes imp-host on podman0; services.imp.ipv6.enable moves it to br-imphost"
@@ -257,7 +260,7 @@ let
                 "the relay pepys-ingest-relay assumes imp-host on podman0; services.imp.ipv6.enable moves it to br-imphost"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          }
         '';
     }
   ];
@@ -265,6 +268,10 @@ in
 pkgs.runCommand "bridge-relays-check"
   {
     nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
       pkgs.diffutils
       pkgs.jq
     ];
@@ -272,10 +279,6 @@ pkgs.runCommand "bridge-relays-check"
     inherit testUtilsCheck;
   }
   ''
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${pkgs.writeText "bridge-relays-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "bridge-relays.bats" (renderCases cases)}
     touch $out
   ''

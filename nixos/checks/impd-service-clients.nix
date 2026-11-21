@@ -2,13 +2,12 @@
 # settings that name them, the restart it asks of imp-host, and each assertion that refuses a client list impd's parser would
 # refuse. Each case evaluates its own config, beside imp's module, through
 # test-utils/build-module-system.nix, and runs in
-# a fresh directory under scripts/src/test-utils/shell/run-cases.sh.
+# a fresh directory as a bats test.
 # Run: bun run test:nixos impd-service-clients
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
@@ -248,8 +247,9 @@ let
             } \
             '{$modes, $tokenFile, $clientsFile, $restartTriggers, $settings}' > actual
 
-          assert_files_equal expected actual
-          assert_equals '[]' ${
+          diff -u expected actual
+          # failed assertions
+          assert_equal ${
             lib.escapeShellArg (
               builtins.toJSON (
                 collectFailedAssertions (buildClientsSystem {
@@ -261,14 +261,15 @@ let
                 })
               )
             )
-          } "failed assertions"
+          } '[]'
         '';
     }
   ]
   ++ map (refusal: {
     inherit (refusal) title;
     script = ''
-      assert_equals ${lib.escapeShellArg (builtins.toJSON refusal.messages)} ${
+      # failed assertions
+      assert_equal ${
         lib.escapeShellArg (
           builtins.toJSON (
             collectFailedAssertions (
@@ -281,13 +282,17 @@ let
             )
           )
         )
-      } "failed assertions"
+      } ${lib.escapeShellArg (builtins.toJSON refusal.messages)}
     '';
   }) refusals;
 in
 pkgs.runCommand "impd-service-clients-check"
   {
     nativeBuildInputs = [
+      (pkgs.bats.withLibraries (p: [
+        p.bats-support
+        p.bats-assert
+      ]))
       pkgs.diffutils
       pkgs.jq
     ];
@@ -295,10 +300,6 @@ pkgs.runCommand "impd-service-clients-check"
     inherit testUtilsCheck;
   }
   ''
-    source ${testLib}/run-cases.sh
-    source ${testLib}/assert-equals.sh
-    source ${testLib}/assert-files-equal.sh
-    source ${pkgs.writeText "impd-service-clients-cases.sh" (renderCases cases)}
-    run_cases
+    bats --timing --print-output-on-failure ${pkgs.writeText "impd-service-clients.bats" (renderCases cases)}
     touch $out
   ''

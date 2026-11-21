@@ -95,18 +95,6 @@ gates:
       - scripts/alert-scheduled-drift.sh
       - scripts/hold-prod-lock.sh
       - scripts/hold-host-prod-lock.sh
-      - scripts/src/test-utils/shell/run-cases.sh
-      - scripts/src/test-utils/shell/test-run-cases.sh
-      - scripts/src/test-utils/shell/assert-equals.sh
-      - scripts/src/test-utils/shell/test-assert-equals.sh
-      - scripts/src/test-utils/shell/assert-not-equals.sh
-      - scripts/src/test-utils/shell/test-assert-not-equals.sh
-      - scripts/src/test-utils/shell/assert-files-equal.sh
-      - scripts/src/test-utils/shell/test-assert-files-equal.sh
-      - scripts/src/test-utils/shell/assert-between.sh
-      - scripts/src/test-utils/shell/test-assert-between.sh
-      - scripts/src/test-utils/shell/assert-missing.sh
-      - scripts/src/test-utils/shell/test-assert-missing.sh
       - scripts/src/test-utils/shell/wait-for.sh
       - scripts/src/test-utils/shell/start-stub-discord-webhook.sh
       - scripts/src/test-utils/shell/create-stub-kubectl.sh
@@ -160,7 +148,6 @@ gates:
       - scripts/publish-atc-gateway-images.sh
       - scripts/run-bats.sh
       - scripts/src/test-utils/bats/**
-      - scripts/run-shell-suites.sh
       - scripts/e2e/journey-atc-gateway-restore.bats
       - infra/cluster/build-atc-gateway-spec.ts
       - infra/cluster/create-atc-gateway-backup-job.ts
@@ -178,7 +165,6 @@ gates:
       - scripts/publish-files-image.sh
       - scripts/run-bats.sh
       - scripts/src/test-utils/bats/**
-      - scripts/run-shell-suites.sh
       - scripts/src/test-utils/shell/**
       - bun.lock
       - .bun-version
@@ -199,7 +185,6 @@ gates:
       - images/atc-gateway/versions.env
       - scripts/run-bats.sh
       - scripts/src/test-utils/bats/**
-      - scripts/run-shell-suites.sh
       - scripts/src/test-utils/shell/**
   boxxy-image:
     skipped: Nothing the boxxy image builds from changed, so its image test did not run.
@@ -211,7 +196,6 @@ gates:
       - scripts/publish-boxxy-image.sh
       - scripts/run-bats.sh
       - scripts/src/test-utils/bats/**
-      - scripts/run-shell-suites.sh
       - scripts/src/test-utils/shell/**
       - bun.lock
       - .bun-version
@@ -223,8 +207,6 @@ gates:
       - deploy/files/backup/**
       - scripts/run-bats.sh
       - scripts/src/test-utils/bats/**
-      - scripts/run-shell-suites.sh
-      - scripts/src/test-utils/shell/run-cases.sh
       - scripts/src/test-utils/shell/run-backup.sh
       - scripts/src/test-utils/shell/run-backup-shell.sh
       - scripts/src/test-utils/shell/normalize-restic-output.sh
@@ -239,10 +221,7 @@ gates:
       - deploy/nixie/backup/**
       - scripts/run-bats.sh
       - scripts/src/test-utils/bats/**
-      - scripts/run-shell-suites.sh
-      - scripts/src/test-utils/shell/run-cases.sh
       - scripts/src/test-utils/shell/create-case-tree.sh
-      - scripts/src/test-utils/shell/assert-status.sh
       - scripts/src/test-utils/shell/normalize-restic-output.sh
       - scripts/src/test-utils/shell/create-stub-racing-restic.sh
       - infra/Pulumi.prod.yaml
@@ -267,10 +246,7 @@ gates:
       - infra/Pulumi.prod.yaml
       - scripts/run-bats.sh
       - scripts/src/test-utils/bats/**
-      - scripts/run-shell-suites.sh
-      - scripts/src/test-utils/shell/run-cases.sh
       - scripts/src/test-utils/shell/create-case-tree.sh
-      - scripts/src/test-utils/shell/assert-status.sh
       - bun.lock
       - .bun-version
       - package.json
@@ -290,7 +266,6 @@ gates:
       - scripts/src/test-utils/shell/**
       - scripts/src/test-utils/bats/**
       - scripts/run-bats.sh
-      - scripts/run-shell-suites.sh
       - bun.lock
       - .bun-version
       - package.json
