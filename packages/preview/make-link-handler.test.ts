@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { systemClock } from '@zgeoff/std';
-import { createFakeClock } from '@zgeoff/testing/clock';
+import { createFakeClock, runClockUntil } from '@zgeoff/testing/clock';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
@@ -11,7 +11,6 @@ import { makeLinkHandler } from './make-link-handler.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { composeFiles } from './src/test-utils/constants.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
-import { runUntilSettled } from './src/test-utils/run-until-settled.ts';
 import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
@@ -102,7 +101,22 @@ test('it sleeps the running preview when a second one opens with one slot', asyn
 
   await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/18'));
 
-  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
+  const pendingJob = Promise.all(ctx.pendingBoots);
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   const slept = await ctx.impd.client.imps.get({ name: 'pv-0a1b2c3d-17' });
   const opened = await ctx.impd.client.imps.get({ name: 'pv-0a1b2c3d-18' });
@@ -140,7 +154,22 @@ test('it runs one preview when two first opens with one slot arrive at once', as
     ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/18')),
   ]);
 
-  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
+  const pendingJob = Promise.all(ctx.pendingBoots);
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   const imps = await ctx.impd.client.imps.list({});
 
@@ -208,7 +237,23 @@ test('it keeps both previews running when two slots fit them', async () => {
   });
 
   await handler(new Request('http://geoffcloud:8417/acme/greenhouse/18'));
-  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
+
+  const pendingJob = Promise.all(ctx.pendingBoots);
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
 });
@@ -232,7 +277,22 @@ test('it answers a first open with the booting page and boots the head commit', 
 
   const response = await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/18'));
 
-  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
+  const pendingJob = Promise.all(ctx.pendingBoots);
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   const text = await response.text();
 
@@ -425,13 +485,40 @@ test('it boots a woken preview again when its stack never answers', async () => 
 
   // a cold boot left the stack down, so no app answers impd's proxy
 
-  const response = await runUntilSettled(
-    ctx.clock,
-    ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17')),
-    { maxMs: 3_600_000 },
-  );
+  const responseJob = ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17'));
+  let responseSettled = false;
 
-  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
+  const responseWatch = (async () => {
+    try {
+      await responseJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    responseSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => responseSettled, { maxMs: 3_600_000 });
+  await responseWatch;
+
+  const response = await responseJob;
+
+  const pending2Job = Promise.all(ctx.pendingBoots);
+  let pending2Settled = false;
+
+  const pending2Watch = (async () => {
+    try {
+      await pending2Job;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pending2Settled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pending2Settled, { maxMs: 3_600_000 });
+  await pending2Watch;
+  await pending2Job;
 
   expect(response.status).toBe(202);
   expect(ctx.impd.commands.map((command) => command.argv[0])).toContain('timeout');
@@ -479,7 +566,22 @@ test('it rebuilds a ready preview once a push moved its head', async () => {
 
   const response = await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17'));
 
-  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
+  const pendingJob = Promise.all(ctx.pendingBoots);
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(response.status).toBe(202);
 
@@ -558,7 +660,22 @@ test('it boots a failed preview again when the retry link opens', async () => {
 
   await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17?retry=1'));
 
-  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
+  const pendingJob = Promise.all(ctx.pendingBoots);
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ready');
 });
@@ -590,7 +707,22 @@ test('it shows the failure page and boots nothing more when the booting page rel
 
   const retriedText = await retried.text();
 
-  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
+  const pendingJob = Promise.all(ctx.pendingBoots);
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   // a browser reloads the refresh's URL, or the page's own URL when the refresh names none
   const reloadPath =
@@ -601,7 +733,22 @@ test('it shows the failure page and boots nothing more when the booting page rel
 
   const reloaded = await ctx.handler(new Request(`http://geoffcloud:8417${reloadPath}`));
 
-  await runUntilSettled(ctx.clock, Promise.all(ctx.pendingBoots), { maxMs: 3_600_000 });
+  const pending2Job = Promise.all(ctx.pendingBoots);
+  let pending2Settled = false;
+
+  const pending2Watch = (async () => {
+    try {
+      await pending2Job;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pending2Settled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pending2Settled, { maxMs: 3_600_000 });
+  await pending2Watch;
+  await pending2Job;
 
   expect(reloaded.status).toBe(502);
   expect(ctx.pendingBoots.size).toBe(0);

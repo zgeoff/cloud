@@ -2,11 +2,10 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createFakeClock } from '@zgeoff/testing/clock';
+import { createFakeClock, runClockUntil } from '@zgeoff/testing/clock';
 import { runSandboxImageJob } from './run-sandbox-image-job.ts';
 import { buildStubKubectlJob } from './src/test-utils/build-stub-kubectl-job.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
-import { runUntilSettled } from './src/test-utils/run-until-settled.ts';
 
 async function setupTest() {
   const tempRoot = await mkdtemp(join(tmpdir(), 'sandbox-image-job-'));
@@ -32,27 +31,40 @@ test('it creates the script ConfigMap and the Job, waits for the Job to complete
 
   const runner = buildStubRunner(kubectl.handler);
 
-  const exitCode = await runUntilSettled(
+  const exitCodeJob = runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job","metadata":{"generateName":"nixie-sandbox-images-"}}',
+      }),
+    },
+    kubeconfig: 'apiVersion: v1\nkind: Config\n',
+    run: runner.run,
+    readScript: () => Promise.resolve('console.log("bundled");\n'),
+    tempRoot: ctx.tempRoot,
     clock,
-    runSandboxImageJob({
-      env: {
-        NIXIE_SANDBOX_IMAGES: JSON.stringify({
-          namespace: 'nixie',
-          configMap: 'nixie-sandbox-images',
-          scriptKey: 'add-sandbox-images.js',
-          job: '{"kind":"Job","metadata":{"generateName":"nixie-sandbox-images-"}}',
-        }),
-      },
-      kubeconfig: 'apiVersion: v1\nkind: Config\n',
-      run: runner.run,
-      readScript: () => Promise.resolve('console.log("bundled");\n'),
-      tempRoot: ctx.tempRoot,
-      clock,
-      printOut: ctx.printOut,
-      printErr: ctx.printErr,
-    }),
-    { maxMs: 1_000_000 },
-  );
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  let exitCodeSettled = false;
+
+  const exitCodeWatch = (async () => {
+    try {
+      await exitCodeJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    exitCodeSettled = true;
+  })();
+
+  await runClockUntil(clock, () => exitCodeSettled, { maxMs: 1_000_000 });
+  await exitCodeWatch;
+
+  const exitCode = await exitCodeJob;
 
   expect(exitCode).toBe(0);
 
@@ -144,28 +156,40 @@ test('it hands kubectl the kubeconfig in a file only its user reads, and removes
 
   const runner = buildStubRunner(kubectl.handler);
 
-  await runUntilSettled(
+  const pendingJob = runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
+      }),
+    },
+    kubeconfig:
+      'apiVersion: v1\nkind: Config\nusers: [{name: admin, user: {token: kube-token-for-tests}}]\n',
+    run: runner.run,
+    readScript: () => Promise.resolve(''),
+    tempRoot: ctx.tempRoot,
     clock,
-    runSandboxImageJob({
-      env: {
-        NIXIE_SANDBOX_IMAGES: JSON.stringify({
-          namespace: 'nixie',
-          configMap: 'nixie-sandbox-images',
-          scriptKey: 'add-sandbox-images.js',
-          job: '{"kind":"Job"}',
-        }),
-      },
-      kubeconfig:
-        'apiVersion: v1\nkind: Config\nusers: [{name: admin, user: {token: kube-token-for-tests}}]\n',
-      run: runner.run,
-      readScript: () => Promise.resolve(''),
-      tempRoot: ctx.tempRoot,
-      clock,
-      printOut: ctx.printOut,
-      printErr: ctx.printErr,
-    }),
-    { maxMs: 1_000_000 },
-  );
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(clock, () => pendingSettled, { maxMs: 1_000_000 });
+  await pendingWatch;
+  await pendingJob;
 
   const leftover = await readdir(ctx.tempRoot);
 
@@ -198,27 +222,40 @@ test('it exits 1, prints the logs, and removes the ConfigMap when the Job fails'
 
   const runner = buildStubRunner(kubectl.handler);
 
-  const exitCode = await runUntilSettled(
+  const exitCodeJob = runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
+      }),
+    },
+    kubeconfig: 'apiVersion: v1\n',
+    run: runner.run,
+    readScript: () => Promise.resolve(''),
+    tempRoot: ctx.tempRoot,
     clock,
-    runSandboxImageJob({
-      env: {
-        NIXIE_SANDBOX_IMAGES: JSON.stringify({
-          namespace: 'nixie',
-          configMap: 'nixie-sandbox-images',
-          scriptKey: 'add-sandbox-images.js',
-          job: '{"kind":"Job"}',
-        }),
-      },
-      kubeconfig: 'apiVersion: v1\n',
-      run: runner.run,
-      readScript: () => Promise.resolve(''),
-      tempRoot: ctx.tempRoot,
-      clock,
-      printOut: ctx.printOut,
-      printErr: ctx.printErr,
-    }),
-    { maxMs: 1_000_000 },
-  );
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  let exitCodeSettled = false;
+
+  const exitCodeWatch = (async () => {
+    try {
+      await exitCodeJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    exitCodeSettled = true;
+  })();
+
+  await runClockUntil(clock, () => exitCodeSettled, { maxMs: 1_000_000 });
+  await exitCodeWatch;
+
+  const exitCode = await exitCodeJob;
 
   expect(exitCode).toBe(1);
 
@@ -246,27 +283,40 @@ test("it reports a refused removal of the ConfigMap with kubectl's exit and erro
 
   const runner = buildStubRunner(kubectl.handler);
 
-  const exitCode = await runUntilSettled(
+  const exitCodeJob = runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
+      }),
+    },
+    kubeconfig: 'apiVersion: v1\n',
+    run: runner.run,
+    readScript: () => Promise.resolve(''),
+    tempRoot: ctx.tempRoot,
     clock,
-    runSandboxImageJob({
-      env: {
-        NIXIE_SANDBOX_IMAGES: JSON.stringify({
-          namespace: 'nixie',
-          configMap: 'nixie-sandbox-images',
-          scriptKey: 'add-sandbox-images.js',
-          job: '{"kind":"Job"}',
-        }),
-      },
-      kubeconfig: 'apiVersion: v1\n',
-      run: runner.run,
-      readScript: () => Promise.resolve(''),
-      tempRoot: ctx.tempRoot,
-      clock,
-      printOut: ctx.printOut,
-      printErr: ctx.printErr,
-    }),
-    { maxMs: 1_000_000 },
-  );
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  let exitCodeSettled = false;
+
+  const exitCodeWatch = (async () => {
+    try {
+      await exitCodeJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    exitCodeSettled = true;
+  })();
+
+  await runClockUntil(clock, () => exitCodeSettled, { maxMs: 1_000_000 });
+  await exitCodeWatch;
+
+  const exitCode = await exitCodeJob;
 
   expect(exitCode).toBe(0);
 
@@ -292,27 +342,40 @@ test('it exits 1 once the wait outlasts the Job deadline with no outcome', async
 
   const runner = buildStubRunner(kubectl.handler);
 
-  const exitCode = await runUntilSettled(
+  const exitCodeJob = runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
+      }),
+    },
+    kubeconfig: 'apiVersion: v1\n',
+    run: runner.run,
+    readScript: () => Promise.resolve(''),
+    tempRoot: ctx.tempRoot,
     clock,
-    runSandboxImageJob({
-      env: {
-        NIXIE_SANDBOX_IMAGES: JSON.stringify({
-          namespace: 'nixie',
-          configMap: 'nixie-sandbox-images',
-          scriptKey: 'add-sandbox-images.js',
-          job: '{"kind":"Job"}',
-        }),
-      },
-      kubeconfig: 'apiVersion: v1\n',
-      run: runner.run,
-      readScript: () => Promise.resolve(''),
-      tempRoot: ctx.tempRoot,
-      clock,
-      printOut: ctx.printOut,
-      printErr: ctx.printErr,
-    }),
-    { maxMs: 1_000_000 },
-  );
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  let exitCodeSettled = false;
+
+  const exitCodeWatch = (async () => {
+    try {
+      await exitCodeJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    exitCodeSettled = true;
+  })();
+
+  await runClockUntil(clock, () => exitCodeSettled, { maxMs: 1_000_000 });
+  await exitCodeWatch;
+
+  const exitCode = await exitCodeJob;
 
   expect(exitCode).toBe(1);
   expect(clock.now()).toBe(960_000);
@@ -336,27 +399,40 @@ test("it reports a failed read of the Job with kubectl's exit and error, and wai
 
   const runner = buildStubRunner(kubectl.handler);
 
-  const exitCode = await runUntilSettled(
+  const exitCodeJob = runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
+      }),
+    },
+    kubeconfig: 'apiVersion: v1\n',
+    run: runner.run,
+    readScript: () => Promise.resolve(''),
+    tempRoot: ctx.tempRoot,
     clock,
-    runSandboxImageJob({
-      env: {
-        NIXIE_SANDBOX_IMAGES: JSON.stringify({
-          namespace: 'nixie',
-          configMap: 'nixie-sandbox-images',
-          scriptKey: 'add-sandbox-images.js',
-          job: '{"kind":"Job"}',
-        }),
-      },
-      kubeconfig: 'apiVersion: v1\n',
-      run: runner.run,
-      readScript: () => Promise.resolve(''),
-      tempRoot: ctx.tempRoot,
-      clock,
-      printOut: ctx.printOut,
-      printErr: ctx.printErr,
-    }),
-    { maxMs: 1_000_000 },
-  );
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  let exitCodeSettled = false;
+
+  const exitCodeWatch = (async () => {
+    try {
+      await exitCodeJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    exitCodeSettled = true;
+  })();
+
+  await runClockUntil(clock, () => exitCodeSettled, { maxMs: 1_000_000 });
+  await exitCodeWatch;
+
+  const exitCode = await exitCodeJob;
 
   expect(exitCode).toBe(0);
 
@@ -383,27 +459,40 @@ test('it exits 1 after three failed reads of the Job in a row, with no wait to t
 
   const runner = buildStubRunner(kubectl.handler);
 
-  const exitCode = await runUntilSettled(
+  const exitCodeJob = runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
+      }),
+    },
+    kubeconfig: 'apiVersion: v1\n',
+    run: runner.run,
+    readScript: () => Promise.resolve(''),
+    tempRoot: ctx.tempRoot,
     clock,
-    runSandboxImageJob({
-      env: {
-        NIXIE_SANDBOX_IMAGES: JSON.stringify({
-          namespace: 'nixie',
-          configMap: 'nixie-sandbox-images',
-          scriptKey: 'add-sandbox-images.js',
-          job: '{"kind":"Job"}',
-        }),
-      },
-      kubeconfig: 'apiVersion: v1\n',
-      run: runner.run,
-      readScript: () => Promise.resolve(''),
-      tempRoot: ctx.tempRoot,
-      clock,
-      printOut: ctx.printOut,
-      printErr: ctx.printErr,
-    }),
-    { maxMs: 1_000_000 },
-  );
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  let exitCodeSettled = false;
+
+  const exitCodeWatch = (async () => {
+    try {
+      await exitCodeJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    exitCodeSettled = true;
+  })();
+
+  await runClockUntil(clock, () => exitCodeSettled, { maxMs: 1_000_000 });
+  await exitCodeWatch;
+
+  const exitCode = await exitCodeJob;
 
   expect(exitCode).toBe(1);
   expect(clock.delays).toStrictEqual([5000, 5000]);
@@ -430,27 +519,40 @@ test('it exits 1 with no Job when kubectl cannot create the ConfigMap', async ()
         : undefined,
   );
 
-  const exitCode = await runUntilSettled(
+  const exitCodeJob = runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
+      }),
+    },
+    kubeconfig: 'apiVersion: v1\n',
+    run: runner.run,
+    readScript: () => Promise.resolve(''),
+    tempRoot: ctx.tempRoot,
     clock,
-    runSandboxImageJob({
-      env: {
-        NIXIE_SANDBOX_IMAGES: JSON.stringify({
-          namespace: 'nixie',
-          configMap: 'nixie-sandbox-images',
-          scriptKey: 'add-sandbox-images.js',
-          job: '{"kind":"Job"}',
-        }),
-      },
-      kubeconfig: 'apiVersion: v1\n',
-      run: runner.run,
-      readScript: () => Promise.resolve(''),
-      tempRoot: ctx.tempRoot,
-      clock,
-      printOut: ctx.printOut,
-      printErr: ctx.printErr,
-    }),
-    { maxMs: 1_000_000 },
-  );
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  let exitCodeSettled = false;
+
+  const exitCodeWatch = (async () => {
+    try {
+      await exitCodeJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    exitCodeSettled = true;
+  })();
+
+  await runClockUntil(clock, () => exitCodeSettled, { maxMs: 1_000_000 });
+  await exitCodeWatch;
+
+  const exitCode = await exitCodeJob;
 
   expect(exitCode).toBe(1);
   expect(runner.calls).toHaveLength(2);
@@ -477,27 +579,40 @@ test('it exits 1, removes the ConfigMap, and reads no Job when kubectl cannot cr
 
   const runner = buildStubRunner(kubectl.handler);
 
-  const exitCode = await runUntilSettled(
+  const exitCodeJob = runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
+      }),
+    },
+    kubeconfig: 'apiVersion: v1\n',
+    run: runner.run,
+    readScript: () => Promise.resolve(''),
+    tempRoot: ctx.tempRoot,
     clock,
-    runSandboxImageJob({
-      env: {
-        NIXIE_SANDBOX_IMAGES: JSON.stringify({
-          namespace: 'nixie',
-          configMap: 'nixie-sandbox-images',
-          scriptKey: 'add-sandbox-images.js',
-          job: '{"kind":"Job"}',
-        }),
-      },
-      kubeconfig: 'apiVersion: v1\n',
-      run: runner.run,
-      readScript: () => Promise.resolve(''),
-      tempRoot: ctx.tempRoot,
-      clock,
-      printOut: ctx.printOut,
-      printErr: ctx.printErr,
-    }),
-    { maxMs: 1_000_000 },
-  );
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  let exitCodeSettled = false;
+
+  const exitCodeWatch = (async () => {
+    try {
+      await exitCodeJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    exitCodeSettled = true;
+  })();
+
+  await runClockUntil(clock, () => exitCodeSettled, { maxMs: 1_000_000 });
+  await exitCodeWatch;
+
+  const exitCode = await exitCodeJob;
 
   expect(exitCode).toBe(1);
 
@@ -525,26 +640,39 @@ test('it exits 2 with no kubectl call when the payload names no Job', async () =
   const clock = createFakeClock();
   const runner = buildStubRunner();
 
-  const exitCode = await runUntilSettled(
+  const exitCodeJob = runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+      }),
+    },
+    kubeconfig: 'apiVersion: v1\n',
+    run: runner.run,
+    readScript: () => Promise.resolve(''),
+    tempRoot: ctx.tempRoot,
     clock,
-    runSandboxImageJob({
-      env: {
-        NIXIE_SANDBOX_IMAGES: JSON.stringify({
-          namespace: 'nixie',
-          configMap: 'nixie-sandbox-images',
-          scriptKey: 'add-sandbox-images.js',
-        }),
-      },
-      kubeconfig: 'apiVersion: v1\n',
-      run: runner.run,
-      readScript: () => Promise.resolve(''),
-      tempRoot: ctx.tempRoot,
-      clock,
-      printOut: ctx.printOut,
-      printErr: ctx.printErr,
-    }),
-    { maxMs: 1_000_000 },
-  );
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  let exitCodeSettled = false;
+
+  const exitCodeWatch = (async () => {
+    try {
+      await exitCodeJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    exitCodeSettled = true;
+  })();
+
+  await runClockUntil(clock, () => exitCodeSettled, { maxMs: 1_000_000 });
+  await exitCodeWatch;
+
+  const exitCode = await exitCodeJob;
 
   expect(exitCode).toBe(2);
   expect(runner.calls).toStrictEqual([]);
@@ -562,27 +690,40 @@ test('it exits 2 with no kubectl call when stdin holds no kubeconfig', async () 
   const clock = createFakeClock();
   const runner = buildStubRunner();
 
-  const exitCode = await runUntilSettled(
+  const exitCodeJob = runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
+      }),
+    },
+    kubeconfig: '',
+    run: runner.run,
+    readScript: () => Promise.resolve(''),
+    tempRoot: ctx.tempRoot,
     clock,
-    runSandboxImageJob({
-      env: {
-        NIXIE_SANDBOX_IMAGES: JSON.stringify({
-          namespace: 'nixie',
-          configMap: 'nixie-sandbox-images',
-          scriptKey: 'add-sandbox-images.js',
-          job: '{"kind":"Job"}',
-        }),
-      },
-      kubeconfig: '',
-      run: runner.run,
-      readScript: () => Promise.resolve(''),
-      tempRoot: ctx.tempRoot,
-      clock,
-      printOut: ctx.printOut,
-      printErr: ctx.printErr,
-    }),
-    { maxMs: 1_000_000 },
-  );
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  let exitCodeSettled = false;
+
+  const exitCodeWatch = (async () => {
+    try {
+      await exitCodeJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    exitCodeSettled = true;
+  })();
+
+  await runClockUntil(clock, () => exitCodeSettled, { maxMs: 1_000_000 });
+  await exitCodeWatch;
+
+  const exitCode = await exitCodeJob;
 
   expect(exitCode).toBe(2);
   expect(runner.calls).toStrictEqual([]);

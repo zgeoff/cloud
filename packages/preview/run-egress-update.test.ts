@@ -3,14 +3,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { systemClock } from '@zgeoff/std';
-import { createFakeClock } from '@zgeoff/testing/clock';
+import { createFakeClock, runClockUntil } from '@zgeoff/testing/clock';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { runEgressUpdate } from './run-egress-update.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
-import { runUntilSettled } from './src/test-utils/run-until-settled.ts';
 import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
 import { waitForCondition } from './src/test-utils/wait-for-condition.ts';
@@ -70,9 +69,26 @@ test('it puts every imp impd lists, running or sleeping, under the public egress
   await ctx.impd.seedImp({ name: 'pv-0a1b2c3d-17' });
   await ctx.impd.seedImp({ name: 'pv-4e5f6a7b-3', httpPort: 3000, state: 'sleeping' });
 
-  const updated = await runUntilSettled(ctx.clock, runEgressUpdate(ctx.deps, ctx.signal), {
+  const updatedJob = runEgressUpdate(ctx.deps, ctx.signal);
+  let updatedSettled = false;
+
+  const updatedWatch = (async () => {
+    try {
+      await updatedJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    updatedSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => updatedSettled, {
     maxMs: 60_000,
   });
+
+  await updatedWatch;
+
+  const updated = await updatedJob;
 
   expect(updated).toBeTrue();
 
@@ -97,9 +113,26 @@ test('it tries again after impd refuses the list, and updates every imp once the
     { times: 1 },
   );
 
-  const updated = await runUntilSettled(ctx.clock, runEgressUpdate(ctx.deps, ctx.signal), {
+  const updatedJob = runEgressUpdate(ctx.deps, ctx.signal);
+  let updatedSettled = false;
+
+  const updatedWatch = (async () => {
+    try {
+      await updatedJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    updatedSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => updatedSettled, {
     maxMs: 60_000,
   });
+
+  await updatedWatch;
+
+  const updated = await updatedJob;
 
   expect(updated).toBeTrue();
 
@@ -137,9 +170,26 @@ test('it updates the other imps, then tries again the imp whose update impd refu
     },
   );
 
-  const updated = await runUntilSettled(ctx.clock, runEgressUpdate(ctx.deps, ctx.signal), {
+  const updatedJob = runEgressUpdate(ctx.deps, ctx.signal);
+  let updatedSettled = false;
+
+  const updatedWatch = (async () => {
+    try {
+      await updatedJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    updatedSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => updatedSettled, {
     maxMs: 60_000,
   });
+
+  await updatedWatch;
+
+  const updated = await updatedJob;
 
   expect(updated).toBeTrue();
 
@@ -185,7 +235,22 @@ test('it stops trying and returns false when the signal aborts during the wait f
 
   stop.abort();
 
-  const updated = await runUntilSettled(ctx.clock, running, { maxMs: 60_000 });
+  let updatedSettled = false;
+
+  const updatedWatch = (async () => {
+    try {
+      await running;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    updatedSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => updatedSettled, { maxMs: 60_000 });
+  await updatedWatch;
+
+  const updated = await running;
 
   expect(updated).toBeFalse();
   expect(ctx.impd.calls).toStrictEqual([]);

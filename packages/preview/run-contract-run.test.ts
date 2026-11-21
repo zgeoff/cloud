@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { systemClock } from '@zgeoff/std';
-import { createFakeClock } from '@zgeoff/testing/clock';
+import { createFakeClock, runClockUntil } from '@zgeoff/testing/clock';
 import { HttpResponse, http } from 'msw';
 import { z } from 'zod';
 import { buildGitHubClient } from './build-github-client.ts';
@@ -14,7 +14,6 @@ import { runContractRun } from './run-contract-run.ts';
 import { commitStatuses } from './src/test-utils/constants.ts';
 import { githubAPIURL } from './src/test-utils/github-api-url.ts';
 import { network } from './src/test-utils/network.ts';
-import { runUntilSettled } from './src/test-utils/run-until-settled.ts';
 import { startPreviewImpd } from './src/test-utils/start-preview-impd.ts';
 import { startStubImpd } from './src/test-utils/start-stub-impd.ts';
 import { stubApp } from './src/test-utils/stub-app.ts';
@@ -232,14 +231,26 @@ test('it posts failure and removes the imp when the run passes its time limit', 
 
   ctx.impd.answerCommand = () => ({ code: null, hold: true });
 
-  await runUntilSettled(
-    ctx.clock,
-    runContractRun(ctx.deps, {
-      repo: 'acme/greenhouse',
-      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    }),
-    { maxMs: 3_600_000 },
-  );
+  const pendingJob = runContractRun(ctx.deps, {
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  let pendingSettled = false;
+
+  const pendingWatch = (async () => {
+    try {
+      await pendingJob;
+    } catch {
+      // the await of the job below throws it
+    }
+
+    pendingSettled = true;
+  })();
+
+  await runClockUntil(ctx.clock, () => pendingSettled, { maxMs: 3_600_000 });
+  await pendingWatch;
+  await pendingJob;
 
   expect(ctx.clock.delays).toStrictEqual([690_000]);
 
