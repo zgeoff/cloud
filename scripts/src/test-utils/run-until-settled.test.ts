@@ -18,7 +18,7 @@ test('it steps the clock through each sleep and returns the result of the job', 
   expect(clock.now()).toBe(10_000);
 });
 
-test('it throws the error of the job', async () => {
+test('it throws the error of the job', () => {
   const clock = createFakeClock();
 
   const job = (async () => {
@@ -29,12 +29,12 @@ test('it throws the error of the job', async () => {
 
   const outcome = runUntilSettled(clock, job, { maxMs: 60_000 });
 
-  await expect(outcome).rejects.toThrow('the job failed');
+  expect(outcome).rejects.toThrow('the job failed');
 });
 
-test('it throws when the job still waits at the fake time limit', async () => {
+test('it throws when the job still waits at the fake time limit', () => {
   const clock = createFakeClock();
   const outcome = runUntilSettled(clock, clock.sleep(120_000), { maxMs: 60_000 });
 
-  await expect(outcome).rejects.toThrow('the job did not settle within the fake time limit');
+  expect(outcome).rejects.toThrow('the job did not settle within the fake time limit');
 });
