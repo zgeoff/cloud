@@ -3,6 +3,7 @@ import { copyFileSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } fro
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createGitOrigin, readGitEnv } from '@zgeoff/testing/git';
 import { $ } from 'bun';
 import { z } from 'zod';
 
@@ -218,17 +219,15 @@ async function setupTest() {
     GIT_CONFIG_GLOBAL: '/dev/null',
   };
 
-  const upstream = join(directory, 'upstream.git');
+  const origin = await createGitOrigin(readGitEnv(directory));
+
+  const upstream = origin.path;
   const repo = join(directory, 'work');
   const ranLog = join(directory, 'ran.log');
 
-  // no auto maintenance in either repository: a commit's or a push's detached repack could still
-  // write into it while the test's cleanup removes it
-  await $`git init --quiet --bare --template= --initial-branch=main ${upstream} && git clone --quiet --template= ${upstream} ${repo}`
-    .env(env)
-    .quiet();
-
-  await $`git config maintenance.auto false`.env(env).cwd(upstream).quiet();
+  // the kit's origin turns off auto maintenance, and so does the clone: a commit's or a push's
+  // detached repack could still write into it while the test's cleanup removes it
+  await $`git clone --quiet --template= ${upstream} ${repo}`.env(env).quiet();
 
   await $`git config user.name cloud && git config user.email cloud@example.com && git config commit.gpgsign false && git config tag.gpgsign false && git config maintenance.auto false`
     .env(env)
