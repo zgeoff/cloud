@@ -43,7 +43,7 @@ host_imp() { ssh root@geoffcloud podman exec -i imp-host impz "$@"; }
    ssh root@geoffcloud 'install -d -m 0700 /var/lib/tank-cloud/host-secrets/preview && podman exec imp-host impz token new preview --scope manage --imps "pv-*" --grantable gh,preview-model | (umask 077 && cat > /var/lib/tank-cloud/host-secrets/preview/imp-token) && test -s /var/lib/tank-cloud/host-secrets/preview/imp-token && echo ok' < /dev/null
    ```
 
-   Expect `ok`. A token minted before the contract run grants `gh` alone. Point it at both secrets
+   Expect `ok`. A token minted before the contract run grants `gh` alone. Let it grant both secrets
    with `host_imp token set preview --grantable gh,preview-model < /dev/null`.
 
 4. Make the webhook secret, store it in the 1Password item `preview-webhook-secret` of the `cloud`
@@ -93,7 +93,7 @@ host_imp() { ssh root@geoffcloud podman exec -i imp-host impz "$@"; }
    ```
 
    Expect `ok` twice. The service refuses to start on a key file that is not a PEM private key, and
-   its journal says `the credential github-app-key is not a PEM private key`.
+   logs `the credential github-app-key is not a PEM private key`.
 
 7. Switch the host from a clean checkout of `main` that a green `NixOS checks` run covers:
    `bash scripts/switch-geoffcloud.sh`, which `bun run ops:switch-host` wraps. Then start the unit,
@@ -158,13 +158,13 @@ closes. Raise `limitDollars` and switch the host to let it go on; the count keep
 
 ## Opt a repository in
 
-A repository opts in with a `preview/` folder and an install of the preview GitHub App. The host's
-`services.preview.repos` lists every repository of the owner, and the App installs only on the
-owner's account, so the install is the only switch. Install the App from its public page, under
-Install App, and add the repository to the installation's repository list. A private repository
-needs a place in the `gh` token's repository list too, so that each preview imp can clone it. The
-folder holds one Compose file, whose services start the app, seed it with invented data, and publish
-the app's HTTP port on the guest:
+To opt a repository in, add a `preview/` folder to it and install the preview GitHub App on it. The
+host's `services.preview.repos` lists every repository of the owner, and the App installs only on
+the owner's account, so the install is the only switch. Install the App from its public page, under
+Install App, and add the repository to the installation's repository list. Add a private repository
+to the `gh` token's repository list too, so that each preview imp can clone it. Put one Compose file
+in the folder, whose services start the app, seed it with invented data, and publish the app's HTTP
+port on the guest:
 
 ```yaml
 x-preview:
@@ -198,16 +198,16 @@ services:
       - '8080:8080'
 ```
 
-The seed loads data written for the preview, never a copy of production data. Each boot starts the
-stack on empty volumes, so the seed runs once per build. A preview of a push builds the new commit's
+Seed only data written for the preview, never a copy of production data. Each boot starts the stack
+on empty volumes, so the seed runs once per build. A preview of a push builds the new commit's
 `preview/compose.yaml`, so a pull request can change its own preview.
 
 ## Run the SDK contract suite on a pull request
 
 The preview service runs a repository's SDK contract suite on each pull request that changes the
-version of `@anthropic-ai/claude-agent-sdk` in its `package.json` or `bun.lock`. The repository
-takes part once the host's `services.preview.contractRepos` lists it and the preview GitHub App is
-installed on it. The service starts an imp for each run, and the imp runs
+version of `@anthropic-ai/claude-agent-sdk` in its `package.json` or `bun.lock`. To have a
+repository take part, list it in the host's `services.preview.contractRepos` and install the preview
+GitHub App on it. The service starts an imp for each run, and the imp runs
 `NIXIE_SDK_CONTRACT=1 bun test evals/sdk-contract` at the pull request's head commit, so the
 repository needs that folder and a `bun.lock`.
 [The SDK contract run](../architecture/workloads/preview.md#the-sdk-contract-run) describes each
@@ -265,8 +265,8 @@ service aims to run at once. The service never puts a run's imp to sleep, so a p
 during a run starts beside it, past that number. A waiting run's status reads
 `Waiting for a free preview slot`, and the service tries the run again each minute. On each try, the
 service puts to sleep a preview that nobody used for `services.preview.contractIdleMinutes`, and
-starts the run in its slot. [Slots and sleep](../architecture/workloads/preview.md#slots-and-sleep)
-defines a preview's use.
+starts the run in its slot. For what counts as a preview's use, see
+[Slots and sleep](../architecture/workloads/preview.md#slots-and-sleep).
 
 The service's journal holds the tail of each run's output, and the line
 `asleep to free a slot for the SDK contract run` for each preview that a run put to sleep. Read it
@@ -360,13 +360,13 @@ change:
 ssh root@geoffcloud journalctl -u preview -n 50 --no-pager
 ```
 
-A journal line that ends `/installation: HTTP 404: Not Found` names a repository that the App is not
-installed on, such as one removed from the installation's repository list while a preview of it ran.
-Add the repository to the installation again before you close its pull requests. GitHub sends no
-delivery for a repository the App is not installed on, so a close without the installation never
-reaches the service, and the preview's record and imp stay. To retire such a repository, restore the
-installation, close or merge its open pull requests, and only then remove the repository from the
-installation.
+A journal line that ends `/installation: HTTP 404: Not Found` comes from a repository that the App
+is not installed on, such as one removed from the installation's repository list while a preview of
+it ran. Add the repository to the installation again before you close its pull requests. GitHub
+sends no delivery for a repository the App is not installed on, so a close without the installation
+never reaches the service, and the preview's record and imp stay. To retire such a repository,
+restore the installation, close or merge its open pull requests, and only then remove the repository
+from the installation.
 
 A boot that fails on `PRECONDITION_FAILED` ran without the broker: check step 1 and the token's
 grantable secret. A boot that times out reached `docker compose up` but never got an answer on the
@@ -374,7 +374,7 @@ health path: run
 `host_imp exec pv-<hash>-<number> -- docker compose -f /srv/preview/preview/compose.yaml ps` to see
 which service stopped.
 
-A boot whose failure says the port did not answer through impd's proxy built and started its stack,
+A boot that fails because the port did not answer through impd's proxy built and started its stack,
 but nothing listens on the imp's own address. The failure quotes the proxy's last answer, such as
 `502 Nothing answers in the imp`. Publish the port on every address of the guest (`'8080:8080'`,
 never `'127.0.0.1:8080:8080'`), and make the app listen on `0.0.0.0` inside its container.
