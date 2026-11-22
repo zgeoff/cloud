@@ -1,5 +1,8 @@
 # nixie
 
+Use this runbook to deploy, upgrade, check and restore nixie, and to manage its secrets, impd token
+and sandbox images. Any operator of geoff.cloud uses it.
+
 nixie runs in k3s from the stack config `nixie` and the files in `deploy/nixie/`, and answers at
 `https://nixie.geoff.cloud` on the tailnet. [nixie](../architecture/workloads/nixie.md) explains the
 pods, the secrets and the route. Run the Pulumi steps from a clean checkout of `main`, as
