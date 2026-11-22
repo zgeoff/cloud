@@ -9,9 +9,10 @@ directory. When the key fails to load, the host still boots to SSH, and k3s, imp
 daemon stay stopped, so none of them starts on an empty mount point on `vda`.
 
 The NixOS module `nixos/modules/tank-cloud.nix` does the unlock and the mounts. It never creates the
-datasets: you create them once with the commands below, before the first switch to a config that
-enables it. The `tank-cloud-unlock` check boots a VM through those commands, a reboot, a reboot
-without the key and a restored key.
+datasets. geoffcloud's config already enables it, so you create them with the commands below only on
+a pool that lacks them, such as a new `vdb` after [Lose `vdb`](./lost-disk.md#lose-vdb). The
+`tank-cloud-unlock` check boots a VM through those commands, a reboot, a reboot without the key and
+a restored key.
 
 The secret files of imp-host and the atc daemon and impd's database copies keep their paths and live
 on these datasets: the module bind-mounts the directories `imp-host` and `atc-daemon` of
@@ -35,8 +36,9 @@ without it and a restored key.
 
 ## Create the datasets
 
-**CAUTION:** A switch to a config that enables `services.tank-cloud` while `tank/cloud` does not
-exist leaves k3s, imp-host and the atc daemon stopped. Create the datasets before that switch.
+**CAUTION:** While `tank/cloud` does not exist, k3s, imp-host and the atc daemon stay stopped,
+because geoffcloud's config enables `services.tank-cloud`. Create the datasets before you start the
+new cluster.
 
 Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 

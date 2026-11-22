@@ -156,9 +156,11 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    ```
 
    Expect `tank/cloud/host-secrets[/imp-host] zfs`, then `removed`. Without `removed`, the block
-   stopped at the failed step, and the staged copies stay on the root disk. Run
-   `bash scripts/install-imp-dns-token.sh` from this machine to restore the DNS token, which the
-   reinstall does not stage. The script refuses to write while the bind is not mounted.
+   stopped at the failed step, and the staged copies stay on the root disk.
+
+   Then, on every reinstall, run `bash scripts/install-imp-dns-token.sh` from this machine to
+   restore the DNS token, which the reinstall does not stage. The script refuses to write while the
+   bind is not mounted.
 
 9. Remove the stale Ubuntu-era Tailscale nodes in the admin console.
 
@@ -166,8 +168,11 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 
 The stack config `cluster` says whether Pulumi manages k3s. With `none`, the program leaves every
 k3s workload out. With `managed` (the `prod` setting), a run without `K3S_KUBECONFIG` fails before
-any resource registers. Keep `cluster: none` until step 1 has stored the kubeconfig, then set
-`pulumi config set cluster managed`.
+any resource registers. `.env` already refers to the stored kubeconfig, and the cluster's
+certificate authority lives on the `rancher` zvol on `vdb`, so the stored copy still opens the
+cluster after a reinstall. Never set `cluster` to `none` on `prod`: with `none`, the program plans
+to delete every cluster resource. Run step 1 when the stored kubeconfig no longer opens the cluster,
+such as after a new cluster.
 
 1. Run `bash scripts/connect-k3s.sh`. It stores the kubeconfig as the document
    `op://cloud/k3s-kubeconfig/kubeconfig.yaml`, with the server set to `https://geoffcloud:6443`,

@@ -7,7 +7,7 @@ resources. It reads a root-only credentials file on the host, whose values come 
 vault `cloud`, and no GitHub workflow reads that vault.
 [Infrastructure as code](../architecture/infrastructure-as-code.md#state-and-drift) describes what
 the check covers and why it runs on the host. This runbook sets the check up, runs it by hand, reads
-a run, and answers drift.
+a run, answers drift and rotates the check's credentials.
 
 ## What holds what
 
@@ -145,8 +145,8 @@ The refresh's plan in the log shows each resource that differs. A run ends in on
 
 ## Answer drift
 
-1. Find what changed. From a clean checkout of `main`, run the check by hand with the `cloud` vault,
-   which also reads the resources the scheduled check leaves out:
+1. Find what changed. From a clean checkout of `main` on your own machine, run the full drift check
+   with the `cloud` vault, which also reads the resources the scheduled check leaves out:
 
    ```bash
    bun run drift
@@ -160,8 +160,8 @@ The refresh's plan in the log shows each resource that differs. A run ends in on
    dispatch it, as [Answer a held run](./prod-apply.md#answer-a-held-run) describes. Its apply
    refreshes first, so it writes the live value into the state. Until then, every scheduled check
    reports the same drift.
-4. Run the check by hand again, as [Run the check by hand](#run-the-check-by-hand) describes, and
-   expect it to pass.
+4. Run the scheduled check by hand again on the host, as
+   [Run the check by hand](#run-the-check-by-hand) describes, and expect it to pass.
 
 A drift that the prod apply job finds first holds its run, as
 [the prod apply job](./prod-apply.md#answer-a-held-run) describes.
