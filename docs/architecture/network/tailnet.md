@@ -33,20 +33,16 @@ sees the cluster as a whole as `tag:cloud`, and only the cluster's own egress po
 pod uses a grant ([which pod uses each grant](#which-pod-uses-each-grant)). The grants for
 `tag:cloud` are single ports to single hosts: the PC's daemon port, and impd's HTTPS port, which the
 policy names as the health probe's grant. Each grant names its destination by a host alias for one
-node rather than by a tag, so a later node with the same tag gains nothing. The table under
-[which pod uses each grant](#which-pod-uses-each-grant) lists every pod that uses each grant.
+node rather than by a tag, so a later node with the same tag gains nothing.
 
 nixie's pod calls impd's API over the same route, so `tag:cloud` holds a second grant to impd's node
 for HTTPS, named in the policy as nixie's route to impd
 ([nixie](../workloads/nixie.md#reaching-impd)). It matches the probe's grant exactly and gives the
 cluster nothing beyond it. Tailscale takes the union of the grants that match a connection, so the
-route stays open while either grant stands: a change to the probe's grant leaves nixie's route open,
-and removing nixie's grant cuts nixie off from impd once the probe's grant no longer covers the
-route.
+route stays open while either grant stands.
 
 Members hold a second grant, to the host's HTTPS port for nixie, beside the grant that lets them
-reach every device. The policy lists nixie's route in its own grant, so the route stays open if the
-wider grant narrows.
+reach every device. nixie's route has its own grant, so it stays open if the wider grant narrows.
 
 Over the tailnet, the host's k3s API is open to two sources only: the PC, where the owner runs
 Pulumi's preview, apply and drift check, and the prod apply job's runner. A cluster credential that
@@ -57,21 +53,21 @@ every node except the host. The host is the only `tag:cloud` node, so that grant
 devices and the other tags. The owner runs kubectl by hand on the host over Tailscale SSH, which
 needs no grant to the API port.
 
-impd's nodes reach each other's API only, which is what lets impd move an imp between hosts and
-nothing more. imp's end-to-end suites run on tailnets that hold no production service, so the policy
-holds no tag and no grant for a test node, and a test run never reaches a live impd
+impd's nodes reach only each other's API, which impd needs to move an imp between hosts. imp's
+end-to-end suites run on tailnets that hold no production service, so the policy holds no tag and no
+grant for a test node, and a test run never reaches a live impd
 ([imp's e2e nodes](../../runbooks/imp-e2e-tailnet.md)).
 
 The prod apply job's runner joins for one run as `tag:cloud-deploy`, through a federated identity
 that GitHub's token for the job proves, so no key for it is stored anywhere. The runner holds
-full-account cloud credentials for the run, so its grants reach two ports on the host: the k3s API,
-which Pulumi drives the cluster through, and Grafana's NodePort, which Pulumi's Grafana provider
-reads Grafana's service accounts through. No SSH rule lists it as a destination
+full-account cloud credentials for the run, so its grants are kept to two ports on the host: the k3s
+API, which Pulumi drives the cluster through, and Grafana's NodePort, which Pulumi's Grafana
+provider reads Grafana's service accounts through. No SSH rule lists it as a destination
 ([infrastructure as code](../infrastructure-as-code.md#the-apply-job)).
 
 Each tag owns itself as well as being owned by the tailnet's admins, because Tailscale lets an OAuth
-client mint keys only for tags its own tags own. Pulumi's client carries `tag:cloud` and `tag:imp`,
-and mints the host's and impd's auth keys with it.
+client mint keys only for tags its own tags own. Pulumi's OAuth client carries `tag:cloud` and
+`tag:imp`, and Pulumi mints the host's and impd's auth keys with it.
 
 ## Which pod uses each grant
 
@@ -96,7 +92,7 @@ the host's own addresses, so no NetworkPolicy applies to it.
 
 kube-router, the policy engine inside k3s, filters a pod's packets before the host masquerades them
 to its own address, so a policy sees which pod sent each packet on the tailnet and on the host's own
-ports alike. The policies narrow which pod uses a grant, and they are no identity: each daemon's
+ports alike. The policies only narrow which pod uses a grant, and prove no identity: each daemon's
 bearer token and impd's token still check every call. The tokens alone guard the moment after a pod
 starts, before kube-router writes the pod's rules. The NixOS check `network-policy` runs the
 policies on k3s in a VM and dials each destination from an allowed pod and from a pod beside it.
@@ -110,11 +106,11 @@ host's sshd runs with keys only, and both the host's own firewall and the cloud 
 port off the internet ([firewalls](./firewalls.md)).
 
 Tailscale SSH logs each session's full remote command line in the host's journal, and Alloy ships
-the journal to Loki, so a secret never travels in an SSH command line ([secrets](../secrets.md)).
+the journal to Loki, so never put a secret in an SSH command line ([secrets](../secrets.md)).
 
 ## Names
 
-MagicDNS names every node, so the host is `geoffcloud` on the tailnet, and impd's node is
+MagicDNS names every node: the host is `geoffcloud` on the tailnet, and impd's node is
 `imp-geoffcloud`. impd's HTTPS names under `imps.geoff.cloud` are public DNS records that point at
 that node's tailnet address, so they resolve anywhere and answer only on the tailnet
 ([imp on the host](../host/imp.md#dns-and-certificates)). nixie's name, `nixie.geoff.cloud`, follows
