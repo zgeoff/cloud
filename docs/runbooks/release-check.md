@@ -1,16 +1,16 @@
 # Release check
 
 The `release check` workflow finds new atc, imp, nixie, pepys, boxxy CLI, auto-mode and noslop
-releases and opens one bump pull request per dependency, so the release repositories know nothing
-about cloud. It runs on a schedule and on dispatch. Its check job compares each dependency's newest
-release with the pins on `main`, and its bump job runs only when a pin is older. The
+releases and opens one bump pull request per dependency, so nothing in the release repositories
+refers to cloud. It runs on a schedule and on dispatch. Its check job compares each dependency's
+newest release with the pins on `main`, and its bump job runs only when a pin is older. The
 `release bump merge` workflow then merges a bump that may merge on its own once its checks pass. A
 merged nixie bump changes the stack config, so the `Deploy prod` workflow applies it to prod with no
 person involved, unless its guard holds the plan ([the prod apply job](./prod-apply.md)). The same
 holds for the later pull request that pins the atc-gateway images an atc bump publishes
 ([The atc-gateway images](#the-atc-gateway-images)), unless it moves only the backup image's tag. A
-host switch and an agent image rebuild stay with a person, and each pull request's body lists the
-steps its merge leaves. An atc major release reaches the host's atc daemon only after the atc
+person does the host switch and the agent image rebuild, and each pull request's body lists the
+steps left after its merge. An atc major release reaches the host's atc daemon only after the atc
 gateway runs that major, because the host switch refuses a skew
 ([Switch the host](./workflows.md#switch-the-host)). An atc release reaches a daemon's `cloud`
 target only in the order that [the agent image runbook](./agent-image.md#roll-out-an-atc-release)
@@ -37,10 +37,10 @@ The noslop pin holds only a version: the bump waits until npm lists the release,
 writes holds each package's integrity hash. Before it writes anything, it checks every pin line of
 the dependency, so a pin at the release with another sum fails the bump and changes no file. The
 bump never moves a pin back to an older release. The check finds a dependency's newest release among
-the newest 30 releases of its repository. The boxxy CLI record reads 300, because boxxy publishes
-other packages' releases beside the CLI's.
+the newest 30 releases of its repository. The boxxy CLI record raises that to 300, because boxxy
+publishes other packages' releases beside the CLI's.
 
-A restore Job names the backup image of its workload, so a bump that moves `backupImage` in the
+Each restore Job holds the backup image of its workload, so a bump that moves `backupImage` in the
 stack config also runs `infra/cluster/write-restore-jobs.ts` on the checkout and commits the restore
 Jobs it writes. CI's restore Job check fails a bump without them. The writer needs the repo's
 dependencies, so each workflow that bumps a backup image runs `bun install` first. When a lock
@@ -69,11 +69,11 @@ that, and the next run rebuilds its branch.
 
 CI's image pin check (`bun run check:image-pins`) covers the pins a person edits too. A release tag
 of an image this repo publishes is never replaced, so the check fails a pull request whose release
-tag names another digest at the registry. An upstream tag, such as Distroless's `nonroot`, moves
-when its publisher rebuilds the image, so for an upstream pin the check asks only that the registry
-still serves the pinned digest. The atc-gateway packages on GHCR are private, so the check reads
-them with a GitHub token that can read packages: CI hands it the workflow's token, and on a PC it
-takes the token that `gh auth token` prints, which needs the `read:packages` scope
+tag resolves to another digest at the registry. An upstream tag, such as Distroless's `nonroot`,
+moves when its publisher rebuilds the image, so an upstream pin passes the check as long as the
+registry still serves the pinned digest. The atc-gateway packages on GHCR are private, so the check
+reads them with a GitHub token that can read packages: CI hands it the workflow's token, and on a PC
+it takes the token that `gh auth token` prints, which needs the `read:packages` scope
 (`gh auth refresh -s read:packages`).
 
 ## The atc-gateway images
@@ -121,8 +121,8 @@ it `needs-review` when any of these holds:
   only, so a revert does not undo them.
 
 A nixie bump that changes nixie's sandbox images gets the label `sandbox-images-changed`, which
-never holds the merge: nixie adds its own images to impd at start. The label tells delivery to pin
-the new images once the release reports ready, as
+never holds the merge: nixie adds its own images to impd at start. Delivery takes the label as its
+cue to pin the new images once the release reports ready, as
 [Pin nixie's sandbox images](./nixie.md#pin-nixies-sandbox-images) describes.
 
 The merge workflow runs each time CI or the NixOS checks finish on a `release-check/` branch, and
@@ -159,9 +159,9 @@ deleting its branch.
 
 ## Add a dependency
 
-1. Add a record to the release registry. Its source kind decides how the bump reads a release. Each
-   pin line's pattern captures each part of the line in a named group, so the bump reads a version
-   and writes a sum or a digest with no code of the dependency's own.
+1. Add a record to the release registry. The bump reads a release by the record's source kind. Give
+   each pin line a pattern that captures each part of the line in a named group, so the bump reads a
+   version and writes a sum or a digest with no code of the dependency's own.
 2. Run `bun scripts/release/check-release-pins.ts --write`, which adds the new pins to the pin
    table.
 3. Run `bun run test`. The registry's tests fail when a pattern matches no line, or more than one,
