@@ -1,9 +1,10 @@
 # Observe geoff.cloud
 
-Grafana, Loki, Prometheus and Alertmanager run in the cluster's `observability` namespace. You reach
-Grafana from the tailnet, and Prometheus and Alertmanager through an SSH port forward. Alertmanager
-sends alerts to Discord when the stack config turns Discord alerts on. The external health check
-runs as a Cloudflare Worker outside the cluster.
+Use this runbook to look at the estate's state, during an incident, after an alert or on a routine
+check. Grafana, Loki, Prometheus and Alertmanager run in the cluster's `observability` namespace.
+You reach Grafana from the tailnet, and Prometheus and Alertmanager through an SSH port forward.
+Alertmanager sends alerts to Discord when the stack config turns Discord alerts on. The external
+health check runs as a Cloudflare Worker outside the cluster.
 [The observability architecture](../architecture/workloads/observability.md) describes how the parts
 fit together.
 
@@ -60,8 +61,10 @@ dashboard, under Workers.
 
 ## Turn Discord alerts on or off
 
-Discord alerts are on in `prod`. Changing the flag, or sending a test alert, needs the owner's
-approval first.
+Turn the `prod` stack's alerts on, or off to stop every message. Changing the flag, or sending a
+test alert, needs the owner's approval first, because each alert reaches the owner's Discord. `.env`
+maps `ALERT_WEBHOOK_URL` and `ALERT_MENTION_USER_ID` to their 1Password items, so each `op run`
+below fills them.
 
 1. Set the flag and land the change through a PR:
 

@@ -1,8 +1,9 @@
 # 1Password Connect for imps
 
 A Connect server in k3s lets a granted imp read vault items with `op read`, through imp's credential
-broker. It has no public route.
-[1Password Connect](../architecture/workloads/onepassword-connect.md) explains the path.
+broker. It has no public route. Use this runbook to set the path up, rotate its secrets, or find why
+an imp's `op read` fails. [1Password Connect](../architecture/workloads/onepassword-connect.md)
+explains the path.
 
 ## The path
 
@@ -13,17 +14,18 @@ ClusterIP, `10.43.82.198:8000`, whose target is Connect's API on 8080.
 
 ## What holds what
 
-| Where                                                 | Holds                                                      |
-| ----------------------------------------------------- | ---------------------------------------------------------- |
-| vault `cloud`, item `onepassword-connect-credentials` | the Connect server `imp-connect`'s credentials file (JSON) |
-| vault `cloud`, item `onepassword-connect-token`       | the read-only Connect token `imp-agents-ro` (vault `imp`)  |
-| vault `imp`                                           | the items imps read; granted to the Connect server only    |
-| the Connect Secret in k3s                             | the credentials file, set by Pulumi from `.env`            |
-| impd, static secret `op-connect`                      | the token, with `op-connect.imp.internal` as its only host |
+| Where                                                 | Holds                                                                           |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------- |
+| vault `cloud`, item `onepassword-connect-credentials` | the Connect server `imp-connect`'s credentials file (JSON)                      |
+| vault `cloud`, item `onepassword-connect-token`       | the read-only Connect token `imp-agents-ro` (vault `imp`)                       |
+| vault `imp`                                           | the items imps read; only `imp-connect` and its token reach it                  |
+| the Connect Secret in k3s                             | the credentials file, which Pulumi reads through `.env`'s reference to the item |
+| impd, static secret `op-connect`                      | the token, with `op-connect.imp.internal` as its only host                      |
 
 ## Add the token to impd
 
-Send the token on stdin. Never put it on a command line.
+Send the token on stdin. Never put it on a command line, because the host's journal records each SSH
+session's command line and ships it to Loki ([secrets](../architecture/secrets.md)).
 
 ```sh
 op read op://cloud/onepassword-connect-token/credential \
@@ -91,4 +93,4 @@ Run these on the host (`ssh root@geoffcloud`). None of them takes a secret.
 | ------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 502 from the broker | the relay or Connect is down                              | on the host: `systemctl status onepassword-connect-relay.socket`; check the Service's ClusterIP is still `10.43.82.198`; `k3s kubectl -n onepassword get pods` |
 | 403 from Connect    | a write: the token is read-only                           | none: writes are out of scope                                                                                                                                  |
-| 401 from Connect    | the token is missing a grant on the vault, or it is wrong | grant the Connect server and token the `imp` vault; re-add the token                                                                                           |
+| 401 from Connect    | the token is missing a grant on the vault, or it is wrong | in 1Password, give `imp-connect` and its token access to the `imp` vault; re-add the token                                                                     |

@@ -99,12 +99,14 @@ signature of every GitHub delivery.
 The telemetry routes are `private`, so the tunnel never forwards them. The telemetry relay on the
 node and the boxxy server's pod reach them, and nixie's Traefik reaches `/forwarded/v1/logs` while
 [the forwarders' route](#the-forwarders-tailnet-route) is on. Ingest refuses a telemetry export
-without a proven sender. The trust documents of the sender proof are the JSON files in
-`deploy/pepys/imp-issuers/`, which a ConfigMap mounts at `PEPYS_IMP_IDENTITY_ISSUERS`, and the
-audience is the stack config's `pepys.impIdentityAudience`, `pepys.imp.internal`. The folder holds
-`geoffcloud.json`, the public key of the issuer `geoffcloud`, so ingest accepts an export whose
-identity token that issuer signed for that audience, and refuses every other export. An invalid
-document stops ingest at start.
+without a proven sender. On the session route, the trust documents of the sender proof are the JSON
+files in `deploy/pepys/imp-issuers/`, which a ConfigMap mounts at `PEPYS_IMP_IDENTITY_ISSUERS`, and
+the audience is the stack config's `pepys.impIdentityAudience`, `pepys.imp.internal`. The folder
+holds `geoffcloud.json`, the public key of the issuer `geoffcloud`, so ingest accepts an export
+whose identity token that issuer signed for that audience, and refuses every other export on that
+route. The forwarders' route has trust documents of its own, as
+[the forwarders' tailnet route](#the-forwarders-tailnet-route) says. An invalid document stops
+ingest at start.
 
 The boxxy route, `/boxxy/facts`, is `private`. It takes a batch of facts whose body the sender
 signed with `PEPYS_BOXXY_SIGNING_SECRET`, and ingest answers 401 to a batch with no signature or a

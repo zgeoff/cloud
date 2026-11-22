@@ -175,11 +175,11 @@ no model call.
 Only the broker reaches the listener. imp-host masquerades each guest's traffic to its own address
 on the bridge, so neither the host's firewall nor the listener can tell a guest from the broker.
 impd's `public` egress policy, which every imp of the service runs under, refuses the guest every
-private address, the bridge included. An imp keeps the policy it was created with, so the service
-sets it on every imp at each start, and tries again until every imp has it. The listener opens only
-after that, so no guest outside the policy finds it open. The service also sets the policy on an
-existing imp before a boot or an open wakes it. The broker dials from imp-host itself, outside that
-policy, so the guest's model calls still go out through the broker.
+private address, the bridge included. impd never moves an imp to a new policy by itself, so the
+service sets it on every imp at each start, and tries again until every imp has it. The listener
+opens only after that, so no guest outside the policy finds it open. The service also sets the
+policy on an existing imp before a boot or an open wakes it. The broker dials from imp-host itself,
+outside that policy, so the guest's model calls still go out through the broker.
 
 Each proxy counts in a file of its own in the service's state, and the count lasts for the pull
 request's life. A proxy with no reply under way that went unused for the sleep time stops and keeps
@@ -195,16 +195,18 @@ Each preview imp and each contract run's imp boots elastic, at a boot size that 
 pressure, both from the host module's settings. An elastic imp runs on base pages, so it stays off
 the host's huge page pool.
 
-The service runs at most a set number of previews at once, one by default, because each preview's
-imp holds memory from impd's budget while it runs. Before a preview boots or wakes, the service
-lists the running preview imps and puts the least recently used to sleep until the opening one fits.
-A sleeping imp keeps its memory on disk, so its next open resumes it where it stopped. A sweep on a
-timer puts every preview to sleep that nobody used for the idle timeout. A preview's last use is the
-last request through impd's wake proxy, which impd returns as `lastRequestAt` and keeps current
-while a proxied stream or WebSocket stays open. impd's `lastActiveAt` also moves while a preview's
-own stack holds connections and CPU in the guest, so it stays current while nobody uses the preview.
-The service reads `lastActiveAt` only for an imp with no `lastRequestAt`. An impd before 6.4.0
-returns no `lastRequestAt`, and on a newer impd the boot's health probe through the proxy sets it.
+The service runs at most a set number of imps at once, one by default, and a contract run's imp
+takes a slot as a preview's does, because each imp holds memory from impd's budget while it runs.
+Before a preview boots or wakes, the service lists its running imps and puts the least recently used
+previews to sleep until the opening one fits. A sleeping imp keeps its memory on disk, so its next
+open resumes it where it stopped, unless the wake falls back to a cold boot as "The link opens"
+above says. A sweep on a timer puts every preview to sleep that nobody used for the idle timeout. A
+preview's last use is the last request through impd's wake proxy, which impd returns as
+`lastRequestAt` and keeps current while a proxied stream or WebSocket stays open. impd's
+`lastActiveAt` also moves while a preview's own stack holds connections and CPU in the guest, so it
+stays current while nobody uses the preview. The service reads `lastActiveAt` only for an imp with
+no `lastRequestAt`. An impd before 6.4.0 returns no `lastRequestAt`, and on a newer impd the boot's
+health probe through the proxy sets it.
 
 The slot rule runs under one lock, so two opens at once never both find a free slot. A boot holds
 the lock until it settles, because its build's guest commands would wake an imp that another open

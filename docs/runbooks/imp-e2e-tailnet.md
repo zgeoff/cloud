@@ -11,6 +11,9 @@ and the dev instance stays off the production tailnet.
 
 ## Check the production tailnet
 
+Run this check after a change to the tailnet policy, and whenever an unknown node shows up on the
+production tailnet.
+
 1. Run the policy's tests from a clean checkout of `main`:
 
    ```bash

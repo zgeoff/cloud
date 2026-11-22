@@ -4,7 +4,8 @@ The values that geoff.cloud's host, Pulumi program, scripts and image builds sha
 `constants.json`: the VM's ID and public addresses, the tailnet's range, tags and node addresses,
 k3s's ranges and ports, Podman's bridge that imp-host runs on, and the ports and addresses of atc,
 impd and 1Password Connect. Each value has one written source, so a change to one is a change to
-this file, and every reader picks it up from the same commit.
+this file, and every reader that can read the file picks it up from the same commit. The few copies
+that cannot read it are listed below, with the check that holds them to the file.
 
 ## Readers
 

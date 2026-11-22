@@ -21,7 +21,8 @@ cloud resources and the cluster, and a NixOS flake manages the host.
 
 ## Quick start
 
-Set up the tools and secrets that the development setup lists, then run:
+Read this to work on the repo: set up a machine, preview the live stack and run the checks. Set up
+the tools and secrets that [the development setup](docs/runbooks/development.md) lists, then run:
 
 ```bash
 bun install
