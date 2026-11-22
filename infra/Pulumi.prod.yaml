@@ -53,7 +53,7 @@ config:
     serviceClientDigests:
       wringer-ro: bd9b7496b91be8979ea3f37cb5cdf55b3a35bc22b154846f671bb4e31cea3689
   geoff-cloud:boxxy:
-    image: ghcr.io/zgeoff/cloud-boxxy:051585d92a6f3836028a0fbbdffcd160c15c8cc8@sha256:47b496099d789d1344d31d8a6137cf774058df0282775b2202b5120776383d71
+    image: ghcr.io/zgeoff/cloud-boxxy:34836adade2b50dead09291b8d2126c424d07b67@sha256:81b8be87fd2c46847572c77b3df329cc44d88003185d5e7c9306f5b8deead443
     runner: geoffcloud
     atc:
       trustedFolders: {}
