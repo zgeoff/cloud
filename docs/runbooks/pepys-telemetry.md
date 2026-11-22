@@ -1,14 +1,14 @@
 # pepys: telemetry from sessions
 
 Let Claude and Codex sessions in imps send their OpenTelemetry logs to the ingest of
-[pepys](../architecture/workloads/pepys.md), and rotate the token that ingest accepts.
-[Let sessions send telemetry](#let-sessions-send-telemetry) follows
-[the first deploy of pepys](./pepys.md#deploy-the-first-time), and runs once.
-[Rotate the token](#rotate-the-token) replaces the token. [Add a forwarder](#add-a-forwarder) lets a
-machine outside impz, such as the owner's PC, send its logs through
+[pepys](../architecture/workloads/pepys.md), and rotate the token that ingest accepts. Run
+[Let sessions send telemetry](#let-sessions-send-telemetry) once, after
+[the first deploy of pepys](./pepys.md#deploy-the-first-time). Run
+[Rotate the token](#rotate-the-token) to replace the token. Run [Add a forwarder](#add-a-forwarder)
+to let a machine outside impz, such as the owner's PC, send its logs through
 [the forwarders' tailnet route](../architecture/workloads/pepys.md#the-forwarders-tailnet-route),
-and [Rotate or remove a forwarder's key](#rotate-or-remove-a-forwarders-key) changes what ingest
-trusts.
+and [Rotate or remove a forwarder's key](#rotate-or-remove-a-forwarders-key) to change which keys
+ingest trusts.
 
 ## The path and what holds the token
 
@@ -17,9 +17,8 @@ A Claude or Codex session in an [imp](../architecture/host/imp.md) sends its Ope
 the Podman container `imp-host` on the machine `geoffcloud`. The broker adds the bearer token and an
 [imp identity token](../architecture/host/imp.md#how-impd-is-reached) to each request, and forwards
 the request to the pepys relay, which listens on `geoffcloud`'s address on Podman's bridge. The
-relay dials the ingest Service. The session holds neither token.
-[The telemetry path from a session](../architecture/workloads/pepys.md#the-telemetry-path-from-a-session)
-explains each hop.
+relay dials the ingest Service. The session holds neither token. For each hop, read
+[The telemetry path from a session](../architecture/workloads/pepys.md#the-telemetry-path-from-a-session).
 
 | Where                                           | Holds                                                                           |
 | ----------------------------------------------- | ------------------------------------------------------------------------------- |
@@ -27,8 +26,8 @@ explains each hop.
 | impd, static secret `pepys-telemetry`           | the same token, which the broker adds only to requests for `pepys.imp.internal` |
 | the atc daemon's `pepys-telemetry` auth profile | the secret's name                                                               |
 
-The secret tells the broker to add the identity token as well. The auth profile holds
-`telemetry.logs`, so atc points the log export of each session that selects the profile at
+Because the secret has `--identity`, the broker adds the identity token as well. The auth profile
+holds `telemetry.logs`, so atc points the log export of each session that selects the profile at
 `https://pepys.imp.internal`: Claude Code through four OpenTelemetry variables, and Codex through
 the `[otel]` section of its `config.toml`. `geoffcloud`'s NixOS configuration defines the profile
 and gives it to each agent, so no step here creates it. No agent entry or profile in that
@@ -51,10 +50,10 @@ and its auth profiles.
 
 2. Check that `impIdentityAudience` in the `geoff-cloud:pepys` object of `infra/Pulumi.prod.yaml` is
    `pepys.imp.internal`, as [the first deploy](./pepys.md#deploy-the-first-time) sets it.
-3. Check that impd signs identity tokens. In `imp-host`, `impz info --json` shows `secretIdentity`
-   as true under `features`, and `impz identity jwks` prints the document that
-   `deploy/pepys/imp-issuers/geoffcloud.json` holds.
-4. Check the command's `--upstream` value before you run the command. Its address is
+3. Check that impd signs identity tokens. In `imp-host`, expect `impz info --json` to show
+   `secretIdentity` as true under `features`, and `impz identity jwks` to print the document in
+   `deploy/pepys/imp-issuers/geoffcloud.json`.
+4. Check the `--upstream` value in the command of step 5 before you run it. Its address is
    `podman.bridgeAddress` in [`constants.json`](../../packages/topology/constants.json), and its
    port is the port of the `pepys-ingest-relay` entry in
    [the exposure registry](../architecture/network/firewalls.md#the-exposure-registry). When a value
@@ -154,8 +153,9 @@ and its auth profiles.
 
 ### When the query returns an empty list
 
-The API answers `{"json":[]}` when no stored row matches all three values, so the session may still
-have sent telemetry. Check these, in order, and run the query again after each fix:
+The API answers `{"json":[]}` when no stored row matches all three values. A wrong value gets the
+same answer as a session that sent nothing. Check these, in order, and run the query again after
+each fix:
 
 1. Check the `session` value. It must be the whole entity ID, `telemetry:session:<session_id>`. The
    API answers `{"json":[]}` for the bare session ID.
@@ -183,8 +183,8 @@ have sent telemetry. Check these, in order, and run the query again after each f
    - When `(identity)` is missing, the broker adds no identity token, and ingest answers 401 to each
      export and logs nothing. Add the secret again as step 5 of
      [Let sessions send telemetry](#let-sessions-send-telemetry) says for a change to `--identity`.
-     That step drops each imp's grant of the secret, so set the grantable list again as step 6 does,
-     then spawn a new session.
+     `--rebind` drops each imp's grant of the secret, so set the grantable list again as step 6
+     does, then spawn a new session.
 
 6. When the API still answers `{"json":[]}`, [rotate the token](#rotate-the-token). Ingest also
    answers 401 to a wrong bearer token, and no command compares impd's copy of the token with the
@@ -205,8 +205,8 @@ have sent telemetry. Check these, in order, and run the query again after each f
 
    Expect `deployment "pepys-ingest" successfully rolled out`.
 
-A secret that you remove and add again under the same name needs the grantable list set again, as
-step 6 of [Let sessions send telemetry](#let-sessions-send-telemetry) does.
+When you remove a secret and add it again under the same name, set the grantable list again, as step
+6 of [Let sessions send telemetry](#let-sessions-send-telemetry) does.
 
 ## Add a forwarder
 
@@ -228,7 +228,7 @@ document only for a machine whose user the owner trusts with that.
    `infra/Pulumi.prod.yaml`.
 
 2. Open a pull request that adds the file as `deploy/pepys/forwarder-issuers/home-wsl.json`.
-3. Run the check of the folder:
+3. Run the folder's check:
 
    ```sh
    bun test infra/cluster/collect-pepys-forwarder-trust-failures.test.ts
@@ -289,7 +289,7 @@ Run each command on a device on the tailnet.
 
 ## Rotate or remove a forwarder's key
 
-Ingest refuses a token from a key that no document in the folder holds, from its next start. The
+From its next start, ingest refuses a token from a key that no document in the folder holds. The
 records that the old key wrote stay in the log, under the issuer.
 
 1. To rotate the key, move the forwarder's identity folder away on the machine. Then run the
