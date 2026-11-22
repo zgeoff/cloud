@@ -198,9 +198,11 @@ config `nixie`. `pepys.forwarder` turns on these together:
   name to ingest's port, 8080. Traefik answers 404 on every other path, so none of ingest's other
   routes answers on the name. Traefik cleans a path such as `/a/../forwarded/v1/logs` before it
   matches the route, and sends ingest the cleaned path;
-- three middlewares of Traefik's file provider, which the Ingress names. Traefik takes 4 requests to
-  the route at once and answers 429 to a fifth, and answers 413 to a body over 4,194,304 bytes, the
-  telemetry path's limit. Together they hold at most 16 MiB of bodies in Traefik's memory;
+- three middlewares of Traefik's file provider, which the Ingress names. Traefik answers 429 past a
+  fixed count of requests in flight, counted for the whole route, and 413 to a body over the
+  telemetry path's limit, so the bodies that Traefik holds in memory have a bound.
+  [`pepys-forwarder-middlewares.ts`](../../../infra/cluster/pepys-forwarder-middlewares.ts) holds
+  the values;
 - a certificate, and a DNS-only A record at the node's tailnet address, as for the API's tailnet
   route;
 - the rule in ingest's network policy that admits Traefik to 8080.
