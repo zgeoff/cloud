@@ -59,21 +59,21 @@ impd holds the host's memory budget for imps and refuses a boot that would excee
 imp sleeps to disk and frees its memory. The ZFS cache has a cap of its own, so the pool and the
 imps never compete for the rest of the host's memory.
 
-impd keeps part of the budget for nixie's sandboxes, the imps named `nixie-*`, because a person
-waits on each nixie turn and an agent imp does not. impd refuses an agent imp's boot or wake that
-would take the kept memory, while a nixie sandbox can use the whole budget and sleeps agent imps to
-make room
-([imp's priority imps](https://github.com/zgeoff/impz/blob/main/docs/architecture/lifecycle/ram-governor.md#priority-imps)).
-The host's `configuration.nix` sets the kept size beside the sandboxes it covers. impd keeps that
-memory in the whole budget and in the huge page pool, where the sandboxes run, and keeps none in the
-budget past the pool, so the elastic agent imps can use all of that part.
-
 impd runs every imp of fixed memory on huge pages, and restores and wakes it through a page handler
 ([imp's huge pages](https://github.com/zgeoff/impz/blob/main/docs/architecture/lifecycle/huge-pages.md)).
 A guest on huge pages takes one fault on the host where a guest on base pages takes 512, which is
-most of a template restore's time on this nested host. An elastic imp runs on base pages: the dev
-imps, the harness imps, the agent image check's imp, the preview service's imps and impd's image
-builders are elastic.
+most of a template restore's time on this nested host. nixie's sandboxes, the imps named `nixie-*`,
+have fixed memory and run on huge pages. Every other kind of imp is elastic and runs on base pages:
+the agent imps that atc sessions run in, the dev imps, the harness imps, the agent image check's
+imp, the preview service's imps and impd's image builders.
+
+impd keeps part of the huge page pool for nixie's sandboxes, because a person waits on each nixie
+turn and an agent imp does not
+([imp's priority imps](https://github.com/zgeoff/impz/blob/main/docs/architecture/lifecycle/ram-governor.md#priority-imps)).
+impd refuses any other imp's boot or wake that would take the kept memory, while a nixie sandbox can
+use the kept memory and the rest of the pool. The host's `configuration.nix` sets the kept size
+beside the sandboxes it covers. impd keeps none of it in the part of the budget past the pool, so
+the elastic imps can use all of that part.
 
 The host reserves a fixed huge page pool early in boot, and the kernel makes no huge page past it.
 `configuration.nix` sets the pool's size apart from impd's memory budget, and the budget is larger

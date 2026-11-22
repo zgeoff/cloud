@@ -32,12 +32,14 @@ metadata:
 ## The required check
 
 The `main` ruleset requires one check: `pr / checks`, the `checks` job in
-[`ci.yml`](../../../.github/workflows/ci.yml). It needs every other job, always runs, and passes only
-when each job passed or its gate skipped it.
+[`ci.yml`](../../../.github/workflows/ci.yml). It needs every other job and always runs.
 
-While cloud is public, each check runs as its own job. When cloud is private, GitHub bills each job
-at least a minute, so the other jobs skip and `checks` runs every check as a step. To add a gated
-check:
+- While cloud is public, each check runs as its own job, and `checks` passes only when each job
+  passed or its gate skipped it.
+- While cloud is private, the other jobs skip, because GitHub bills each job at least a minute.
+  `checks` runs every check as a step of its own, and skips the test of the other jobs' results.
+
+To add a gated check:
 
 1. Add the gate to [`gates.yml`](../../../.github/gates.yml).
 2. Name the gate in both calls of `ci:decide-ci-gates`
@@ -49,8 +51,8 @@ check:
 5. Copy the job's steps into `checks`, each with an `if:` on `github.event.repository.private` and
    `steps.decide.outputs.<gate> != 'false'`. Reuse the setup steps in `checks`.
 
-For a check with no gate, skip steps 1 and 2. In step 5, use
-`steps.decide.outputs.reused != 'true'` in place of the gate, as the `Format` step does, because
-`checks` skips its install when a green run has checked the same tree.
+For a check with no gate, skip steps 1 and 2. In step 3, copy the `if:` of the `bun` job. In step
+5, use `steps.decide.outputs.reused != 'true'` in place of the gate, as the `Format` step does,
+because `checks` skips its install when a green run has checked the same tree.
 
 Never make the `NixOS checks` workflow a required check. It blocks only the deploy to the host.

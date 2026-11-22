@@ -33,12 +33,12 @@ metadata:
 
 ## Suites in CI
 
-- Add a suite by creating a `.bats` file. `run-bats.sh` runs every `.bats` file that git tracks or
-  sees as untracked.
-- Tag each suite on the line after its shebang with `# bats file_tags=suite:<group>`. Give a suite
-  that needs no Docker the `scripts` group, which `bun run test:scripts` runs. Give a Docker suite
-  the group of the `test:*` script that runs it, such as `alert-rules` for `test:alert-rules`.
-  `run-bats.sh` skips a file with no tag.
+- Add a suite by creating a `.bats` file and tagging it, on the line after its shebang, with
+  `# bats file_tags=suite:<group>`. `run-bats.sh <group>` runs each `.bats` file that git tracks or
+  sees as untracked and whose tag names that group, so it never runs a file with no tag.
+- Give a suite that needs no Docker the `scripts` group, which `bun run test:scripts` runs. Give a
+  Docker suite the group of the `test:*` script that runs it, such as `alert-rules` for
+  `test:alert-rules`.
 - When a suite starts to read a new file, add that file's path to the suite's gate in
   [`gates.yml`](../../../.github/gates.yml), if it has one. A gate lists the paths whose change makes
   CI run a check. CI skips the suite when only an unlisted file changes.
@@ -75,8 +75,10 @@ only.
   modes, and the imp agent sessions run as root.
 - Stand in for `getent hosts` and for curl to a URL that isn't loopback. In the `getent` stand-in's
   own test, call the real `getent` with `-s files`, which reads the hosts file and never asks DNS.
-- Run the real `gh` only with `GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1`, so it sends
-  no telemetry and makes no update check.
+- When a case checks the requests that gh itself sends, run the real `gh` against the loopback API
+  that [`start-stub-github-api.sh`](../../../scripts/src/test-utils/shell/start-stub-github-api.sh)
+  starts, with `GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1`, so it sends no telemetry and
+  makes no update check. Every other case uses the gh stand-in that Shell stand-ins describes.
 - Give a TLS stand-in's certificate to the client through `SSL_CERT_FILE`, with `SSL_CERT_DIR` set to
   an empty case folder, so the client trusts that certificate and no system one.
 
@@ -125,8 +127,9 @@ in `scripts/host/`.
   [`buildRealProgramHandler`](../../../scripts/src/test-utils/build-real-program-handler.ts). Run git
   with the environment that [`createSeededGitOrigin`](../../../scripts/src/test-utils/create-seeded-git-origin.ts)
   returns.
-- Test a script in `scripts/host/`, which travels on ssh's stdin, with real bash against loopback
-  stand-ins, such as [`startStubImpd`](../../../scripts/src/test-utils/start-stub-impd.ts).
+- A script in `scripts/host/` travels on ssh's stdin and has no `Runner`. Test it by running real
+  bash on it directly, against loopback stand-ins, such as
+  [`startStubImpd`](../../../scripts/src/test-utils/start-stub-impd.ts).
 - Assert that no secret appears in any recorded argv, and that each secret reaches its call on
   stdin.
 
@@ -148,9 +151,10 @@ in `scripts/host/`.
 - Poll with `wait_for` from [`wait-for.sh`](../../../scripts/src/test-utils/shell/wait-for.sh), and step time
   with [`create_stub_clock`](../../../scripts/src/test-utils/shell/create-stub-clock.sh).
 
-A NixOS check's cases can call only `wait_for` of the shell helpers, because
+A NixOS check's cases can call only the shell helpers that
 [`build-shell-lib-source.nix`](../../../nixos/checks/test-utils/build-shell-lib-source.nix) copies
-only `wait-for.sh` into the checks.
+into the checks. To call another helper there, add it to that file, as
+[nixos-checks.md](./references/nixos-checks.md) says.
 
 ## Shell stand-ins
 

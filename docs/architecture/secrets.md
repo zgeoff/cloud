@@ -17,7 +17,7 @@ flowchart LR
   V -->|"SSH stdin"| HF["root-only file<br>on the host"]
   V -->|"install extra files"| HF
   HF --> SVC["host service"]
-  HF --> IMPD["impd"]
+  HF -->|"copied at start"| IMPD["impd"]
 ```
 
 - **Into a Pulumi run.** The committed `.env` holds only `op://` references, and every Pulumi
@@ -38,18 +38,19 @@ flowchart LR
   age key and a recovery key. Pulumi gives the pod the encrypted file and the host's age identity as
   a Secret, and nixie decrypts the file in its own process at start
   ([nixie](./workloads/nixie.md#secrets)).
-- **Into a service.** A host service never reads a secret file itself. The atc daemon takes its two
-  tokens through systemd's credentials, which copy each file when the service starts, so a rotation
-  reaches it only after a restart. The scheduled drift check takes its credentials file the same
-  way, at each daily start, and that file holds the passphrase and read-only credentials
-  ([the drift check runbook](../runbooks/drift-check.md)). imp's module copies its secrets to a
-  runtime directory before each start of imp-host and mounts them read-only.
+- **Into a service.** A host service never reads its secret file in place. It gets a copy at start.
+  The atc daemon takes its two tokens through systemd's credentials, which copy each file when the
+  service starts, so a rotation reaches it only after a restart. The scheduled drift check takes its
+  credentials file the same way, at each daily start, and that file holds the passphrase and
+  read-only credentials ([the drift check runbook](../runbooks/drift-check.md)). imp's module copies
+  its secrets to a runtime directory before each start of imp-host and mounts them read-only.
 
 ## Protection at rest
 
 The host keeps its data on the second disk, `vdb`, and the data's key on the root disk, `vda`, so
 neither disk alone exposes the data. Every Onidel snapshot copies `vda` whole, and Onidel never
-snapshots `vdb`. A copy of either disk, alone, therefore holds the key or the data but never both.
+snapshots `vdb`. A copy of either disk, alone, therefore holds the key or the data but never both,
+under the conditions that [Threats](#threats) gives for a snapshot.
 [The tank/cloud runbook](../runbooks/tank-cloud.md) creates the datasets and restores their key.
 
 ZFS on the pool `tank` encrypts the data under two encryption roots, both keyed by the one key:
@@ -96,7 +97,7 @@ Four threats shape the layout:
 2. **A leaked Onidel account.** Encryption does not stop it. The account controls the running host,
    with the key loaded. The response hardens the account and accepts the rest.
 3. **A leaked restic backup.** restic encrypts each backup, and no backup's password sits on `vda`,
-   so a snapshot and a backup together expose nothing.
+   so a snapshot and a backup together expose no backed-up data.
 4. **A stolen `vdb`.** It holds ciphertext without the key.
 
 [The leak runbook](../runbooks/leak-response.md) gives the response to each leak.
@@ -105,9 +106,10 @@ Four threats shape the layout:
 
 The layout leaves five risks open, each accepted:
 
-1. **No credential rotation.** Every credential that ever sat in a `vda` snapshot stays valid.
-   Deleting the old snapshots and cleaning the root disk's free space are the only ways to shrink
-   that exposure, and nothing can check how Onidel handles a deleted snapshot.
+1. **Credentials in old snapshots stay valid.** A credential that sat in a `vda` snapshot gets no
+   rotation for that reason, so it stays valid until its own rotation. Deleting the old snapshots
+   and cleaning the root disk's free space are the only ways to shrink that exposure, and nothing
+   can check how Onidel handles a deleted snapshot.
 2. **A leaked Onidel account exposes everything**, because the account reaches the running host.
 3. **The Tailscale node key, the OpenSSH host keys and the ZFS key stay plain on `vda`**, so a
    snapshot leak exposes them.

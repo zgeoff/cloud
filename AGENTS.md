@@ -6,7 +6,9 @@ workload. `docs/architecture/overview.md` describes the system, and Linear holds
 
 ## Required reading
 
-The rules a task needs are not repeated here. Load the skill for the work before starting it.
+Each skill below holds the rules for one kind of work, and this file doesn't repeat them. Load the
+skill for the work before starting it. The rest of this file holds the rules that cover the whole
+repo.
 
 | Skill                | Load before                                                                                |
 | -------------------- | ------------------------------------------------------------------------------------------ |
@@ -74,10 +76,11 @@ docs/
 
 - lefthook runs the light checks before a commit and a push. Leave the heavier checks to CI, because
   the host may have little memory.
-- An agent session runs an operator action, such as a host switch, a workflow dispatch or an apply,
-  through its `bun run ops:<verb>` script, never the script or workflow behind it.
-  [`docs/runbooks/ops.md`](docs/runbooks/ops.md) lists each verb, what it wraps and its
-  preconditions.
+- Run each operator action that has a `bun run ops:<verb>` script through that script, never the
+  script or workflow behind it: `ops:switch-host` for a host switch, `ops:nixos-checks` for a
+  `NixOS checks` dispatch, and `ops:preview` and `ops:up` for a preview and an apply of the prod
+  stack. [`docs/runbooks/ops.md`](docs/runbooks/ops.md) lists each verb, what it wraps and its
+  preconditions. Run a command that has no verb, such as `bun run drift`, as this file gives it.
 - `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and the type check.
   oxlint runs both through `tsrs-lint`, which the `tsrs` package ships and oxlint finds on its own,
   in tsgolint's place, because stock tsgolint runs out of memory under 2 GiB. The script builds the
@@ -111,10 +114,10 @@ docs/
 
 ## Host switches
 
-- Switch the host with `bash scripts/switch-geoffcloud.sh` from a clean checkout of `main`. It
-  builds a `git archive` snapshot of the commit with `nix build --no-link` in a `nixos/nix`
-  container, and only after the build exits 0 copies that exact store path to the host and activates
-  it. `--build-only` stops after the build.
+- Switch the host with `bun run ops:switch-host` from a clean checkout of `main`. It runs
+  `scripts/switch-geoffcloud.sh`, the switch script, which builds a `git archive` snapshot of the
+  commit with `nix build --no-link` in a `nixos/nix` container. Only after the build exits 0 does it
+  copy that exact store path to the host and activate it. `--build-only` stops after the build.
 - Never use `nixos-rebuild build`, because the repo mounts read-only. Never switch by hand after a
   failed build, and never re-evaluate the flake to switch.
 - The script refuses an atc daemon pin of another atc major than the running atc gateway's image, so
@@ -129,8 +132,7 @@ docs/
 - The NixOS checks gate the switch, not the merge: the script refuses a commit that neither a green
   `NixOS checks` run on `main` covers, nor the green `nixos` check of the merged pull request that
   produced it when no NixOS input differs between its head and the commit. Dispatch a run with
-  `gh workflow run nixos-checks.yml --ref main` when neither covers the commit, and never switch
-  around the gate.
+  `bun run ops:nixos-checks` when neither covers the commit, and never switch around the gate.
 - Before a switch that changes imp, copy impd's database with
   `bash scripts/copy-impd-db.sh <label>`. It takes a `VACUUM INTO` copy inside imp-host while impd
   runs, and records its integrity check, schema migration and imp version in `COPY-INFO`. Never tar
@@ -146,7 +148,8 @@ docs/
 - The `Deploy prod` workflow applies each merged change to a Pulumi input once CI passes on `main`,
   bracketed by drift checks. `docs/runbooks/prod-apply.md` covers its runs. Its guard holds a run
   for any of these:
-  - any operation other than a create, an update or a refresh, such as a delete or a replace
+  - a delete, a replace, or any other operation that isn't a create, an update or a refresh, apart
+    from the one replace the next paragraph describes
   - a change to the tailnet policy, the VM, the cloud firewall, a tunnel's routes, a DNS record or
     the gateway's Access policy
   - a failed drift check, for a manual dispatch
@@ -160,11 +163,15 @@ docs/
   `deleteBeforeReplace: true`, or its replacement fails on the taken name.
   [The apply job](docs/architecture/infrastructure-as-code.md#the-apply-job) gives the reason.
 
-- Never run `bun run up` while a `Deploy prod` run is in progress.
-- An apply by hand follows the same bracket, in order: `bun run drift` from a clean checkout of the
-  `deployed/prod` tag, `bun run preview -- --refresh` from a clean `main` that shows only the
-  reviewed changes, `bun run up`, `bun run drift` again, then move the tag. Record both drift
-  results.
+- Never apply by hand while a `Deploy prod` run is queued or in progress, because both would change
+  the prod stack at once. `bun run ops:up` refuses then.
+- Apply by hand inside the same bracket, in this order, and record both drift results:
+  1. `bun run drift` from a clean checkout of the `deployed/prod` tag.
+  2. `bun run ops:preview -- --refresh` from a clean `main`. Expect only the reviewed changes.
+  3. `bun run ops:up`.
+  4. `bun run drift` again.
+  5. Move the `deployed/prod` tag to the applied commit, as
+     [`docs/runbooks/workflows.md`](docs/runbooks/workflows.md) shows.
 
 ## Choices that need the owner
 

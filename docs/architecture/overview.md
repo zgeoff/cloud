@@ -63,10 +63,10 @@ approved runs each host switch.
 
 ## Topology
 
-The VM holds three kinds of workload, and one placement rule decides where each runs. Host-level
-work, which needs the kernel, the disks or the host's own network, runs on NixOS or beside it on the
-host. A containerised app runs on k3s, because a Helm chart or a manifest describes it there and
-Pulumi deploys it with the rest of the estate.
+Each workload runs in one of three places: k3s, the imp-host container, or a NixOS service on the
+host. An app that a Helm chart or a manifest describes runs on k3s, so Pulumi deploys it with the
+rest of the estate. Work that needs the kernel, the disks or the host's own network runs on the host
+instead: imp in its container, and the rest as NixOS services.
 
 ```mermaid
 flowchart TB
@@ -110,7 +110,7 @@ but Tailscale's own port and the HTTPS port of the host's TLS front
 
 ## Data
 
-The estate keeps state in five places, and each has its own backup or none:
+The estate keeps state in six places, and each has its own backup or none:
 
 - **Pulumi state** sits in a Cloudflare R2 bucket, encrypted with a passphrase, and holds every
   secret Pulumi generated, such as Grafana's admin password
@@ -122,18 +122,20 @@ The estate keeps state in five places, and each has its own backup or none:
   volume that outlives its claim, and a nightly job backs it up to R2. nixie's databases sit on a
   volume of the same kind, with their own nightly backup
   ([the atc gateway](./workloads/atc-gateway.md#state-and-backup)).
+- **The atc daemon's state** sits in plain form on the root disk, which each Onidel snapshot copies
+  whole ([the host](./host/host.md#disks)).
 - **Metrics and logs** sit on cluster volumes with no backup, because losing them loses history,
   never service ([observability](./workloads/observability.md)).
 - **Deployment inputs** live in the owner's 1Password vault `cloud`, which the repo names only by
   reference ([secrets](./secrets.md)).
 
-The data sits on the second disk and its key on the root disk, so neither disk alone exposes the
-data. ZFS encrypts two dataset trees there: impd's dataset, and `tank/cloud`, which holds k3s's data
-directory, the host's secret files and the copies of impd's database. k3s's data directory holds the
-cluster's datastore and every cluster volume. Every Onidel snapshot copies the root disk, which
-keeps only the key, the host's tailnet identity, its SSH host keys and the atc daemon's state in
-plain form. Onidel never snapshots the second disk, so its data relies on each system's own backup
-([protection at rest](./secrets.md#protection-at-rest)).
+The pool's data sits on the second disk and its key on the root disk, so neither disk alone exposes
+the pool's data. ZFS encrypts two dataset trees there: impd's dataset, and `tank/cloud`, which holds
+k3s's data directory, the host's secret files and the copies of impd's database. k3s's data
+directory holds the cluster's datastore and every cluster volume. Every Onidel snapshot copies the
+root disk, which keeps only the key, the host's tailnet identity, its SSH host keys and the atc
+daemon's state in plain form. Onidel never snapshots the second disk, so its data relies on each
+system's own backup ([protection at rest](./secrets.md#protection-at-rest)).
 
 ## Cross-cutting
 

@@ -9,7 +9,8 @@ metadata:
 
 # cloud code style
 
-cloud follows every rule of [code-style](../code-style/SKILL.md), and adds no stricter rule.
+cloud follows every rule of [code-style](../code-style/SKILL.md). It replaces none of them and adds
+no rule of its own.
 
 ## Departures
 

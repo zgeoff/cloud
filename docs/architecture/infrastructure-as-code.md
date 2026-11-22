@@ -1,12 +1,12 @@
 # Infrastructure as code
 
-One Pulumi program, in `infra/`, declares every cloud resource and every workload in the k3s
-cluster, and one stack, `prod`, holds the live state. Pulumi runs on Bun, and every run reads its
-inputs from 1Password through `op run`, so the program sees each secret only for the length of a
-run. A preview changes nothing. The apply job applies each merged change on its own, unless its plan
-guard holds the change for a person, and the guards at the top of the program stop a run whose
-inputs would plan a mass delete. [The host](./host/host.md) covers the NixOS host, which Pulumi does
-not drive.
+One Pulumi program, in `infra/`, declares every cloud resource but the VM's second disk, and every
+workload in the k3s cluster, and one stack, `prod`, holds the live state. Pulumi runs on Bun, and
+every run reads its inputs from 1Password through `op run`, so the program sees each secret only for
+the length of a run. A preview changes nothing. The apply job applies each merged change on its own,
+unless its plan guard holds the change for a person, and the guards at the top of the program stop a
+run whose inputs would plan a mass delete. [The host](./host/host.md) covers the NixOS host, which
+Pulumi does not drive.
 
 ## What the program owns
 
@@ -40,9 +40,10 @@ resource and no API call. It covers the one VM and its firewall, which rarely ch
 the estate needs a second VM decides what the provider must grow into. Replacing the provider waits
 on that decision too.
 
-The program writes one value back outside Pulumi. imp's reusable tailnet key, which imp's dev
-instances join by, is minted by Pulumi and copied into its 1Password item on each new key, so the
-item always holds the live key.
+The program writes two values back outside Pulumi, each into a 1Password item whenever Pulumi mints
+a new one, so the item always holds the live value: imp's reusable tailnet key, which imp's dev
+instances join by, into the `cloud` vault, and the token of Grafana's MCP account into the `zgeoff`
+vault.
 
 ## What the program never owns
 
@@ -224,11 +225,12 @@ The job points `.env` at that vault before it resolves anything. Its tailnet nod
 federated identity, with no stored key, as `tag:cloud-deploy`, whose grants reach the k3s API and
 Grafana's NodePort on the host ([the tailnet](./network/tailnet.md)).
 
-Some writes stay with a person. The program copies each new `tag:imp` key into the `cloud` vault,
-and each new token of Grafana's MCP account into the `zgeoff` vault. The job's account can write
-neither vault, but a new key or token replaces the command that copies it, and the guard holds that
-replace. A NixOS switch and an agent-image rollout run by hand
-([workflows](../runbooks/workflows.md)).
+Some writes stay with a person. The job's account can write neither vault that the program copies a
+new key or token into, but a new key or token replaces the command that copies it, and the guard
+holds that replace. A manual dispatch runs under the same account, so a person applies that change
+by hand, from a 1Password session that can write the vault the plan writes
+([apply by hand](../runbooks/workflows.md#apply-by-hand)). A NixOS switch and an agent-image rollout
+run by hand ([workflows](../runbooks/workflows.md)).
 
 ## Guards
 
