@@ -3,15 +3,14 @@
 Use this runbook to look at the estate's state, during an incident, after an alert or on a routine
 check. Grafana, Loki, Prometheus and Alertmanager run in the cluster's `observability` namespace.
 You reach Grafana from the tailnet, and Prometheus and Alertmanager through an SSH port forward.
-Alertmanager sends alerts to Discord when the stack config turns Discord alerts on. The external
-health check runs as a Cloudflare Worker outside the cluster.
-[The observability architecture](../architecture/workloads/observability.md) describes how the parts
-fit together.
+Alertmanager sends alerts to Discord once you turn Discord alerts on in the stack config. The
+external health check runs as a Cloudflare Worker outside the cluster. For how the parts fit
+together, read [the observability architecture](../architecture/workloads/observability.md).
 
 ## Grafana
 
 Grafana is at `http://geoffcloud:30300`, from the tailnet only. The user is `admin`. The password is
-a stack output, so this prints a secret to your terminal:
+a secret stack output. This command prints it to your terminal:
 
 ```sh
 cd infra
@@ -61,10 +60,10 @@ dashboard, under Workers.
 
 ## Turn Discord alerts on or off
 
-Turn the `prod` stack's alerts on, or off to stop every message. Changing the flag, or sending a
-test alert, needs the owner's approval first, because each alert reaches the owner's Discord. `.env`
-maps `ALERT_WEBHOOK_URL` and `ALERT_MENTION_USER_ID` to their 1Password items, so each `op run`
-below fills them.
+Set the `prod` stack's `discordAlerts` flag to send alerts to Discord, and remove it to stop every
+message. Get the owner's approval before you change the flag or send a test alert, because each
+alert reaches the owner's Discord. Each `op run` below fills `ALERT_WEBHOOK_URL` and
+`ALERT_MENTION_USER_ID` from the 1Password items that `.env` maps them to.
 
 1. Set the flag and land the change through a PR:
 
@@ -75,10 +74,11 @@ below fills them.
 
    This adds `geoff-cloud:discordAlerts: 'true'` to `infra/Pulumi.prod.yaml`.
 
-2. `bun run preview` shows the new Secret `observability/alertmanager-discord`. The run fails if
-   `ALERT_WEBHOOK_URL` or `ALERT_MENTION_USER_ID` is empty.
-3. The merge applies it through the apply job. Alertmanager then sends every alert to Discord,
-   except the chart's always-firing `Watchdog` and its `InfoInhibitor` helper.
+2. From the repo root, run `bun run preview`, and check that it shows the new Secret
+   `observability/alertmanager-discord`. It fails if `ALERT_WEBHOOK_URL` or `ALERT_MENTION_USER_ID`
+   is empty.
+3. Once the PR merges, the apply job applies the change. Alertmanager then sends every alert to
+   Discord, except the chart's always-firing `Watchdog` and its `InfoInhibitor` helper.
 
 To turn it off again, run `op run --env-file=../.env -- pulumi config rm --stack prod discordAlerts`
 in `infra/`, and land it the same way. The external health check uses the same webhook either way.
