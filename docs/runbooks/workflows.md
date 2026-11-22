@@ -4,8 +4,8 @@ Use this runbook to make a live change to geoff.cloud: its infrastructure, its s
 host or a credential. Each change lands through a squash PR to `main`; run live changes from a clean
 checkout of `main`.
 
-**CAUTION:** No live change without a preview first. A change that costs money, deletes data or
-cannot be undone needs the owner's approval of its exact effect.
+**CAUTION:** Preview every live change first. A change that costs money, deletes data or cannot be
+undone needs the owner's approval of its exact effect.
 
 ## Change infrastructure
 
@@ -17,12 +17,12 @@ cannot be undone needs the owner's approval of its exact effect.
    bun run preview
    ```
 
-   Read every replace and delete. If the preview changes the tailnet policy, the owner reviews the
-   diff first: Pulumi replaces the whole policy file.
+   Read every replace and delete. If the preview changes the tailnet policy, ask the owner to review
+   the diff first, because Pulumi replaces the whole policy file.
 
 3. Merge it. Once CI passes on `main`, the `Deploy prod` workflow checks drift from the deployed
-   revision, previews, applies and checks drift again, unless its guard holds the plan.
-   [The prod apply job](./prod-apply.md) covers reading its run and answering a held one.
+   revision, previews, applies and checks drift again, unless its guard holds the plan. To read its
+   run or answer a held one, see [the prod apply job](./prod-apply.md).
 4. Link the run on the PR or issue. Its log holds both drift results.
 
 Pass Pulumi flags after `--`, such as `bun run preview -- --diff`.
@@ -42,8 +42,8 @@ stack.
    bun run drift
    ```
 
-   It exits non-zero on any change, so it expects 0 changes only against the deployed code. Record
-   the revision and the result. Resolve drift before you go on.
+   It exits non-zero on any change. Only the deployed code should give 0 changes. Record the
+   revision and the result. Resolve drift before you go on.
 
 2. From a clean current `main`, preview against the live state:
 
@@ -79,7 +79,7 @@ op run --env-file=../.env -- pulumi config set --stack prod <key> <value>
 ```
 
 Land the YAML change through a PR, which the apply job applies after the merge.
-`infra/Pulumi.prod.yaml` holds the keys, and the program's input loaders describe each one.
+`infra/Pulumi.prod.yaml` holds the keys; read the program's input loaders for what each one means.
 
 ## Switch the host
 
@@ -103,20 +103,21 @@ bash scripts/switch-geoffcloud.sh --stop-ordinary-page-imps  # switch in the hug
    merged pull request covers, as [Check the host before a switch](#check-the-host-before-a-switch)
    describes. `--build-only` skips this gate, because it reaches no host.
 3. It refuses a commit whose atc daemon pin is another atc major release than a running atc gateway
-   pod's image, or that finds no gateway pod, because atc breaks the daemon protocol only in a major
-   release and the daemon handshake does not catch the break. It checks again before the activation.
-   For an atc major bump, review and merge the pull request that pins the atc-gateway images'
-   digests, which the atc-gateway images workflow opens once it publishes them, let the
-   `Deploy prod` workflow roll it out, then switch. `--build-only` skips this gate too.
+   pod's image, because atc breaks the daemon protocol only in a major release and the daemon
+   handshake does not catch the break. It also stops when it finds no gateway pod, and checks again
+   before the activation. For an atc major bump, first review and merge the pull request that pins
+   the atc-gateway images' digests. The atc-gateway images workflow opens it once it publishes the
+   images. Let the `Deploy prod` workflow roll it out, then switch. `--build-only` skips this gate
+   too.
 4. It refuses a commit whose impd, the imp-host image's release, is a major release that a running
-   nixie pod refuses, or that finds no nixie pod, because nixie then retries its start without end
-   while every host check passes. A nixie pod accepts the major of its imp client, whose version the
-   script reads from the `bun.lock` of the pod's nixie release on GitHub: `@impz/client` from nixie
-   0.35.1, and `@zgeoff/imp-client` before it. It accepts impd 2 beside a 1.x client from nixie
-   0.28.0 on. From nixie 0.42.0 it also accepts each major in the `EXTRA_IMPD_MAJORS` set of its imp
-   adapter, which the script reads from the release's source on GitHub. The script checks again
-   before the activation. For an impd major bump, deploy a nixie release that accepts the new major
-   first. `--build-only` skips this gate too.
+   nixie pod refuses, because nixie then retries its start without end while every host check
+   passes. It also stops when it finds no nixie pod. A nixie pod accepts the major of its imp
+   client, whose version the script reads from the `bun.lock` of the pod's nixie release on GitHub:
+   `@impz/client` from nixie 0.35.1, and `@zgeoff/imp-client` before it. It accepts impd 2 beside a
+   1.x client from nixie 0.28.0 on. From nixie 0.42.0 it also accepts each major in the
+   `EXTRA_IMPD_MAJORS` set of its imp adapter, which the script reads from the release's source on
+   GitHub. The script checks again before the activation. For an impd major bump, deploy a nixie
+   release that accepts the new major first. `--build-only` skips this gate too.
 5. It refuses a commit whose impd stores a secret kind that the commit's atc daemon pin does not
    accept, and names each such kind, because atc's auth binding then refuses every brokered secret
    of that kind and every cloud spawn and adopt fails with `auth_secret_mismatch`. It reads impd's
@@ -128,13 +129,13 @@ bash scripts/switch-geoffcloud.sh --stop-ordinary-page-imps  # switch in the hug
    reaches the host.
 7. It copies the built store path to the host with `nix copy`, then runs the copied system's
    `switch-to-configuration dry-activate`, which changes nothing and lists the units the activation
-   would stop and restart. It holds the switch with exit 1 and those lines when either list holds
+   would stop and restart. It stops with exit 1 and prints those lines when either list includes
    `k3s.service`, because nixie can stay down for minutes after k3s restarts. In a planned k3s
    window, run the switch again with `--allow-k3s-restart`: it prints the same lines and goes on.
 8. With `--stop-ordinary-page-imps`, it stops each running or sleeping imp whose guest is on 4 KiB
    pages with `impz stop`, so the imp boots cold on the pool at its next use. impd gives guests on
-   ordinary pages only the budget less the pool, so when a pool change leaves them short it sleeps
-   them at a time it picks and boots each fixed-memory imp cold on its next wake; the flag makes
+   ordinary pages only the budget less the pool. When a pool change leaves them short, impd sleeps
+   them at a time it picks and boots each fixed-memory imp cold on its next wake. The flag makes
    that move in a set order. The flag also stops every elastic imp, the dev imps included, which
    cannot run on the pool. Each imp keeps its disk and loses its processes and sessions. The stop
    order is the names in `IMP_STOP_ORDER`, then the other imps' names sorted, then the names in
@@ -143,7 +144,7 @@ bash scripts/switch-geoffcloud.sh --stop-ordinary-page-imps  # switch in the hug
    last gate and before the activation reserves the pool, so a pool that comes up short leaves no
    guest on ordinary pages beside it. `impz stop` does not take an image builder, so a builder that
    runs on 4 KiB pages fails the switch before any stop: wait for its build to end, then switch
-   again. Pass the flag only in the pool's window that the owner approved.
+   again. Pass the flag only in a pool window the owner approved.
 9. It sets the system profile to the built store path and runs its `switch-to-configuration switch`
    under `systemd-run`, as `nixos-rebuild` does. The flake is not evaluated again. Before the
    activation it appends the commit and the store path to `/var/lib/host-build-lag/switches` on the
@@ -198,20 +199,24 @@ snapshot of the working tree's tracked and unignored files. Its Nix store is the
 
 ### Check the host before a switch
 
-The NixOS checks gate the switch, not the merge. The `NixOS checks` workflow runs on `main` every
-night and on each dispatch, on `main` or on a branch. It also runs on each push to a pull request
-that changes an input of the checks, a release bump included, so a break shows before the merge; the
-merge does not wait for it. The switch counts it only as the next paragraph says. A Renovate pull
-request starts no run; the nightly run checks its bump.
+The NixOS checks gate the switch; the merge does not wait for them. The `NixOS checks` workflow runs
+on `main` every night and on each dispatch, on `main` or on a branch. It also runs on each push to a
+pull request that changes an input of the checks, a release bump included, so a break shows before
+the merge. The switch counts such a run only in the cases below. A Renovate pull request starts no
+run; the nightly run checks its bump.
 
-A run builds nothing, and passes, in three cases. Two of them are runs that cover a commit. A green
-scheduled or dispatched run on `main` covers every later commit that changes no input of the checks,
-which the `nixos` gate of [`gates.yml`](../../.github/gates.yml) lists. The green `nixos` check of
-the merged pull request that produced a commit also covers it, when no input of the gate differs
-between the pull request's head and the commit. One gap is accepted: an input change on `main` that
-was reverted before the merge. The third: a run skips the build when an earlier run built and passed
-the same derivations with the same workflow and build scripts, wherever that run ran; the skipped
-run's summary links it. A dispatch with `-f force=true` always builds.
+A run builds nothing, and passes, when a green run already covers its commit or built the same
+derivations:
+
+- A green scheduled or dispatched run on `main` covers every later commit that changes no input of
+  the checks, which the `nixos` gate of [`gates.yml`](../../.github/gates.yml) lists.
+- The green `nixos` check of the merged pull request that produced a commit also covers it, when no
+  input of the gate differs between the pull request's head and the commit. One gap is accepted: an
+  input change on `main` that was reverted before the merge.
+- An earlier run, wherever it ran, built and passed the same derivations with the same workflow and
+  build scripts. The skipped run's summary links it.
+
+A dispatch with `-f force=true` always builds.
 
 A newer run on the same ref cancels the older one, on `main` as on a branch or pull request. On
 `main`, the newer run checks the newest commit, which is the one a switch takes. A newer run on a
@@ -234,9 +239,9 @@ To switch before the nightly run covers the commit:
    gh run watch <run_id> --exit-status
    ```
 
-   Expect exit 0. A failed run means the commit breaks a check: fix it in a PR rather than
-   switching. A cancelled run means a newer run on `main`, such as the nightly run, took its place:
-   run `git pull`, then wait for the newest run that the list shows.
+   Expect exit 0. A failed run means the commit breaks a check: fix it in a PR before you switch. A
+   cancelled run means a newer run on `main`, such as the nightly run, took its place: run
+   `git pull`, then wait for the newest run that the list shows.
 
 3. Run `bash scripts/switch-geoffcloud.sh`. Expect its first line to be `== checked by <run url>`.
 
@@ -245,8 +250,8 @@ nothing.
 
 ## Upgrade imp
 
-imp is pinned in three places, and the imp release pin moves all three together, in a bump pull
-request or [by hand](./release-check.md#pin-a-release-by-hand):
+imp is pinned in three places. Move all three together, in a bump pull request or
+[by hand](./release-check.md#pin-a-release-by-hand):
 
 | Pin                  | File                                                                                                                   |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -258,8 +263,8 @@ The [release check](./release-check.md) opens the bump pull request for each new
 `release-check/imp` branch, with all three pins moved. The `release bump merge` workflow merges it
 once its checks pass, unless its labels hold it for a person, as
 [When a bump merges on its own](./release-check.md#when-a-bump-merges-on-its-own) describes. The
-merge changes nothing on the host. The steps that act on the host stay with a person, and the pull
-request's body lists them. The first can come before the merge:
+merge changes nothing on the host. Do the steps that act on the host yourself; the pull request's
+body lists them too. You can do the first before the merge:
 
 1. Read imp's release notes for migrations and new host settings: before you merge a bump labelled
    `needs-review`, or after the merge for one that merged on its own.
@@ -269,8 +274,8 @@ request's body lists them. The first can come before the merge:
    bash scripts/copy-impd-db.sh imp-<old version>-pre-<new version>
    ```
 
-   The copy and its `COPY-INFO` land in `/root/imp-db-backups/`.
-   [The restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back) puts a copy back.
+   The copy and its `COPY-INFO` land in `/root/imp-db-backups/`. To put a copy back, follow
+   [the restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back).
 
 3. [Switch the host](#switch-the-host). The switch restarts impd.
 4. Check: `ssh root@geoffcloud podman exec imp-host impz info` shows the new version,
@@ -281,16 +286,16 @@ request's body lists them. The first can come before the merge:
 
 A merged bump that waits a day for the switch fires the `HostBehindLatestBuild` alert.
 
-The move from imp 5.0.0 on Docker to imp 6.0.0 on Podman takes more steps, which
-[the Podman switch runbook](./imp-podman-switch.md) lists.
+For the move from imp 5.0.0 on Docker to imp 6.0.0 on Podman, which takes more steps, follow
+[the Podman switch runbook](./imp-podman-switch.md).
 
 impd's database lives in `tank/imp`, which has a legacy mountpoint inside imp-host. The host's
 `/var/lib/imp` is empty.
 
 ## Observe
 
-[The observe runbook](./observe.md) covers Grafana, the Loki and Prometheus queries, the external
-health check, and turning Discord alerts on or off.
+For Grafana, the Loki and Prometheus queries, the external health check, and turning Discord alerts
+on or off, see [the observe runbook](./observe.md).
 
 ## Rotate a credential
 
@@ -323,6 +328,6 @@ survives.
 
 ## Recover
 
-[The restore runbook](./restore-geoff-cloud.md) covers imps, impd's database, the host, the root
-disk and the cluster. The atc gateway has
+To restore imps, impd's database, the host, the root disk or the cluster, follow
+[the restore runbook](./restore-geoff-cloud.md). The atc gateway has
 [its own backup and restore runbook](./atc-gateway-backup-restore.md).

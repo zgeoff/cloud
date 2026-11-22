@@ -4,7 +4,7 @@ geoffcloud has two disks. `vda` holds NixOS, the pool's key and the host's tailn
 holds the ZFS pool `tank`, with every encrypted dataset: impd's state, k3s's data directory, the
 host's secret files and the copies of impd's database
 ([protection at rest](../architecture/secrets.md#protection-at-rest)). Pick the section for the disk
-you lost. A recovery on the live host is a consequential operation: get approval for it first.
+you lost. Get approval before you recover the live host.
 
 | Lost       | What survives                                    | Section                             |
 | ---------- | ------------------------------------------------ | ----------------------------------- |
@@ -20,7 +20,7 @@ VM cannot have ([the restore drill](./restore-drill.md#restore-a-root-disk-snaps
 
 **Desk check:** every step traced against the repo at `main` `14f6e3c`, with nothing run: the pool
 import and key load against the NixOS config and its checks, the reinstall against
-[its runbook](./reinstall-geoffcloud.md), whose numbered steps this doc calls "reinstall step N",
+[its runbook](./reinstall-geoffcloud.md) ("reinstall step N" below means step N of that runbook),
 and the firewall group against the Onidel provider. The panel, the boot menu and the Tailscale
 console stay unchecked.
 
@@ -44,10 +44,10 @@ nix-env -p /nix/var/nix/profiles/system --switch-generation <generation>
 `scripts/switch-geoffcloud.sh` cannot help here, because it queries the cluster before it builds and
 stops while k3s is down. A snapshot holds only the generations from before it was taken, so it often
 holds no matching generation. A database copy fixes only an impd mismatch, so when no generation's
-k3s is new enough for the datastore, reinstall, as the next bullet does.
+k3s is new enough for the datastore, follow **From nothing** below.
 
-- **From a snapshot:** `op run --env-file=.env -- bun run onidel:snapshot pre-<change>` takes one
-  before a risky change. Restore it from the Onidel panel.
+- **From a snapshot:** restore it from the Onidel panel. Take one before a risky change with
+  `op run --env-file=.env -- bun run onidel:snapshot pre-<change>`.
 - **From nothing:** reinstall onto the empty disk. The pool survives with its live files, so the
   host needs only its own new tailnet key and the ZFS key:
 
@@ -58,10 +58,10 @@ k3s is new enough for the datastore, reinstall, as the next bullet does.
      is on `tank/imp`, so imp's node rejoins with it and needs no key.
   3. Run reinstall step 3 with that key in `$x/var/lib/tailscale/authkey`, and skip its
      `bun run up`. Write the key from the clipboard, as step 6 of
-     [Lose both disks](#lose-both-disks) does. Stage the ZFS key as the step does, and stage none of
-     the imp files, so skip the step's `chmod` of them as well: the bind from the pool's
-     `host-secrets` dataset mounts imp-host's live files over `/var/lib/imp-host/secrets`, so a
-     staged copy would sit hidden on `vda`.
+     [Lose both disks](#lose-both-disks) does. Stage the ZFS key as the step does. Stage none of the
+     imp files, and skip the step's `chmod` of them: the bind from the pool's `host-secrets` dataset
+     mounts imp-host's live files over `/var/lib/imp-host/secrets`, so a staged copy would sit
+     hidden on `vda`.
   4. Run reinstall steps 5 to 7, with the VM's public address as the install target, as step 7 of
      [Lose both disks](#lose-both-disks) describes. Skip step 2, which needs the old host, step 4,
      because no running host holds the pool, and step 8, because nothing of imp's was staged.
@@ -87,8 +87,8 @@ unless the VM reaches that state.
 **Desk check:** every step traced against the repo at `main` `14f6e3c`, with nothing run: the pool
 against the NixOS checks, the secret files against their install scripts, impd's secrets and tokens
 against the daemon's profiles, the credential installer and imp's token rules, and the image rebuild
-against its build script. Step 12 is traced against atc's imp target and impd's token store, with
-nothing run. impd's start on an empty pool stays unchecked.
+against its build script, and step 12 against atc's imp target and impd's token store. impd's start
+on an empty pool stays unchecked.
 
 Run steps 1 to 4 on geoffcloud, as root, over `ssh root@geoffcloud`. Run the rest from a clean
 checkout of `main`.
@@ -104,9 +104,9 @@ checkout of `main`.
    zpool create -O mountpoint=none -O compression=lz4 -O atime=off -O xattr=sa tank /dev/vdb
    ```
 
-2. Create `tank/imp` as its own encryption root. The key file on `vda` survives, so both roots reuse
-   it. A new key works too, because no data under the old key remains: store it in `zfs-tank-key`,
-   then place it as
+2. Create `tank/imp` as its own encryption root. The key file on `vda` survives, so reuse it for
+   both roots. A new key works too, because no data under the old key remains: store it in
+   `zfs-tank-key`, then place it as
    [If the key fails to load at boot](./tank-cloud.md#if-the-key-fails-to-load-at-boot) does.
 
    ```bash
@@ -166,8 +166,9 @@ checkout of `main`.
 
    Expect `impz token whoami` to print `operator`.
 
-9. Add impd's secrets again, because they lived on the pool, in this order:
-   - The secrets of the atc daemon's auth profiles but `op-connect`, which the Connect bullet adds
+9. impd's secrets lived on the pool. Add them again, in this order:
+   - The secrets of the atc daemon's auth profiles, except `op-connect`, which you add with the
+     Connect token below
      ([the cloud daemon](../architecture/workloads/atc-gateway.md#the-cloud-daemon)), each with the
      kind, host and header of its profile in `nixos/hosts/geoffcloud/configuration.nix`, on stdin:
      `op read op://cloud/<secret>/credential | host_imp secret add <secret> --kind custom --hosts <host> --header <header> --scheme <scheme>`,
@@ -180,8 +181,8 @@ checkout of `main`.
      token while one of them is missing, and lists each missing secret.
    - The GitHub secret `gh`, through step 1 of
      [Set the service up](./preview.md#set-the-service-up). Each preview imp clones through it. The
-     daemon's GitHub profile uses `github-imp-agents`, so the profile secrets leave `gh` out. impd
-     refuses to mint the preview token while a secret it may grant is missing.
+     daemon's GitHub profile uses `github-imp-agents`, so you did not add `gh` with the profile
+     secrets. impd refuses to mint the preview token while a secret it may grant is missing.
    - nixie's model secrets, through [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd).
      nixie adds its sandbox images itself when it starts.
    - The Connect token, with the command in
@@ -205,26 +206,26 @@ checkout of `main`.
     ```
 
     Expect the last line `<image> <digest> check passed`, with the configured name. The home-pc
-    daemon's `cloud` target has its own image, which
-    [Switch the `cloud` target](./agent-image.md#switch-the-cloud-target) sets. Build that commit as
-    well when it differs.
+    daemon's `cloud` target has its own image, set in
+    [Switch the `cloud` target](./agent-image.md#switch-the-cloud-target). Build that commit as well
+    when it differs.
 
 11. Put the atc daemon's bearer back on the host first. The 1Password item `atc-daemon-token`
     survives, but its host copy was on the pool, and the credential installer stops when only one
     copy exists. `op read` ends the value with a newline, as the installer writes the file:
 
-```bash
-op read op://cloud/atc-daemon-token/credential | ssh root@geoffcloud 'mountpoint -q /var/lib/atc-daemon-secrets && (umask 077 && cat > /var/lib/atc-daemon-secrets/gateway-token) && chmod 0400 /var/lib/atc-daemon-secrets/gateway-token && echo ok'
-```
+    ```bash
+    op read op://cloud/atc-daemon-token/credential | ssh root@geoffcloud 'mountpoint -q /var/lib/atc-daemon-secrets && (umask 077 && cat > /var/lib/atc-daemon-secrets/gateway-token) && chmod 0400 /var/lib/atc-daemon-secrets/gateway-token && echo ok'
+    ```
 
-Expect `ok`. Then mint `atc-cloud` with `bun scripts/install-atc-gateway-credentials.ts`, which
-finds the two bearer copies equal and skips them. Start the daemon with
-`ssh root@geoffcloud systemctl start atc-daemon`.
+    Expect `ok`. Then mint `atc-cloud` with `bun scripts/install-atc-gateway-credentials.ts`, which
+    finds the two bearer copies equal and skips them. Start the daemon with
+    `ssh root@geoffcloud systemctl start atc-daemon`.
 
 12. Give the home-pc daemon's `cloud` target a new impd token. Its old token was in impd's database,
     so each call the target makes to impd fails as unauthorized. Run the rest of this step on
     home-pc, as the user that runs the daemon. Read the target's impd address, token source and imp
-    prefix, and the secrets the auth profiles name, from the daemon's config:
+    prefix, and the secrets of its auth profiles, from the daemon's config:
 
     ```bash
     jq '{target: .targets.cloud | {url, impPrefix, tokenFile, tokenEnv}, grantable: ([.authProfiles[]?.secret] | join(","))}' ~/.config/atc/config.json
@@ -241,14 +242,14 @@ finds the two bearer copies equal and skips them. Start the daemon with
     impd refuses the mint with `NOT_FOUND` for a secret that step 9 did not add, so add that secret
     first. When a failed attempt leaves `home-pc-cloud` in `impz token ls` in imp-host, remove it
     with `ssh root@geoffcloud podman exec imp-host impz token rm home-pc-cloud` before a rerun. Keep
-    the target's token source as it is, because a change between a file and a variable changes the
-    target's identity and refuses its sessions with `target_changed`. The daemon reads the file
+    the target's token source as it is, because a switch between a file and a variable changes the
+    target's identity, and its sessions then fail with `target_changed`. The daemon reads the file
     before each call to impd, so the new token needs no restart
     ([imp targets](https://github.com/zgeoff/atc/blob/main/docs/guides/configuration/targets.md#imp-targets)).
     A `tokenFile` under `/run/credentials` is a copy that systemd makes, so write the unit's source
-    file instead and restart the daemon. A target that sets `tokenEnv` reads the variable at startup
-    only, so write the token where the daemon's environment sets that variable, and restart the
-    daemon with `atc daemon restart`.
+    file instead and restart the daemon. When the target sets `tokenEnv`, the daemon reads the
+    variable at startup only, so write the token where the daemon's environment sets that variable,
+    and restart the daemon with `atc daemon restart`.
 
     Expect `IMP_URL=<url> IMP_TOKEN="$(cat <token_file>)" impz token whoami` to print
     `home-pc-cloud`. Then spawn a session on `cloud`, as step 3 of
@@ -276,16 +277,15 @@ consumer gets a new token in the steps above.
 
 ## Lose both disks
 
-**Untested.** Reinstall, then rebuild the pool. Besides the items the reinstall reads, the recovery
-needs the backups' passwords and R2 keys and the Pulumi passphrase, in the 1Password items
-`imp-restic`, `r2-backups`, `atc-gateway-restic`, `r2-atc-gateway-backup` and `pulumi-passphrase`.
-It does not need the old key in `zfs-tank-key`, because no data under that key remains. The
-reinstall stages whatever key the item holds, and the new roots use it.
+**Untested.** Reinstall, then rebuild the pool. Besides the items the reinstall reads, you need the
+backups' passwords and R2 keys and the Pulumi passphrase, in the 1Password items `imp-restic`,
+`r2-backups`, `atc-gateway-restic`, `r2-atc-gateway-backup` and `pulumi-passphrase`. You do not need
+the old key in `zfs-tank-key`, because no data under that key remains. The reinstall stages whatever
+key the item holds, and the new roots use it.
 
 The reinstall runbook starts from a running host, which no longer exists, and its `bun run up` mint
-fails while Pulumi points at the lost cluster. So the recovery boots an installer first, mints both
-tailnet keys in the Tailscale admin console, and runs only the reinstall steps that need no old
-host.
+fails while Pulumi points at the lost cluster. So boot an installer first, mint both tailnet keys in
+the Tailscale admin console, and run only the reinstall steps that need no old host.
 
 **Desk check:** every step traced against the repo at `main` `14f6e3c`, with nothing run: the
 installer against the host's network config and the Onidel API, the staging against the reinstall
@@ -295,8 +295,8 @@ runbook. The `geoffcloud-no-pool` NixOS check covers the boot without a pool.
 2. Boot the VM from a NixOS minimal installer ISO, through `POST /isos` and the panel, as
    [If kexec still fails](./reinstall-geoffcloud.md#if-kexec-still-fails) describes.
 3. In the noVNC console, where the installer logs in as `nixos`, give the installer the VM's static
-   address, because Onidel's network has no DHCP. `ip -br link` names the interface. Then give root
-   your SSH key and start the installer's SSH server, which it leaves stopped:
+   address, because Onidel's network has no DHCP. Find the interface with `ip -br link`. Then give
+   root your SSH key and start the installer's SSH server, which it leaves stopped:
 
    ```bash
    sudo ip link set <interface> up
@@ -327,8 +327,8 @@ runbook. The `geoffcloud-no-pool` NixOS check covers the boot without a pool.
    The host boots and joins the tailnet, with k3s, imp-host and the atc daemon stopped, so step 7's
    `zpool status`, `keystatus`, `k3s kubectl` and `impz` checks fail until the pool exists. Then
    give `geoffcloud` its tailnet address back, as
-   [Keep the tailnet addresses](./leak-response.md#keep-the-tailnet-addresses) describes. No step
-   here runs the switch script, which needs a running cluster.
+   [Keep the tailnet addresses](./leak-response.md#keep-the-tailnet-addresses) describes. Do not run
+   the switch script: it needs a running cluster.
 8. Run steps 1 to 4 of [Lose `vdb`](#lose-vdb).
 9. Delete the staged imp files from `vda` with the first block of reinstall step 8. The bind of the
    new, empty dataset shadows them, so the block takes its first branch, which deletes them through
