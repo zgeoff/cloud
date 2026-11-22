@@ -63,12 +63,12 @@ context, after `bun install --frozen-lockfile` in `deploy/pepys`:
 4. It compiles the two entry files with
    [`compile-entries.ts`](../../../deploy/pepys/compile-entries.ts).
 
-The `@pepys/*` packages in `deploy/pepys/package.json` carry the release that `PEPYS_RELEASE` in
-`images/pepys/versions.env` names, so the binaries and the modules come from one release.
+The `@pepys/*` packages in `deploy/pepys/package.json` carry the release set in `PEPYS_RELEASE` in
+`images/pepys/versions.env`, so the binaries and the modules come from one release.
 [`collect-pepys-version-mismatches.test.ts`](../../../scripts/collect-pepys-version-mismatches.test.ts)
 fails when a package version differs from the release. `@boxxy/pepys` carries boxxy's own version
-and takes `@pepys/kit` as a peer, so the plug-in and the deployment share one copy of the kit.
-[The pepys runbook](../../runbooks/pepys.md#bump-the-pepys-release) gives the bump.
+and takes `@pepys/kit` as a peer, so the plug-in and the deployment share one copy of the kit. To
+bump the release, follow [the pepys runbook](../../runbooks/pepys.md#bump-the-pepys-release).
 
 The compile embeds Turso's native addon in the API. Turso's loader reaches the addon through
 `createRequire`, which `bun build --compile` does not follow, so the compile script drops that call,
@@ -114,9 +114,8 @@ wrong one. The signature is the route's only check: unlike a telemetry export, a
 proven sender, so each holder of the secret can write boxxy facts. A pod reaches the route only when
 ingest's network policy admits that pod, as [Network policies](#network-policies) says.
 
-The ingest Service has the pinned ClusterIP that `pepysIngest` in
-[`constants.json`](../../../packages/topology/constants.json) names, so a relay on the host can dial
-it.
+The ingest Service has a pinned ClusterIP, `pepysIngest` in
+[`constants.json`](../../../packages/topology/constants.json), so a relay on the host can dial it.
 
 ### The API's public route
 
@@ -133,9 +132,9 @@ Access fronts the sign-in pages for the owner, and the owner's passkey signs the
   `/auth`. The API exits at start with a public URL and no auth folder, so the program sets both or
   neither;
 - the claim `pepys-auth`, on `local-path-retain`, mounted at `/auth` in the API's container only. It
-  holds `mcp-auth.db`, the OAuth server's clients, grants, token hashes and the owner's passkey. A
-  claim of its own keeps the host's StatefulSet in place: a live StatefulSet refuses a new claim
-  template, so one would replace it;
+  holds `mcp-auth.db`, the OAuth server's clients, grants, token hashes and the owner's passkey. The
+  claim stands alone because a live StatefulSet refuses a new claim template, and adding one would
+  replace the StatefulSet;
 - the rule in the host pod's network policy that admits the shared tunnel's cloudflared to the API's
   port;
 - the tunnel's two rules, the Access application and the proxied record of the host.
@@ -146,14 +145,14 @@ the field in the pull request that pins a 0.3.0 or later image.
 
 The backup leaves `mcp-auth.db` out, as pepys decides in its design: a lost database costs one
 passkey enrollment and one sign-in per client, and the retaining class keeps the volume when its
-claim goes. [The API runbook](../../runbooks/pepys-api.md#turn-on-the-apis-public-route) turns the
-route on, enrolls the passkey and adds a client.
+claim goes. To turn the route on, enroll the passkey and add a client, follow
+[the API runbook](../../runbooks/pepys-api.md#turn-on-the-apis-public-route).
 
 A service client signs in at `/mcp` with a secret, with no person present, and gets the read scope.
 Stack config `pepys.serviceClientDigests` maps each client's name to the sha256 digest of its
 secret, which the API reads from a ConfigMap as its service-token file. A digest is no secret. The
-mount has no `subPath`, because a `subPath` mount keeps the first copy of the file.
-[Add a service client](../../runbooks/pepys-api.md#add-a-service-client) gives the steps.
+mount has no `subPath`, because a `subPath` mount keeps the first copy of the file. To add a service
+client, follow [the API runbook](../../runbooks/pepys-api.md#add-a-service-client).
 
 ### The API's tailnet route
 
@@ -219,7 +218,8 @@ Ingest reads the trust documents at start only. Pulumi names the ConfigMap, so a
 folder replaces the ConfigMap and rolls ingest. Ingest exits at start on a document that its loader
 refuses, and on an issuer name or a key that both folders hold. The Pulumi program checks the folder
 for each of these before the apply, and also refuses a document whose file name is not its issuer
-name. [Add a forwarder](../../runbooks/pepys-telemetry.md#add-a-forwarder) gives the steps.
+name. To add a forwarder, follow
+[Add a forwarder](../../runbooks/pepys-telemetry.md#add-a-forwarder).
 
 ### The telemetry path from a session
 
@@ -233,7 +233,7 @@ neither, and sends the request to the pepys relay on the host's address on Podma
 relay dials the ingest Service at its pinned ClusterIP. Ingest's policy has no rule for the relay,
 and the relay still passes: kube-router accepts a packet whose source is one of the node's own
 addresses before it applies any policy, so the policy needs no `ipBlock`. Ingest then checks the
-bearer token and the identity token as above. The secret's setup is in
+bearer token and the identity token as above. To set up the secret, follow
 [the telemetry runbook](../../runbooks/pepys-telemetry.md#let-sessions-send-telemetry).
 
 ## Network policies
@@ -296,10 +296,11 @@ digest, and the host's store needs none, because the host rebuilds it from the f
 
 The backup reads Garage with its own key, which can read each bucket the backup copies and write
 none. `pepysWorkloads.backup.buckets` in
-[`pepys-workloads.ts`](../../../infra/shared/pepys-workloads.ts) lists the buckets, so a bucket
-added there needs a read grant for the backup's key too. Garage creates s2-lite's key at each start,
-but it has no way to create a second key, so an operator imports the backup's key by hand, once and
-again after any rebuild of Garage's data. The
-[backup runbook](../../runbooks/pepys-backup.md#give-the-backup-its-garage-key) gives the steps.
+[`pepys-workloads.ts`](../../../infra/shared/pepys-workloads.ts) lists the buckets. When you add a
+bucket there, grant the backup's key read on it too. Garage creates s2-lite's key at each start, but
+it has no way to create a second key, so import the backup's key by hand, once and again after any
+rebuild of Garage's data. Follow
+[the backup runbook](../../runbooks/pepys-backup.md#give-the-backup-its-garage-key) to import it.
 
-[The pepys runbook](../../runbooks/pepys.md#deploy-the-first-time) deploys pepys the first time.
+To deploy pepys the first time, follow
+[the pepys runbook](../../runbooks/pepys.md#deploy-the-first-time).

@@ -19,15 +19,15 @@ metadata:
 
 ## Departures
 
-- Write each check as a job in cloud's own [`ci.yml`](../../../.github/workflows/ci.yml). The Jobs
-  section of [ci-design](../ci-design/SKILL.md) asks for a call to `bun-checks.yml` instead.
+- Write each check as a job in cloud's own [`ci.yml`](../../../.github/workflows/ci.yml). Skip
+  the call to `bun-checks.yml` that the Jobs section of [ci-design](../ci-design/SKILL.md) gives.
   `bun-checks.yml` has no input to set up Go, the Pulumi CLI or the backup and gateway images that
   the fixture suites run, and it can't skip a check whose files a change leaves alone.
 - Skip a job through its gate in [`gates.yml`](../../../.github/gates.yml), which the `decide` job
-  reads. The Path filters section of [ci-design](../ci-design/SKILL.md) asks for a `changes` job
-  that calls `paths-changed.yml` instead. One `decide` job decides every gate in one run. On a push
-  to main, it compares the push with main's last green commit, so it still runs the checks that a
-  cancelled run skipped.
+  reads. Skip the `changes` job that calls `paths-changed.yml`, which the Path filters section of
+  [ci-design](../ci-design/SKILL.md) gives. One `decide` job decides every gate in one run. On a push
+  to main, it compares the push with main's last green commit, so the checks that a cancelled run
+  skipped still run.
 
 ## The required check
 
