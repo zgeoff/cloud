@@ -226,7 +226,7 @@ every part ready. For a dry run, which changes nothing in impd, run steps 1 and 
      previous="$(manifest "$PREVIOUS_IMAGE")" || exit 1
      in_use="$(host_imp ls --json < /dev/null | jq -r '.[].image')" || exit 1
      comm -23 <(sort -u <<< "$pinned") <(printf '%s\n' "$current" "$previous" "$in_use" | sort -u)
-   )" && printf 'unpin: %s\n' ${unpin:-none} || { unpin=''; echo 'a listing failed: unpin nothing' >&2; }
+   )" && sed 's/^/unpin: /' <<< "${unpin:-none}" || { unpin=''; echo 'a listing failed: unpin nothing' >&2; }
    ```
 
    Expect one `unpin: <name>` line per image, or `unpin: none`. When the image listing, a manifest
