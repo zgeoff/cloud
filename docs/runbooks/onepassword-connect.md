@@ -2,8 +2,8 @@
 
 A Connect server in k3s lets a granted imp read vault items with `op read`, through imp's credential
 broker. It has no public route. Use this runbook to set the path up, rotate its secrets, or find why
-an imp's `op read` fails. [1Password Connect](../architecture/workloads/onepassword-connect.md)
-explains the path.
+an imp's `op read` fails. For how the path works, read
+[1Password Connect](../architecture/workloads/onepassword-connect.md).
 
 ## The path
 
@@ -33,14 +33,14 @@ op read op://cloud/onepassword-connect-token/credential \
       --header authorization --scheme bearer --upstream http://10.88.0.1:18081
 ```
 
-Replacing an older binding (the secret bound to a different host) needs `--replace --rebind`.
+To replace an older binding, such as the secret bound to a different host, add `--replace --rebind`.
 
 ## Rotate
 
-- **The token:** mint a new one in 1Password, update the item `onepassword-connect-token`, and run
-  the command above with `--replace`.
-- **The credentials file:** update the item `onepassword-connect-credentials`, then `bun run up`.
-  Pulumi replaces the Secret and the Deployment rolls the pod.
+- To rotate the token, mint a new one in 1Password, update the item `onepassword-connect-token`, and
+  run the command above with `--replace`.
+- To rotate the credentials file, update the item `onepassword-connect-credentials`, then run
+  `bun run up`. Pulumi replaces the Secret, and the Deployment rolls the pod.
 
 ## Check from a granted imp
 
@@ -92,5 +92,5 @@ Run these on the host (`ssh root@geoffcloud`). None of them takes a secret.
 | Symptom             | Cause                                                     | Fix                                                                                                                                                            |
 | ------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 502 from the broker | the relay or Connect is down                              | on the host: `systemctl status onepassword-connect-relay.socket`; check the Service's ClusterIP is still `10.43.82.198`; `k3s kubectl -n onepassword get pods` |
-| 403 from Connect    | a write: the token is read-only                           | none: writes are out of scope                                                                                                                                  |
+| 403 from Connect    | the request is a write, and the token is read-only        | none; writes are out of scope                                                                                                                                  |
 | 401 from Connect    | the token is missing a grant on the vault, or it is wrong | in 1Password, give `imp-connect` and its token access to the `imp` vault; re-add the token                                                                     |
