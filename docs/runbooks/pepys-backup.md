@@ -21,8 +21,8 @@ read, and `cloud-deploy`, which [the prod apply job](./prod-apply.md) reads to g
 the key.
 
 The Pulumi program adds the backup CronJob only while the repo's root `.env` names every
-`PEPYS_BACKUP_*` and `PEPYS_R2_*` variable. The steps below do not need the CronJob, except the
-last.
+`PEPYS_BACKUP_*` and `PEPYS_R2_*` variable. Of the five steps below, only the last needs the
+CronJob, as does [Back up now](#back-up-now).
 
 1. Check whether the item exists in each vault:
 

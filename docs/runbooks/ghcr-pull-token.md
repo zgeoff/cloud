@@ -1,19 +1,19 @@
 # The GHCR pull token
 
-k3s pulls the atc gateway's image and the backup image from GHCR, where both packages are private. A
-pull Secret named `ghcr-pull` holds the login and token that k3s pulls them with, in each namespace
-that runs one of the images: `atc` for the gateway and its backup, and `nixie` for nixie's backup.
+k3s pulls several workloads' images from GHCR, where the packages are private: the atc gateway and
+its backup, nixie's backup, pepys, boxxy and files. A pull Secret named `ghcr-pull` holds the login
+and token that k3s pulls them with, in each namespace that runs one of the images.
 [The atc gateway](../architecture/workloads/atc-gateway.md#the-gateway-pod) explains why the Secret
 has a fixed name. This runbook rotates the token and checks a pull.
 
 ## What holds what
 
-| Where                                       | Holds                                                             |
-| ------------------------------------------- | ----------------------------------------------------------------- |
-| vault `cloud`, item `ghcr-pull`             | the GitHub login (`username`) and the token (`credential`)        |
-| vault `cloud-deploy`, item `ghcr-pull`      | the apply job's copy of the same two fields                       |
-| `.env`                                      | `GHCR_PULL_USERNAME` and `GHCR_PULL_TOKEN`, as `op://` references |
-| the Secret `ghcr-pull` in `atc` and `nixie` | the two values as a docker config, set by Pulumi from `.env`      |
+| Where                                              | Holds                                                             |
+| -------------------------------------------------- | ----------------------------------------------------------------- |
+| vault `cloud`, item `ghcr-pull`                    | the GitHub login (`username`) and the token (`credential`)        |
+| vault `cloud-deploy`, item `ghcr-pull`             | the apply job's copy of the same two fields                       |
+| `.env`                                             | `GHCR_PULL_USERNAME` and `GHCR_PULL_TOKEN`, as `op://` references |
+| the Secret `ghcr-pull` in each of those namespaces | the two values as a docker config, set by Pulumi from `.env`      |
 
 The token is a classic personal access token, because GHCR accepts no fine-grained token for a
 package pull. A classic token with `read:packages` reads every package the account can see, so the
@@ -48,8 +48,9 @@ the stack.
    bun run preview -- --refresh
    ```
 
-   Expect an update to the Secret `atc-ghcr-pull`, and to `nixie-ghcr-pull` when nixie's backup is
-   set, and nothing else. A changed token updates each Secret in place, so no pod restarts.
+   Expect an update to each pull Secret and nothing else. The preview names each by its Pulumi
+   resource name, such as `atc-ghcr-pull` or `pepys-ghcr-pull`, one for each workload the stack
+   sets. A changed token updates each Secret in place, so no pod restarts.
 
 5. Apply, then check that nothing drifted:
 
@@ -93,7 +94,7 @@ Secret in `atc`, and runs `restic version` in it.
 
    Expect `Succeeded`. A phase of `Pending` with the event `Failed to pull image` and
    `401 Unauthorized` means GHCR refused the token. Read the events with
-   `kubectl -n atc describe pod ghcr-pull-check`.
+   `ssh root@geoffcloud k3s kubectl -n atc describe pod ghcr-pull-check`.
 
 3. Remove the pod:
 
