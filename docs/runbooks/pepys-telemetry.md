@@ -33,8 +33,8 @@ The secret tells the broker to add the identity token as well. The auth profile 
 the `[otel]` section of its `config.toml`. `geoffcloud`'s NixOS configuration defines the profile
 and gives it to each agent, so no step here creates it. No agent entry or profile in that
 configuration sets `CLAUDE_CODE_ENABLE_TELEMETRY`, `OTEL_LOGS_EXPORTER`,
-`OTEL_EXPORTER_OTLP_PROTOCOL` or `OTEL_EXPORTER_OTLP_ENDPOINT`, because the daemon starts without an
-entry that sets one beside the profile.
+`OTEL_EXPORTER_OTLP_PROTOCOL` or `OTEL_EXPORTER_OTLP_ENDPOINT`, because atc refuses an entry that
+sets one beside the profile.
 [The cloud daemon](../architecture/workloads/atc-gateway.md#the-cloud-daemon) covers the atc daemon
 and its auth profiles.
 
@@ -183,7 +183,8 @@ have sent telemetry. Check these, in order, and run the query again after each f
    - When `(identity)` is missing, the broker adds no identity token, and ingest answers 401 to each
      export and logs nothing. Add the secret again as step 5 of
      [Let sessions send telemetry](#let-sessions-send-telemetry) says for a change to `--identity`.
-     That step drops each imp's grant of the secret, so spawn a new session afterwards.
+     That step drops each imp's grant of the secret, so set the grantable list again as step 6 does,
+     then spawn a new session.
 
 6. When the API still answers `{"json":[]}`, [rotate the token](#rotate-the-token). Ingest also
    answers 401 to a wrong bearer token, and no command compares impd's copy of the token with the
@@ -276,8 +277,8 @@ Run each command on a device on the tailnet.
 
    Expect `404`, Traefik's answer.
 
-3. Check that ingest stores the forwarder's records. Read ingest's log for a warning that names the
-   sender route:
+3. Check that ingest refuses none of the forwarder's records. Read ingest's log for a warning that
+   names the sender route:
 
    ```sh
    ssh root@geoffcloud k3s kubectl -n pepys logs deployment/pepys-ingest --since=10m | grep forwarded

@@ -176,7 +176,8 @@ reaches `root@geoffcloud` over SSH. A failure in any of them is a reason to
 
 Roll back when imp-host does not come up under Podman, or when a post-switch check fails and no fix
 can wait. The previous generation brings back Docker, `imp-docker-proxy` and imp-host's Docker unit,
-and Docker still holds the 5.0.0 image, so the rollback pulls nothing.
+and Docker's image store in `/var/lib/docker` survives the switch's removal of Docker, so it still
+holds the 5.0.0 image and the rollback pulls nothing.
 
 **CAUTION:** The rollback stops imp-host, and the stop sleeps every awake imp within its stop
 timeout. An imp that does not sleep in time loses its memory, not its disk. Stop the atc sessions
@@ -216,10 +217,11 @@ and sleep the awake imps first, as steps 2 and 3 of the switch do, with `podman`
    applies the egress-deny NetworkPolicy and nixie's imp config for `docker0` again, and the next
    host switch from `main` keeps imp 5.0.0.
 
-impd's database needs no restore, because imp 6.0.2 ran no migration on it. When it does need one,
-restore the copy from step 1 of the switch with the 5.0.0 generation's own `restore-impd-db`, as
-[the restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back) describes, once the
-rollback has run. imp 6's `restore-impd-db` refuses a generation that runs imp-host under Docker.
+impd's database needs no restore, because imp 6.0.2 ran no migration on it. If the rolled-back impd
+still fails on its database, restore the copy from step 1 of the switch with the 5.0.0 generation's
+own `restore-impd-db`, as [the restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back)
+describes, once the rollback has run. imp 6's `restore-impd-db` refuses a generation that runs
+imp-host under Docker.
 
 ## Rebind the upstream secrets
 
