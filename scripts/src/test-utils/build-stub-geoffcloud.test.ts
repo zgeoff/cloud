@@ -62,7 +62,7 @@ test('it answers a sandbox’s probe from the sandbox’s reach once impz new ha
   });
 
   const created = await host.runRemote(
-    'podman exec imp-host impz new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3 --policy public',
+    'podman exec imp-host impz new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3 --policy public --memory 192',
   );
 
   const probe = await host.runRemote(

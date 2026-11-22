@@ -40,7 +40,7 @@ test('it reads a public page from the sandbox, finds every internal address bloc
   expect(
     host.commands.filter((command) => command.startsWith('podman exec imp-host impz new')),
   ).toStrictEqual([
-    'podman exec imp-host impz new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3 --policy public',
+    'podman exec imp-host impz new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3 --policy public --memory 192',
   ]);
 
   expect(printOut.mock.calls).toStrictEqual([
@@ -304,7 +304,7 @@ test('it stops when impd cannot create the sandbox, and names it for impz ls', a
   expect(exitCode).toBe(1);
 
   expect(host.commands.filter((command) => command.startsWith('podman'))).toStrictEqual([
-    'podman exec imp-host impz new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3 --policy public',
+    'podman exec imp-host impz new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3 --policy public --memory 192',
   ]);
 
   expect(printErr.mock.calls).toStrictEqual([
