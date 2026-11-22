@@ -1,16 +1,15 @@
 # Leak response
 
-This runbook gives the response to four leaks: an Onidel snapshot, the Onidel account, a restic
-backup and the disk `vdb`. Each section lists what the leak exposes and what to revoke, with the
-1Password item and the command for each credential. What a leak exposes follows from the host's
-layout: the data sits on `vdb` and its key on `vda`, so neither disk alone exposes the data
+When an Onidel snapshot, the Onidel account, a restic backup or the disk `vdb` leaks, find what the
+leak exposes and what to revoke in its section below, with the 1Password item and the command for
+each credential. What a leak exposes follows from the host's layout: the data sits on `vdb` and its
+key on `vda`, so neither disk alone exposes the data
 ([protection at rest](../architecture/secrets.md#protection-at-rest)).
 
-The response revokes the credentials that still sit on the leaked disk, and rotates nothing else. A
-credential that has since moved off `vda`, but sat there when an old snapshot was taken, stays
-valid, which is an accepted risk ([accepted risks](../architecture/secrets.md#accepted-risks)).
-Deleting old snapshots and cleaning the root disk's free space are the only ways to shrink that
-exposure.
+Revoke the credentials that still sit on the leaked disk, and rotate nothing else. A credential that
+has since moved off `vda`, but sat there when an old snapshot was taken, stays valid, which is an
+accepted risk ([accepted risks](../architecture/secrets.md#accepted-risks)). Deleting old snapshots
+and cleaning the root disk's free space are the only ways to shrink that exposure.
 
 **CAUTION:** Each revocation changes live access to the host or a backup. State its exact effect to
 the coordinating agent, and act only on its approval.
@@ -31,8 +30,8 @@ A snapshot copies `vda`, which holds these in plain form:
 - the atc daemon's state directory, which holds neither of the daemon's tokens
 
 A snapshot from before the encryption holds every host secret file and the cluster's datastore in
-plain form as well. No such snapshot remains, and the response for it is the account response,
-because the exposure is the same.
+plain form as well. No such snapshot remains. Answer one as
+[The Onidel account leaks](#the-onidel-account-leaks) does, because it exposes the same.
 
 1. Delete the snapshot on the Onidel API, so it leaks no further. `bun run onidel:snapshot` prints
    no snapshot ID, so list the IDs first. The key reaches curl through a header file, never its
@@ -44,7 +43,7 @@ because the exposure is the same.
    onidel -X DELETE https://api.cloud.onidel.com/snapshots/<snapshot_id>
    ```
 
-   Expect the list without the snapshot when you run the list again.
+   List the snapshots again, and expect the deleted one to be gone.
 
 2. Revoke the host's node and its host keys, as [Rejoin the tailnet](#rejoin-the-tailnet) describes.
 3. Change the ZFS key, as [Change the ZFS key](#change-the-zfs-key) describes, so the leaked key
@@ -53,8 +52,8 @@ because the exposure is the same.
 ## The Onidel account leaks
 
 **Encryption does not stop this leak.** The account controls the running host, with the key loaded,
-so it reaches every disk and every secret on the host. The response hardens the account and accepts
-the rest, which is an accepted risk.
+so it reaches every disk and every secret on the host. Harden the account. The rest is an accepted
+risk.
 
 | Credential           | 1Password item  | Command                                                                               |
 | -------------------- | --------------- | ------------------------------------------------------------------------------------- |
@@ -71,9 +70,9 @@ drift. Delete the old key in the panel after the apply. Delete every snapshot th
 
 ## A restic backup leaks
 
-A restic repository holds ciphertext, and its password sits in 1Password and in a file or Secret on
-the encrypted pool, and no longer on `vda`. A leaked repository alone therefore exposes nothing. A
-repository and its password together expose that system's backed-up data.
+A restic repository holds ciphertext. Its password sits in 1Password and in a file or Secret on the
+encrypted pool, and no longer on `vda`, so a leaked repository alone exposes nothing. A repository
+and its password together expose that system's backed-up data.
 
 | Repository   | Password item        | R2 key item             |
 | ------------ | -------------------- | ----------------------- |
@@ -96,15 +95,15 @@ in its item, and deliver it:
   CronJob's Secret. The bracket's baseline drift reads the new key from 1Password, so expect it to
   report that Secret's update and nothing else, and go on.
 
-The response leaves each restic password in place. A password that sat on `vda` before it moved to
-the pool, and so sits in an old `vda` snapshot, stays valid, which is the accepted no-rotation risk.
-The host's Tailscale node needs no revocation, because no backup holds its state.
+Leave each restic password in place. A password that sat on `vda` before it moved to the pool, and
+so sits in an old `vda` snapshot, stays valid, which is an accepted risk. The host's Tailscale node
+needs no revocation, because no backup holds its state.
 
 ## `vdb` leaks
 
 A copy of `vdb` holds ciphertext without the key. ZFS leaves the names and properties of the
-datasets readable, and encrypts their contents. The response revokes nothing, the host's Tailscale
-node included, because the node's state sits on `vda`.
+datasets readable, and encrypts their contents. Revoke nothing, not even the host's Tailscale node,
+because its state sits on `vda`.
 
 When the key leaked as well, through a snapshot or the account, the holder can read the copy. Answer
 it as [The Onidel account leaks](#the-onidel-account-leaks) does. A new ZFS key does not protect the
@@ -129,7 +128,7 @@ tailnet again with a new auth key. The reboot puts every imp to sleep and restar
 
    Expect `ok`.
 
-3. Schedule the rejoin, which runs after you remove the old node:
+3. Schedule the rejoin for two minutes from now, so it runs after you remove the old node:
 
    ```bash
    ssh root@geoffcloud 'systemd-run --on-active=120 --unit=tailnet-rejoin sh -c "systemctl stop tailscaled && rm -rf /var/lib/tailscale/tailscaled.state /var/lib/tailscale/ssh && rm -f /etc/ssh/ssh_host_* && systemctl reboot"'
@@ -162,8 +161,8 @@ names that point at the node reach nothing. A node's tailnet IPv6 address needs 
 repo holds only the tailnet's IPv6 range. Run these steps for each node that joined again:
 
 1. On the Tailscale admin console's Machines page, edit the node's IPv4 address, and enter the
-   `address` that `constants.json` gives the node. Tailscale lets an admin change a node's IPv4
-   address at any time ([IP pool](https://tailscale.com/docs/reference/ip-pool)).
+   node's `address` from `constants.json`. Tailscale lets an admin change a node's IPv4 address at
+   any time ([IP pool](https://tailscale.com/docs/reference/ip-pool)).
 2. Check from your machine: `tailscale ip -4 <node>` prints that address.
 
 ## Change the ZFS key
@@ -202,8 +201,8 @@ risk on the master key ([accepted risks](../architecture/secrets.md#accepted-ris
    ssh root@geoffcloud 'cd /var/lib/zfs-keys && zfs change-key -o keylocation=file:///var/lib/zfs-keys/tank.key.new tank/cloud && zfs change-key -o keylocation=file:///var/lib/zfs-keys/tank.key.new tank/imp && mv tank.key.new tank.key && chmod 0400 tank.key && zfs set keylocation=file:///var/lib/zfs-keys/tank.key tank/cloud && zfs set keylocation=file:///var/lib/zfs-keys/tank.key tank/imp && echo ok'
    ```
 
-   Expect `ok`. Without it, run `zfs get -H -o name,value keylocation tank/cloud tank/imp`: each
-   root's key location holds the file that opens it, so keep both files until both roots hold
+   Expect `ok`. If you don't see it, run `zfs get -H -o name,value keylocation tank/cloud tank/imp`:
+   each root's key location holds the file that opens it, so keep both files until both roots hold
    `tank.key`.
 
 4. Check:
