@@ -49,11 +49,11 @@ flowchart LR
 
 ## Protection at rest
 
-The host keeps its data on the second disk, `vdb`, and the data's key on the root disk, `vda`, so
-neither disk alone exposes the data. Every Onidel snapshot copies `vda` whole, and Onidel never
-snapshots `vdb`. A copy of either disk, alone, therefore holds the key or the data but never both,
-under the conditions that [Threats](#threats) gives for a snapshot.
-[The tank/cloud runbook](../runbooks/tank-cloud.md) creates the datasets and restores their key.
+The host keeps its data on the second disk, `vdb`, and the data's key on the root disk, `vda`. Every
+Onidel snapshot copies `vda` whole, and Onidel never snapshots `vdb`. A copy of either disk, alone,
+therefore holds the key or the data but never both, under the conditions that [Threats](#threats)
+gives for a snapshot. To create the datasets or restore their key, follow
+[the tank/cloud runbook](../runbooks/tank-cloud.md).
 
 ZFS on the pool `tank` encrypts the data under two encryption roots, both keyed by the one key:
 
@@ -64,14 +64,14 @@ ZFS on the pool `tank` encrypts the data under two encryption roots, both keyed 
 | the host services' secret files               | `tank/cloud/host-secrets`   | `tank/cloud`    |
 | the copies of impd's database                 | `tank/cloud/imp-db-backups` | `tank/cloud`    |
 
-k3s's data directory holds the cluster's datastore and every cluster volume, so every Kubernetes
-Secret and the gateway's and nixie's databases sit on the zvol too. `tank/cloud/rancher` is a zvol
-that holds ext4. Each service reads its usual path, because the host mounts the dataset, or binds a
+`tank/cloud/rancher` is a zvol that holds ext4. k3s's data directory holds the cluster's datastore
+and every cluster volume, so every Kubernetes Secret and the gateway's and nixie's databases sit on
+the zvol too. Each service reads its usual path, because the host mounts the dataset, or binds a
 directory of it, at that path.
 
 ### What stays plain on the root disk
 
-Four things stay on `vda` in plain form, each for a reason:
+These stay on `vda` in plain form:
 
 - **The host's Tailscale node state**, because access to the host must never depend on the pool. A
   host whose pool fails to unlock still joins the tailnet and answers SSH.
@@ -91,27 +91,27 @@ that master key unchanged.
 
 ### Threats
 
-Four threats shape the layout:
+The layout guards against these threats:
 
 1. **A leaked Onidel snapshot.** Encryption stops it, because a snapshot holds the key but no data.
    That holds while no snapshot from before the encryption survives and the root disk's free space
    holds no plain copy of the data.
 2. **A leaked Onidel account.** Encryption does not stop it. The account controls the running host,
-   with the key loaded. The response hardens the account and accepts the rest.
+   with the key loaded. The response to this risk hardens the account and accepts the rest.
 3. **A leaked restic backup.** restic encrypts each backup, and no backup's password sits on `vda`,
    so a snapshot and a backup together expose no backed-up data.
 4. **A stolen `vdb`.** It holds ciphertext without the key.
 
-[The leak runbook](../runbooks/leak-response.md) gives the response to each leak.
+For the response to each leak, follow [the leak runbook](../runbooks/leak-response.md).
 
 ### Accepted risks
 
-The layout leaves five risks open, each accepted:
+The layout leaves these risks open by choice:
 
 1. **Credentials in old snapshots stay valid.** A credential that sat in a `vda` snapshot gets no
    rotation for that reason, so it stays valid until its own rotation. Deleting the old snapshots
-   and cleaning the root disk's free space are the only ways to shrink that exposure, and nothing
-   can check how Onidel handles a deleted snapshot.
+   and cleaning the root disk's free space are the only ways to shrink that exposure, and no one can
+   check how Onidel handles a deleted snapshot.
 2. **A leaked Onidel account exposes everything**, because the account reaches the running host.
 3. **The Tailscale node key, the OpenSSH host keys and the ZFS key stay plain on `vda`**, so a
    snapshot leak exposes them.
@@ -124,15 +124,15 @@ The layout leaves five risks open, each accepted:
 
 ## Secrets 1Password cannot restore
 
-Three kinds of secret exist only where their system keeps them, and a rebuild that loses that place
-loses them:
+These secrets exist only where their system keeps them, and a rebuild that loses that place loses
+them:
 
 - **Pulumi's generated secrets**, such as Grafana's admin password, live only in the encrypted state
   in R2.
 - **impd's own secrets** live on its dataset: its root token, the broker's certificate authority,
   its TLS files and the values of the secrets it injects. impd's database holds its named tokens and
-  the names of its secrets. The token that lets a granted imp read 1Password lives only there, as
-  one of impd's secrets ([1Password Connect](./workloads/onepassword-connect.md)).
+  the names of its secrets. The token that lets a granted imp read 1Password lives only on that
+  dataset, as one of impd's secrets ([1Password Connect](./workloads/onepassword-connect.md)).
 - **k3s's own credentials**, its certificate authorities and its node token, live only in k3s's data
   directory. A rebuilt cluster makes new ones, so the kubeconfig in 1Password changes with it
   ([the restore runbook](../runbooks/restore-geoff-cloud.md#5-rebuild-the-cluster)). Every
@@ -141,7 +141,8 @@ loses them:
 
 ## Items outside `.env`
 
-The program reads the items `.env` references. Four more items in the vault serve other readers:
+The program reads the items that `.env` references. The vault also holds these items for other
+readers:
 
 | Item                    | Read by                                                                  |
 | ----------------------- | ------------------------------------------------------------------------ |
@@ -153,4 +154,4 @@ The program reads the items `.env` references. Four more items in the vault serv
 ## The Onidel VM object
 
 Onidel's API returns the VM's root password in the VM object. The provider drops the password when
-it decodes a response, so it never enters the state, and no script prints a whole VM object.
+it decodes a response, so it never enters the state. No script prints a whole VM object.

@@ -7,8 +7,8 @@ gateway keeps its clients and its grants in SQLite, so it runs as one replica on
 outlives a deleted claim, and a nightly job backs that volume up.
 [Public ingress](../network/public-ingress.md) covers the route in, and
 [the agent image](./agent-image.md) covers the image that sessions run on. Each sign-in outcome that
-the gateway writes as a security event reaches Discord as an alert, under
-[sign-in alerts](./observability.md#sign-in-alerts).
+the gateway writes as a security event reaches Discord as an alert
+([sign-in alerts](./observability.md#sign-in-alerts)).
 
 ## Daemons and the registry
 
@@ -19,8 +19,8 @@ a registry entry that points at the wrong daemon fails instead of reaching it. E
 own bearer token, which the gateway presents and the daemon checks, so a token taken from one
 daemon's path opens no other daemon.
 
-The gateway dials each daemon, and a daemon never dials the gateway. The two daemons sit at
-different distances:
+The gateway dials each daemon, and a daemon never dials the gateway. The gateway reaches the two
+daemons by different paths:
 
 - **The cloud daemon** runs on the host, so the gateway's traffic reaches the host's own tailnet
   address from the pod network without crossing the tailnet, and needs no tailnet grant. The host's
@@ -45,7 +45,7 @@ stack config stays unreachable until its address joins the policy.
 The gateway is atc's released binary in a distroless image that this repo builds. CI builds the
 image from the pinned release after checking the release's checksum. Only `main` publishes it: a
 push that changes the image pins, or a manual run on `main`, and neither replaces a tag that already
-exists. The stack config names each image by digest, so a deploy runs exactly the image that was
+exists. The stack config pins each image by digest, so a deploy runs exactly the image that was
 checked. After a publish, the workflow opens a pull request that pins the new digests, which merges
 and applies as a release bump does ([the release check](../../runbooks/release-check.md)).
 
@@ -96,8 +96,8 @@ with its claim and Secret and in its image.
 ## Service tokens
 
 A service in the cluster that cannot sign in with a browser calls `/mcp` with a fixed bearer token,
-which the gateway reads from a file at start (`--service-token-file`, atc 7.14.0 and later). The
-boxxy server holds the two such clients. Pulumi builds the file from the stack's `BOXXY_ATC_TOKEN`,
+which the gateway reads from a file at start (`--service-token-file`, atc 7.14.0 and later). Both
+such clients belong to the boxxy server. Pulumi builds the file from the stack's `BOXXY_ATC_TOKEN`,
 its `BOXXY_ATC_NOTICE_TOKEN` and the public URL: the resource is the public URL's origin and `/mcp`,
 and the gateway refuses to start when the file names another.
 
@@ -136,9 +136,9 @@ Secret, no init container, no mount and no flag, and the file leaves out each cl
 is unset. Pulumi refuses `serviceClientDigests` while the stack's `atcGateway.image` is older than
 7.16.0, because that gateway refuses the file and exits at start. While
 `images/atc-gateway/versions.env` pins an atc release older than 7.14.0, or the stack's
-`atcGateway.image` is older than 7.14.0, the image has no such flag. Pulumi then leaves them out and
-prints one warning for each variable that is set, so a deploy never starts a gateway that cannot
-read its arguments
+`atcGateway.image` is older than 7.14.0, the gateway has no `--service-token-file` flag. Pulumi then
+leaves out the Secret, the init container, the mount and the flag, and prints one warning for each
+variable that is set, so a deploy never starts a gateway that cannot read its arguments
 ([the boxxy runbook](../../runbooks/boxxy.md#the-service-token-at-the-atc-gateway)).
 
 ## The cloud daemon
@@ -153,13 +153,13 @@ becomes an environment variable of the daemon's process
 when the service starts, and the service then copies the bearer into its runtime directory on tmpfs,
 owned by the daemon's user with mode 0600, because atc refuses a token file that another user owns.
 So a rotated token reaches the daemon only after a restart; a reload rereads the old copy. The
-bearer comes from one 1Password item that both the gateway's Secret and the host's file take, and
-the daemon's file holds one token or two, so a rotation needs no outage: add the new token to the
-host's file beside the old one and restart the daemon, apply so the gateway rolls onto the new
-token, then remove the old one and restart again.
+bearer comes from one 1Password item that both the gateway's Secret and the host's file take. The
+daemon's file holds one token or two, so a rotation needs no outage: add the new token to the host's
+file beside the old one and restart the daemon, apply so the gateway rolls onto the new token, then
+remove the old one and restart again.
 
-The daemon has one execution target, impd on the host's loopback, and names every imp it creates
-with a fixed prefix. Its impd token can create, wake and destroy only imps with that prefix, so a
+The daemon has one execution target, impd on the host's loopback, and gives every imp it creates a
+fixed prefix. Its impd token can create, wake and destroy only imps with that prefix, so a
 compromised daemon cannot touch any other imp. The daemon's config lists each gateway client it
 serves, with the targets that client may use, and refuses a client it does not list, so it never
 falls back to running a session on the host itself.
@@ -202,8 +202,8 @@ design sessions never get the read-only token, and a review session cannot push.
 Two lists name every secret the daemon may grant. The profiles in the host's config name them, and
 the grantable list of the daemon's impd token (`scripts/atc-cloud-grantable.ts`) bounds them: `glm`,
 `claude-setup-token`, `github-imp-agents`, `linear-imp-agents`, `op-connect`, `pepys-telemetry`,
-`boxxy`, `boxxy-github-token` and `codex-chatgpt`. A new profile changes both, and the token's list
-changes by hand ([the boxxy runbook](../../runbooks/boxxy.md#let-sessions-reach-the-server)).
+`boxxy`, `boxxy-github-token` and `codex-chatgpt`. A new profile changes both lists; change the
+token's list by hand ([the boxxy runbook](../../runbooks/boxxy.md#let-sessions-reach-the-server)).
 
 The daemon's `principals` lists the OAuth clients of the gateway, the boxxy server's service token
 as `service:boxxy`, and atc's verify read client as `service:wringer-ro`
