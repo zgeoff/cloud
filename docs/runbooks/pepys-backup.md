@@ -4,25 +4,24 @@ Give the backup of [pepys](../architecture/workloads/pepys.md) its key to Garage
 on demand. Garage is the bucket store in the `pepys` namespace, and the backup copies Garage's
 buckets to R2 each day. Use [Give the backup its Garage key](#give-the-backup-its-garage-key) before
 the first backup, and again after Garage loses its keys. Use [Back up now](#back-up-now) to copy the
-buckets outside the daily schedule.
-[Secrets and the backup](../architecture/workloads/pepys.md#secrets-and-the-backup) explains what
-the backup copies and where.
+buckets outside the daily schedule. For what the backup copies and where, see
+[Secrets and the backup](../architecture/workloads/pepys.md#secrets-and-the-backup).
 
 ## Give the backup its Garage key
 
 Garage keeps its keys on its `meta` volume, and it creates only the key of s2-lite, the server of
-the fact log, at each start. An operator imports the backup's key by hand. A `meta` volume that
-starts empty, such as after a rebuild of Garage's data, holds no backup key, and the backup then
-fails with `AccessDenied`.
+the fact log, at each start. Import the backup's key by hand. A `meta` volume that starts empty,
+such as after a rebuild of Garage's data, holds no backup key, and the backup then fails with
+`AccessDenied`.
 
 The 1Password item `pepys-garage-backup` holds the key in two fields, `access-key-id` and
 `secret-access-key`. The item lives under the same name in two vaults: `cloud`, which these steps
 read, and `cloud-deploy`, which [the prod apply job](./prod-apply.md) reads to give the backup's pod
 the key.
 
-The Pulumi program adds the backup CronJob only while the repo's root `.env` names every
-`PEPYS_BACKUP_*` and `PEPYS_R2_*` variable. Of the five steps below, only the last needs the
-CronJob, as does [Back up now](#back-up-now).
+The Pulumi program adds the backup CronJob only while the repo's root `.env` sets every
+`PEPYS_BACKUP_*` and `PEPYS_R2_*` variable. Only step 5 below and [Back up now](#back-up-now) need
+the CronJob.
 
 1. Check whether the item exists in each vault:
 
@@ -64,9 +63,9 @@ CronJob, as does [Back up now](#back-up-now).
    Expect Garage's `INFO` connection lines and no error. When Garage already holds the key, the
    import fails with `KeyAlreadyExists` and changes nothing, so go on to the next step.
 
-4. Give the key read access to each bucket that the backup copies. `pepysWorkloads.backup.buckets`
-   in [`pepys-workloads.ts`](../../infra/shared/pepys-workloads.ts) lists the buckets. Run the
-   command once for each bucket, with the bucket's name in place of `facts`:
+4. Give the key read access to each bucket that the backup copies. Find the buckets in
+   `pepysWorkloads.backup.buckets` in [`pepys-workloads.ts`](../../infra/shared/pepys-workloads.ts).
+   Run the command once for each bucket, with the bucket's name in place of `facts`:
 
    ```sh
    ssh root@geoffcloud k3s kubectl -n pepys exec pepys-garage-0 -c garage -- \
@@ -77,7 +76,7 @@ CronJob, as does [Back up now](#back-up-now).
    s2-lite's `default access key`. Running it again changes nothing. The key then reads each bucket
    that the backup copies, and writes none.
 
-5. Run the backup once, as [Back up now](#back-up-now) describes.
+5. Run the backup once, with the steps in [Back up now](#back-up-now).
 
 ## Back up now
 

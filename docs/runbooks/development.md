@@ -1,6 +1,6 @@
 # Development
 
-This page sets up a machine to work on geoff.cloud, and ends with a preview of the live stack.
+Set up a machine to work on geoff.cloud, then preview the live stack.
 
 ## Prerequisites
 
@@ -29,13 +29,13 @@ bun install
 `bun install` also installs the lefthook git hooks. pre-commit fixes and checks staged files and
 runs gitleaks. pre-push runs the format check, the Pulumi pin and topology checks and typecheck on
 every push, and the linters and tests of each kind of file the branch changes, such as every shell
-suite for a branch that changes a shell file; `lefthook.yml` lists the jobs. pre-push then runs the
+suite for a branch that changes a shell file. The jobs are in `lefthook.yml`. pre-push then runs the
 rest of the baseline that `lefthook.yml` extends from `@zgeoff/chex`: the docs checks that
-`check:docs` names, and the local-path, test-timeout, dependency-gate and uncommitted-file checks.
+`check:docs` runs, and the local-path, test-timeout, dependency-gate and uncommitted-file checks.
 Its commit check skips, because cloud keeps its own commitlint config. CI runs the docs checks
 again, and adds the type-aware lint, the dead-code check and the NixOS checks.
 
-The Pulumi CLI runs at the version `infra/package.json` pins for `@pulumi/pulumi`, the one Pulumi
+Install the Pulumi CLI at the version `infra/package.json` pins for `@pulumi/pulumi`, the one Pulumi
 pin in the repo. CI installs that version for the SDK check, and `check:sdk` warns when the local
 CLI differs, because another CLI version can generate a different SDK.
 
@@ -43,14 +43,14 @@ CLI differs, because another CLI version can generate a different SDK.
 
 The repo is public, so it holds no secret. Every deployment input lives in the 1Password vault
 `cloud`. Some secrets live elsewhere: see [secrets](../architecture/secrets.md). The committed
-`.env` holds only `op://` references, and each command that needs them runs through `op run`:
+`.env` holds only `op://` references. Run each command that needs them through `op run`:
 
 ```sh
 op run --env-file=.env -- <command>
 ```
 
 The root scripts `preview`, `drift` and `up` already do this. `op` needs a service-account token
-that can read the `cloud` vault, in `OP_SERVICE_ACCOUNT_TOKEN`. `.env` names each variable and its
+that can read the `cloud` vault, in `OP_SERVICE_ACCOUNT_TOKEN`. Look in `.env` for each variable's
 1Password item.
 
 Never print a resolved value. Never log a whole Onidel VM object: the API returns the VM's root
