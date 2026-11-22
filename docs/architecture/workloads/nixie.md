@@ -3,16 +3,15 @@
 nixie is the owner's assistant: a server that keeps its state in SQLite, a web client in front of
 it, and an imp for every model loop it runs. It runs in k3s from nixie's released images, and it
 answers on the tailnet only, at one public name that points at the host's tailnet address. nixie
-reaches impd over the tailnet with a token limited to its own imps, so the host owner adds nixie's
-model credential to impd by hand before nixie starts. The prod apply adds each release's sandbox
-images to impd before nixie rolls, so the new pod finds them in place. Every model request of
-nixie's sandboxes passes the [model gateway](../../runbooks/model-gateway.md) on the host, which
-counts a day and a month and refuses past nixie's limits, so nixie pauses at its spending stop
-instead of spending past it. nixie sets those limits through the gateway's control relay on the
-host's tailnet address, which its network policy lets the pod reach.
-[The tailnet](../network/tailnet.md) covers the grants on the route in and out, and
-[the nixie runbook](../../runbooks/nixie.md) gives the steps for a deploy, an upgrade and a
-rotation.
+reaches impd over the tailnet with a token limited to its own imps. That token cannot add a secret,
+so the host owner adds nixie's model credential to impd by hand before nixie starts. The prod apply
+adds each release's sandbox images to impd before nixie rolls, so the new pod finds them in place.
+Every model request of nixie's sandboxes passes the [model gateway](../../runbooks/model-gateway.md)
+on the host, which counts spend per day and per month and refuses each request past nixie's limits,
+so nixie pauses at its spending stop. nixie sets those limits through the gateway's control relay on
+the host's tailnet address, which its network policy lets the pod reach. For the grants on the route
+in and out, see [the tailnet](../network/tailnet.md). For the steps of a deploy, an upgrade and a
+rotation, see [the nixie runbook](../../runbooks/nixie.md).
 
 ```mermaid
 flowchart LR
@@ -26,12 +25,12 @@ flowchart LR
 
 ## The pods
 
-nixie's design in its own repo sets the shape, and this repo keeps its own version of it. nixie runs
-as one replica of a StatefulSet, because SQLite takes one writer, and a rollout stops the old pod
-before it starts the new one. The StatefulSet starts and replaces its pod without waiting for it to
-turn ready, so an apply that fixes an unready nixie rolls it out. The data volume is a claim of the
-retaining storage class that the atc gateway's volume uses, so deleting the claim keeps `nixie.db`
-and the key store beside it.
+This repo follows the shape of nixie's design in nixie's own repo, and keeps its own version of it.
+nixie runs as one replica of a StatefulSet, because SQLite takes one writer, and a rollout stops the
+old pod before it starts the new one. The StatefulSet starts and replaces its pod without waiting
+for it to turn ready, so an apply that fixes an unready nixie rolls it out. The data volume is a
+claim of the retaining storage class that the atc gateway's volume uses, so deleting the claim keeps
+`nixie.db` and the key store beside it.
 
 nixie stages a backup set of both databases on its data volume, and a nightly CronJob runs the job
 in the `nixie-backup` image of nixie's release, which ships each set with restic to two repositories
@@ -40,16 +39,16 @@ keeps the newest set alone, so a forgotten item's key leaves the key repository 
 data repository's older snapshots tagged `nixie` hold a whole `keys.db` until retention drops them
 or an operator purges them
 ([purge a forgotten item](../../runbooks/nixie-backup.md#purge-a-forgotten-item-from-old-snapshots)).
-Kubernetes never retries a failed run, because a second run skips the set whose failed receipt the
-first wrote and exits 0.
+Kubernetes never retries a failed run, because a second run would skip the set whose failed receipt
+the first wrote, and exit 0.
 
 Each repository has its own password, which only 1Password and the backup's Secret hold, and nixie's
 own container mounts neither. Only nixie's commands open nixie's databases, so nixie may change its
 files between releases without breaking the backup. The CronJob runs as nixie's user, so nixie can
-remove what the job leaves, and the record keys stay useless without the deployment key in the
-secrets file. [nixie's backup](../../runbooks/nixie-backup.md) gives the steps. The volume sits in
-k3s's data directory on the encrypted zvol on the second disk, so no Onidel snapshot holds the
-databases ([protection at rest](../secrets.md#protection-at-rest)).
+remove what the job leaves. The record keys stay useless without the deployment key in the secrets
+file. For the steps, see [nixie's backup](../../runbooks/nixie-backup.md). The volume sits in k3s's
+data directory on the encrypted zvol on the second disk, so no Onidel snapshot holds the databases
+([protection at rest](../secrets.md#protection-at-rest)).
 
 The web client is a Deployment of its own, because it holds no state, no secret and no database. It
 calls nixie's API at its cluster address, and the browser calls `/rpc` on the web client's own
@@ -65,9 +64,9 @@ nixie's data and each container's temporary directory. nixie's health endpoint l
 migrations and the integrity check finish, so the pod's startup probe waits on liveness before the
 readiness probe takes over. Once nixie has turned ready, the readiness probe takes it out of its
 Service only when the database or the definitions seed fails, because nixie cannot serve without
-them. impd, the conversation imp and the disk are dependency parts: one that fails or answers slowly
-makes nixie answer 200 with the status degraded, because nixie is the only endpoint behind its
-Service and still serves its API. The NixieDegraded alert watches that status
+them. nixie's dependency parts are impd, the conversation imp and the disk. When one fails or
+answers slowly, nixie answers 200 with the status degraded, because nixie is the only endpoint
+behind its Service and still serves its API. The NixieDegraded alert watches that status
 ([alert rules](observability.md#alert-rules)).
 
 ## Configuration and definitions
@@ -92,8 +91,7 @@ arrives. git-sync retries a failed fetch every minute and never exits on one. It
 fails only until its first good sync, so a GitHub outage leaves the pod ready, and nixie serves the
 last checkout. The NixieDefinitionsStale alert reports that state with the time of the last good
 fetch ([alert rules](observability.md#alert-rules)). The pod's file-system group is a supplementary
-group of both containers, which is what lets git-sync read its key and nixie read git-sync's
-checkout.
+group of both containers, so git-sync can read its key and nixie can read git-sync's checkout.
 
 nixie never writes to that checkout. When nixie writes a skill, it opens a pull request in
 `zgeoff/nixie-definitions` with a token from its secrets file, and git-sync brings the skill back
@@ -109,8 +107,8 @@ nixie decrypts its own secrets file in its own process at start and keeps the pl
 The file is `deploy/nixie/secrets.sops.yaml`, encrypted with sops to two age recipients: the host
 key, which the pod holds, and the recovery key, which stays in 1Password and off the host. The repo
 holds only the public halves, in the sops config beside the file. The file holds the deployment key
-that wraps every record key, nixie's impd token, the token nixie opens a pull request in the
-definitions repo with for each skill it writes, and the owner's name under `settings`, which the
+that wraps every record key, nixie's impd token, the token nixie uses to open a pull request in the
+definitions repo for each skill it writes, and the owner's name under `settings`, which the
 configuration names as `deployment:owner_name` so the name stays out of this public repo.
 
 Pulumi puts the encrypted file and the host's age identity into one Secret, and only the nixie
@@ -128,10 +126,11 @@ whose reads call nixie's API. Each half has its own credential, and neither can 
 The doctor reads the cluster as the service account `nixie-verify`. Its Role grants only `get`, each
 on one named object: the pod `nixie-0` and its log, the StatefulSet `nixie`, and `services/proxy` on
 `http:nixie:http`. The API server authorizes a proxy call by the whole name in the URL, scheme and
-port included, so the bare Service name refuses it. A `get` through the proxy reaches nixie's API
-port as an anonymous call, because the API server strips the caller's token before it proxies. The
-account cannot list, exec, port-forward, read a Secret or proxy to another Service, and the
-port-forward guard in the Pulumi program checks the Role like any other.
+port included, so the API server refuses the call when the Role grants only the bare Service name. A
+`get` through the proxy reaches nixie's API port as an anonymous call, because the API server strips
+the caller's token before it proxies. The account cannot list, exec, port-forward, read a Secret or
+proxy to another Service, and the port-forward guard in the Pulumi program checks the Role like any
+other.
 
 No pod runs as the account, so it has no mounted token. Two callers mint one with the admin
 kubeconfig:
@@ -144,19 +143,19 @@ kubeconfig:
   check
   ([`ops:store-nixie-verify-kubeconfig`](../../runbooks/ops.md#bun-run-opsstore-nixie-verify-kubeconfig)).
 
-The reads use an API token that nixie answers only read procedures for. `config.yaml` lists the
-token's SHA-256 under `api.read_only_token_hashes`, and the token itself stays in vault `nixie`, so
-the public repo holds no credential. The deploy job runs no read, because the conversation and the
-task list are the owner's data.
+The reads use an API token, and nixie answers only read procedures for that token. `config.yaml`
+lists the token's SHA-256 under `api.read_only_token_hashes`, and the token itself stays in vault
+`nixie`, so the public repo holds no credential. The deploy job runs no read, because the
+conversation and the task list are the owner's data.
 
 ## Reaching impd
 
 nixie calls impd's API at `imps.geoff.cloud` over HTTPS. A pod has no tailnet identity of its own,
 so the call leaves through the host's node as `tag:cloud`, on the tailnet grant to impd's node for
 HTTPS that the policy names as nixie's route to impd. That grant keeps the route open when the
-health probe's grant changes, and [the tailnet](../network/tailnet.md#identities) explains how the
-two grants combine. impd delivers each tool call from an imp back over nixie's own connection, so
-the pod opens no inbound port for its tools.
+health probe's grant changes. For how the two grants combine, see
+[the tailnet](../network/tailnet.md#identities). impd delivers each tool call from an imp back over
+nixie's own connection, so the pod opens no inbound port for its tools.
 
 The grant belongs to the host's node, so an egress NetworkPolicy decides which pod in nixie's
 namespace may use it. nixie's pod and the Job that adds its sandbox images reach impd's node, on
@@ -179,9 +178,9 @@ secret's value in impd under the same name, with no deploy.
 The prod apply adds a release's sandbox images to impd before Pulumi rolls nixie's StatefulSet. At
 start, nixie adds each image of its sandbox manifest that impd lacks, and it first turns ready only
 once impd holds them all. A pull takes minutes, so an add at start would leave the new pod unready
-after the old one stopped. Pulumi runs a local command on the apply's machine. The StatefulSet, and
-the config ConfigMap, the Secret and the definitions key that nixie's pod mounts, wait for that
-command, and the backup's copy of the config waits for the roll:
+after the old one stopped. Pulumi runs a local command on the apply's machine. The StatefulSet waits
+for that command, as do the config ConfigMap, the Secret and the definitions key that nixie's pod
+mounts. The backup's copy of the config waits for the roll. The command runs these steps:
 
 1. The command creates a ConfigMap that holds the add script, bundled into one file, because the
    nixie image holds Bun but none of this repo's packages.

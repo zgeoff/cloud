@@ -4,8 +4,8 @@ A granted imp reads items from the owner's 1Password vault `imp` through a 1Pass
 in the cluster, and the imp never holds the Connect token. imp's credential broker holds the token
 and adds it to each request, so the guest sees only a placeholder. Connect has no public route, and
 imp-host cannot reach the cluster directly, so each request takes a fixed path through a relay on
-the host. [Secrets](../secrets.md) covers how the token reaches impd, and
-[firewalls](../network/firewalls.md) covers the tables the path crosses.
+the host. For how the token reaches impd, see [Secrets](../secrets.md). For the tables the path
+crosses, see [firewalls](../network/firewalls.md).
 
 ## The path
 
@@ -28,14 +28,13 @@ flowchart LR
 
 The relay is one instance of the module that also relays pepys ingest and the boxxy worker Service
 ([firewalls](../network/firewalls.md#the-narrowing-table)); its unit names, address and port are its
-own. The relay exists because imp's forward table drops imp-host's traffic to the cluster's ranges,
-and the drop holds even after kube-proxy rewrites a destination, so the container can reach neither
-the Service, nor a pod, nor a NodePort. The host is not under that rule, so the host dials the
-Service for it. systemd holds the relay's socket and starts the proxy on the first connection, so
-the socket can bind the host's address on Podman's bridge before Podman's network backend creates
-the bridge for imp-host. A NixOS switch never restarts a changed socket unit, so a switch that moves
-the relay's address restarts the socket through a unit of its own, and the proxy stops with the
-socket.
+own. The relay exists because imp's forward table drops imp-host's traffic to the cluster's ranges.
+The drop holds even after kube-proxy rewrites a destination, so the container can reach neither the
+Service, nor a pod, nor a NodePort. The host is not under that rule, so the host dials the Service
+for it. systemd holds the relay's socket and starts the proxy on the first connection, so the socket
+can bind the host's address on Podman's bridge before Podman's network backend creates the bridge
+for imp-host. A NixOS switch never restarts a changed socket unit, so a switch that moves the
+relay's address restarts the socket through a unit of its own, and the proxy stops with the socket.
 
 The relay dials the Service by its cluster address, so the Service pins that address, and Pulumi
 ignores any later change to it. Recreating the Service at a new address would silently break the
@@ -45,10 +44,10 @@ which moves imp-host to a bridge of its own.
 
 ## What limits a read
 
-- **The token is read-only.** The Connect token reads the `imp` vault only, so Connect itself
-  refuses a write and any other vault.
-- **The grant is per imp.** Only an imp that impd granted the Connect secret gets the broker's
-  injection, so an ungranted imp reaches the name and gets no token.
+- **The token is read-only.** The Connect token can only read, and only the `imp` vault, so Connect
+  itself refuses a write or a request for any other vault.
+- **The grant is per imp.** The broker adds the token only for an imp that impd granted the Connect
+  secret. An ungranted imp can still reach the name, and its requests carry no token.
 - **The relay's port is local.** The host's narrowing table admits the relay's port from Podman's
   subnet only, on Podman's bridge. Every container on that bridge can reach it, and each still needs
   the bearer.
@@ -61,7 +60,7 @@ which moves imp-host to a bridge of its own.
 
 ## Credentials
 
-Connect has two secrets. The server's credentials file lets it sync the vault, and Pulumi turns it
-into the server's Secret from 1Password. The access token, which the broker presents, lives only in
-impd: neither the repo nor Pulumi holds it. A token rotation is therefore an impd change and no
-Pulumi run ([the Connect runbook](../../runbooks/onepassword-connect.md)).
+Connect has two secrets. The server needs its credentials file to sync the vault, and Pulumi reads
+that file from 1Password and turns it into the server's Secret. The access token, which the broker
+presents, lives only in impd: neither the repo nor Pulumi holds it. To rotate the token, change
+impd; no Pulumi run is needed. See [the Connect runbook](../../runbooks/onepassword-connect.md).
