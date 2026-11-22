@@ -1,20 +1,22 @@
 # Switch geoffcloud from imp 5 on Docker to imp 6 on Podman
 
+Follow this runbook once, to move geoffcloud from imp 5.0.0 to imp 6.0.2, and to move it back if the
+move fails.
+
 imp 6.0.0 runs imp-host under rootful Podman instead of Docker, and its NixOS module no longer
 enables Docker. The host switch that brings imp 6 to geoffcloud therefore stops the Docker
-container, removes Docker and `imp-docker-proxy` from the host, and starts imp-host under Podman on
-Podman's default network, whose bridge `podman0` replaces `docker0` for the Connect relay and the
+container, removes Docker and `imp-docker-proxy` from the host, and starts imp-host on Podman's
+default network. That network's bridge, `podman0`, replaces `docker0` for the Connect relay and the
 preview model route listener. imp-host's CPU weight moves with it, from Docker's `imp.slice` to
 `machine.slice`, where rootful Podman puts each container. impd's data on `tank/imp` stays as it is,
-and imp 6.0.2 adds no database migration to 5.0.0, so a rollback keeps the database. This runbook
-moves the host once, from imp 5.0.0 to imp 6.0.2, and back if the move fails.
+and imp 6.0.2 adds no database migration to 5.0.0, so a rollback keeps the database.
 
 ## Before the switch
 
-Outside the host, the cluster is set for Podman: the egress-deny NetworkPolicy refuses pods Podman's
-subnet instead of Docker's, and nixie's imp config lists the host's address on `podman0`. Until the
-switch, inet cloud_host on the host still drops pod traffic to Docker's subnet, so no pod reaches
-imp-host on `docker0` in between.
+Outside the host, the cluster is set for Podman: the egress-deny NetworkPolicy blocks pod traffic to
+Podman's subnet instead of Docker's, and nixie's imp config holds the host's address on `podman0`.
+Until the switch, inet cloud_host on the host still drops pod traffic to Docker's subnet, so no pod
+reaches imp-host on `docker0` in between.
 
 Check each of these before you start:
 
@@ -175,9 +177,9 @@ reaches `root@geoffcloud` over SSH. A failure in any of them is a reason to
 ## Roll back to imp 5.0.0
 
 Roll back when imp-host does not come up under Podman, or when a post-switch check fails and no fix
-can wait. The previous generation brings back Docker, `imp-docker-proxy` and imp-host's Docker unit,
-and Docker's image store in `/var/lib/docker` survives the switch's removal of Docker, so it still
-holds the 5.0.0 image and the rollback pulls nothing.
+can wait. The previous generation brings back Docker, `imp-docker-proxy` and imp-host's Docker unit.
+Docker's image store in `/var/lib/docker` survives the switch's removal of Docker and still holds
+the 5.0.0 image, so the rollback pulls nothing.
 
 **CAUTION:** The rollback stops imp-host, and the stop sleeps every awake imp within its stop
 timeout. An imp that does not sleep in time loses its memory, not its disk. Stop the atc sessions
