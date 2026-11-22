@@ -22,14 +22,13 @@ metadata:
 
 | Fact          | Where                                                                                                                                                                                                                                                                                                                   |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Test commands | [`rig.config.ts`](../../../rig.config.ts) holds each test command's file suffix and per-test timeout. `bun run test:e2e` runs the journeys in `scripts/e2e/` through `rig e2e`, which builds each program that `rig.config.ts` declares first, and `bun run test` leaves them out                                                                                                                                   |
+| Test commands | [`rig.config.ts`](../../../rig.config.ts) holds each test command's file suffix and per-test timeout. `bun run test:e2e` runs the journeys in `scripts/e2e/` through `rig e2e`, which first builds each program that `rig.config.ts` declares, and `bun run test` leaves them out                                                                                                                                   |
 | Test utils    | the `src/test-utils/` folder of the package, such as [`infra/src/test-utils/`](../../../infra/src/test-utils/) or [`scripts/src/test-utils/`](../../../scripts/src/test-utils/); [`scripts/src/test-utils/shell/`](../../../scripts/src/test-utils/shell/) for a shell suite; [`nixos/checks/test-utils/`](../../../nixos/checks/test-utils/) for a NixOS check |
 
 ## Departures
 
-- Assert a Go test with testify's `assert` and `require`.
-  [Go assertions](../testing/references/go.md#assertions) asks for gotest.tools or go-cmp. Every
-  provider test uses testify, and a second library would split the suite.
+- Assert a Go test with testify's `assert` and `require`, in place of the gotest.tools or go-cmp of
+  [Go assertions](../testing/references/go.md#assertions). Every provider test uses testify, and a second library would split the suite.
 
 ## Suites in CI
 
@@ -40,14 +39,14 @@ metadata:
   Docker suite the group of the `test:*` script that runs it, such as `alert-rules` for
   `test:alert-rules`.
 - When a suite starts to read a new file, add that file's path to the suite's gate in
-  [`gates.yml`](../../../.github/gates.yml), if it has one. A gate lists the paths whose change makes
-  CI run a check. CI skips the suite when only an unlisted file changes.
+  [`gates.yml`](../../../.github/gates.yml), if it has one. CI runs a gated suite only when one of the
+  paths in its gate changes.
 - Read the `NixOS checks` result on the pull request before you merge a change to a check's inputs.
   The workflow doesn't block the merge, but
   [`switch-geoffcloud.sh`](../../../scripts/switch-geoffcloud.sh) refuses to deploy a commit unless a
   green run on main covers it.
-- Run `git config maintenance.auto false` in each git repository a test creates, a bare origin
-  included, in any language. Git's background repack can write into the repository while the cleanup removes it.
+- Run `git config maintenance.auto false` in each git repository that a test in any language
+  creates, a bare origin included. Git's background repack can write into the repository while the cleanup removes it.
 
 ## Real hosts
 
@@ -78,7 +77,8 @@ only.
 - When a case checks the requests that gh itself sends, run the real `gh` against the loopback API
   that [`start-stub-github-api.sh`](../../../scripts/src/test-utils/shell/start-stub-github-api.sh)
   starts, with `GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1`, so it sends no telemetry and
-  makes no update check. Every other case uses the gh stand-in that Shell stand-ins describes.
+  makes no update check. In every other case, use the gh stand-in from
+  [Shell stand-ins](#shell-stand-ins).
 - Give a TLS stand-in's certificate to the client through `SSL_CERT_FILE`, with `SSL_CERT_DIR` set to
   an empty case folder, so the client trusts that certificate and no system one.
 
@@ -115,8 +115,8 @@ only.
 
 ## Operator scripts
 
-These rules cover the TypeScript scripts in `scripts/`, and the TypeScript tests of the bash scripts
-in `scripts/host/`.
+Follow these rules for the TypeScript scripts in `scripts/`, and for the TypeScript tests of the bash
+scripts in `scripts/host/`.
 
 - Run every subprocess through the script's injected `Runner`. In a test, pass
   [`buildStubRunner`](../../../scripts/src/test-utils/build-stub-runner.ts), which exits 97 with
@@ -138,11 +138,12 @@ in `scripts/host/`.
 - Name each case `@test "it <words>"`. Run the cases whose title holds a phrase with
   `CASE='<phrase>' bash scripts/run-bats.sh <group>`.
 - Load [`setup.bash`](../../../scripts/src/test-utils/bats/setup.bash) from both `setup_file` and
-  `setup`, and call `stop_timeout_watchdog` first in every `teardown`, as `setup.bash` explains.
+  `setup`, and call `stop_timeout_watchdog` first in every `teardown`. The reason is in the comment above it in
+  `setup.bash`.
 - In `setup`, load the stand-in scripts the suite uses, set `umask 022`, and set
   `tree="$BATS_TEST_TMPDIR"`, the case tree.
-- Write one `setup_test` per suite, which each case calls first. It wires the stand-ins every case
-  needs and holds no scenario data.
+- Write one `setup_test` per suite, and call it first in each case. Wire in it the stand-ins every
+  case needs, and keep scenario data out of it.
 - Run the script under test with `env -i` and a `PATH`, `HOME` and `TMPDIR` in the case tree, with
   `$tree/bin`, the case's `bin` folder, first on `PATH`.
 - Compare the whole stdout, stderr and stand-in call log. Use `run -<status> --separate-stderr`
@@ -153,8 +154,8 @@ in `scripts/host/`.
 
 A NixOS check's cases can call only the shell helpers that
 [`build-shell-lib-source.nix`](../../../nixos/checks/test-utils/build-shell-lib-source.nix) copies
-into the checks. To call another helper there, add it to that file, as
-[nixos-checks.md](./references/nixos-checks.md) says.
+into the checks. To call another helper there, add it to that file, following
+[nixos-checks.md](./references/nixos-checks.md).
 
 ## Shell stand-ins
 
