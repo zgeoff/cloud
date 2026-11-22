@@ -9,10 +9,10 @@ directory. When the key fails to load, the host still boots to SSH, and k3s, imp
 daemon stay stopped, so none of them starts on an empty mount point on `vda`.
 
 The NixOS module `nixos/modules/tank-cloud.nix` does the unlock and the mounts. It never creates the
-datasets. geoffcloud's config already enables it, so you create them with the commands below only on
-a pool that lacks them, such as a new `vdb` after [Lose `vdb`](./lost-disk.md#lose-vdb). The
-`tank-cloud-unlock` check boots a VM through those commands, a reboot, a reboot without the key and
-a restored key.
+datasets. geoffcloud's config already enables the module. Create the datasets with the commands
+below only on a pool that lacks them, such as a new `vdb` after
+[Lose `vdb`](./lost-disk.md#lose-vdb). The `tank-cloud-unlock` check boots a VM through those
+commands, a reboot, a reboot without the key and a restored key.
 
 The secret files of imp-host and the atc daemon and impd's database copies keep their paths and live
 on these datasets: the module bind-mounts the directories `imp-host` and `atc-daemon` of
@@ -79,7 +79,7 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
 4. Make the ext4 filesystem on the zvol:
 
-   **CAUTION:** `mkfs.ext4` erases the device it is given. Check the path names the new zvol.
+   **CAUTION:** `mkfs.ext4` erases the device it is given. Check that the path is the new zvol's.
 
    ```bash
    udevadm settle
@@ -97,18 +97,17 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
 ## Switch and check
 
-1. For a new cluster, start it before the switch, as step 14 of
-   [Lose `vdb`](./lost-disk.md#lose-vdb) does. That step needs a host whose running system already
-   enables `services.tank-cloud`, as a lost `vdb` leaves, because the guard and the mounts live in
-   that system. The switch script cannot make the cluster: before it builds, it reads the cluster's
-   atc-gateway and nixie pods over `k3s kubectl`, which reaches no API while k3s stays stopped, and
-   a new cluster runs neither workload. The cluster and its workloads come before any switch,
-   through that step and the rebuild it ends with.
+1. For a new cluster, start it before the switch, with step 14 of
+   [Lose `vdb`](./lost-disk.md#lose-vdb) and the rebuild that step ends with. Step 14 needs a host
+   whose running system already enables `services.tank-cloud`, because the guard and the mounts live
+   in that system. A host that lost `vdb` runs such a system. The switch script cannot make the
+   cluster: before it builds, it reads the cluster's atc-gateway and nixie pods over `k3s kubectl`.
+   That command reaches no API while k3s stays stopped, and a new cluster runs neither workload.
 2. Switch with `bash scripts/switch-geoffcloud.sh --allow-k3s-restart` in a planned k3s window, as
-   [Workflows](./workflows.md#switch-the-host) describes. The switch restarts k3s, imp-host and the
-   atc daemon, because their units gain the mount requirement, so imp-host's restart puts every
-   awake imp to sleep. k3s starts only once the zvol holds a cluster's certificate authority and
-   datastore, so it never makes a new cluster on an empty zvol by accident.
+   in [Workflows](./workflows.md#switch-the-host). The switch restarts k3s, imp-host and the atc
+   daemon, because their units gain the mount requirement. imp-host's restart puts every awake imp
+   to sleep. k3s starts only once the zvol holds a cluster's certificate authority and datastore, so
+   it never makes a new cluster on an empty zvol by accident.
 3. Check the mounts and the services:
 
    ```bash
@@ -141,19 +140,19 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 After a reboot, `zfs get -H -o value encryption,keystatus tank/cloud` prints `aes-256-gcm` and
 `available`.
 
-k3s, imp-host and the atc daemon each require their datasets' mounts. So `systemctl stop` of a mount
-stops the services that require it, and `systemctl start` of the mount leaves them stopped: start
-them again by name, as step 2 of
-[If the key fails to load at boot](#if-the-key-fails-to-load-at-boot) does.
+k3s, imp-host and the atc daemon each require their datasets' mounts. When you stop a mount with
+`systemctl stop`, the services that require it stop too. When you start the mount again, they stay
+stopped: start them by name, as in step 2 of
+[If the key fails to load at boot](#if-the-key-fails-to-load-at-boot).
 
 ## Grow the rancher zvol
 
-Grow the zvol when `/var/lib/rancher` runs short of space. The grow needs no unmount and no restart
-of k3s.
+Grow the zvol when `/var/lib/rancher` runs short of space. You can grow it without an unmount or a
+restart of k3s.
 
 Each GiB the zvol gains is a GiB that `tank/imp` loses, because the zvol reserves its whole size.
-impd starts and stops its image eviction at two percents of `tank/imp`. In steps 6 and 7, you check
-both percents against the smaller `tank/imp`.
+impd starts and stops its image eviction at two percents of `tank/imp`. In steps 6 and 7, check both
+percents against the smaller `tank/imp`.
 
 Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
@@ -177,8 +176,8 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 3. Set the new size, where `<size>` is the whole new size, such as `40G`:
 
    **CAUTION:** A `<size>` smaller than the size that step 1 printed cuts the end off the ext4
-   filesystem and destroys data. The zvol only grows. Check that `<size>` is larger than the current
-   size before you run the command.
+   filesystem and destroys data. Only ever grow the zvol. Check that `<size>` is larger than the
+   current size before you run the command.
 
    ```bash
    zfs set volsize=<size> tank/cloud/rancher
@@ -190,9 +189,9 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
    zfs get -H -o property,value volsize,refreservation tank/cloud/rancher
    ```
 
-   Expect the new `volsize`, and a `refreservation` a little above it, such as `30.5G` for `30G`. A
-   `refreservation` of `none` or of the old size leaves the growth with no reserved space: set it
-   with `zfs set refreservation=auto tank/cloud/rancher`.
+   Expect the new `volsize`, and a `refreservation` a little above it, such as `30.5G` for `30G`.
+   When `refreservation` is `none` or the old size, the growth has no reserved space: set it with
+   `zfs set refreservation=auto tank/cloud/rancher`.
 
 5. Grow the ext4 filesystem to the zvol's size:
 
@@ -212,14 +211,14 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
    Add `USED` and `AVAIL`. The sum is the size.
 
 7. Open the comment above `settings.IMP_IMAGE_EVICT_HIGH_PERCENT` in
-   `nixos/hosts/geoffcloud/configuration.nix`. The comment gives three figures: the size of
-   `tank/imp`, impd's disk reserve of 5 % of the size, and the space between the two percents.
+   `nixos/hosts/geoffcloud/configuration.nix`. It holds three figures: the size of `tank/imp`,
+   impd's disk reserve of 5 % of the size, and the space between the two percents.
 
    When the size differs from the comment's, correct the three figures in a pull request.
 
    Then take `IMP_IMAGE_EVICT_HIGH_PERCENT` from 95. That percent of the size is the space above
-   impd's reserve when eviction starts: at 80 and 162 GiB, 15 % is 24 GiB. The comment says that
-   space holds the 20 GiB disk of a builder imp. When the space is under 20 GiB, lower
+   impd's reserve when eviction starts: at 80 and 162 GiB, 15 % is 24 GiB. That space has to hold
+   the 20 GiB disk of a builder imp. When the space is under 20 GiB, lower
    `IMP_IMAGE_EVICT_HIGH_PERCENT` until it holds 20 GiB. Lower `IMP_IMAGE_EVICT_LOW_PERCENT` by the
    same number of points, in the same pull request.
 
@@ -230,8 +229,8 @@ The unit `tank-cloud-key` fails, and its journal holds the reason, such as
 `tank/imp`. The host stays reachable over SSH, and k3s, imp-host and the atc daemon stay stopped.
 The datasets keep their data.
 
-1. Restore the key from the 1Password item `zfs-tank-key`. The key travels on SSH's stdin, never on
-   a command line, because Tailscale SSH logs each command line:
+1. Restore the key from the 1Password item `zfs-tank-key`. Send the key on SSH's stdin, never on a
+   command line, because Tailscale SSH logs each command line:
 
    ```bash
    op read --no-newline op://cloud/zfs-tank-key/password | ssh root@geoffcloud \
