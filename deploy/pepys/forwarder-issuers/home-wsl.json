@@ -1,0 +1,15 @@
+{
+  "issuer": "home-wsl",
+  "keys": [
+    {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "hUBCkcVu1rQGkOLw6N2gHz19SfBL8HcR4JBTfxFiGIk",
+      "y": "Ve_k1V7t5fXTDkxJS4jnE9GMuIC3l6ExmpQ6g_5HlDw",
+      "kid": "Zf4xnzcetPsGKLGbGPvmo4w0KCGV_B84KUs4uAwOQrA",
+      "alg": "ES256",
+      "use": "sig"
+    }
+  ],
+  "retire": []
+}
