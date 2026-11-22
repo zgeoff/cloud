@@ -26,9 +26,10 @@ The spawn passes these settings:
 
 The workspace is `zgeoff/coderabbit`, a public repository of two files with no `.claude` folder. The
 session reads the clone's own Claude settings, so a repository with hooks runs them before the
-smoke's tool calls; this repository's skill gate is one such hook. atc refuses a brokered spawn into
-a clone whose Claude settings set an `apiKeyHelper` or a sign-in variable in `env`, because those
-settings would route around the broker.
+smoke's tool calls. The cloud repo's own skill gate is one such hook, so the smoke clones a
+repository with no `.claude` folder. atc refuses a brokered spawn into a clone whose Claude settings
+set an `apiKeyHelper` or a sign-in variable in `env`, because those settings would route around the
+broker.
 
 ## Installed agents
 
@@ -110,5 +111,6 @@ with the atc MCP tools.
 - A refusal with the code `auth_target_unsupported` that names a settings file means the
   repository's Claude settings would override the broker's sign-in. Use a repository without those
   settings.
-- A session that shows the folder-trust dialog means the call left out `trustClonedWorkspace` or set
-  it to `false`. Forget the session and spawn again with it set to `true`.
+- A session that shows the folder-trust dialog means the call left out `trustClonedWorkspace`, set
+  it to `false`, or set a `cwd` outside the clone's root. Forget the session and spawn again with it
+  set to `true` and no other `cwd`.

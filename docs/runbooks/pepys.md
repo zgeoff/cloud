@@ -111,4 +111,5 @@ fails when the release and a package version differ.
    consumer's rows again from the fact log. When the fact log refuses the connection at start, the
    host logs `pepys: up <consumer> retries in <n> ms after a store error` and tries again, up to 10
    times, so the lines above follow the retry lines. When the host exits after the last retry, the
-   pod starts the host again. When the starts keep failing, check `deployment/pepys-s2`.
+   pod starts the host again. When the starts keep failing, check `deployment/pepys-s2`, which
+   serves the fact log.

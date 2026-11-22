@@ -1,13 +1,15 @@
 # Troubleshooting
 
-Known failures, by the message or symptom you see.
+Known failures, by the message or symptom you see: in a Pulumi run, a 1Password login, a check, a
+host switch or an alert. Find your message, then apply its fix.
 
 ## Pulumi runs
 
 ### `stack config "cluster" is unset`
 
-The stack must say whether it manages the k3s cluster. Set it to `managed` (the `prod` value) or
-`none`:
+The stack must say whether it manages the k3s cluster. Set it to `managed` (the `prod` value). Set
+`none` only on a stack that has never had a cluster, because with `none` the program plans to delete
+every cluster resource:
 
 ```sh
 cd infra
@@ -123,8 +125,8 @@ the metrics fail, the external check stays healthy.
 
 A pod cannot open a TCP connection to an atc daemon in `atcGateway.daemons`, or the probe reports
 nothing. The alert's summary names the daemon's address; the probe's `target` label is `atc-daemon`
-for geoffcloud and `atc-daemon-<name>` for any other. The gateway cannot reach that daemon then
-either. For geoffcloud's daemon, three causes:
+for geoffcloud and `atc-daemon-<name>` for any other. When the connection fails, the gateway cannot
+reach that daemon either. For geoffcloud's daemon, three causes:
 
 1. The daemon is down. Check `ssh root@geoffcloud systemctl status atc-daemon`.
 2. The host firewall drops the pod's path: port 8415 from `cni0`, source `10.42.0.0/16`. Check
