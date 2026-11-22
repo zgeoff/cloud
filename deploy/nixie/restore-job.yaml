@@ -34,7 +34,7 @@ spec:
         - name: ghcr-pull
       initContainers:
         - name: fetch
-          image: ghcr.io/zgeoff/nixie-backup:0.93.0@sha256:20ef876e1bc9ca987f3efa5002eb1071f21171093c4befc71ca912913613dd15
+          image: ghcr.io/zgeoff/nixie-backup:0.94.0@sha256:cb1a5f4d0f6d5ebf16da50a67ae8abd06259dea6e10dd2f7bb85c1d3b246261b
           command:
             - /bin/sh
             - /opt/nixie-backup/restore.sh
