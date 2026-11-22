@@ -2,12 +2,12 @@
 
 The files service holds the screenshots and other files that agents link from pull requests, at
 `files.geoff.cloud`. An agent uploads a file with a role token and gets back a URL of the form
-`https://files.geoff.cloud/<id>/<filename>`. Anyone with that URL can read the file until it
-expires, and then the service answers 404 for it. GitHub's image proxy fetches each image in a pull
-request without signing in, and imps cannot reach the tailnet, so the service sits on a public route
-rather than the tailnet ([public ingress](../network/public-ingress.md)). The service runs in k3s as
-one pod with its own volume, and a nightly job backs that volume up to R2 once the backup is
-configured.
+`https://files.geoff.cloud/<id>/<filename>`. Anyone with that URL can read the file until it expires
+or someone removes it, and from then on the service answers 404 for it. GitHub's image proxy fetches
+each image in a pull request without signing in, and imps cannot reach the tailnet, so the service
+sits on a public route rather than the tailnet ([public ingress](../network/public-ingress.md)). The
+service runs in k3s as one pod with its own volume, and a nightly job backs that volume up to R2
+once the backup is configured.
 
 ## Uploads and roles
 

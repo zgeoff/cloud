@@ -1,15 +1,15 @@
 # nixie
 
-nixie is the owner's assistant: a server that keeps its state in one SQLite database, a web client
-in front of it, and an imp for every model loop it runs. It runs in k3s from nixie's released
-images, and it answers on the tailnet only, at one public name that points at the host's tailnet
-address. nixie reaches impd over the tailnet with a token limited to its own imps, so the host owner
-adds nixie's model credential to impd by hand before nixie starts. The prod apply adds each
-release's sandbox images to impd before nixie rolls, so the new pod finds them in place. Every model
-request of nixie's sandboxes passes the [model gateway](../../runbooks/model-gateway.md) on the
-host, which counts a day and a month and refuses past nixie's limits, so nixie pauses at its
-spending stop instead of spending past it. nixie sets those limits through the gateway's control
-relay on the host's tailnet address, which its network policy lets the pod reach.
+nixie is the owner's assistant: a server that keeps its state in SQLite, a web client in front of
+it, and an imp for every model loop it runs. It runs in k3s from nixie's released images, and it
+answers on the tailnet only, at one public name that points at the host's tailnet address. nixie
+reaches impd over the tailnet with a token limited to its own imps, so the host owner adds nixie's
+model credential to impd by hand before nixie starts. The prod apply adds each release's sandbox
+images to impd before nixie rolls, so the new pod finds them in place. Every model request of
+nixie's sandboxes passes the [model gateway](../../runbooks/model-gateway.md) on the host, which
+counts a day and a month and refuses past nixie's limits, so nixie pauses at its spending stop
+instead of spending past it. nixie sets those limits through the gateway's control relay on the
+host's tailnet address, which its network policy lets the pod reach.
 [The tailnet](../network/tailnet.md) covers the grants on the route in and out, and
 [the nixie runbook](../../runbooks/nixie.md) gives the steps for a deploy, an upgrade and a
 rotation.
@@ -63,11 +63,11 @@ that Service, and a Service that waited for ready pods would hold back the rollo
 Both containers run as their images' users on a read-only root, with writable volumes only for
 nixie's data and each container's temporary directory. nixie's health endpoint listens only once
 migrations and the integrity check finish, so the pod's startup probe waits on liveness before the
-readiness probe takes over. The readiness probe takes nixie out of its Service only when the
-database or the definitions seed fails, because nixie cannot serve without them. impd, the
-conversation imp and the disk are dependency parts: one that fails or answers slowly makes nixie
-answer 200 with the status degraded, because nixie is the only endpoint behind its Service and still
-serves its API. The NixieDegraded alert watches that status
+readiness probe takes over. Once nixie has turned ready, the readiness probe takes it out of its
+Service only when the database or the definitions seed fails, because nixie cannot serve without
+them. impd, the conversation imp and the disk are dependency parts: one that fails or answers slowly
+makes nixie answer 200 with the status degraded, because nixie is the only endpoint behind its
+Service and still serves its API. The NixieDegraded alert watches that status
 ([alert rules](observability.md#alert-rules)).
 
 ## Configuration and definitions
@@ -176,12 +176,12 @@ secret's value in impd under the same name, with no deploy.
 
 ## Sandbox images before a roll
 
-The prod apply adds a release's sandbox images to impd before Pulumi rolls nixie's StatefulSet.
-nixie turns ready only once impd holds every image of its sandbox manifest, and a pull takes
-minutes, so an add at start would leave the new pod unready after the old one stopped. Pulumi runs a
-local command on the apply's machine. The StatefulSet, and the config ConfigMap, the Secret and the
-definitions key that nixie mounts, wait for that command, and the backup's copy of the config waits
-for the roll:
+The prod apply adds a release's sandbox images to impd before Pulumi rolls nixie's StatefulSet. At
+start, nixie adds each image of its sandbox manifest that impd lacks, and it first turns ready only
+once impd holds them all. A pull takes minutes, so an add at start would leave the new pod unready
+after the old one stopped. Pulumi runs a local command on the apply's machine. The StatefulSet, and
+the config ConfigMap, the Secret and the definitions key that nixie's pod mounts, wait for that
+command, and the backup's copy of the config waits for the roll:
 
 1. The command creates a ConfigMap that holds the add script, bundled into one file, because the
    nixie image holds Bun but none of this repo's packages.

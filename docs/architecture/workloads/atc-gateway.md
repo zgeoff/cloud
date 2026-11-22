@@ -19,7 +19,8 @@ a registry entry that points at the wrong daemon fails instead of reaching it. E
 own bearer token, which the gateway presents and the daemon checks, so a token taken from one
 daemon's path opens no other daemon.
 
-The gateway dials; a daemon never dials out. The two daemons sit at different distances:
+The gateway dials each daemon, and a daemon never dials the gateway. The two daemons sit at
+different distances:
 
 - **The cloud daemon** runs on the host, so the gateway's traffic reaches the host's own tailnet
   address from the pod network without crossing the tailnet, and needs no tailnet grant. The host's
@@ -148,14 +149,14 @@ own binary into a guest whose image ships another atc release. It listens on the
 address, and systemd hands it two tokens as credentials: the bearer the gateway must present, and
 the impd token it uses itself. A third credential, the read-only token for cloning private repos,
 becomes an environment variable of the daemon's process
-([the clone token](../../runbooks/boxxy.md#the-daemons-clone-token)). systemd copies both when the
-service starts, and the service then copies the bearer into its runtime directory on tmpfs, owned by
-the daemon's user with mode 0600, because atc refuses a token file that another user owns. So a
-rotated token reaches the daemon only after a restart; a reload rereads the old copy. The bearer
-comes from one 1Password item that both the gateway's Secret and the host's file take, and the
-daemon's file holds one token or two, so a rotation needs no outage: add the new token to the host's
-file beside the old one and restart the daemon, apply so the gateway rolls onto the new token, then
-remove the old one and restart again.
+([the clone token](../../runbooks/boxxy.md#the-daemons-clone-token)). systemd copies both
+credentials when the service starts, and the service then copies the bearer into its runtime
+directory on tmpfs, owned by the daemon's user with mode 0600, because atc refuses a token file that
+another user owns. So a rotated token reaches the daemon only after a restart; a reload rereads the
+old copy. The bearer comes from one 1Password item that both the gateway's Secret and the host's
+file take, and the daemon's file holds one token or two, so a rotation needs no outage: add the new
+token to the host's file beside the old one and restart the daemon, apply so the gateway rolls onto
+the new token, then remove the old one and restart again.
 
 The daemon has one execution target, impd on the host's loopback, and names every imp it creates
 with a fixed prefix. Its impd token can create, wake and destroy only imps with that prefix, so a
@@ -163,19 +164,20 @@ compromised daemon cannot touch any other imp. The daemon's config lists each ga
 serves, with the targets that client may use, and refuses a client it does not list, so it never
 falls back to running a session on the host itself.
 
-The target boots each imp from the [agent image](../../runbooks/agent-image.md), and the session
-hooks run the image's own atc while it matches the daemon's release, so a spawn uploads no binary.
-When the image ships another release, the daemon copies its own binary into each new imp. The target
-sets `rebindChangedAuth`, so a session made before a change to its agent's profiles moves to the new
+The target boots each imp from the [agent image](./agent-image.md), and the session hooks run the
+image's own atc while it matches the daemon's release, so a spawn uploads no binary. When the image
+ships another release, the daemon copies its own binary into each new imp. The target sets
+`rebindChangedAuth`, so a session made before a change to its agent's profiles moves to the new
 profiles at its next revive or restore. atc still refuses when the change withdraws a grant the imp
 holds, or when the imp also runs a session of another agent.
 
 The daemon offers Claude and Codex. A Claude session signs in through impd's credential broker with
-the same profiles as the home-pc daemon's `cloud` target: the Claude subscription, GitHub, Linear's
-MCP server and 1Password Connect. The cloud daemon adds the `pepys-telemetry` profile to every
-entry, so each Claude and Codex session sends its OpenTelemetry logs to pepys ingest through the
-broker ([the telemetry path](./pepys.md#the-telemetry-path-from-a-session)). The profiles name
-impd's secrets, never their values, so a renamed or added profile changes the daemons' configs. The
+the same profiles as the home-pc daemon's `cloud` target: `claude`, the Claude subscription alone;
+`github`, which can push; `linear`, Linear's MCP server; and `op-connect`, 1Password Connect. The
+cloud daemon adds the `pepys-telemetry` profile to every entry, so each Claude and Codex session
+sends its OpenTelemetry logs to pepys ingest through the broker
+([the telemetry path](./pepys.md#the-telemetry-path-from-a-session)). The profiles name impd's
+secrets, never their values, so a renamed or added profile changes the daemons' configs. The
 daemon's impd token lists each of those secrets as grantable, so the token, not the config, bounds
 what a session can reach. impd ties each entry of that list to the secret it named, so a secret made
 again under the same name needs a new grantable list on each daemon's token. A Codex session signs
@@ -184,8 +186,8 @@ renews. The cloud daemon's `boxxy` entry selects that profile too, so a build se
 `codex review` runs on the same sign-in, and sends its logs to pepys ingest as a Codex session does.
 
 The daemon also offers the `boxxy` agent for the boxxy server's worker sessions
-([boxxy](./boxxy.md)). It is a Claude entry with the same profiles and variables as `claude`, and
-the `boxxy` profile beside them, which gives the session `BOXXY_URL` and the broker's token for the
+([boxxy](./boxxy.md)). It is a Claude entry with the same profiles and variables as `claude`, plus
+`codex` and the `boxxy` profile, which gives the session `BOXXY_URL` and the broker's token for the
 worker listener. Its `args` load the boxxy hook plug-in that the agent image holds. A stock Claude
 entry's `auth` takes no `args`, and the plug-in's folder exists only in the guest, so the plug-in
 sits in the entry's `args`. atc adds `atc.session.id` to `OTEL_RESOURCE_ATTRIBUTES` in every session

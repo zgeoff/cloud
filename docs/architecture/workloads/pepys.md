@@ -196,7 +196,8 @@ config `nixie`. `pepys.forwarder` turns on these together:
 
 - ingest's `PEPYS_TELEMETRY_FORWARDER_AUDIENCE`, and `PEPYS_TELEMETRY_FORWARDER_ISSUERS`, the folder
   where a ConfigMap mounts the JSON files of `deploy/pepys/forwarder-issuers/`. The folder holds the
-  forwarders' trust documents and no other file, apart from the imps' folder;
+  forwarders' trust documents and no other file. It sits beside the imps' folder,
+  `deploy/pepys/imp-issuers/`, never inside it;
 - the Ingress `pepys-forwarder-tailnet`, which sends only the exact path `/forwarded/v1/logs` of the
   name to ingest's port, 8080. Traefik answers 404 on every other path, so none of ingest's other
   routes answers on the name. Traefik cleans a path such as `/a/../forwarded/v1/logs` before it
@@ -237,16 +238,15 @@ Each pod admits only its callers:
 
 - Garage admits s2-lite and the backup on 3900.
 - s2-lite admits ingest and the host.
-- ingest admits two pods on 8080, and a third while
-  [the forwarders' route](#the-forwarders-tailnet-route) is on: the shared tunnel's cloudflared,
-  nixie's Traefik, and [the boxxy server](./boxxy.md), which decides the next task of the fleet of
-  coding agents. The boxxy server is the pod with the label `app: boxxy-server` in the namespace
-  `boxxy`, and it sends its facts to `/boxxy/facts`. The policy matches a pod and a port, never a
-  path, so an admitted pod reaches every ingest route. The tunnel forwards only the `public` routes.
-  The boxxy server reaches the `public` routes and the telemetry routes too, and each route's own
-  check still applies. Traefik reaches every route as well, so its Ingress alone keeps the
-  forwarders' name to one path. A process on the node needs no rule, because kube-router admits the
-  node's own addresses before any policy.
+- ingest admits the shared tunnel's cloudflared and [the boxxy server](./boxxy.md) on 8080, and
+  nixie's Traefik too while [the forwarders' route](#the-forwarders-tailnet-route) is on. The boxxy
+  server, which decides the next task of the fleet of coding agents, is the pod with the label
+  `app: boxxy-server` in the namespace `boxxy`, and it sends its facts to `/boxxy/facts`. The policy
+  matches a pod and a port, never a path, so an admitted pod reaches every ingest route. The tunnel
+  forwards only the `public` routes. The boxxy server reaches the `public` routes and the telemetry
+  routes too, and each route's own check still applies. Traefik reaches every route as well, so its
+  Ingress alone keeps the forwarders' name to one path. A process on the node needs no rule, because
+  kube-router admits the node's own addresses before any policy.
 - The host's pod admits the boxxy server on 8081, the API's port, and the shared tunnel's
   cloudflared too while the API's public route is on. `/rpc` checks no caller, so the boxxy server
   reads every query under `/rpc`. `/mcp` needs an OAuth token and the public host's name in `Host`,

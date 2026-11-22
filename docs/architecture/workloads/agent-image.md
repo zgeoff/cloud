@@ -1,12 +1,13 @@
 # The agent image
 
 The agent image is the imp image an agent session runs on: imp's base image plus the tools a session
-uses, each at a pinned version whose download is checked against a published checksum. It holds
-binaries only, with no configuration, no login state and no secret, because atc sets each session up
-at launch with its grants, placeholder variables and config. The image is built on impd's host from
-a commit of this repo, and each build gets a new image name, so the image that ran before stays on
-the host for a rollback. [The atc gateway](./atc-gateway.md) covers the daemons whose sessions run
-on it.
+uses, each at a pinned version that the build verifies before it installs it, as
+[what the image holds](#what-the-image-holds) explains for each kind of download. It holds the
+tools, with the few wrapper scripts and boot services they need, and no session's configuration,
+login state or secret, because atc sets each session up at launch with its grants, placeholder
+variables and config. The image is built on impd's host from a commit of this repo and named after
+that commit, so the image of an earlier commit stays on the host for a rollback.
+[The atc gateway](./atc-gateway.md) covers the daemons whose sessions run on it.
 
 ## What the image holds
 
@@ -20,8 +21,9 @@ Chrome download stays under the speed floor that the Chrome step of the Dockerfi
 `images/agent/` sets with `--speed-limit` and `--speed-time`, the build step opens a new one that
 goes on from the last byte, so a slow build network still finishes the download. apt resolves the
 Ubuntu packages and their dependencies against Ubuntu's snapshot archive at a fixed moment, so a
-build installs the same versions after Ubuntu replaces one in its live archive. apt fetches each
-package file from the live archive when it still holds that version, and from the snapshot archive
+build installs the same versions after Ubuntu replaces one in its live archive. apt checks each
+package against the archive's signed index, as it does on any Ubuntu host. apt fetches each package
+file from the live archive when it still holds that version, and from the snapshot archive
 otherwise. The build step fetches again after a wait when either archive answers with an error,
 because apt does not retry an HTTP error by itself.
 
@@ -47,10 +49,11 @@ checkout.
 
 ## Build and check
 
-The image is built by impd, not by CI: the build script sends a `git archive` of a commit on `main`
-to the imp host, and impd builds it into an image named after that commit. The script then checks
-the new image in a fresh imp and removes a failed image unless told to keep it, so the host holds
-only images that passed.
+impd builds every image that sessions run on. CI builds the image with Docker only to check it, and
+that copy runs nowhere. The build script sends a `git archive` of a commit on `main` to the imp
+host, and impd builds it into an image named after that commit. The script then checks the new image
+in a fresh imp and removes it when the check fails. An operator can tell the script to keep a failed
+image for debugging, and otherwise the host holds only images that passed.
 
 A timer on the host runs that script for the newest commit on `main` that changes the image, once
 impd holds no image of that commit's name, so a merged pin reaches an image without a person. The

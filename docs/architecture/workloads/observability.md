@@ -1,11 +1,11 @@
 # Observability
 
 The estate watches itself from two places. A monitoring stack in k3s collects metrics and logs from
-the cluster and the host, evaluates the alert rules and sends alerts to Discord. A Cloudflare Worker
-probes the public route from Cloudflare's edge, because monitoring on the host cannot report that
-the host is down. Every rule that rests on one probe's metric fires when that metric is missing as
-well as when it is bad, so a probe, an exporter or a timer that stops reporting raises an alert
-instead of reading as healthy.
+the cluster and the host, evaluates the alert rules and, while Discord alerts are on, sends alerts
+to Discord. A Cloudflare Worker probes the public route from Cloudflare's edge, because monitoring
+on the host cannot report that the host is down. Every rule that rests on one probe's metric fires
+when that metric is missing as well as when it is bad, so a probe, an exporter or a timer that stops
+reporting raises an alert instead of reading as healthy.
 
 ## The stack in the cluster
 
@@ -54,13 +54,13 @@ token into the `credential` field of the `grafana-mcp` item in the `zgeoff` vaul
 server's launcher reads it at each connect
 ([the apply job](../infrastructure-as-code.md#the-apply-job)). Metrics and logs sit on cluster
 volumes with no backup, because losing them loses history and never service. Grafana's database sits
-on a cluster volume with no backup too, so the account and its token outlive a pod restart. The
-volume's class keeps it when its claim is deleted. The database is one SQLite file, which two
-Grafana processes can corrupt when they write it at once. A rollout stops the old pod before it
-starts the new one, so only one pod writes the file. If the volume is lost, `mcp-viewer` and its
-token are gone until an [apply by hand](../../runbooks/workflows.md#apply-by-hand) with a refresh:
-the refresh finds the account missing, so Pulumi makes a new account and token and copies the token
-into the `grafana-mcp` item.
+on a cluster volume with no backup too, and the volume lets the account and its token outlive a pod
+restart. The volume's class keeps it when its claim is deleted. The database is one SQLite file,
+which two Grafana processes can corrupt when they write it at once. A rollout stops the old pod
+before it starts the new one, so only one pod writes the file. If the volume is lost, `mcp-viewer`
+and its token are gone until an [apply by hand](../../runbooks/workflows.md#apply-by-hand) with a
+refresh: the refresh finds the account missing, so Pulumi makes a new account and token and copies
+the token into the `grafana-mcp` item.
 
 ## Probes of impd
 
@@ -136,13 +136,13 @@ only on a bad value, because a target that vanishes is no longer a target. They 
 
 ## Delivery
 
-Alertmanager sends every alert to a Discord webhook once the stack config turns Discord alerts on,
-and the webhook reaches it as a mounted Secret file, so the URL never appears in Alertmanager's
-config. Two alerts never send: the chart's always-firing watchdog and its inhibition helper. With
-Discord alerts off, every alert goes to a receiver that sends nothing, and alerts show only in
-Prometheus and Alertmanager. Alertmanager keeps silences and notification state in memory-backed
-storage, so a restart forgets them. Grafana does no alerting. The sign-in alerts take a route of
-their own to the same webhook ([sign-in alerts](#sign-in-alerts)).
+Alertmanager sends each alert but the two below to a Discord webhook once the stack config turns
+Discord alerts on, and the webhook reaches it as a mounted Secret file, so the URL never appears in
+Alertmanager's config. Two alerts never send: the chart's always-firing watchdog and its inhibition
+helper. With Discord alerts off, every alert goes to a receiver that sends nothing, and alerts show
+only in Prometheus and Alertmanager. Alertmanager keeps silences and notification state in
+memory-backed storage, so a restart forgets them. Grafana does no alerting. The sign-in alerts take
+a route of their own to the same webhook ([sign-in alerts](#sign-in-alerts)).
 
 A critical alert reaches Discord twice: once as every alert does, and once in a message that
 mentions the owner's Discord user, so the owner's phone gets a push. The mention goes with a firing
@@ -166,17 +166,17 @@ flowchart LR
 The atc gateway writes each sign-in outcome to stderr as one security event: a line that starts
 `atc security ` and holds a JSON object, under the security-event contract in atc's OAuth docs.
 Alloy turns the events into counters, Prometheus alerts on the counters, and Alertmanager sends each
-category of alert to Discord as one message. No event line and no field of one reaches Discord: each
-alert holds only values that the contract lists.
+category of alert to Discord as one message. No event line reaches Discord whole, and a field
+reaches it only as a label whose value the contract lists.
 
 Alloy reads the gateway container's log files on the node, not the Kubernetes log API, because the
 API joins stdout and stderr and the contract puts the events on stderr alone. It counts a stderr
-line only when the line starts with the event prefix, and it never counts stdout, where atc printed
-approval codes before passkey sign-in. This pipeline reads each log file from its start, so a new
-pod's first events count even when they land before Alloy finds the file. It drops each event older
-than a cutoff longer than that search takes, so a start without saved read positions raises no alert
-for history. The pipeline forwards no line: the gateway's logs reach Loki through the pod-log path
-that every pod's logs take.
+line only when the line starts with the event prefix, and it never counts stdout. This pipeline
+keeps no seeded positions, unlike the pod-log path above, and reads each log file from its start, so
+a new pod's first events count even when they land before Alloy finds the file. It drops each event
+older than a cutoff longer than Alloy takes to find a new file, so a start without saved read
+positions raises no alert for history. The pipeline forwards no line: the gateway's logs reach Loki
+through the pod-log path that every pod's logs take.
 
 Alloy labels each count with the event's kind, outcome, reason, route and method, and checks each
 value against the contract. A kind and an outcome pass only as a pair that the contract lists, and
