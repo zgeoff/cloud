@@ -5,7 +5,7 @@
     "": {
       "name": "@zgeoff/cloud-pepys-deployment",
       "dependencies": {
-        "@boxxy/pepys": "0.3.4",
+        "@boxxy/pepys": "0.3.5",
         "@pepys/api": "0.4.5",
         "@pepys/cli": "0.4.5",
         "@pepys/ingest": "0.4.5",
@@ -46,11 +46,11 @@
 
     "@better-fetch/fetch": ["@better-fetch/fetch@1.3.3", "", {}, "sha512-U6SlDt/GUWtK2JAxS/NhdoYTEim+EL1G5byz2TUj83KjLZBUpYzb5SmX0aXaCnbGkAjFKnV/o/0+cyXMbEcqqg=="],
 
-    "@boxxy/content-hash": ["@boxxy/content-hash@0.3.4", "", { "dependencies": { "zod": "4.6.7" } }, "sha512-gQ9OM0F4bOwsaV4cJjyQLEhe5y/w5MKYLd7SA7HRYUvHIRDFrYEsL6tIWLFPHccl15RkOo7W6zlMa5FI5lfksg=="],
+    "@boxxy/content-hash": ["@boxxy/content-hash@0.3.5", "", { "dependencies": { "zod": "4.6.7" } }, "sha512-YYqQLJ+6sXvEvtD0aPbDUy5h++ahH8YjHIbdpM02pcwn8bbCo3eqHv08JXq2WLGGaLZePfgt2/SxzxliqHPcsQ=="],
 
-    "@boxxy/model": ["@boxxy/model@0.3.4", "", { "dependencies": { "@boxxy/content-hash": "0.3.4", "tiny-invariant": "1.3.3", "zod": "4.6.7" }, "peerDependencies": { "@faker-js/faker": "10.6.0" }, "optionalPeers": ["@faker-js/faker"] }, "sha512-3BaUDC24P4bYAqd8Xju7zl3hFu0gG+3Vorn3LFtJ6b26QV6zzKyITklVOw43QV8nRKaS+mA5igfP993VhDVvEA=="],
+    "@boxxy/model": ["@boxxy/model@0.3.5", "", { "dependencies": { "@boxxy/content-hash": "0.3.5", "tiny-invariant": "1.3.3", "zod": "4.6.7" }, "peerDependencies": { "@faker-js/faker": "10.6.0" }, "optionalPeers": ["@faker-js/faker"] }, "sha512-f/QGqCIoRO1bVyK2tGOqNpCvu++xcm3EuXUwKqLjKX5xYX1gLPsftWipHw66LV/PohMnScbsq4aZLaxzUyHoqw=="],
 
-    "@boxxy/pepys": ["@boxxy/pepys@0.3.4", "", { "dependencies": { "@boxxy/model": "0.3.4" }, "peerDependencies": { "@orpc/client": "2.0.0-beta.50", "@pepys/api": "^0.4.0", "@pepys/ingest": "^0.4.0", "@pepys/kit": "^0.4.0", "@pepys/source-github": "^0.4.0", "@pepys/source-telemetry": "^0.4.0", "@pepys/testing": "^0.4.0", "zod": "4.6.7" }, "optionalPeers": ["@orpc/client", "@pepys/api", "@pepys/ingest", "@pepys/source-github", "@pepys/source-telemetry", "@pepys/testing"] }, "sha512-OrCJbezhb8Mt6mkObHOzyPGjlC2RIeGLwBpQgbHnF1qILlWIEYiLovZilAfc/E9HXEuYGTziuNXBahNyDxZB+Q=="],
+    "@boxxy/pepys": ["@boxxy/pepys@0.3.5", "", { "dependencies": { "@boxxy/model": "0.3.5" }, "peerDependencies": { "@orpc/client": "2.0.0-beta.50", "@pepys/api": "^0.4.0", "@pepys/ingest": "^0.4.0", "@pepys/kit": "^0.4.0", "@pepys/source-github": "^0.4.0", "@pepys/source-telemetry": "^0.4.0", "@pepys/testing": "^0.4.0", "zod": "4.6.7" }, "optionalPeers": ["@orpc/client", "@pepys/api", "@pepys/ingest", "@pepys/source-github", "@pepys/source-telemetry", "@pepys/testing"] }, "sha512-lgrSKbgmgcH6iPkvPo7qJiNh2YCC1CBYIDYhhhZh4jtqAWw4mhRWPFWmV1PsYKW2BMyhR1GbuNuyFbFpzMovgg=="],
 
     "@hexagon/base64": ["@hexagon/base64@1.1.28", "", {}, "sha512-lhqDEAvWixy3bZ+UOYbPwUbBkwBq5C1LAJ/xPC8Oi+lL54oyakv/npbA0aU2hgCsx/1NUd4IBvV03+aUBWxerw=="],
 
