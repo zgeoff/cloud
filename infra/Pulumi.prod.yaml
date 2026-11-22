@@ -42,7 +42,7 @@ config:
       wow-forever: 9c7ec1cfaf6ac25bea1f2f4d7c38be8894b79cb4b34cca4430679f7dd21a8bce
       zgeoff: 8b0c70a3aa87a41fc5b4180a19391b26e7480f14fbe5df862281d734804687f7
   geoff-cloud:pepys:
-    image: ghcr.io/zgeoff/cloud-pepys:0.4.3-05fee32fd919@sha256:5576e796cd5729096e317aa84cd78a332462242c10726df9f537e712a6184d0b
+    image: ghcr.io/zgeoff/cloud-pepys:0.4.4-d1b78f274da0@sha256:65bd216d329d0b1749fcb084c41a23d466e040eb46642bf5fbcd274788534857
     apiHostname: pepys.geoff.cloud
     tailnetHostname: pepys-api.geoff.cloud
     webhookHostname: pepys-webhook.geoff.cloud
