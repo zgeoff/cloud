@@ -17,11 +17,11 @@ none, because the service keeps room free for the session's checkout and the bro
 service prints its choice and the free space it read, which `impz logs <name> swap` shows.
 `images/agent/sbin/setup-swap` holds the bounds and the reason for each.
 
-Beside them, the image holds one Claude Code hook, which [Locked packages](#locked-packages) covers.
-It holds no other configuration, no login state and no secret: atc sets up grants, placeholder
-variables, the config bundle and the seed for each session at launch. Its build runs no tool but
-Bun's install of noslop's lock, because a tool can write state when it runs (`codex --version`
-creates `~/.codex`).
+Beside them, the image holds Claude Code managed settings: one hook, which
+[Locked packages](#locked-packages) covers, and auto memory turned off. It holds no other
+configuration, no login state and no secret: atc sets up grants, placeholder variables, the config
+bundle and the seed for each session at launch. Its build runs no tool but Bun's install of noslop's
+lock, because a tool can write state when it runs (`codex --version` creates `~/.codex`).
 
 | Path                                  | Holds                                                     |
 | ------------------------------------- | --------------------------------------------------------- |
@@ -54,9 +54,9 @@ the shim runs the newest version the image holds.
 
 A pin the image lacks also runs the newest version, after a note on stderr that names both versions,
 so a session keeps working. When a repo moves its `.bun-version` to a version the image lacks, add
-that version to the Dockerfile's Bun pins, then build and switch the image. For cloud's own
-`.bun-version`, CI's image check fails until the image holds the pinned version, so a Renovate bump
-of that pin adds the version in the same pull request.
+that version to the Dockerfile's Bun pins, then switch to the image the host builds from it. For
+cloud's own `.bun-version`, CI's image check fails until the image holds the pinned version, so a
+Renovate bump of that pin adds the version in the same pull request.
 
 ## Locked packages
 
@@ -91,8 +91,8 @@ bun scripts/build-agent-image.ts            # origin/main's head, after a fetch
 bun scripts/build-agent-image.ts <commit>   # or an older commit on main
 ```
 
-Name the commit that changed `images/agent`, as the timer does, so a build by hand and the timer
-make the same image name.
+To make the image the timer would make, name the newest commit that changed `images/agent`. A build
+of `origin/main`'s head gets the same name only when that head changed `images/agent`.
 
 The script builds from a `git archive` of the commit, so the clone's working tree never reaches the
 image. It names the image `agent-<short sha>`, then boots the imp `agent-check-<short sha>` from it,
@@ -141,10 +141,11 @@ ssh root@geoffcloud journalctl -u agent-image-build --since -1d | grep 'agent-im
 ```
 
 Expect `agent-image-build: agent-<short sha> <digest> check passed` after a pin merges. A failed
-build fails the unit and records its time in `/var/lib/agent-image-build/failed/<sha>`, and later
-runs skip that commit, so a broken commit is built once. Read the build's output in the journal, fix
-the cause, then remove that file: the next run builds the commit again. A failure before the build,
-such as an imp-host that does not answer, records nothing, and the next run tries again.
+build, other than one that an imp-host change interrupts, fails the unit and records its time in
+`/var/lib/agent-image-build/failed/<sha>`, and later runs skip that commit, so a broken commit is
+built once. Read the build's output in the journal, fix the cause, then remove that file: the next
+run builds the commit again. A failure before the build, such as an imp-host that does not answer,
+records nothing, and the next run tries again.
 
 ## Check
 
@@ -355,7 +356,8 @@ image. An image without atc, such as `agent-1` or `coder`, needs `guestATC` remo
 too, so the daemon copies its binary in again.
 
 1. Check that the earlier image is still on the host: `impz image ls`.
-2. Set `targets.cloud.image` to it, as in the switch, and restart the daemon.
+2. Set `targets.cloud.image` to it, as in the switch, remove `guestATC` for an image without atc,
+   and restart the daemon.
 3. Spawn a session on `cloud`, and check its imp's image with `impz ls`.
 
 Imps created from the new image keep it. Remove them, or let their sessions end, when the image is

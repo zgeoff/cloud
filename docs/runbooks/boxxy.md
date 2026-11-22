@@ -27,8 +27,9 @@ the items, with their copies, before the PR that adds the lines merges.
 
 1. Merge the server. The `boxxy image` workflow publishes `ghcr.io/zgeoff/cloud-boxxy:<commit>` from
    `main`, and its run summary gives the digest.
-2. Create the four items in the `cloud` vault, then copy each into `cloud-deploy`. Mint the worker
-   token as 32 random bytes in hex:
+2. Create four items of the table in the `cloud` vault: `boxxy-worker-token`, `boxxy-atc-token`, and
+   `boxxy-restic` and `r2-boxxy-backup` when you want the backup now. Copy each into `cloud-deploy`.
+   Mint the worker token as 32 random bytes in hex:
 
    ```bash
    openssl rand -hex 32
@@ -83,9 +84,9 @@ the items, with their copies, before the PR that adds the lines merges.
    and one alone fails the preview.
 
    Run `bun run preview` and check that it adds the `boxxy` namespace, its Secrets, both ConfigMaps,
-   both Services, both NetworkPolicies, the StatefulSet, and the backup Secret and CronJob, and
-   changes nothing else. Without the `BOXXY_RESTIC_*` and `BOXXY_R2_*` variables, the server deploys
-   with no backup.
+   both Services, both NetworkPolicies, the StatefulSet, and, with the backup variables, the backup
+   Secret and CronJob, and changes nothing else. Without the `BOXXY_RESTIC_*` and `BOXXY_R2_*`
+   variables, the server deploys with no backup.
 
 4. Merge the PR. `Deploy prod` applies it, since every step is a create.
 5. Check that the pod is up and its listeners started:
@@ -484,10 +485,10 @@ no restart of the server. A rename keeps the session's ID, so it needs no new re
    `cloud` and in its `cloud-deploy` copy. For the worker token, also replace impd's `boxxy` secret.
 2. [Apply by hand](./workflows.md#apply-by-hand) from `main`. The `Deploy prod` job applies only a
    new commit, so it never runs for a change in 1Password alone. Both drift checks and the preview
-   show one change: Pulumi replaces the Secret `boxxy-tokens`. Expect nothing else.
-3. The new Secret rolls `boxxy-0`, and the old token stops working once the new pod is ready. A new
-   atc token also replaces the gateway's `atc-gateway-service-tokens` Secret, which rolls the
-   gateway.
+   show one change for the worker token: Pulumi replaces the Secret `boxxy-tokens`. A new atc token
+   also replaces the gateway's `atc-gateway-service-tokens` Secret. Expect nothing else.
+3. The new Secret rolls `boxxy-0`, and the old token stops working once the new pod is ready. The
+   gateway's new Secret rolls the gateway.
 
 ## Back up now
 
