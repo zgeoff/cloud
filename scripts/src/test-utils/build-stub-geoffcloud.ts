@@ -135,7 +135,7 @@ function buildImpAnswer(state: StubState, call: ImpCall): RemoteResult {
 }
 
 function buildCreateAnswer(state: StubState, call: ImpCall): RemoteResult {
-  if (!/ --image nixie-fetch-[\da-f]{12} --policy public$/u.test(call.command)) {
+  if (!/ --image nixie-fetch-[\da-f]{12} --policy public --memory 192$/u.test(call.command)) {
     return { exitCode: 97, stdout: '', stderr: `unexpected: ${call.command}` };
   }
 

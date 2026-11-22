@@ -165,13 +165,16 @@ async function runSandboxCheck(
 
 // the line runs as one shell line on the host, whose words hold no character to quote
 const impCommand = buildHostImpArgv([]).join(' ');
+const fetchSandboxMemoryMiB = 192;
 
 async function createSandbox(
   options: Readonly<CheckFetchSandboxOptions>,
   image: string,
 ): Promise<boolean> {
+  // nixie runs each fetch sandbox at 192 MiB; impd's 2 GiB default does not fit beside the pool it
+  // keeps for nixie's own imps.
   const created = await options.runRemote(
-    `${impCommand} new ${options.sandboxName} --image ${image} --policy public`,
+    `${impCommand} new ${options.sandboxName} --image ${image} --policy public --memory ${fetchSandboxMemoryMiB}`,
   );
 
   if (created.exitCode !== 0) {
