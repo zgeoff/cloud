@@ -12,17 +12,17 @@ file named `complete` into it last.
 The `nixie-backup` CronJob runs every night at 04:00 Melbourne time. Each run uploads every complete
 set with restic, which encrypts it in the pod, to two repositories in R2:
 
-| Repository | Path                                         | Holds      | Retention                                            |
-| ---------- | -------------------------------------------- | ---------- | ---------------------------------------------------- |
-| data       | `s3:<endpoint>/geoff-cloud-nixie/nixie`      | `nixie.db` | 24 hourly, 7 daily, 4 weekly and 6 monthly snapshots |
-| key        | `s3:<endpoint>/geoff-cloud-nixie/nixie-keys` | `keys.db`  | the newest set's snapshot only                       |
+| Repository | Path                                         | Holds                                                         | Retention                                            |
+| ---------- | -------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------- |
+| data       | `s3:<endpoint>/geoff-cloud-nixie/nixie`      | `nixie.db`; older snapshots tagged `nixie` hold `keys.db` too | 24 hourly, 7 daily, 4 weekly and 6 monthly snapshots |
+| key        | `s3:<endpoint>/geoff-cloud-nixie/nixie-keys` | `keys.db`                                                     | the newest set's snapshot only                       |
 
 After each upload to the key repository, the run prunes it with `--max-unused 0`, so restic deletes
 the older sets' `keys.db` data at once. The run then writes a receipt, a file that records the
 snapshots and each step's result, into each set, and deletes the set's two database copies. nixie
 checks its `backup` folder on a poll, records each receipt it finds and deletes that set's folder.
-nixie writes no new hourly set while a set waits for its receipt, so a set can wait up to a day for
-the nightly run.
+nixie writes no new set while a set waits for its receipt, so a set can wait up to a day for the
+nightly run.
 
 A failed upload gives the set a failed receipt and fails the run's Job. Kubernetes never retries the
 Job: a second run skips each set that holds a receipt and exits 0, so a retry would turn the failed

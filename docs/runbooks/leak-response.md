@@ -6,10 +6,11 @@ backup and the disk `vdb`. Each section lists what the leak exposes and what to 
 layout: the data sits on `vdb` and its key on `vda`, so neither disk alone exposes the data
 ([protection at rest](../architecture/secrets.md#protection-at-rest)).
 
-The response revokes what the leak hands over now, and rotates nothing else. Every credential that
-ever sat in a `vda` snapshot stays valid, which is an accepted risk
-([accepted risks](../architecture/secrets.md#accepted-risks)). Deleting old snapshots and cleaning
-the root disk's free space are the only ways to shrink that exposure.
+The response revokes the credentials that still sit on the leaked disk, and rotates nothing else. A
+credential that has since moved off `vda`, but sat there when an old snapshot was taken, stays
+valid, which is an accepted risk ([accepted risks](../architecture/secrets.md#accepted-risks)).
+Deleting old snapshots and cleaning the root disk's free space are the only ways to shrink that
+exposure.
 
 **CAUTION:** Each revocation changes live access to the host or a backup. State its exact effect to
 the coordinating agent, and act only on its approval.
@@ -71,7 +72,7 @@ drift. Delete the old key in the panel after the apply. Delete every snapshot th
 ## A restic backup leaks
 
 A restic repository holds ciphertext, and its password sits in 1Password and in a file or Secret on
-the encrypted pool, never on `vda`. A leaked repository alone therefore exposes nothing. A
+the encrypted pool, and no longer on `vda`. A leaked repository alone therefore exposes nothing. A
 repository and its password together expose that system's backed-up data.
 
 | Repository   | Password item        | R2 key item             |
@@ -95,9 +96,9 @@ in its item, and deliver it:
   CronJob's Secret. The bracket's baseline drift reads the new key from 1Password, so expect it to
   report that Secret's update and nothing else, and go on.
 
-The response leaves each restic password in place. A password that sat in an old `vda` snapshot
-stays valid, which is the accepted no-rotation risk. The host's Tailscale node needs no revocation,
-because no backup holds its state.
+The response leaves each restic password in place. A password that sat on `vda` before it moved to
+the pool, and so sits in an old `vda` snapshot, stays valid, which is the accepted no-rotation risk.
+The host's Tailscale node needs no revocation, because no backup holds its state.
 
 ## `vdb` leaks
 

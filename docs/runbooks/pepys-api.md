@@ -119,8 +119,9 @@ OAuth server.
    claude mcp add --transport http --client-id <client_id> --callback-port <port> pepys https://pepys.geoff.cloud/mcp
    ```
 
-   Leave out `--client-secret`: the OAuth server gives no client a secret. Expect the first
-   connection to open the owner's browser on `/oauth2/authorize`.
+   Leave out `--client-secret`: the OAuth server gives no MCP client a secret. Only a service client
+   signs in with a secret, as the next section describes. Expect the first connection to open the
+   owner's browser on `/oauth2/authorize`.
 
 ## Add a service client
 
@@ -140,7 +141,8 @@ or later.
 
 3. Run `bun run preview`. Expect it to create the ConfigMap `pepys-service-tokens`, or to replace it
    when the field held a client already, and to update the StatefulSet `pepys-host`.
-4. Merge it. `Deploy prod` applies it once CI passes on `main`, and the pod `pepys-host-0` rolls.
+4. Merge it. `Deploy prod` applies it once CI passes on `main`, and the pod `pepys-host-0` rolls. A
+   replaced ConfigMap gets a new name, so the replace does not hold the run.
 5. Check the API's start log:
 
    ```sh
