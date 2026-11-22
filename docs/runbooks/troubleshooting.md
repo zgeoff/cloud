@@ -1,13 +1,13 @@
 # Troubleshooting
 
-Known failures, by the message or symptom you see: in a Pulumi run, a 1Password login, a check, a
-host switch or an alert. Find your message, then apply its fix.
+Look up a failure by the message or symptom you see in a Pulumi run, a 1Password login, a check, a
+host switch or an alert, then apply its fix.
 
 ## Pulumi runs
 
 ### `stack config "cluster" is unset`
 
-The stack must say whether it manages the k3s cluster. Set it to `managed` (the `prod` value). Set
+Set `cluster` to say whether the stack manages the k3s cluster. Use `managed`, the `prod` value. Set
 `none` only on a stack that has never had a cluster, because with `none` the program plans to delete
 every cluster resource:
 
@@ -19,8 +19,8 @@ op run --env-file=../.env -- pulumi config set --stack prod cluster managed
 ### `cluster is managed, but K3S_KUBECONFIG is empty`
 
 The run did not resolve `.env`, or the reference is missing. Run through the root scripts, which
-wrap `op run`. Check that `.env` has `K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/kubeconfig.yaml`;
-`bash scripts/connect-k3s.sh` stores the item and adds the line.
+wrap `op run`. Check that `.env` has `K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/kubeconfig.yaml`. To
+store the item and add the line, run `bash scripts/connect-k3s.sh`.
 
 **CAUTION:** Never set `cluster` to `none` to get past this error. With `none`, the program plans to
 delete every cluster resource.
@@ -39,9 +39,9 @@ The run did not go through `op run`, or the reference resolved to an empty value
 ### `discordAlerts is on, but ALERT_MENTION_USER_ID is empty` or `is not a Discord user ID`
 
 `discordAlerts` is true, but the Discord user that a critical alert mentions did not resolve to a
-user ID. Check the `mention-user-id` field of the `alert-webhook` item in `cloud`, and in
-`cloud-deploy` for the apply job: it holds the user's numeric ID, from **Copy User ID** in Discord's
-developer mode.
+user ID. Check that the `mention-user-id` field of the `alert-webhook` item holds the user's numeric
+ID, from **Copy User ID** in Discord's developer mode. Check it in `cloud`, and in `cloud-deploy`
+for the apply job.
 
 ### `x509: certificate signed by unknown authority`
 
@@ -53,15 +53,15 @@ cluster rebuild, follow
 ### `atcGateway.daemons.<name>.daemonID is unset`, or another `atcGateway` error
 
 These come from the inputs group in `infra/inputs/` when `atcGateway` is set: the stack config's
-schema, then each daemon's token. Each message starts with the failing field's path and names its
-fix, one line per field.
+schema, then each daemon's token. Each failing field gets one line, which starts with the field's
+path and gives its fix. Apply that fix.
 
 ### The preview shows changes on a clean `main`
 
 If every merged change is applied, that is drift: the live resources differ from the code, and
-`bun run drift` fails on it. A merged change that nobody has applied yet shows the same way; compare
-the changes with the ones reviewed on its PR. Find the cause before an apply. A change to the
-tailnet policy needs the owner's review, because the apply replaces the whole policy file.
+`bun run drift` fails on it. A merged change that nobody has applied yet shows the same way, so
+compare the changes with the ones reviewed on its PR. Find the cause before you apply. Get the
+owner's review for a change to the tailnet policy, because the apply replaces the whole policy file.
 
 ## 1Password
 
@@ -94,20 +94,21 @@ The repo mounts read-only. Build with `nix build --no-link`, as in
 Check `ssh root@geoffcloud systemctl status imp-host` and impd's logs in Loki.
 
 `Stale` means the probe stopped reporting. Check the timer with
-`ssh root@geoffcloud systemctl status impd-local-health.timer`, and that node-exporter runs in
+`ssh root@geoffcloud systemctl status impd-local-health.timer`, and check that node-exporter runs in
 `observability`.
 
 ### `HostBehindLatestBuild` or `HostBuildLagStale` fires
 
-`HostBehindLatestBuild` means the host has run an older system or imp, the alert's `part`, than the
-latest green build of `main` for over a day. [Switch the host](./workflows.md#switch-the-host) from
-`main`, and for a change to imp, copy impd's database first, as
-[Upgrade imp](./workflows.md#upgrade-imp) describes. The alert clears at the next hourly check after
-the switch. A `system` part on a host that runs `main`'s build means a switch that did not go
-through `scripts/switch-geoffcloud.sh`, such as a rollback, which leaves no switch record: the next
-switch records one. An `imp` part on a current system means imp-host runs another imp than its pin,
-or does not answer: compare `ssh root@geoffcloud podman exec imp-host impz info` with the pin, and
-check `ssh root@geoffcloud systemctl status imp-host`.
+`HostBehindLatestBuild` means that, for over a day, the host has run an older system or imp than the
+latest green build of `main`. The alert's `part` label is `system` or `imp`.
+[Switch the host](./workflows.md#switch-the-host) from `main`, and for a change to imp, copy impd's
+database first, as [Upgrade imp](./workflows.md#upgrade-imp) describes. The alert clears at the next
+hourly check after the switch. When `part` is `system` and the host runs `main`'s build, the last
+switch did not go through `scripts/switch-geoffcloud.sh`, such as a rollback, and left no switch
+record. The next switch records one. When `part` is `imp` and the system is current, imp-host runs a
+different imp from its pin, or does not answer. Compare
+`ssh root@geoffcloud podman exec imp-host impz info` with the pin, and check
+`ssh root@geoffcloud systemctl status imp-host`.
 
 `HostBuildLagStale` means the check stopped reporting, or that the host runs a build without it.
 Check `ssh root@geoffcloud systemctl status host-build-lag.service` and its journal. The check reads
@@ -118,19 +119,19 @@ can fail it.
 
 No cloudflared pod holds a tunnel connection, or Prometheus cannot scrape cloudflared's metrics.
 Check the pods with `ssh root@geoffcloud k3s kubectl -n ingress get pods`, and their logs in Loki.
-If the tunnel is down, the external health check reports it from outside as `tunnel-down`; if only
-the metrics fail, the external check stays healthy.
+To tell the two apart, look at the external health check: it reports `tunnel-down` when the tunnel
+is down, and stays healthy when only the metrics fail.
 
 ### `ATCDaemonUnreachable` fires
 
 A pod cannot open a TCP connection to an atc daemon in `atcGateway.daemons`, or the probe reports
-nothing. The alert's summary names the daemon's address; the probe's `target` label is `atc-daemon`
-for geoffcloud and `atc-daemon-<name>` for any other. When the connection fails, the gateway cannot
-reach that daemon either. For geoffcloud's daemon, three causes:
+nothing. Find the daemon's address in the alert's summary. The probe's `target` label is
+`atc-daemon` for geoffcloud and `atc-daemon-<name>` for any other. When the connection fails, the
+gateway cannot reach that daemon either. For geoffcloud's daemon, check each cause in turn:
 
 1. The daemon is down. Check `ssh root@geoffcloud systemctl status atc-daemon`.
-2. The host firewall drops the pod's path: port 8415 from `cni0`, source `10.42.0.0/16`. Check
-   `ssh root@geoffcloud nft list table inet cloud_host`.
+2. The host firewall drops the pod's traffic to port 8415, which arrives on `cni0` from
+   `10.42.0.0/16`. Check `ssh root@geoffcloud nft list table inet cloud_host`.
 3. The daemon's `address` in `atcGateway.daemons` is wrong. Compare it with the address the daemon
    listens on, from `ssh root@geoffcloud ss -tlnp`.
 

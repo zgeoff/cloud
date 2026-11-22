@@ -4,8 +4,8 @@ The files service runs `files.geoff.cloud`, the file drop for agents' PR screens
 own files. It runs as the `files` StatefulSet in k3s, on a retained local-path volume that holds the
 files and their SQLite metadata. Role tokens gate every write: one `owner` token, and an `agent`
 token for each repo's agents. The cluster holds only their SHA-256 hashes. The `files-backup`
-CronJob backs the volume up every night with restic to a `files` repository in R2. Setting the stack
-config `files` turns the deploy on, and leaving it unset keeps the service out of the cluster.
+CronJob backs the volume up every night with restic to a `files` repository in R2. The service
+deploys only when the stack config `files` is set.
 
 ## What holds what
 
@@ -20,8 +20,8 @@ under the same name.
 
 Each repo's agents have an agent token of their own, in the item `files-upload-token` in the repo's
 own vault, such as `nixie`. Agents on an imp use the copy in the `imp` vault. The cloud repo holds
-no copy of these tokens: stack config `files.agentTokenDigests` names each one with its SHA-256
-digest. On an imp, the atc daemon's `claude` and `boxxy` entries, in
+no copy of these tokens: the stack config `files.agentTokenDigests` maps each token's name to its
+SHA-256 digest. On an imp, the atc daemon's `claude` and `boxxy` entries, in
 [`configuration.nix`](../../nixos/hosts/geoffcloud/configuration.nix), set two variables in each
 session: `CLOUD_FILES_URL`, the service's `/api/files` address, and `CLOUD_FILES_TOKEN_REF`, the
 `op://` reference of `files-upload-token` in the `imp` vault.
@@ -29,10 +29,10 @@ session: `CLOUD_FILES_URL`, the service's `/api/files` address, and `CLOUD_FILES
 ## Deploy the first time
 
 **CAUTION:** The first apply adds a public route. Its `Deploy prod` run holds on the tunnel route
-change until the owner approves it, as [the prod apply job](./prod-apply.md) describes.
+change until the owner approves it; see [the prod apply job](./prod-apply.md).
 
 1. Merge the service. The `files image` workflow publishes `ghcr.io/zgeoff/cloud-files:<commit>`
-   from `main`, and its run summary gives the digest.
+   from `main`. Take the digest from its run summary.
 2. Create the three items in the `cloud` vault, then copy each into `cloud-deploy`. Mint the owner
    token as 32 random bytes in hex:
 
@@ -40,7 +40,7 @@ change until the owner approves it, as [the prod apply job](./prod-apply.md) des
    openssl rand -hex 32
    ```
 
-   Mint at least one agent token, as [Add an agent token](#add-an-agent-token) describes.
+   Mint at least one agent token with the steps in [Add an agent token](#add-an-agent-token).
 
 3. In a PR, add the references to `.env` and the `files` object, with each agent token's digest, to
    `infra/Pulumi.prod.yaml`:
@@ -86,7 +86,7 @@ change until the owner approves it, as [the prod apply job](./prod-apply.md) des
 
 ## Upload a file
 
-An agent on an imp uploads with `curl`, which sends the token as a bearer token:
+On an imp, upload with `curl`, and send the token as a bearer token:
 
 ```bash
 FILES_TOKEN="$(op read "$CLOUD_FILES_TOKEN_REF")"
@@ -133,8 +133,8 @@ it, then remove the item from the repo's vault. To revoke the owner token:
 1. Mint a new value with `openssl rand -hex 32`, and put it in the item in `cloud` and in its copy
    in `cloud-deploy`.
 2. [Apply by hand](./workflows.md#apply-by-hand) from `main`. The `Deploy prod` job applies only a
-   new commit, so it never runs for a change in 1Password alone. Both drift checks and the preview
-   show one change: Pulumi replaces the hash Secret `files-tokens`. Expect nothing else.
+   new commit, so it never runs for a change in 1Password alone. Expect both drift checks and the
+   preview to show only one change: Pulumi replaces the hash Secret `files-tokens`.
 3. The new Secret rolls `files-0`, and the old token stops working once the new pod is ready.
    Existing uploads stay.
 
@@ -189,8 +189,8 @@ snapshot is lost. Back up first if those uploads still matter.
 
 ## Check a restore
 
-The check restores the latest snapshot into a scratch claim, so the live volume and the service stay
-as they are.
+Restore the latest snapshot into a scratch claim, so the live volume and the service stay as they
+are.
 
 1. Create the scratch claim:
 

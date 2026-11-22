@@ -1,15 +1,14 @@
 # Restore drill
 
-A restore drill proves that geoff.cloud's backups restore on a machine other than geoffcloud, and
-measures how long each restore takes. It runs on one scratch Onidel VM, which only reads the backups
-and is destroyed at the end, pass or fail. [Restore geoff.cloud](./restore-geoff-cloud.md) gives the
-restores on the live host; this runbook rehearses an impd database copy and hq from its off-PC
-backup away from it. A root-disk snapshot restore is described but **untested**: no drill has run
-one.
+Run a restore drill to prove that geoff.cloud's backups restore on a machine other than geoffcloud,
+and to measure how long each restore takes. Run it on one scratch Onidel VM that only reads the
+backups, and destroy the VM at the end, pass or fail. The drill rehearses an impd database copy, and
+hq from its off-PC backup. To restore on the live host, follow
+[Restore geoff.cloud](./restore-geoff-cloud.md). A root-disk snapshot restore is described but
+**untested**: no drill has run one.
 
-**CAUTION:** Every step reads geoffcloud, its snapshots and the backup repositories, and never
-writes to them. Use `--no-lock` on every restic command, because a lock is a write to the
-repository.
+**CAUTION:** Only read geoffcloud, its snapshots and the backup repositories, and never write to
+them. Use `--no-lock` on every restic command, because a lock is a write to the repository.
 
 ## Size the scratch VM
 
@@ -83,23 +82,22 @@ STEPS
 ```
 
 Expect restic's `Summary: Restored <n> files/dirs`, and `ok` from the integrity check. The steps
-stop at the first failure, and on a missing or empty `hq.db` they print `no restored hq.db` and exit
-1, because `sqlite3` on an empty filename prints `ok`.
+stop at the first failure. On a missing or empty `hq.db` they print `no restored hq.db` and exit 1:
+without that check, `sqlite3` would get an empty filename and print `ok`.
 
 ## Restore a root-disk snapshot
 
-`POST /vm/<vm_id>/restore-snapshot` restores a snapshot onto a VM. The API has no volume endpoint,
-and Onidel's block storage page offers monthly terms only, so neither an hourly VM nor a volume
-holds a 240 GB snapshot. `POST /snapshots/<snapshot_id>` returns a download URL for a snapshot; its
-file format and size are not documented.
+`POST /vm/<vm_id>/restore-snapshot` restores a snapshot onto a VM. An hourly VM's 40 GB disk can't
+hold the 240 GB snapshot, and you can't add an hourly volume: the API has no volume endpoint, and
+Onidel's block storage page offers monthly terms only. `POST /snapshots/<snapshot_id>` returns a
+download URL for a snapshot; its file format and size are not documented.
 
 **CAUTION:** A VM restored from geoffcloud's snapshot boots as geoffcloud: the same static address,
 Tailscale identity, cloudflared tunnel and k3s backup jobs. In Melbourne it could share the live
-host's network and claim its address, so restore it in another location. **Untested:** whether the
-clone's outbound traffic stays contained there. Its static address has no route back to it, so a
-reply should go to the live host, but no drill has checked that. Contain a clone before its services
-reach the network: disable Tailscale, cloudflared and k3s on the restored disk from a rescue boot
-first.
+host's network and claim its address, so restore it in another location. There, its static address
+has no route back to it, so a reply should go to the live host, but no drill has **tested** whether
+the clone's outbound traffic stays contained. Contain a clone before its services reach the network:
+disable Tailscale, cloudflared and k3s on the restored disk from a rescue boot first.
 
 ## Destroy the VM
 
