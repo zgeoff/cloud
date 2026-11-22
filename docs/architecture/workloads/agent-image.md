@@ -53,7 +53,7 @@ impd builds every image that sessions run on. CI builds the image with Docker on
 that copy runs nowhere. The build script sends a `git archive` of a commit on `main` to the imp
 host, and impd builds it into an image named after that commit. The script then checks the new image
 in a fresh imp and removes it when the check fails. An operator can tell the script to keep a failed
-image for debugging, and otherwise the host holds only images that passed.
+image, and otherwise the host holds only images that passed.
 
 A timer on the host runs that script for the newest commit on `main` that changes the image, once
 impd holds no image of that commit's name, so a merged pin reaches an image without a person. The

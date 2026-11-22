@@ -4,11 +4,12 @@ A preview is one pull request's code running in its own imp, so the owner and th
 change live without touching production. The preview service, a NixOS service on the host, posts one
 comment on each pull request of an opted-in repository with a tailnet link. Opening the link boots
 the pull request's head commit from its `preview/` folder, or wakes the imp that already runs it,
-and closing the pull request destroys the imp. The service knows nothing about any project: a
-repository opts in with a Compose file, a seed step that loads invented data, and a health path. A
-pull request that changes the Agent SDK's pin in a repository the service lists for it also gets a
-commit status from a run of that repository's SDK contract suite, in an imp of its own.
-[imp on the host](../host/imp.md) covers impd, which runs each preview's imp, and
+and closing the pull request destroys the imp. The service knows nothing about any project. A
+repository gets previews when three things hold: the App is installed on it, the service lists it,
+and the head commit's `preview/` folder holds a Compose file, a seed step that loads invented data,
+and a health path. A pull request that changes the Agent SDK's pin in a repository the service lists
+for it also gets a commit status from a run of that repository's SDK contract suite, in an imp of
+its own. [imp on the host](../host/imp.md) covers impd, which runs each preview's imp, and
 [the preview runbook](../../runbooks/preview.md) gives the steps to set the service up, opt a
 repository in and check it live.
 
@@ -49,13 +50,14 @@ neither push to it nor reach a repository the service does not list.
 ## GitHub access
 
 The service reaches GitHub as the preview GitHub App, and an install of the App on a repository is
-that repository's opt-in: GitHub sends the App's deliveries only for the repositories it is
-installed on, and the comments post as the App's bot. The service holds the App's private key and no
-GitHub token. For each call, such as one comment update, it signs a short-lived JWT with the key,
-looks up the App's installation on the repository, and mints an installation token scoped to that
-one repository, which it drops when the call ends. A leaked installation token reaches one
-repository, and it expires at the end of the lifetime that GitHub fixes for it. The App is private
-to the owner's account, so no other account can install it and send the service deliveries.
+the first part of that repository's opt-in: GitHub sends the App's deliveries only for the
+repositories it is installed on, and the comments post as the App's bot. The service holds the App's
+private key and no GitHub token. For each call, such as one comment update, it signs a short-lived
+JWT with the key, looks up the App's installation on the repository, and mints an installation token
+scoped to that one repository, which it drops when the call ends. A leaked installation token
+reaches one repository, and it expires at the end of the lifetime that GitHub fixes for it. The App
+is private to the owner's account, so no other account can install it and send the service
+deliveries.
 
 ## A pull request's preview
 
@@ -251,10 +253,10 @@ runs the suite once however many deliveries name it, and each push to a new head
 The guest's `timeout` bounds the whole run, and a deadline on the host backs it for a guest that
 never reports an exit. Either way the status reports failure at the time limit, and the imp goes. A
 run's imp holds a slot like a preview's, but neither the slot rule nor the idle sweep puts it to
-sleep, because its suite would stop halfway, so a preview that opens meanwhile runs beside it. A run
-that a stopped service left behind starts over at the next start's first retry, on a fresh imp. A
-service started without contract settings runs no suite, so the retry ends each run it still holds
-with an error status and removes its imp.
+sleep, because its suite would stop halfway, so a preview that opens while a run holds the last slot
+runs beside it, one past the cap. A run that a stopped service left behind starts over at the next
+start's first retry, on a fresh imp. A service started without contract settings runs no suite, so
+the retry ends each run it still holds with an error status and removes its imp.
 
 The store holds a run's moves in a transition table of their own. A run waits for a slot, runs, and
 settles, and a stopped service's next start queues a running run again. A settled run passes or

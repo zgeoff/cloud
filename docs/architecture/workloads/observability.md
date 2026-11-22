@@ -141,17 +141,19 @@ Discord alerts on, and the webhook reaches it as a mounted Secret file, so the U
 Alertmanager's config. Two alerts never send: the chart's always-firing watchdog and its inhibition
 helper. With Discord alerts off, every alert goes to a receiver that sends nothing, and alerts show
 only in Prometheus and Alertmanager. Alertmanager keeps silences and notification state in
-memory-backed storage, so a restart forgets them. Grafana does no alerting. The sign-in alerts take
-a route of their own to the same webhook ([sign-in alerts](#sign-in-alerts)).
+memory-backed storage, so a restart forgets them. Grafana does no alerting. While Discord alerts are
+on, the sign-in alerts take a route of their own to the same webhook
+([sign-in alerts](#sign-in-alerts)).
 
-A critical alert reaches Discord twice: once as every alert does, and once in a message that
-mentions the owner's Discord user, so the owner's phone gets a push. The mention goes with a firing
-alert only, and the resolved message comes without it. The user's ID reaches Alertmanager as a
-template file in the webhook's Secret, so the ID never appears in the repo or in Alertmanager's
-config. Alertmanager reads a template only when it loads its config, so a change to the Secret
-restarts Alertmanager through a checksum of the Secret on its pod. Each message's title holds the
-status, the alert name and the namespace, each cut to a length that keeps the title within Discord's
-title limit. The sign-in alerts keep Alertmanager's default title, which lists their labels.
+While Discord alerts are on, a critical alert reaches Discord twice: once as every alert does, and
+once in a message that mentions the owner's Discord user, so the owner's phone gets a push. The
+mention goes with a firing alert only, and the resolved message comes without it. The user's ID
+reaches Alertmanager as a template file in the webhook's Secret, so the ID never appears in the repo
+or in Alertmanager's config. Alertmanager reads a template only when it loads its config, so a
+change to the Secret restarts Alertmanager through a checksum of the Secret on its pod. Each
+message's title holds the status, the alert name and the namespace, each cut to a length that keeps
+the title within Discord's title limit. The sign-in alerts keep Alertmanager's default title, which
+lists their labels.
 
 ## Sign-in alerts
 
@@ -213,9 +215,9 @@ The owner's own activity takes `notice`, not `info`, because the chart's info-in
 silences an `info` alert whenever no warning fires beside it, and an owner sign-in alone must still
 reach Discord.
 
-Two categories have no source. Cloudflare Access refuses a request at the edge before it reaches the
-tunnel, so the gateway writes no event for an edge denial, and no alert covers one. atc's rate limit
-counts every client together, so a rate-limit alert holds no source.
+Two refusals carry nothing that names a client. Cloudflare Access refuses a request at the edge
+before it reaches the tunnel, so the gateway writes no event for an edge denial, and no alert covers
+one. atc's rate limit counts every client together, so a rate-limit alert names no client.
 
 Three layers bound the messages a flood sends. atc caps the events of each kind in a window and
 reports the rest as one `suppressed` event, whose count raises its own alert. Each rule sums its

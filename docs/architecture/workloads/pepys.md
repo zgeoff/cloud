@@ -6,7 +6,9 @@ the store. The cluster runs it in the namespace `pepys` once stack config `pepys
 are public: the GitHub webhook route of ingest, and the API's MCP and OAuth paths while stack config
 `pepys.apiHostname` is set. Two routes can answer on the tailnet: the API's every path, `/rpc`
 included, while stack config `pepys.tailnetHostname` is set, and ingest's `/forwarded/v1/logs` while
-stack config `pepys.forwarder` is set. Everything else stays inside the cluster.
+stack config `pepys.forwarder` is set. Sessions in imps reach ingest through a relay on the host, as
+[the telemetry path from a session](#the-telemetry-path-from-a-session) explains. Everything else
+stays inside the cluster.
 
 ## Processes
 
@@ -16,7 +18,7 @@ stack config `pepys.forwarder` is set. Everything else stays inside the cluster.
 | `pepys-s2`     | Deployment, `Recreate` | s2, by its publisher          | the `facts` bucket in Garage            |
 | `pepys-ingest` | Deployment             | `cloud-pepys`                 | s2-lite, the route secrets              |
 | `pepys-host`   | StatefulSet, 1 replica | `cloud-pepys`, two containers | s2-lite; the API reads the host's store |
-| `pepys-backup` | CronJob, 04:00 UTC     | rclone, by its publisher      | every bucket in Garage                  |
+| `pepys-backup` | CronJob, 04:00 UTC     | rclone, by its publisher      | the buckets its config lists            |
 
 [`pepys-workloads.ts`](../../../infra/shared/pepys-workloads.ts) holds each name, port and
 in-cluster URL. [`pepys-images.ts`](../../../infra/shared/pepys-images.ts) pins the three images
