@@ -19,9 +19,10 @@ snapshot of the 240 GB root disk needs a VM with a disk at least that large, whi
 VM cannot have ([the restore drill](./restore-drill.md#restore-a-root-disk-snapshot)).
 
 **Desk check:** every step traced against the repo at `main` `14f6e3c`, with nothing run: the pool
-import and key load against the NixOS config and its checks, the reinstall against its runbook, and
-the firewall group against the Onidel provider. The panel, the boot menu and the Tailscale console
-stay unchecked.
+import and key load against the NixOS config and its checks, the reinstall against
+[its runbook](./reinstall-geoffcloud.md), whose numbered steps this doc calls "reinstall step N",
+and the firewall group against the Onidel provider. The panel, the boot menu and the Tailscale
+console stay unchecked.
 
 **CAUTION:** A snapshot restores `vda` only. impd's database lives on `vdb`, so a snapshot from
 before an imp upgrade brings back an older image beside a newer database, and impd refuses to start.
@@ -42,7 +43,8 @@ nix-env -p /nix/var/nix/profiles/system --switch-generation <generation>
 
 `scripts/switch-geoffcloud.sh` cannot help here, because it queries the cluster before it builds and
 stops while k3s is down. A snapshot holds only the generations from before it was taken, so it often
-holds no matching generation. Reinstall then, as the next bullet does.
+holds no matching generation. A database copy fixes only an impd mismatch, so when no generation's
+k3s is new enough for the datastore, reinstall, as the next bullet does.
 
 - **From a snapshot:** `op run --env-file=.env -- bun run onidel:snapshot pre-<change>` takes one
   before a risky change. Restore it from the Onidel panel.

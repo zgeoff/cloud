@@ -1,7 +1,8 @@
 # Workflows
 
-Common tasks on geoff.cloud. Each change lands through a squash PR to `main`; run live changes from
-a clean checkout of `main`.
+Use this runbook to make a live change to geoff.cloud: its infrastructure, its stack config, the
+host or a credential. Each change lands through a squash PR to `main`; run live changes from a clean
+checkout of `main`.
 
 **CAUTION:** No live change without a preview first. A change that costs money, deletes data or
 cannot be undone needs the owner's approval of its exact effect.
@@ -203,14 +204,14 @@ that changes an input of the checks, a release bump included, so a break shows b
 merge does not wait for it. The switch counts it only as the next paragraph says. A Renovate pull
 request starts no run; the nightly run checks its bump.
 
-A run builds nothing, and passes, in two cases. A green scheduled or dispatched run on `main` covers
-every later commit that changes no input of the checks, which the `nixos` gate of
-[`gates.yml`](../../.github/gates.yml) lists. The green `nixos` check of the merged pull request
-that produced a commit also covers it, when no input of the gate differs between the pull request's
-head and the commit. One gap is accepted: an input change on `main` that was reverted before the
-merge. A run also skips the build when an earlier run built and passed the same derivations with the
-same workflow and build scripts, wherever that run ran; the skipped run's summary links it. A
-dispatch with `-f force=true` always builds.
+A run builds nothing, and passes, in three cases. Two of them are runs that cover a commit. A green
+scheduled or dispatched run on `main` covers every later commit that changes no input of the checks,
+which the `nixos` gate of [`gates.yml`](../../.github/gates.yml) lists. The green `nixos` check of
+the merged pull request that produced a commit also covers it, when no input of the gate differs
+between the pull request's head and the commit. One gap is accepted: an input change on `main` that
+was reverted before the merge. The third: a run skips the build when an earlier run built and passed
+the same derivations with the same workflow and build scripts, wherever that run ran; the skipped
+run's summary links it. A dispatch with `-f force=true` always builds.
 
 A newer run on the same ref cancels the older one, on `main` as on a branch or pull request. On
 `main`, the newer run checks the newest commit, which is the one a switch takes. A newer run on a
@@ -257,8 +258,8 @@ The [release check](./release-check.md) opens the bump pull request for each new
 `release-check/imp` branch, with all three pins moved. The `release bump merge` workflow merges it
 once its checks pass, unless its labels hold it for a person, as
 [When a bump merges on its own](./release-check.md#when-a-bump-merges-on-its-own) describes. The
-merge changes nothing on the host. The steps after it stay with a person, and the pull request's
-body lists them:
+merge changes nothing on the host. The steps that act on the host stay with a person, and the pull
+request's body lists them. The first can come before the merge:
 
 1. Read imp's release notes for migrations and new host settings: before you merge a bump labelled
    `needs-review`, or after the merge for one that merged on its own.
