@@ -8,12 +8,12 @@
   },
   "dependencies": {
     "@boxxy/pepys": "0.3.3",
-    "@pepys/api": "0.4.4",
-    "@pepys/cli": "0.4.4",
-    "@pepys/ingest": "0.4.4",
-    "@pepys/kit": "0.4.4",
-    "@pepys/source-github": "0.4.4",
-    "@pepys/source-telemetry": "0.4.4"
+    "@pepys/api": "0.4.5",
+    "@pepys/cli": "0.4.5",
+    "@pepys/ingest": "0.4.5",
+    "@pepys/kit": "0.4.5",
+    "@pepys/source-github": "0.4.5",
+    "@pepys/source-telemetry": "0.4.5"
   },
   "devDependencies": {
     "@types/bun": "1.4.4",

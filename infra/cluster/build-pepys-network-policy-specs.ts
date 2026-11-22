@@ -19,24 +19,28 @@ const cloudflaredPeer: NetworkPolicyPeer = {
   podSelector: { matchLabels: podLabels.cloudflared },
 };
 
-// nixie's Traefik, which carries the API's tailnet route; its chart sets the label
+// nixie's Traefik, which carries the API's and the forwarders' tailnet routes; its chart sets the
+// label
 const nixieTraefikPeer: NetworkPolicyPeer = {
   namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'nixie-ingress' } },
   podSelector: { matchLabels: { 'app.kubernetes.io/name': 'traefik' } },
 };
 
-export interface PepysAPIRoutes {
+export interface PepysRoutes {
   // the shared tunnel carries the API's /mcp and OAuth paths
   readonly isPublic: boolean;
 
   // nixie's Traefik carries every path of the API on the host's tailnet address
   readonly isTailnetRouted: boolean;
+
+  // nixie's Traefik carries ingest's /forwarded/v1/logs alone on the host's tailnet address
+  readonly isForwarderRouted: boolean;
 }
 
 // Each pepys pod admits only its callers. kube-router admits the node's own addresses before any
 // policy, so a relay on the host still reaches a Service.
 export function buildPepysNetworkPolicySpecs(
-  apiRoutes: PepysAPIRoutes,
+  routes: PepysRoutes,
 ): Readonly<Record<string, NetworkPolicySpec>> {
   const workloads = pepysWorkloads;
 
@@ -50,12 +54,16 @@ export function buildPepysNetworkPolicySpecs(
     ]),
 
     // the shared tunnel's cloudflared carries the public routes, and the boxxy server sends its
-    // facts to a private one
+    // facts to a private one. A policy cannot tell one path from another, so Traefik reaches every
+    // route of the port, and its Ingress alone keeps the name to the forwarders' route.
     [workloads.ingest.name]: buildIngressPolicy(workloads.ingest.labels, [
       {
         port: workloads.ingest.port,
         from: [cloudflaredPeer, boxxyServerPeer],
       },
+      ...(routes.isForwarderRouted
+        ? [{ port: workloads.ingest.port, from: [nixieTraefikPeer] }]
+        : []),
     ]),
 
     // the boxxy server queries /rpc, which checks no caller; the tunnel carries only /mcp and the
@@ -63,9 +71,9 @@ export function buildPepysNetworkPolicySpecs(
     [workloads.host.name]: buildIngressPolicy(workloads.host.labels, [
       {
         port: workloads.host.apiPort,
-        from: apiRoutes.isPublic ? [cloudflaredPeer, boxxyServerPeer] : [boxxyServerPeer],
+        from: routes.isPublic ? [cloudflaredPeer, boxxyServerPeer] : [boxxyServerPeer],
       },
-      ...(apiRoutes.isTailnetRouted
+      ...(routes.isTailnetRouted
         ? [{ port: workloads.host.apiPort, from: [nixieTraefikPeer] }]
         : []),
     ]),

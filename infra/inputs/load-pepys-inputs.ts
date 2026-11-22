@@ -17,6 +17,7 @@ const pepysConfigSchema = z.object({
   apiHostname: z.string().optional(),
   tailnetHostname: z.string().optional(),
   impIdentityAudience: z.string().min(1).optional(),
+  forwarder: z.object({ hostname: z.string(), audience: z.string().min(1) }).optional(),
 
   // what the API's service-token file takes: the API refuses to start on a file it rejects
   serviceClientDigests: z
@@ -58,6 +59,15 @@ export function loadPepysInputs(
     requireTailnetHostname(config.tailnetHostname, [config.webhookHostname, config.apiHostname]);
   }
 
+  if (config.forwarder !== undefined) {
+    requireForwarder(config.forwarder, {
+      webhookHostname: config.webhookHostname,
+      apiHostname: config.apiHostname,
+      tailnetHostname: config.tailnetHostname,
+      impIdentityAudience: config.impIdentityAudience,
+    });
+  }
+
   if (config.serviceClientDigests !== undefined) {
     requireServiceClientRelease(config.apiHostname, config.image);
   }
@@ -79,6 +89,7 @@ export function loadPepysInputs(
         ...(config.impIdentityAudience === undefined
           ? {}
           : { impIdentityAudience: config.impIdentityAudience }),
+        ...(config.forwarder === undefined ? {} : { forwarder: config.forwarder }),
         ...(config.serviceClientDigests === undefined
           ? {}
           : { serviceClientDigests: config.serviceClientDigests }),
@@ -151,13 +162,50 @@ function requireTailnetHostname(
     );
   }
 
+  requireListedTailnetHostname('pepys.tailnetHostname', tailnetHostname);
+}
+
+function requireListedTailnetHostname(key: string, hostname: string): void {
   const isListed = exposure.entries.some(
-    (entry) => entry.kind === 'tailnet-hostname' && entry.hostname === tailnetHostname,
+    (entry) => entry.kind === 'tailnet-hostname' && entry.hostname === hostname,
   );
 
   if (!isListed) {
     throw new Error(
-      `stack config "pepys.tailnetHostname" needs a tailnet-hostname entry for ${tailnetHostname} in packages/topology/exposure.json`,
+      `stack config "${key}" needs a tailnet-hostname entry for ${hostname} in packages/topology/exposure.json`,
+    );
+  }
+}
+
+interface PepysHostnames {
+  readonly webhookHostname: string;
+  readonly apiHostname?: string | undefined;
+  readonly tailnetHostname?: string | undefined;
+  readonly impIdentityAudience?: string | undefined;
+}
+
+// The route checks only a forwarder's identity token, and ingest reads a whole body before it, so
+// the name must be one the registry keeps on the tailnet. Ingest refuses to start when the two
+// audiences are equal, so the check fails the preview first.
+function requireForwarder(
+  forwarder: Readonly<{ hostname: string; audience: string }>,
+  config: PepysHostnames,
+): void {
+  requireGeoffCloudHostname('pepys.forwarder.hostname', forwarder.hostname);
+
+  const others = [config.webhookHostname, config.apiHostname, config.tailnetHostname];
+
+  if (others.includes(forwarder.hostname)) {
+    throw new Error(
+      'stack config "pepys.forwarder.hostname" must differ from "pepys.webhookHostname", "pepys.apiHostname" and "pepys.tailnetHostname"',
+    );
+  }
+
+  requireListedTailnetHostname('pepys.forwarder.hostname', forwarder.hostname);
+
+  if (forwarder.audience === config.impIdentityAudience) {
+    throw new Error(
+      'stack config "pepys.forwarder.audience" must differ from "pepys.impIdentityAudience"',
     );
   }
 }

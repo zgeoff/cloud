@@ -4,7 +4,11 @@ Let Claude and Codex sessions in imps send their OpenTelemetry logs to the inges
 [pepys](../architecture/workloads/pepys.md), and rotate the token that ingest accepts.
 [Let sessions send telemetry](#let-sessions-send-telemetry) follows
 [the first deploy of pepys](./pepys.md#deploy-the-first-time), and runs once.
-[Rotate the token](#rotate-the-token) replaces the token.
+[Rotate the token](#rotate-the-token) replaces the token. [Add a forwarder](#add-a-forwarder) lets a
+machine outside impz, such as the owner's PC, send its logs through
+[the forwarders' tailnet route](../architecture/workloads/pepys.md#the-forwarders-tailnet-route),
+and [Rotate or remove a forwarder's key](#rotate-or-remove-a-forwarders-key) changes what ingest
+trusts.
 
 ## The path and what holds the token
 
@@ -202,3 +206,97 @@ have sent telemetry. Check these, in order, and run the query again after each f
 
 A secret that you remove and add again under the same name needs the grantable list set again, as
 step 6 of [Let sessions send telemetry](#let-sessions-send-telemetry) does.
+
+## Add a forwarder
+
+Ingest trusts a forwarder by its trust document, one JSON file in `deploy/pepys/forwarder-issuers/`
+named after the forwarder's issuer. These steps use the issuer `home-wsl`.
+
+**CAUTION:** Each process that runs as the machine's user can read the forwarder's key, and each
+holder of the key can write telemetry log records under the issuer from any tailnet device. Add a
+document only for a machine whose user the owner trusts with that.
+
+1. On the machine, install the forwarder and print its trust document:
+
+   ```sh
+   pepys-telemetry-forwarder install --issuer home-wsl --audience pepys.forwarder.internal \
+     --ingest-url https://pepys-forwarder.geoff.cloud > home-wsl.json
+   ```
+
+   The audience must equal `audience` in the `forwarder` object of `geoff-cloud:pepys` in
+   `infra/Pulumi.prod.yaml`.
+
+2. Open a pull request that adds the file as `deploy/pepys/forwarder-issuers/home-wsl.json`.
+3. Run the check of the folder:
+
+   ```sh
+   bun test infra/cluster/collect-pepys-forwarder-trust-failures.test.ts
+   ```
+
+   Expect every test to pass. The check fails for a file that ingest's loader refuses, a file not
+   named `<issuer>.json`, and an issuer name or a key that `deploy/pepys/imp-issuers/` holds. Ingest
+   would exit at start for each of these, except the file name.
+
+4. Merge the pull request. The `Deploy prod` run of the merge replaces the ConfigMap
+   `pepys-forwarder-issuers` and rolls ingest, with no hold.
+5. Check that ingest rolled:
+
+   ```sh
+   ssh root@geoffcloud k3s kubectl -n pepys rollout status deployment/pepys-ingest --timeout=300s
+   ```
+
+   Expect `deployment "pepys-ingest" successfully rolled out`.
+
+6. On the machine, start the forwarder:
+
+   ```sh
+   systemctl --user enable --now pepys-telemetry-forwarder.service
+   ```
+
+7. [Check the forwarders' route](#check-the-forwarders-route).
+
+### Check the forwarders' route
+
+Run each command on a device on the tailnet.
+
+1. Check that the route refuses a request with no identity token:
+
+   ```sh
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST https://pepys-forwarder.geoff.cloud/forwarded/v1/logs
+   ```
+
+   Expect `401`. Only ingest gives this answer. Traefik answers `404` while ingest runs a pepys
+   release older than 0.4.5, which has no sender route.
+
+2. Check that the name keeps ingest's other routes closed:
+
+   ```sh
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST https://pepys-forwarder.geoff.cloud/v1/logs
+   ```
+
+   Expect `404`, Traefik's answer.
+
+3. Check that ingest stores the forwarder's records. Read ingest's log for a warning that names the
+   sender route:
+
+   ```sh
+   ssh root@geoffcloud k3s kubectl -n pepys logs deployment/pepys-ingest --since=10m | grep forwarded
+   ```
+
+   Expect no line. On the machine, `journalctl --user -u pepys-telemetry-forwarder` shows each send
+   that ingest refused, with its status.
+
+## Rotate or remove a forwarder's key
+
+Ingest refuses a token from a key that no document in the folder holds, from its next start. The
+records that the old key wrote stay in the log, under the issuer.
+
+1. To rotate the key, move the forwarder's identity folder away on the machine. Then run the
+   `install` command of [Add a forwarder](#add-a-forwarder) again, with the same issuer. It makes a
+   new key and prints the new trust document.
+2. Open a pull request that replaces `deploy/pepys/forwarder-issuers/<issuer>.json` with the new
+   document. To remove the forwarder, delete the file.
+3. Follow steps 3 to 5 of [Add a forwarder](#add-a-forwarder).
+4. On the machine, restart the forwarder with
+   `systemctl --user restart pepys-telemetry-forwarder.service`. Skip this step when you removed the
+   forwarder.

@@ -21,6 +21,11 @@
       "reach": "private"
     },
     {
+      "source": "telemetry",
+      "route": "/forwarded/v1/logs",
+      "reach": "private"
+    },
+    {
       "source": "boxxy",
       "route": "/boxxy/facts",
       "reach": "private"

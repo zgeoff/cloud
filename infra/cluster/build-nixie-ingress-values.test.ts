@@ -2,6 +2,32 @@ import { expect, test } from 'bun:test';
 import { geoffcloudNode } from '../shared/geoffcloud-node.ts';
 import { buildNixieIngressValues } from './build-nixie-ingress-values.ts';
 
+function setupTest() {
+  // the forwarders' route: one count for every client, 4 requests at once, and 4 MiB of body each,
+  // held in memory
+  return {
+    enabled: true,
+    content: {
+      http: {
+        middlewares: {
+          'pepys-forwarder-slot': {
+            headers: { customRequestHeaders: { 'X-Pepys-Forwarder-Slot': 'route' } },
+          },
+          'pepys-forwarder-in-flight': {
+            inFlightReq: {
+              amount: 4,
+              sourceCriterion: { requestHeaderName: 'X-Pepys-Forwarder-Slot' },
+            },
+          },
+          'pepys-forwarder-body-limit': {
+            buffering: { maxRequestBodyBytes: 4_194_304, memRequestBodyBytes: 4_194_304 },
+          },
+        },
+      },
+    },
+  };
+}
+
 test("it holds the host's port 443, reads Ingress objects from the namespaces it is given and reports the host's tailnet address as their endpoint", () => {
   expect(
     buildNixieIngressValues({
@@ -21,6 +47,7 @@ test("it holds the host's port 443, reads Ingress objects from the namespaces it
     api: { dashboard: false },
     providers: {
       kubernetesCRD: { enabled: false },
+      file: setupTest(),
       kubernetesGateway: { enabled: false },
       kubernetesIngress: {
         enabled: true,
@@ -65,6 +92,7 @@ test('it lets the shared Traefik watch both the nixie and the pepys namespaces',
     })['providers'],
   ).toStrictEqual({
     kubernetesCRD: { enabled: false },
+    file: setupTest(),
     kubernetesGateway: { enabled: false },
     kubernetesIngress: {
       enabled: true,

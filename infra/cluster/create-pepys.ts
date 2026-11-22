@@ -14,14 +14,15 @@ import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
 import { buildPepysGarageSpec } from './build-pepys-garage-spec.ts';
 import { buildPepysHostSpec } from './build-pepys-host-spec.ts';
 import { buildPepysIngestSpec } from './build-pepys-ingest-spec.ts';
-import type { PepysAPIRoutes } from './build-pepys-network-policy-specs.ts';
+import type { PepysRoutes } from './build-pepys-network-policy-specs.ts';
 import { buildPepysNetworkPolicySpecs } from './build-pepys-network-policy-specs.ts';
 import { buildPepysPublicPath } from './build-pepys-public-path.ts';
 import { buildPepysS2Spec } from './build-pepys-s2-spec.ts';
 import { buildPepysServiceTokenFile } from './build-pepys-service-token-file.ts';
+import { collectPepysForwarderTrustFailures } from './collect-pepys-forwarder-trust-failures.ts';
 import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
 import { createPepysBackupJob } from './create-pepys-backup-job.ts';
-import { readPepysIssuerDocuments } from './read-pepys-issuer-documents.ts';
+import { readPepysTrustDocuments } from './read-pepys-trust-documents.ts';
 
 // the routes of ingest that the shared tunnel carries, by one anchored path pattern
 export interface PepysRoute {
@@ -43,6 +44,9 @@ interface PepysOutputs {
 
   // the host's Service, once the host's StatefulSet has rolled out
   readonly apiService: Output<string>;
+
+  // ingest's Service, once ingest's Deployment has rolled out
+  readonly ingestService: Output<string>;
 
   // unset while no route of the deployment is public
   readonly route?: PepysRoute;
@@ -66,12 +70,13 @@ export function createPepys(cluster: Provider, inputs: PepysInputs): PepysOutput
   createNetworkPolicies(cluster, namespace, {
     isPublic: apiHostname !== undefined,
     isTailnetRouted: inputs.config.tailnetHostname !== undefined,
+    isForwarderRouted: inputs.config.forwarder !== undefined,
   });
 
   createGarage(cluster, namespace, inputs);
   createS2(cluster, namespace, inputs);
-  createIngest(cluster, namespace, inputs, pull);
 
+  const ingest = createIngest(cluster, namespace, inputs, pull);
   const host = createHost(cluster, namespace, inputs, pull);
 
   if (inputs.backup !== undefined) {
@@ -83,6 +88,7 @@ export function createPepys(cluster: Provider, inputs: PepysInputs): PepysOutput
   return {
     namespace,
     apiService: host.metadata.name.apply(() => pepysWorkloads.host.name),
+    ingestService: ingest.metadata.name.apply(() => pepysWorkloads.ingest.name),
     ...(path === undefined
       ? {}
       : {
@@ -110,9 +116,9 @@ export function createPepys(cluster: Provider, inputs: PepysInputs): PepysOutput
 function createNetworkPolicies(
   cluster: Provider,
   namespace: Output<string>,
-  apiRoutes: PepysAPIRoutes,
+  routes: PepysRoutes,
 ): NetworkPolicy[] {
-  const specs = { ...buildPepysNetworkPolicySpecs(apiRoutes), ...buildPepysEgressPolicySpecs() };
+  const specs = { ...buildPepysNetworkPolicySpecs(routes), ...buildPepysEgressPolicySpecs() };
 
   return Object.entries(specs).map(
     ([name, spec]) =>
@@ -243,11 +249,15 @@ function createIngest(
     ...inputs.secrets.ingest,
   });
 
+  const impDocuments = readPepysTrustDocuments('imp-issuers');
+
   const issuers = new ConfigMap(
     'pepys-imp-issuers',
-    { metadata: { namespace }, data: readPepysIssuerDocuments() },
+    { metadata: { namespace }, data: impDocuments },
     { provider: cluster },
   );
+
+  const forwarder = inputs.config.forwarder;
 
   return new Deployment(
     ingest.name,
@@ -260,11 +270,43 @@ function createIngest(
           : { impIdentityAudience: inputs.config.impIdentityAudience }),
         envSecret: env.metadata.name,
         issuersConfigMap: issuers.metadata.name,
+        ...(forwarder === undefined
+          ? {}
+          : {
+              forwarder: {
+                audience: forwarder.audience,
+                issuersConfigMap: createForwarderIssuers(cluster, namespace, impDocuments),
+              },
+            }),
         pullSecret: ghcrPullSecretName,
       }),
     },
     { provider: cluster, dependsOn: [pull] },
   );
+}
+
+// Pulumi names the ConfigMap, so a change of documents replaces it and rolls ingest, which reads
+// the folder at start only. Ingest exits at start on a document it refuses, so the check fails the
+// preview first.
+function createForwarderIssuers(
+  cluster: Provider,
+  namespace: Output<string>,
+  impDocuments: Readonly<Record<string, string>>,
+): Output<string> {
+  const documents = readPepysTrustDocuments('forwarder-issuers');
+  const failures = collectPepysForwarderTrustFailures(documents, impDocuments);
+
+  if (failures.length > 0) {
+    throw new Error(`the forwarders' trust documents: ${failures.join('; ')}`);
+  }
+
+  const issuers = new ConfigMap(
+    'pepys-forwarder-issuers',
+    { metadata: { namespace }, data: documents },
+    { provider: cluster },
+  );
+
+  return issuers.metadata.name;
 }
 
 function createHost(

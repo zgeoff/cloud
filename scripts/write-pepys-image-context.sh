@@ -23,6 +23,7 @@ route_projection='
 import { deployment } from "./deploy/pepys/deployment.ts";
 const toPath = (path) => path === undefined ? undefined : {
   kind: path.kind, route: path.route, ignoredRoutes: path.ignoredRoutes, reach: path.reach,
+  senderRoutes: path.senderRoutes?.map((senderRoute) => ({ route: senderRoute.route })),
   check: path.check === undefined ? undefined : { secretEnv: path.check.secretEnv }, env: path.env,
 };
 console.log(JSON.stringify({ plugins: deployment.plugins.map((plugin) => ({

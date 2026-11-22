@@ -139,7 +139,7 @@
       "protocol": "tcp",
       "port": 443,
       "scope": "tailnet",
-      "reason": "nixie's Traefik ingress, which holds the host port on the host's tailnet address only and serves the Ingress objects of the nixie and pepys namespaces: nixie.geoff.cloud and pepys-api.geoff.cloud point at that address"
+      "reason": "nixie's Traefik ingress, which holds the host port on the host's tailnet address only and serves the Ingress objects of the nixie and pepys namespaces: nixie.geoff.cloud, pepys-api.geoff.cloud and pepys-forwarder.geoff.cloud point at that address"
     },
     {
       "name": "public-front",
@@ -221,6 +221,13 @@
       "hostname": "pepys-api.geoff.cloud",
       "scope": "tailnet",
       "reason": "The pepys API's every path, /rpc included, for the owner's tailnet devices. nixie's Traefik serves it on the host's tailnet address, and /rpc checks no credential, so the name stays off the tunnels"
+    },
+    {
+      "name": "pepys-forwarder-tailnet",
+      "kind": "tailnet-hostname",
+      "hostname": "pepys-forwarder.geoff.cloud",
+      "scope": "tailnet",
+      "reason": "pepys ingest's sender route /forwarded/v1/logs alone, for the telemetry forwarder on the owner's PC. nixie's Traefik serves it on the host's tailnet address and answers 404 on every other path. The route checks only the forwarder's identity token, and ingest reads a whole body before it, so the name stays off the tunnels"
     },
     {
       "name": "impd-mcp",
