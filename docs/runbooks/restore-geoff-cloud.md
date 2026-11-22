@@ -1,8 +1,7 @@
 # Restore geoff.cloud
 
 How to recover each part of geoff.cloud (#9). Each step says whether it was tested, and where.
-Untested steps are marked **untested**. A restore on the live host is a consequential operation: get
-approval for it first.
+Untested steps are marked **untested**. Get approval before any restore on the live host.
 
 Pick the section for what you lost. Each section says what it restores, what it needs and how to
 check the result.
@@ -47,13 +46,14 @@ template.
 
 ## 2. Roll impd's database back
 
-Every imp upgrade takes a copy first with `bash scripts/copy-impd-db.sh <label>`. The copy is one
+Before every imp upgrade, take a copy with `bash scripts/copy-impd-db.sh <label>`. The copy is one
 `imp.sqlite` file in `/root/imp-db-backups/<label>-<UTC time>/`, with `COPY-INFO` beside it: `path`,
 `sizeBytes`, `lastMigration`, `impVersion`, `createdAt` and `integrity`, the names
 `impz db copy --json` returns (imp #171), plus `image`, which impd cannot know. Copies from before
 those names say `imp` and `migration`; the restore script reads both. `restore-impd-db` puts a copy
-back. The host's NixOS config puts it and the copy's host side on the host's PATH, with the sqlite3
-of the flake's pinned nixpkgs, so a fix to either reaches the host only with a host switch.
+back. The host's NixOS config puts `restore-impd-db` and `copy-impd-db-host` on the host's PATH,
+with the sqlite3 of the flake's pinned nixpkgs, so a fix to either script reaches the host only when
+you switch the host.
 
 **CAUTION:** A restore discards every change impd made to its database after the copy. It is
 one-way: impd runs migrations forward only, and an older binary refuses a newer database. Disks and
@@ -90,8 +90,8 @@ stopped, and switch after.
    ```
 
    The copy's newest migration must be at or below the newest migration of the image that starts; a
-   newer copy fails at start. Matching the image in `COPY-INFO` to the generation's image meets
-   that.
+   newer copy fails at start. To meet that, pick the generation whose image matches the `image` in
+   `COPY-INFO`.
 
    It fails closed. Before it changes anything it checks the copy (integrity, `COPY-INFO`, its
    migration), reads imp-host's state and requires `inactive` or `failed`, checks that no `imp-host`
@@ -224,11 +224,11 @@ ssh root@geoffcloud 'nix-env -p /nix/var/nix/profiles/system --switch-generation
 `<generation>` is the number before the `(current)` one. `nixos-rebuild switch --rollback` fails on
 the host, which has no `nixos-config` to evaluate.
 
-Exception: imp 0.29.1 adds no migration to 0.29.0, so a rollback from 0.29.1 to the 0.29.0
-generation needs no database restore. **CAUTION:** 0.29.0 holds the image.json flaw that 0.29.1
-fixes (imp #196): a crafted imported image can overwrite host files. Before rolling back to 0.29.0,
-stop all image imports and builds (`impz image add`, `impz image build`, templates from a new image,
-BuildKit), and keep them stopped until a fixed imp runs again.
+imp 0.29.1 adds no migration to 0.29.0, so a rollback from 0.29.1 to the 0.29.0 generation needs no
+database restore. **CAUTION:** 0.29.0 holds the image.json flaw that 0.29.1 fixes (imp #196): a
+crafted imported image can overwrite host files. Before rolling back to 0.29.0, stop all image
+imports and builds (`impz image add`, `impz image build`, templates from a new image, BuildKit), and
+keep them stopped until a fixed imp runs again.
 
 A rollback from 0.30.0 needs a database restore: 0.30.0 adds the migration
 `021_add_broker_sessions`, and 0.29.1 refuses a database that holds it. Restore the copy
@@ -244,7 +244,7 @@ rollback crosses a release that added a migration, restore the matching database
 
 ## 4. Recover a lost disk
 
-Follow [Recover a lost disk](./lost-disk.md). It holds three scenarios:
+Follow [Recover a lost disk](./lost-disk.md), which covers these cases:
 
 - **Lose `vda`:** restore an Onidel snapshot, or reinstall with the key from the 1Password item
   `zfs-tank-key` and the host's tailnet key in `--extra-files`. Everything on the pool survives.
@@ -255,8 +255,8 @@ Follow [Recover a lost disk](./lost-disk.md). It holds three scenarios:
 
 ## 5. Rebuild the cluster
 
-Recovery design (option C, accepted 2026-10-04): rebuild k3s, then let Pulumi recreate every object.
-Nothing snapshots the k3s datastore.
+Rebuild k3s, then let Pulumi recreate every object (recovery design accepted 2026-10-04). Nothing
+snapshots the k3s datastore.
 
 **What is lost:** Loki's logs and Prometheus's metrics (both volumes start empty), and every object
 that only lived in the cluster. **What survives:** imps (ZFS on `vdb`, outside k3s), Pulumi state
