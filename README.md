@@ -21,8 +21,8 @@ cloud resources and the cluster, and a NixOS flake manages the host.
 
 ## Quick start
 
-Read this to work on the repo: set up a machine, preview the live stack and run the checks. Set up
-the tools and secrets that [the development setup](docs/runbooks/development.md) lists, then run:
+To work on the repo, set up the tools and secrets in
+[the development setup](docs/runbooks/development.md), then run:
 
 ```bash
 bun install
@@ -54,4 +54,4 @@ NixOS checks run nightly and gate the host switch.
 
 ## Documentation
 
-[docs/](./docs/README.md) covers the architecture and the runbooks.
+Read [docs/](./docs/README.md) for the architecture and the runbooks.

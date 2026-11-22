@@ -2,8 +2,8 @@
 
 ## Architecture
 
-[The overview](./architecture/overview.md) gives the whole estate on one page: the path of a public
-call, the path of a change, the topology and the data.
+Read [the overview](./architecture/overview.md) for the whole estate on one page: the path of a
+public call, the path of a change, the topology and the data.
 
 - [Infrastructure as code](./architecture/infrastructure-as-code.md): the Pulumi program, its
   providers, drift, the apply job and the guards.
@@ -103,4 +103,4 @@ call, the path of a change, the topology and the data.
 - [imp's e2e nodes](./runbooks/imp-e2e-tailnet.md): where imp's end-to-end suites run, and how to
   check that the production tailnet holds none of their nodes.
 
-Planned work and open choices live in Linear, not in this tree.
+Planned work and open choices live in Linear.
