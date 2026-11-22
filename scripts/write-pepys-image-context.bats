@@ -147,6 +147,25 @@ EOF2
   refute [ -L "$tree/builds" ]
 }
 
+@test "it stops before the download when the route table leaves out a sender route" {
+  setup_test "$tree" /hooks/example
+  cat > "$tree/repo/deploy/pepys/deployment.ts" << 'EOF2'
+export const deployment = {
+  plugins: [{ sources: [{ name: 'example', live: { kind: 'receive', route: '/hooks/example',
+    check: { secretEnv: 'EXAMPLE_SECRET' }, reach: 'public',
+    senderRoutes: [{ route: '/relayed/hooks/example', sender: { kind: 'imp-identity' } }] } }] }],
+};
+EOF2
+
+  run -1 --separate-stderr run_write "$tree" "$tree/context"
+
+  assert_stderr --partial '"route": "/relayed/hooks/example"'
+  refute [ -e "$tree/calls" ]
+  refute [ -L "$tree/calls" ]
+  refute [ -e "$tree/builds" ]
+  refute [ -L "$tree/builds" ]
+}
+
 @test "it stops before any step when the deployment is not installed" {
   setup_test "$tree" /hooks/example
   rm -r "$tree/repo/deploy/pepys/node_modules"

@@ -278,9 +278,21 @@ interface PepysConfig {
   // refuses every telemetry export
   readonly impIdentityAudience?: string;
 
+  // the telemetry forwarders' sender route, which nixie's Traefik serves on the host's tailnet
+  // address; while it is unset, the route has no name and ingest trusts no forwarder
+  readonly forwarder?: PepysForwarderConfig;
+
   // the sha256 digest of each service client's secret, by client name; each client signs in at
   // the API's /mcp with the read scope. A digest is no secret, so the stack config holds it.
   readonly serviceClientDigests?: Readonly<Record<string, string>>;
+}
+
+interface PepysForwarderConfig {
+  // the DNS name whose one path, /forwarded/v1/logs, reaches ingest
+  readonly hostname: string;
+
+  // the audience that a forwarder's identity token must name; never the imps' audience
+  readonly audience: string;
 }
 
 // a nightly rclone copy of the Garage buckets to an R2 bucket

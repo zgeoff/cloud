@@ -475,3 +475,73 @@ test.each([
     ),
   ).toThrowWithMessage(Error, /serviceClientDigests/u);
 });
+
+test("it carries the forwarders' hostname and audience", () => {
+  const fixture = setupTest();
+  const forwarder = { hostname: 'pepys-forwarder.geoff.cloud', audience: 'pepys-forwarders-test' };
+
+  const config = buildStubConfig({
+    pepys: JSON.stringify({
+      image: fixture.image,
+      webhookHostname: 'pepys-webhook.geoff.cloud',
+      impIdentityAudience: 'pepys-imps-test',
+      forwarder,
+    }),
+  });
+
+  expect(loadPepysInputs(config, fixture.coreEnv, []).pepys?.config).toStrictEqual({
+    image: fixture.image,
+    webhookHostname: 'pepys-webhook.geoff.cloud',
+    impIdentityAudience: 'pepys-imps-test',
+    forwarder,
+  });
+});
+
+test.each([
+  [
+    'a hostname outside geoff.cloud',
+    { hostname: 'pepys-forwarder.example.test', audience: 'pepys-forwarders-test' },
+    'stack config "pepys.forwarder.hostname" must name a host under geoff.cloud',
+  ],
+  [
+    "the API's tailnet hostname",
+    { hostname: 'pepys-api.geoff.cloud', audience: 'pepys-forwarders-test' },
+    'stack config "pepys.forwarder.hostname" must differ from "pepys.webhookHostname", "pepys.apiHostname" and "pepys.tailnetHostname"',
+  ],
+  [
+    "ingest's webhook hostname",
+    { hostname: 'pepys-webhook.geoff.cloud', audience: 'pepys-forwarders-test' },
+    'stack config "pepys.forwarder.hostname" must differ from "pepys.webhookHostname", "pepys.apiHostname" and "pepys.tailnetHostname"',
+  ],
+  [
+    'a hostname that the exposure registry does not list',
+    { hostname: 'pepys-relay.geoff.cloud', audience: 'pepys-forwarders-test' },
+    'stack config "pepys.forwarder.hostname" needs a tailnet-hostname entry for pepys-relay.geoff.cloud in packages/topology/exposure.json',
+  ],
+  [
+    "the imps' audience",
+    { hostname: 'pepys-forwarder.geoff.cloud', audience: 'pepys-imps-test' },
+    'stack config "pepys.forwarder.audience" must differ from "pepys.impIdentityAudience"',
+  ],
+])(
+  "it refuses a forwarders' section with %s",
+  (_label: string, forwarder: Readonly<Record<string, string>>, message: string) => {
+    const fixture = setupTest();
+
+    expect(() =>
+      loadPepysInputs(
+        buildStubConfig({
+          pepys: JSON.stringify({
+            image: fixture.image,
+            webhookHostname: 'pepys-webhook.geoff.cloud',
+            tailnetHostname: 'pepys-api.geoff.cloud',
+            impIdentityAudience: 'pepys-imps-test',
+            forwarder,
+          }),
+        }),
+        fixture.coreEnv,
+        [],
+      ),
+    ).toThrowWithMessage(Error, message);
+  },
+);

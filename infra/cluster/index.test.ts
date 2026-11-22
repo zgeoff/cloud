@@ -746,3 +746,48 @@ test("it refuses pepys's tailnet hostname without nixie, whose Traefik carries t
     'stack config "pepys.tailnetHostname" needs stack config "nixie": the route goes through nixie\'s Traefik',
   );
 });
+
+test("it refuses the forwarders' route without nixie, whose Traefik carries the route", async () => {
+  const stub = buildStubResourceMocks();
+
+  await runtime.setMocks(stub.mocks, 'geoff-cloud', 'test');
+
+  onTestFinished(() => {
+    stub.release();
+    runtime.resetOptions('', '', -1, '', '', false, '');
+  });
+
+  expect(() =>
+    createCluster(createClusterProvider('k3s', { kubeconfig: output('kubeconfig-for-tests') }), {
+      onePasswordConnect: { credentials: output('{}') },
+      pepys: {
+        config: {
+          image:
+            'ghcr.io/zgeoff/cloud-pepys:0.4.0-3f9c1d2a7b10@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+          webhookHostname: 'pepys-webhook.geoff.cloud',
+          forwarder: {
+            hostname: 'pepys-forwarder.geoff.cloud',
+            audience: 'pepys-forwarders-for-tests',
+          },
+        },
+        pullCredential: {
+          username: 'octo-puller',
+          token: output('ghp_fake0token0for0tests0only0000000000'),
+        },
+        secrets: {
+          garageRPCSecret: output('rpc-secret-for-tests'),
+          garageAdminToken: output('admin-token-for-tests'),
+          s2GarageAccessKeyID: output('GK0123456789abcdef01234567'),
+          s2GarageSecretAccessKey: output('s2-garage-secret-for-tests'),
+          s2AccessToken: output('s2-token-for-tests'),
+          ingest: {},
+        },
+      },
+      zoneID: output('zone'),
+      kubeconfig: output('kubeconfig-for-tests'),
+    }),
+  ).toThrowWithMessage(
+    Error,
+    'stack config "pepys.forwarder" needs stack config "nixie": the route goes through nixie\'s Traefik',
+  );
+});

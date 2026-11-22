@@ -58,6 +58,55 @@ test('it lists each receive route with its reach, private by default, and each v
   });
 });
 
+test("it lists each sender route after its path's own routes, with the path's reach and no variable", () => {
+  expect(
+    buildPepysRouteTable({
+      plugins: [
+        {
+          sources: [
+            {
+              name: 'meters',
+              live: {
+                kind: 'receive',
+                route: '/v1/logs',
+                ignoredRoutes: ['/v1/metrics'],
+                check: { kind: 'token', header: 'authorization', secretEnv: 'METER_TOKEN' },
+                senderRoutes: [
+                  {
+                    route: '/relayed/v1/logs',
+                    sender: {
+                      kind: 'imp-identity',
+                      audienceEnv: 'METER_RELAY_AUDIENCE',
+                      issuersEnv: 'METER_RELAY_ISSUERS',
+                    },
+                  },
+                ],
+              },
+            },
+            {
+              name: 'gauges',
+              live: {
+                kind: 'receive',
+                route: '/hooks/gauges',
+                check: { kind: 'hmac-sha256', header: 'x-signature', secretEnv: 'GAUGE_SECRET' },
+                reach: 'public',
+              },
+            },
+          ],
+        },
+      ],
+    }),
+  ).toStrictEqual({
+    routes: [
+      { source: 'meters', route: '/v1/logs', reach: 'private' },
+      { source: 'meters', route: '/v1/metrics', reach: 'private' },
+      { source: 'meters', route: '/relayed/v1/logs', reach: 'private' },
+      { source: 'gauges', route: '/hooks/gauges', reach: 'public' },
+    ],
+    secretVariables: ['METER_TOKEN', 'GAUGE_SECRET'],
+  });
+});
+
 test('it refuses a value that is not a deployment', () => {
   expect(() => buildPepysRouteTable({ plugins: 'none' })).toThrow();
 });

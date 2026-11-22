@@ -1,3 +1,5 @@
+import { pepysForwarderMiddlewares } from './pepys-forwarder-middlewares.ts';
+
 // the appVersion of chart 41.6.0; bump with the chart
 const traefikVersion = 'v3.7.13';
 const traefikDigest = 'sha256:24841fe2de7304c149343d877d2923b4c8800a38ba015dea9174c23b20e344a0';
@@ -27,6 +29,9 @@ export function buildNixieIngressValues(inputs: NixieIngressValuesInputs): Recor
     api: { dashboard: false },
     providers: {
       kubernetesCRD: { enabled: false },
+
+      // the middlewares that an Ingress names, since the cluster has no Traefik CRDs
+      file: { enabled: true, content: pepysForwarderMiddlewares.config },
       kubernetesGateway: { enabled: false },
       kubernetesIngress: {
         enabled: true,

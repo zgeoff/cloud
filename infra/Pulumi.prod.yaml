@@ -47,6 +47,9 @@ config:
     tailnetHostname: pepys-api.geoff.cloud
     webhookHostname: pepys-webhook.geoff.cloud
     impIdentityAudience: pepys.imp.internal
+    forwarder:
+      hostname: pepys-forwarder.geoff.cloud
+      audience: pepys.forwarder.internal
     serviceClientDigests:
       wringer-ro: bd9b7496b91be8979ea3f37cb5cdf55b3a35bc22b154846f671bb4e31cea3689
   geoff-cloud:boxxy:

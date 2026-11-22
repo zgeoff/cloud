@@ -54,3 +54,42 @@ test('it sets no audience while the stack config names none, so ingest starts an
     { name: 'PEPYS_IMP_IDENTITY_ISSUERS', value: '/etc/pepys/imp-issuers' },
   ]);
 });
+
+test("it gives ingest the forwarders' audience and their own folder of trust documents, apart from the imps'", () => {
+  const issuersConfigMap = output('pepys-imp-issuers-0a1b2c3d');
+  const forwarderIssuersConfigMap = output('pepys-forwarder-issuers-0a1b2c3d');
+
+  const spec = buildPepysIngestSpec({
+    image:
+      'ghcr.io/zgeoff/cloud-pepys:0.4.0-3f9c1d2a7b10@sha256:4444444444444444444444444444444444444444444444444444444444444444',
+    impIdentityAudience: 'pepys-telemetry-for-tests',
+    envSecret: output('pepys-ingest-0a1b2c3d'),
+    issuersConfigMap,
+    forwarder: {
+      audience: 'pepys-forwarders-for-tests',
+      issuersConfigMap: forwarderIssuersConfigMap,
+    },
+    pullSecret: 'ghcr-pull',
+  });
+
+  const container = spec.template.spec?.containers[0];
+
+  expect(spec.template.spec?.volumes).toStrictEqual([
+    { name: 'imp-issuers', configMap: { name: issuersConfigMap } },
+    { name: 'forwarder-issuers', configMap: { name: forwarderIssuersConfigMap } },
+    { name: 'tmp', emptyDir: {} },
+  ]);
+
+  expect(container?.env?.slice(-4)).toStrictEqual([
+    { name: 'PEPYS_IMP_IDENTITY_AUDIENCE', value: 'pepys-telemetry-for-tests' },
+    { name: 'PEPYS_IMP_IDENTITY_ISSUERS', value: '/etc/pepys/imp-issuers' },
+    { name: 'PEPYS_TELEMETRY_FORWARDER_AUDIENCE', value: 'pepys-forwarders-for-tests' },
+    { name: 'PEPYS_TELEMETRY_FORWARDER_ISSUERS', value: '/etc/pepys/forwarder-issuers' },
+  ]);
+
+  expect(container?.volumeMounts).toStrictEqual([
+    { name: 'imp-issuers', mountPath: '/etc/pepys/imp-issuers', readOnly: true },
+    { name: 'forwarder-issuers', mountPath: '/etc/pepys/forwarder-issuers', readOnly: true },
+    { name: 'tmp', mountPath: '/tmp' },
+  ]);
+});

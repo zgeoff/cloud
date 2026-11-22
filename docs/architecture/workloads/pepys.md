@@ -177,6 +177,40 @@ a tailnet request that names it gets Traefik's 404 and never reaches a sign-in p
 route on, check it or turn it off, follow
 [the API runbook](../../runbooks/pepys-api.md#turn-on-the-apis-tailnet-route).
 
+### The forwarders' tailnet route
+
+A telemetry forwarder runs on the owner's PC, outside impz, and sends the PC's OpenTelemetry logs to
+ingest's sender route, `/forwarded/v1/logs`. Ingest checks only an identity token that the PC's own
+ES256 key signed. The route has no shared token, so it answers on the tailnet only. pepys's
+[sender route design](https://github.com/zgeoff/pepys/blob/main/docs/design/telemetry-forwarder/sender-route.md)
+explains what a holder of the key can write.
+
+Stack config `pepys.forwarder` holds the route's `hostname`, `pepys-forwarder.geoff.cloud`, and the
+`audience` that a forwarder's token must name, `pepys.forwarder.internal`. The Pulumi program
+refuses an audience equal to `pepys.impIdentityAudience`, a hostname that another pepys route has, a
+hostname with no `tailnet-hostname` entry in the exposure registry, and the setting without stack
+config `nixie`. `pepys.forwarder` turns on these together:
+
+- ingest's `PEPYS_TELEMETRY_FORWARDER_AUDIENCE`, and `PEPYS_TELEMETRY_FORWARDER_ISSUERS`, the folder
+  where a ConfigMap mounts the JSON files of `deploy/pepys/forwarder-issuers/`. The folder holds the
+  forwarders' trust documents and no other file, apart from the imps' folder;
+- the Ingress `pepys-forwarder-tailnet`, which sends only the exact path `/forwarded/v1/logs` of the
+  name to ingest's port, 8080. Traefik answers 404 on every other path, so none of ingest's other
+  routes answers on the name. Traefik cleans a path such as `/a/../forwarded/v1/logs` before it
+  matches the route, and sends ingest the cleaned path;
+- three middlewares of Traefik's file provider, which the Ingress names. Traefik takes 4 requests to
+  the route at once and answers 429 to a fifth, and answers 413 to a body over 4,194,304 bytes, the
+  telemetry path's limit. Together they hold at most 16 MiB of bodies in Traefik's memory;
+- a certificate, and a DNS-only A record at the node's tailnet address, as for the API's tailnet
+  route;
+- the rule in ingest's network policy that admits Traefik to 8080.
+
+Ingest reads the trust documents at start only. Pulumi names the ConfigMap, so a change to the
+folder replaces the ConfigMap and rolls ingest. Ingest exits at start on a document that its loader
+refuses, and on an issuer name or a key that both folders hold. The Pulumi program checks the folder
+for each of these before the apply, and also refuses a document whose file name is not its issuer
+name. [Add a forwarder](../../runbooks/pepys-telemetry.md#add-a-forwarder) gives the steps.
+
 ### The telemetry path from a session
 
 A Claude or Codex session in an imp reaches ingest without a tunnel. The atc daemon's
@@ -198,14 +232,16 @@ Each pod admits only its callers:
 
 - Garage admits s2-lite and the backup on 3900.
 - s2-lite admits ingest and the host.
-- ingest admits two pods on 8080: the shared tunnel's cloudflared, and
-  [the boxxy server](./boxxy.md), which decides the next task of the fleet of coding agents. The
-  boxxy server is the pod with the label `app: boxxy-server` in the namespace `boxxy`, and it sends
-  its facts to `/boxxy/facts`. The policy matches a pod and a port, never a path, so an admitted pod
-  reaches every ingest route. The tunnel forwards only the `public` routes. The boxxy server reaches
-  the `public` routes and the telemetry routes too, and each route's own check still applies. A
-  process on the node needs no rule, because kube-router admits the node's own addresses before any
-  policy.
+- ingest admits two pods on 8080, and a third while
+  [the forwarders' route](#the-forwarders-tailnet-route) is on: the shared tunnel's cloudflared,
+  nixie's Traefik, and [the boxxy server](./boxxy.md), which decides the next task of the fleet of
+  coding agents. The boxxy server is the pod with the label `app: boxxy-server` in the namespace
+  `boxxy`, and it sends its facts to `/boxxy/facts`. The policy matches a pod and a port, never a
+  path, so an admitted pod reaches every ingest route. The tunnel forwards only the `public` routes.
+  The boxxy server reaches the `public` routes and the telemetry routes too, and each route's own
+  check still applies. Traefik reaches every route as well, so its Ingress alone keeps the
+  forwarders' name to one path. A process on the node needs no rule, because kube-router admits the
+  node's own addresses before any policy.
 - The host's pod admits the boxxy server on 8081, the API's port, and the shared tunnel's
   cloudflared too while the API's public route is on. `/rpc` checks no caller, so the boxxy server
   reads every query under `/rpc`. `/mcp` needs an OAuth token and the public host's name in `Host`,
