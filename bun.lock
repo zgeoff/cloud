@@ -11,7 +11,7 @@
       "devDependencies": {
         "@commitlint/cli": "21.2.4",
         "@faker-js/faker": "10.6.0",
-        "@heynixie/contract": "0.94.0",
+        "@heynixie/contract": "0.95.0",
         "@impz/client": "catalog:",
         "@impz/testing": "catalog:",
         "@mswjs/interceptors": "0.45.11",
@@ -286,7 +286,7 @@
 
     "@hexagon/base64": ["@hexagon/base64@1.1.28", "", {}, "sha512-lhqDEAvWixy3bZ+UOYbPwUbBkwBq5C1LAJ/xPC8Oi+lL54oyakv/npbA0aU2hgCsx/1NUd4IBvV03+aUBWxerw=="],
 
-    "@heynixie/contract": ["@heynixie/contract@0.94.0", "", { "dependencies": { "@orpc/client": "1.16.1", "@orpc/contract": "1.16.1", "@orpc/openapi": "1.16.1", "@orpc/tanstack-query": "1.16.1", "@orpc/zod": "1.16.1", "@tanstack/query-core": "5.107.1", "zod": "4.6.7" } }, "sha512-kujqYgyGdo0au8besYY9Ow/F2uNvBOkGISz0BwSkNdS1i0aOyZ9ydMbiL0l3g1P7MYIpfvfmFFkXUzt/8+lwAg=="],
+    "@heynixie/contract": ["@heynixie/contract@0.95.0", "", { "dependencies": { "@orpc/client": "1.16.1", "@orpc/contract": "1.16.1", "@orpc/openapi": "1.16.1", "@orpc/tanstack-query": "1.16.1", "@orpc/zod": "1.16.1", "@tanstack/query-core": "5.107.1", "zod": "4.6.7" } }, "sha512-nPIpELdBFMw4eIdc5kyt0haDtGfuQCpHohDPiImiU5ewxOIxsr6sQnQkWXhvegV0HG5mUe9KZIiw7AShqU3Gjw=="],
 
     "@humanfs/core": ["@humanfs/core@0.19.2", "", { "dependencies": { "@humanfs/types": "^0.15.0" } }, "sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA=="],
 
