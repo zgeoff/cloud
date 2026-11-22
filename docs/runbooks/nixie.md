@@ -6,8 +6,8 @@ pods, the secrets and the route. Run the Pulumi steps from a clean checkout of `
 [change infrastructure](./workflows.md#change-infrastructure) describes.
 
 **CAUTION:** The secrets file holds the deployment key, which wraps every key in nixie's key store.
-A leaked age key decrypts every earlier commit of the file, so recovery from a leak rotates every
-secret the file ever held. Never print a decrypted value, and never put one on a command line.
+A leaked age key decrypts every earlier commit of the file, so after a leak, rotate every secret the
+file ever held. Never print a decrypted value, and never put one on a command line.
 
 ## What holds what
 
@@ -80,9 +80,9 @@ Before the first deploy, and after a profile joins `config.yaml`, add the model 
    secrets=$(printf '%s\n' "$secret_names" | paste -sd, -)
    ```
 
-   Expect no `no credential item` line. A profile on another host needs its own item, and a case for
-   it here. A Codex profile has no `auth_header`, because the broker always sends its secret as a
-   bearer header. The `chatgpt.com` item holds the route key of the model gateway's
+   Expect no `no credential item` line. For a profile on another host, add its own item, and a case
+   for it here. A Codex profile has no `auth_header`, because the broker always sends its secret as
+   a bearer header. The `chatgpt.com` item holds the route key of the model gateway's
    [plan route](./model-gateway.md#add-the-chatgpt-plan-route), not a model credential.
 
 2. Add each secret that impd lacks:
@@ -96,7 +96,6 @@ Before the first deploy, and after a profile joins `config.yaml`, add the model 
    ```
 
    Expect a table row for each new name. For each name impd already holds, expect
-
    `impz: CONFLICT: secret <name> already exists`, and the loop goes on to the next name.
 
 3. List the secrets:
@@ -111,8 +110,8 @@ Before the first deploy, and after a profile joins `config.yaml`, add the model 
 
 ## Rotate the model credential
 
-nixie's secrets file holds no model credential, so a rotation replaces each model secret's value in
-impd under the same name. The names, nixie's token and every grant stay as they are, and the
+nixie's secrets file holds no model credential, so to rotate one, replace each model secret's value
+in impd under the same name. The names, nixie's token and every grant stay as they are, and the
 rotation needs no PR, no deploy and no restart. The steps below rotate the Claude setup token. To
 rotate the OpenRouter key, run them with the item `nixie-openrouter-credential` and the host
 `openrouter.ai` in place of `nixie-model-credential` and `api.anthropic.com`.
@@ -129,8 +128,7 @@ writes into its real memory.
    op read op://cloud/nixie-model-credential/credential | tr -d '\n' | sha256sum | cut -c1-8
    ```
 
-   Expect the digest of the new token, which `op read` of the item you copied it from prints with
-   the same pipeline.
+   Expect the digest that the same pipeline prints for the item you copied the new token from.
 
 3. Record the model secrets, and in the `IMPS` column the imps each one is granted to:
 
@@ -175,10 +173,10 @@ previews keep the old token.
 
 ## Pin nixie's sandbox images
 
-nixie adds its sandbox images to impd with its own token, which cannot pin an image. You pin them
-with `host_imp`, which runs `impz` as root inside imp-host, so that impd's image eviction never
-removes one and a new sandbox never waits for a pull. Before nixie creates a sandbox on an evicted
-image, nixie adds the image again, so an image that misses its pin costs only a pull.
+nixie adds its sandbox images to impd with its own token, which cannot pin an image. Pin them with
+`host_imp`, which runs `impz` as root inside imp-host, so that impd's image eviction never removes
+one and a new sandbox never waits for a pull. Before nixie creates a sandbox on an evicted image,
+nixie adds the image again, so an image that misses its pin costs only a pull.
 
 Run this section after you deploy a nixie bump PR that has the label `sandbox-images-changed`
 ([Release check](./release-check.md)), once step 3 of [Deploy or upgrade](#deploy-or-upgrade) shows
@@ -390,11 +388,11 @@ cause and dispatch again. The new StatefulSet mounts the same claim.
 
 ## Check a deploy
 
-The `Deploy prod` workflow runs nixie's API check and nixie's own prod doctor after each apply, and
-[the prod apply runbook](./prod-apply.md) reads their failures. Two more checks prove a deploy end
-to end. Run both after each deploy or upgrade of nixie, from a repo checkout on a tailnet device
-that reaches `root@geoffcloud` over SSH. They create nothing in the cluster and write nothing to
-nixie's conversation, and CI never runs them, because they need the live host.
+The `Deploy prod` workflow runs nixie's API check and nixie's own prod doctor after each apply. Read
+their failures with [the prod apply runbook](./prod-apply.md). Two more checks prove a deploy end to
+end. Run both after each deploy or upgrade of nixie, from a repo checkout on a tailnet device that
+reaches `root@geoffcloud` over SSH. They create nothing in the cluster and write nothing to nixie's
+conversation, and CI never runs them, because they need the live host.
 
 **CAUTION:** A check that stops early can leave its session or its imp behind. The stream check
 prints the ID of a session it could not revoke: revoke it from nixie's device list. The sandbox
@@ -422,8 +420,8 @@ check prints the name of an imp it could not remove: remove it with
 
    The check creates one imp, `fetch-check-<8 hex>`, from nixie's fetch image under imp's `public`
    policy, as nixie's web fetch tool does. The imp must read `https://example.com/`, and must not
-   connect to impd, the node's addresses, nixie's pod and Service, or a tailnet address. It removes
-   the imp at the end. Expect `public page: https://example.com/ answered 200 true`, every
+   connect to impd, the node's addresses, nixie's pod and Service, or a tailnet address. The check
+   removes the imp at the end. Expect `public page: https://example.com/ answered 200 true`, every
    `from the sandbox` line `blocked`, and the last line `fetch sandbox check passed`.
 
    Each target must first connect from the host, because an address with no listener refuses the
@@ -484,9 +482,8 @@ work of one that stopped part way.
 ## Keep nixie's data out of copies
 
 A forget in nixie removes an item everywhere nixie holds it, but a copy taken outside nixie keeps
-it. Two kinds of copy exist, and each has its rule. An Onidel snapshot of the root disk holds no
-copy, because nixie's volume sits on the encrypted zvol on `vdb`
-([protection at rest](../architecture/secrets.md#protection-at-rest)).
+it. An Onidel snapshot of the root disk holds no copy, because nixie's volume sits on the encrypted
+zvol on `vdb` ([protection at rest](../architecture/secrets.md#protection-at-rest)).
 
 ### imp backups
 
