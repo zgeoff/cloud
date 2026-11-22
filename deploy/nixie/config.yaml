@@ -589,6 +589,28 @@ search:
   credential: deployment:kagi
   daily_call_cap: 200
 
+# image tools: image.draw and its siblings exist only with this block. Each credential is the sops
+# file's connector_credentials entry of that name. Prices are micros per image for each size, from
+# the providers' pricing pages (read 22 Nov 2026), and the draw charge reads them.
+# - gemini: Nano Banana 2.1 at 1K, which the adapter always requests: $0.0336 per image, plus a
+#   small margin for source and reference images on an edit
+# - openai: gpt-image-2.6-flare at its default quality, priced at the high-quality output tokens
+#   (1,756 at 1024x1024, 1,372 at the other two) at $30 per million, plus a margin for the prompt and
+#   one source image on an edit. OpenAI publishes tokens and rates, not a per-image price
+images:
+  default: gemini
+  profiles:
+    gemini:
+      provider: gemini
+      model: gemini-nano-banana-2.1
+      credential: deployment:gemini-images
+      prices: { '1024x1024': 35000, '1536x1024': 35000, '1024x1536': 35000 }
+    openai:
+      provider: openai
+      model: gpt-image-2.6-flare
+      credential: deployment:openai-images
+      prices: { '1024x1024': 62000, '1536x1024': 50000, '1024x1536': 50000 }
+
 # backups: the nixie-backup CronJob uploads once a day (04:00), so nixie writes a set and expects
 # its receipt on the same daily cadence; readiness reports backups unready past twice the interval
 backup:
