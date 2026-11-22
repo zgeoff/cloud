@@ -54,8 +54,8 @@
     "pluginSum": "ab8f281102a71182e1465fb8c5a254b012adfc7766737da88acf3dd5adcd4153"
   },
   "auto-mode": {
-    "version": "4.0.3",
-    "sum": "64e211160744f5e9c7c6da416517d221a5d8cdea0d546d21e4c513e3c7e0a9da"
+    "version": "4.0.4",
+    "sum": "81f79ab383af72fd4d53db9295e192acec1b87f47806b7244f4ba09bd8aa295f"
   },
   "noslop": {
     "version": "0.4.30"
