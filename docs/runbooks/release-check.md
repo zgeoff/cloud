@@ -8,13 +8,13 @@ release with the pins on `main`, and its bump job runs only when a pin is older.
 merged nixie bump changes the stack config, so the `Deploy prod` workflow applies it to prod with no
 person involved, unless its guard holds the plan ([the prod apply job](./prod-apply.md)). The same
 holds for the later pull request that pins the atc-gateway images an atc bump publishes
-([The atc-gateway images](#the-atc-gateway-images)). A host switch and an agent image rebuild stay
-with a person, and each pull request's body lists the steps its merge leaves. An atc major release
-reaches the host's atc daemon only after the atc gateway runs that major, because the host switch
-refuses a skew ([Switch the host](./workflows.md#switch-the-host)). An atc release reaches a
-daemon's `cloud` target only in the order that
-[the agent image runbook](./agent-image.md#roll-out-an-atc-release) gives: the image first, then the
-daemon.
+([The atc-gateway images](#the-atc-gateway-images)), unless it moves only the backup image's tag. A
+host switch and an agent image rebuild stay with a person, and each pull request's body lists the
+steps its merge leaves. An atc major release reaches the host's atc daemon only after the atc
+gateway runs that major, because the host switch refuses a skew
+([Switch the host](./workflows.md#switch-the-host)). An atc release reaches a daemon's `cloud`
+target only in the order that [the agent image runbook](./agent-image.md#roll-out-an-atc-release)
+gives: the image first, then the daemon.
 
 | Dependency         | Branch                             | Pins                                                                                   |
 | ------------------ | ---------------------------------- | -------------------------------------------------------------------------------------- |
@@ -132,13 +132,13 @@ matters when a bump run fails after its push: the pull request loses the label, 
 finish before the next run puts the label back, and no later check finishes to start a merge.
 
 The workflow merges a pull request labelled `auto-merge` only when the release check app opened it
-and wrote every commit on it, it changes no file outside its dependency's pins, and every GitHub
-Actions check on its head has passed. The merge workflow's own check runs do not count: a run that
-the label starts puts its check run on the head while it decides. A commit anyone else pushes to the
-branch therefore holds the pull request for a person. CI's `pr / checks` check must also have
-passed, because it holds every check, the agent image check and the fixtures included, and it can
-register its check run after the label event. The merge uses the app's token, so the push to `main`
-starts its workflows.
+and wrote every commit on it, it changes no file outside its dependency's pins (with the lock files
+and restore Jobs they write, and the pin table), and every GitHub Actions check on its head has
+passed. The merge workflow's own check runs do not count: a run that the label starts puts its check
+run on the head while it decides. A commit anyone else pushes to the branch therefore holds the pull
+request for a person. CI's `pr / checks` check must also have passed, because it holds every check,
+the agent image check and the fixtures included, and it can register its check run after the label
+event. The merge uses the app's token, so the push to `main` starts its workflows.
 
 ## Review a bump
 

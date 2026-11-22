@@ -96,8 +96,8 @@ host_imp() { ssh root@geoffcloud podman exec -i imp-host impz "$@"; }
    its journal says `the credential github-app-key is not a PEM private key`.
 
 7. Switch the host from a clean checkout of `main` that a green `NixOS checks` run covers:
-   `bash scripts/switch-geoffcloud.sh`. Then start the unit, which the switch skipped while its
-   secrets were missing, and read its first line:
+   `bash scripts/switch-geoffcloud.sh`, which `bun run ops:switch-host` wraps. Then start the unit,
+   which the switch skipped while its secrets were missing, and read its first line:
 
    ```bash
    ssh root@geoffcloud 'systemctl restart preview && sleep 2 && journalctl -u preview -n 5 --no-pager'
@@ -141,7 +141,7 @@ release that ships `counting-proxy-linux-x64`, which the host pins by its sha256
 
 3. In the host config, set `services.preview.impModelSecret` to `preview-model-counted` and turn on
    `services.preview.spendCap` with the pinned package, the model, its prices and the limit. Switch
-   the host as step 6 of [Set the service up](#set-the-service-up) does, and expect the unit's log
+   the host as step 7 of [Set the service up](#set-the-service-up) does, and expect the unit's log
    to hold `previews: model routes on 10.88.0.1:18082`, with the limit after it.
 
 4. Remove each preview imp that booted before the switch:
@@ -278,7 +278,8 @@ ssh root@geoffcloud journalctl -u preview -n 100 --no-pager
 
 When the status reads `The run's imp did not start`, read impd's refusal at the end of the status. A
 refused grant means the service's imp token lacks `preview-model` in its `--grantable` list: set the
-list with step 3 of [Set the service up](#set-the-service-up).
+list with step 3 of [Set the service up](#set-the-service-up), adding `preview-model-counted` when
+the spend cap is on.
 
 When the status reports an exit code and no counts, the run failed before the suite printed its
 counts. Read the run's output in the journal for the step that failed, such as the `git fetch` of

@@ -1,12 +1,13 @@
 # The model gateway
 
 nixie's model gateway runs on the host as the `model-gateway` unit, from the release binary that
-[`nixos/packages/model-gateway.nix`](../../nixos/packages/model-gateway.nix) pins. Every model
-request of production nixie passes it: imp-host's broker sends each request of a nixie sandbox to
-the gateway's model listener, the gateway counts the reply's dollars and tokens in a day and a month
-that reset at midnight in nixie's time zone, and it refuses every request once a count reaches the
-limit nixie set. nixie sets its limits on the control listener, and the gateway refuses any limit
-above the caps in its own config.
+[`nixos/packages/model-gateway.nix`](../../nixos/packages/model-gateway.nix) pins. Once
+[Send nixie's model requests through the gateway](#send-nixies-model-requests-through-the-gateway)
+has run, every model request of production nixie passes it: imp-host's broker sends each request of
+a nixie sandbox to the gateway's model listener, the gateway counts the reply's dollars and tokens
+in a day and a month that reset at midnight in nixie's time zone, and it refuses every request once
+a count reaches the limit nixie set. nixie sets its limits on the control listener, and the gateway
+refuses any limit above the caps in its own config.
 [nixie's model gateway](https://github.com/zgeoff/nixie/blob/main/docs/architecture/policy/model-gateway.md)
 describes the gateway, and
 [`nixos/modules/model-gateway.nix`](../../nixos/modules/model-gateway.nix) describes the unit, its
@@ -217,8 +218,9 @@ they differ. Rotate both in one window:
        <(op item get model-gateway-control --vault cloud --format json)) > /dev/null
    ```
 
-2. Install it on the host, as step 2 there does, and restart the unit:
-   `ssh root@geoffcloud systemctl restart model-gateway < /dev/null`.
+2. Install it on the host, as step 2 of [Set up the control token](#set-up-the-control-token) does,
+   and restart the unit: `ssh root@geoffcloud systemctl restart model-gateway < /dev/null`. This
+   restart is the one stop outside a host switch: nixie pauses until step 3 ends it.
 3. Set nixie's copy, as [change a secret](./nixie.md#change-a-secret) does for the key
    `["settings"]["gateway-control"]`, and merge its PR. nixie stays paused as `unreachable` from
    step 2 until its new pod starts, and the stop clears on its own.
@@ -277,9 +279,9 @@ the switch.
    Expect `ok`. Compare the first 8 hex of each copy's SHA-256, as step 3 of
    [Set up the control token](#set-up-the-control-token) does for the token.
 
-3. Add the profile's model secret to impd with the same key. Set the helpers and `model_secrets` and
-   `secrets` first, as [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) step 1 does,
-   then:
+3. Add the profile's model secret to impd with the same key. Set the helpers, `model_secrets`,
+   `secret_names` and `secrets` first, as
+   [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) step 1 does, then:
 
    ```bash
    op read op://cloud/model-gateway-gpt-6-luna-route-key/credential | tr -d '\n' \
@@ -287,7 +289,7 @@ the switch.
        --header authorization --scheme bearer --upstream http://10.88.0.1:8789
    ```
 
-   Expect a table row for the name. nixie derives the name from the profile `gpt-6-luna`, the header
+   Expect a table row for the name. nixie derives the name from the profile `gpt-6-luna`, the scheme
    `bearer` and the host `chatgpt.com`.
 
 4. Point nixie's token at the list that holds the new name. `--grantable` takes the whole list, and
