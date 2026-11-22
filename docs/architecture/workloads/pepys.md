@@ -4,8 +4,9 @@ pepys is the owner's personal data hub. Its ingest takes signed deliveries and s
 in a log, its host runs the deployment's consumers over that log into a store, and its API serves
 the store. The cluster runs it in the namespace `pepys` once stack config `pepys` is set. Two routes
 are public: the GitHub webhook route of ingest, and the API's MCP and OAuth paths while stack config
-`pepys.apiHostname` is set. While stack config `pepys.tailnetHostname` is set, the API's `/rpc` also
-answers on the tailnet. Everything else stays inside the cluster.
+`pepys.apiHostname` is set. Two routes can answer on the tailnet: the API's every path, `/rpc`
+included, while stack config `pepys.tailnetHostname` is set, and ingest's `/forwarded/v1/logs` while
+stack config `pepys.forwarder` is set. Everything else stays inside the cluster.
 
 ## Processes
 
@@ -94,12 +95,14 @@ pattern anchored at both ends. It answers 404 on every other path of that host. 
 signature of every GitHub delivery.
 
 The telemetry routes are `private`, so the tunnel never forwards them. The telemetry relay on the
-node and the boxxy server's pod reach them. Ingest refuses a telemetry export without a proven
-sender. The trust documents of the sender proof are the JSON files in `deploy/pepys/imp-issuers/`,
-which a ConfigMap mounts at `PEPYS_IMP_IDENTITY_ISSUERS`, and the audience is the stack config's
-`pepys.impIdentityAudience`, `pepys.imp.internal`. The folder holds `geoffcloud.json`, the public
-key of the issuer `geoffcloud`, so ingest accepts an export whose identity token that issuer signed
-for that audience, and refuses every other export. An invalid document stops ingest at start.
+node and the boxxy server's pod reach them, and nixie's Traefik reaches `/forwarded/v1/logs` while
+[the forwarders' route](#the-forwarders-tailnet-route) is on. Ingest refuses a telemetry export
+without a proven sender. The trust documents of the sender proof are the JSON files in
+`deploy/pepys/imp-issuers/`, which a ConfigMap mounts at `PEPYS_IMP_IDENTITY_ISSUERS`, and the
+audience is the stack config's `pepys.impIdentityAudience`, `pepys.imp.internal`. The folder holds
+`geoffcloud.json`, the public key of the issuer `geoffcloud`, so ingest accepts an export whose
+identity token that issuer signed for that audience, and refuses every other export. An invalid
+document stops ingest at start.
 
 The boxxy route, `/boxxy/facts`, is `private`. It takes a batch of facts whose body the sender
 signed with `PEPYS_BOXXY_SIGNING_SECRET`, and ingest answers 401 to a batch with no signature or a
