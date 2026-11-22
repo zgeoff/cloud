@@ -3,10 +3,10 @@
 impd, imp's daemon, runs every imp on the host as a Firecracker microVM, and it runs as imp ships
 it: one `imp-host` container under the host's rootful Podman, set up by imp's NixOS module. impd
 schedules its own microVMs, needs KVM and a ZFS pool, and runs its own tailnet node, so it sits
-outside k3s. Its state is one SQLite database and a set of secret files on its own ZFS dataset, and
-this repo's part is to pin it, wire it to the host and keep a copy of that database before every
-upgrade. [The host](./host.md) covers the disks and the switch, and [secrets](../secrets.md) covers
-how impd's secret files arrive.
+outside k3s. Its state is one SQLite database, a set of secret files and its images, on its own ZFS
+dataset, and this repo's part is to pin it, wire it to the host and keep a copy of that database
+before every upgrade. [The host](./host.md) covers the disks and the switch, and
+[secrets](../secrets.md) covers how impd's secret files arrive.
 
 ## Two pins
 
@@ -19,8 +19,9 @@ release, because a mismatched pair would run one release's daemon under another 
 ## How impd is reached
 
 impd serves its API on the host's loopback and on its own tailnet node, `imp-geoffcloud`, tagged
-`tag:imp`. The cloud daemon and the health probe use the loopback, so neither needs a tailnet grant
-to impd. The tailnet node serves impd's API and each imp over HTTPS at `imps.geoff.cloud` and
+`tag:imp`. Its plain-HTTP listener also answers on Podman's bridge, which the next paragraph covers.
+The cloud daemon and the health probe use the loopback, so neither needs a tailnet grant to impd.
+The tailnet node serves impd's API and each imp over HTTPS at `imps.geoff.cloud` and
 `<name>.imps.geoff.cloud` ([the tailnet](../network/tailnet.md)).
 
 imp-host runs on Podman's default network, whose bridge and subnet the host's configuration pins
@@ -59,7 +60,8 @@ impd holds the host's memory budget for imps and refuses a boot that would excee
 imp sleeps to disk and frees its memory. The ZFS cache has a cap of its own, so the pool and the
 imps never compete for the rest of the host's memory.
 
-impd runs every imp of fixed memory on huge pages, and restores and wakes it through a page handler
+impd boots every imp of fixed memory on huge pages, apart from the one case of a snapshot on base
+pages that the pool's paragraph below gives, and restores and wakes it through a page handler
 ([imp's huge pages](https://github.com/zgeoff/impz/blob/main/docs/architecture/lifecycle/huge-pages.md)).
 A guest on huge pages takes one fault on the host where a guest on base pages takes 512, which is
 most of a template restore's time on this nested host. nixie's sandboxes, the imps named `nixie-*`,
@@ -81,10 +83,10 @@ than the pool. impd gives guests on base pages only the budget less the pool, so
 in that part of the budget. A switch that lowers the pool frees its unused pages on the running
 host, with no reboot. Each page in the pool is lost to the host's ordinary memory while the pool
 holds it, whether imps use it or not. Firecracker maps the pool without a reservation, so a guest
-that faults past an empty pool dies of SIGBUS. impd admits a boot or a wake only into free pool
-pages, and a pool made on demand would fail when memory fragments, so the pool is fixed. A
-fixed-memory imp whose snapshot is on base pages wakes there when that part of the budget has room,
-and otherwise boots cold onto the pool.
+that faults past an empty pool dies of SIGBUS. impd admits a fixed-memory imp's boot or wake into
+the pool only when free pool pages cover it, and a pool made on demand would fail when memory
+fragments, so the pool is fixed. A fixed-memory imp whose snapshot is on base pages wakes there when
+that part of the budget has room, and otherwise boots cold onto the pool.
 
 The imps yield CPU to the cluster rather than hold a cap. Rootful Podman starts its containers,
 imp-host the only one, in `machine.slice`, whose CPU weight of 10 sits below the weight of
@@ -95,10 +97,11 @@ only order the imps among themselves.
 
 ## Images on the pool
 
-impd keeps its images on `tank/imp`, which shares the pool with the encrypted datasets and the k3s
-zvol, and it removes images under storage pressure. The host's configuration sets impd's two marks:
-once an image add, a build or a template leaves the dataset's usage at the high mark or above, impd
-removes unused images, least recently used first, until the usage falls under the low mark
+impd keeps its images on `tank/imp`, which shares the pool with the `tank/cloud` datasets and the
+k3s zvol, and it removes images under storage pressure. The host's configuration sets impd's two
+marks: once an image add, a build or a template leaves the dataset's usage at the high mark or
+above, impd removes unused images, least recently used first, until the usage falls under the low
+mark
 ([imp's image eviction](https://github.com/zgeoff/impz/blob/main/docs/guides/images.md#evict-images-under-storage-pressure)).
 The high mark sits low enough that a builder imp's disk still fits above impd's disk reserve.
 

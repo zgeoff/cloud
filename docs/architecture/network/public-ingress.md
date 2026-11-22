@@ -234,9 +234,11 @@ controls the gateway's pod, Secrets and logs.
 
 ## Adding a route
 
-Each public service gets one host of its own, `<service>.geoff.cloud`, and a service that speaks MCP
-serves it at `/mcp` on that host, as `atc.geoff.cloud/mcp` and `imp.geoff.cloud/mcp` do. A service's
-OAuth issuer and its discovery metadata name the same host.
+Give a new public service a host of its own under `geoff.cloud`, such as `<service>.geoff.cloud`. A
+service with a second public job, such as a webhook, takes a second host for it, as
+`pepys-webhook.geoff.cloud` does. A service that speaks MCP serves it at `/mcp` on its main host, as
+`atc.geoff.cloud/mcp` and `imp.geoff.cloud/mcp` do. A service's OAuth issuer and its discovery
+metadata name the same host.
 
 A new public route is the exception in this estate. A service stays on the host or the tailnet
 unless its PR states why it must be public, and the route is then a tunnel rule ahead of the

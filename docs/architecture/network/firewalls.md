@@ -1,11 +1,11 @@
 # Firewalls
 
-Four layers filter traffic to the host, and each covers a gap in the one before it. Onidel's cloud
-firewall, outside the VM, admits only Tailscale's port, the TLS front's HTTPS port and ICMP from the
-internet. NixOS's own nftables table filters what reaches the host and what it forwards, and trusts
-the tailnet and the cluster's interfaces. A table of this repo's own narrows the ports that the
-trusted interfaces would otherwise leave open, closes the host's SSH to pods, and keeps pods away
-from Podman's bridge, and imp adds tables that keep its imps away from the cluster.
+Four layers filter traffic to the host, and each covers a gap in the one before it. Once attached,
+Onidel's cloud firewall, outside the VM, admits only Tailscale's port, the TLS front's HTTPS port
+and ICMP from the internet. NixOS's own nftables table filters what reaches the host and what it
+forwards, and trusts the tailnet and the cluster's interfaces. A table of this repo's own narrows
+the ports that the trusted interfaces would otherwise leave open, closes the host's SSH to pods, and
+keeps pods away from Podman's bridge, and imp adds tables that keep its imps away from the cluster.
 [The tailnet](./tailnet.md) covers who may reach the host over the tailnet in the first place.
 
 ## The cloud firewall
@@ -35,15 +35,17 @@ networking and the containers' bridge.
 ### NixOS's table
 
 NixOS's table admits nothing from the public interface but Tailscale's port, the TLS front's HTTPS
-port and ICMP. ICMP stays open because path MTU discovery needs ICMP's fragmentation-needed and
-ICMPv6's packet-too-big messages, and ping checks that the host is reachable. OpenSSH's NixOS module
-opens its port on every interface by default, so the host turns that off, and sshd answers only
-through the trusted interfaces. It trusts the tailnet interface and the cluster's pod and overlay
-interfaces as sources, because pods reach the API server and the kubelet on the host, and the
-tailnet is already filtered by the policy. It filters forwarded traffic too, so no public packet
-reaches a pod or a NodePort, and it forwards the pods' own traffic. It does not trust Podman's
-bridge, so a container on it reaches the host only on the ports opened there, the three bridge
-relays'.
+port and ICMP. A port that imp's module publishes through Podman's port forwarding never meets that
+input rule, so the `exposure` check holds such a port to the registry instead, as
+[the exposure registry](#the-exposure-registry) says. ICMP stays open because path MTU discovery
+needs ICMP's fragmentation-needed and ICMPv6's packet-too-big messages, and ping checks that the
+host is reachable. OpenSSH's NixOS module opens its port on every interface by default, so the host
+turns that off, and sshd answers only through the trusted interfaces. It trusts the tailnet
+interface and the cluster's pod and overlay interfaces as sources, because pods reach the API server
+and the kubelet on the host, and the tailnet is already filtered by the policy. It filters forwarded
+traffic too, so no public packet reaches a pod or a NodePort, and it forwards the pods' own traffic.
+It does not trust Podman's bridge, so a container on it reaches the host only on the ports opened
+there, the three bridge relays'.
 
 ### The narrowing table
 
@@ -94,9 +96,10 @@ the host's view.
 ## The exposure registry
 
 The exposure registry in the topology package lists every public route and port, and each port the
-host keeps to the tailnet or to itself, with its scope and its reason. Each part of the estate that
-opens something reads the registry instead of its own list, and a check compares the rest with it,
-so a port or a hostname cannot go public without an entry that records why. The registry's
+host keeps to the tailnet or to itself, with its scope and its reason. The parts of the estate that
+open a host port, a tunnel hostname or a front route read the registry instead of a list of their
+own, and a check compares the rest with it, so none of those can go public without an entry that
+records why. The table shows the kinds that no code enforces. The registry's
 [reference table](../../reference/exposure.md) is generated from it.
 
 | Kind               | Read by                                                                  | Checked by                                                            |
@@ -113,13 +116,13 @@ direction. A port open on every interface needs a public entry, and a tailnet en
 there, such as OpenSSH's default, fails the check. A port open on one interface, or narrowed by the
 narrowing table, needs a host-scope entry for that interface. An interface with a default route or a
 static address faces outside the host, so a port open there needs a public entry, and no host-scope
-entry may name it. Each port that imp's module publishes passes NixOS's input chain through Podman's
-port forwarding, so it needs a public entry as well, unless imp publishes it on the loopback address
-alone: that port needs a host-scope entry for the loopback interface instead. Each route of the
-host's TLS front needs a public front-route entry with the same hostname, upstream and paths, in
-either direction, so the front cannot pass a path that the registry does not list. A port range or a
-hand-written input rule cannot be matched with an entry, so the check fails on either. A tailnet
-capability entry and a Worker URL entry each record a decision that no code reads.
+entry may name it. Each port that imp's module publishes reaches its container past NixOS's table,
+through Podman's port forwarding, so it needs a public entry as well, unless imp publishes it on the
+loopback address alone: that port needs a host-scope entry for the loopback interface instead. Each
+route of the host's TLS front needs a public front-route entry with the same hostname, upstream and
+paths, in either direction, so the front cannot pass a path that the registry does not list. A port
+range or a hand-written input rule cannot be matched with an entry, so the check fails on either. A
+tailnet capability entry and a Worker URL entry each record a decision that no code reads.
 
 Each public route, which is a public entry of any kind but a host port, names its auth layer: the
 part that authenticates each call it carries, such as the workload's own OAuth server or a webhook's

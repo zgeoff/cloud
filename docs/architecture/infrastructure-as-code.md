@@ -1,11 +1,12 @@
 # Infrastructure as code
 
-One Pulumi program, in `infra/`, declares every cloud resource but the VM's second disk, and every
-workload in the k3s cluster, and one stack, `prod`, holds the live state. Pulumi runs on Bun, and
-every run reads its inputs from 1Password through `op run`, so the program sees each secret only for
-the length of a run. A preview changes nothing. The apply job applies each merged change on its own,
-unless its plan guard holds the change for a person, and the guards at the top of the program stop a
-run whose inputs would plan a mass delete. [The host](./host/host.md) covers the NixOS host, which
+One Pulumi program, in `infra/`, declares the estate's cloud resources and every workload in the k3s
+cluster, apart from the few that [what the program never owns](#what-the-program-never-owns) lists,
+and one stack, `prod`, holds the live state. Pulumi runs on Bun, and every run of the program reads
+its inputs from 1Password through `op run`, so the program sees each secret only for the length of a
+run. A preview changes nothing. The apply job applies each merged change on its own, unless its plan
+guard holds the change for a person, and the guards at the top of the program stop a run whose
+missing inputs would plan a mass delete. [The host](./host/host.md) covers the NixOS host, which
 Pulumi does not drive.
 
 ## What the program owns
@@ -47,6 +48,8 @@ vault.
 
 ## What the program never owns
 
+- **The VM's second disk.** Onidel's API has no calls for block volumes, so the disk was added by
+  hand.
 - **The host's configuration.** The NixOS flake owns it, and a host switch applies it
   ([the host](./host/host.md)).
 - **impd's DNS records.** impd writes the records for its own hostnames and its ACME challenges at
@@ -92,7 +95,8 @@ cannot serve, for two reasons: a refresh that only previews never takes it, and 
 for the state bucket can only read. The prod lock is therefore a Kubernetes Lease in k3s, which both
 sides reach: the host as root, and the apply job over the tailnet with the admin kubeconfig it
 already holds. A side that finds the Lease held waits for the holder to release it. Each side holds
-the Lease for a set time, and the other side takes it over once that time runs out, so a runner that
+the Lease for a set time that covers its longest run, the apply job's time limit for the apply job,
+and never renews it. The other side takes the Lease over once that time runs out, so a runner that
 dies holding it blocks the scheduled check only until then. The apply job holds the lock from its
 first drift check to its last step, and the scheduled check holds it around its refresh.
 
@@ -127,11 +131,11 @@ flowchart LR
 
 The tag `deployed/prod` marks the last revision the job applied, and it moves only after an apply
 and its second drift check pass. It is therefore the baseline for both the path filter and the first
-drift check. The job compares the tag with the commit, not the commit with its parent, so a run that
-GitHub dropped from the queue loses nothing: the next run applies every change since the tag. A
-commit that is already at or behind the tag skips, and a tag outside the commit's history fails the
-run, because only a person can say which revision is live. A person sets the tag once, at the last
-revision applied by hand.
+drift check. The job's decision covers every commit since the tag, not only the commit's change from
+its parent, so a run that GitHub dropped from the queue loses nothing: the next run applies every
+change since the tag. A commit that is already at or behind the tag skips, and a tag outside the
+commit's history fails the run, because only a person can say which revision is live. A person sets
+the tag once, at the last revision applied by hand.
 
 GitHub environments here offer branch policies and secrets but no required reviewers, so a guard on
 the plan takes the reviewer's place. It reads the refreshed preview and holds the apply on any of
@@ -178,8 +182,9 @@ API's service proxy, because the job's tailnet grants reach only k3s's API and G
 carries no session, and each names a procedure that only reads, so the check changes nothing in
 nixie even if nixie stopped asking for a session. The check passes when nixie refuses every call
 with the contract's unauthorized error, which shows that the route, the client header, the RPC
-encoding and each procedure still hold. A failed check fails the workflow's check job, not the apply
-job, because the apply is done by then, and Discord gets the failure.
+encoding and each procedure still hold. The check is a step of the apply job, and a failure there
+leaves the apply job green, because the apply is done by then. The workflow's `check` job reads the
+step's outcome and fails, and Discord gets the failure.
 
 The apply plans again from a fresh refresh, so the guard covers the preview and not the apply
 itself. A change made outside Pulumi in the minutes between the two reaches the apply unguarded.

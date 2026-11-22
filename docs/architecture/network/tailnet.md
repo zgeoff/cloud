@@ -1,11 +1,11 @@
 # The tailnet
 
 The owner's Tailscale tailnet is the estate's private network: the host, impd and the owner's
-devices meet on it, and nothing private is reachable any other way. Pulumi owns the whole tailnet
-policy file, so the code in `infra/` is the complete list of who may reach what, and a rule that is
-not in the code does not survive the next apply. [Firewalls](./firewalls.md) covers the host's own
-filtering of what arrives over the tailnet, and [public ingress](./public-ingress.md) covers the one
-public route.
+devices meet on it, and nothing private is reachable from outside the host any other way. Pulumi
+owns the whole tailnet policy file, so the code in `infra/` is the complete list of who may reach
+what, and a rule that is not in the code does not survive the next apply.
+[Firewalls](./firewalls.md) covers the host's own filtering of what arrives over the tailnet, and
+[public ingress](./public-ingress.md) covers the public routes.
 
 ## One file, owned whole
 
@@ -31,9 +31,10 @@ port except the host's k3s API.
 A pod has no tailnet identity of its own. Its traffic leaves through the host's node, so the tailnet
 sees the cluster as a whole as `tag:cloud`, and only the cluster's own egress policies narrow which
 pod uses a grant ([which pod uses each grant](#which-pod-uses-each-grant)). The grants for
-`tag:cloud` are single ports to single hosts: the PC's daemon port for the gateway, and impd's HTTPS
-port for the cluster's health probe. Each names its destination by a host alias for one node rather
-than by a tag, so a later node with the same tag gains nothing.
+`tag:cloud` are single ports to single hosts: the PC's daemon port, and impd's HTTPS port, which the
+policy names as the health probe's grant. Each grant names its destination by a host alias for one
+node rather than by a tag, so a later node with the same tag gains nothing. The table under
+[which pod uses each grant](#which-pod-uses-each-grant) lists every pod that uses each grant.
 
 nixie's pod calls impd's API over the same route, so `tag:cloud` holds a second grant to impd's node
 for HTTPS, named in the policy as nixie's route to impd
@@ -47,13 +48,14 @@ Members hold a second grant, to the host's HTTPS port for nixie, beside the gran
 reach every device. The policy lists nixie's route in its own grant, so the route stays open if the
 wider grant narrows.
 
-The host's k3s API is open to two sources only: the PC, where the owner runs Pulumi's preview, apply
-and drift check, and the prod apply job's runner. A cluster credential that leaves the host, in a
-disk snapshot or a copied kubeconfig, therefore works from no other member device. A grant can only
-add access, so the members' wide grant lists every protocol and port that a wildcard covers except
-TCP on the API port, and a further grant gives members that port back on every node except the host.
-The host is the only `tag:cloud` node, so that grant lists member devices and the other tags. The
-owner runs kubectl by hand on the host over Tailscale SSH, which needs no grant to the API port.
+Over the tailnet, the host's k3s API is open to two sources only: the PC, where the owner runs
+Pulumi's preview, apply and drift check, and the prod apply job's runner. A cluster credential that
+leaves the host, in a disk snapshot or a copied kubeconfig, therefore works from no other member
+device. A grant can only add access, so the members' wide grant lists every protocol and port that a
+wildcard covers except TCP on the API port, and a further grant gives members that port back on
+every node except the host. The host is the only `tag:cloud` node, so that grant lists member
+devices and the other tags. The owner runs kubectl by hand on the host over Tailscale SSH, which
+needs no grant to the API port.
 
 impd's nodes reach each other's API only, which is what lets impd move an imp between hosts and
 nothing more. imp's end-to-end suites run on tailnets that hold no production service, so the policy

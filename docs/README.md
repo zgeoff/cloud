@@ -19,8 +19,8 @@ call, the path of a change, the topology and the data.
     SSH.
   - [Firewalls](./architecture/network/firewalls.md): the cloud firewall and the host's nftables
     tables.
-  - [Public ingress](./architecture/network/public-ingress.md): the Cloudflare tunnel and its one
-    route.
+  - [Public ingress](./architecture/network/public-ingress.md): the Cloudflare tunnels, the host's
+    TLS front, and the public routes through them.
 - Workloads:
   - [The atc gateway](./architecture/workloads/atc-gateway.md): the gateway, its daemons, its state
     and its backup.

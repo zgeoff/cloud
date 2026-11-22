@@ -7,8 +7,8 @@ repo holds the whole estate and a change to it is a reviewed PR before it is a l
 first workload is an agent platform: [atc](https://github.com/zgeoff/atc) manages agent sessions,
 and [imp](https://github.com/zgeoff/impz) runs each one in a Firecracker microVM. An assistant such
 as ChatGPT reaches two public MCP endpoints: atc's, through a Cloudflare tunnel, and imp's, through
-a TLS front on the host. A few other routes are public, each for a reason the exposure registry
-records, and everything else stays on the host or on the tailnet.
+a TLS front on the host. A few other routes are public, each with a reason stated in its PR and
+recorded in the exposure registry, and everything else stays on the host or on the tailnet.
 
 ## The path of a public call
 
@@ -140,8 +140,9 @@ system's own backup ([protection at rest](./secrets.md#protection-at-rest)).
 ## Cross-cutting
 
 - **Public by exception.** A new service stays on the host or on the tailnet. A public route needs
-  its own reason in its PR and an auth layer named in the exposure registry, and it enters through a
-  Cloudflare tunnel or the host's TLS front ([public ingress](./network/public-ingress.md)).
+  its own reason, stated in its PR and recorded in the exposure registry with its auth layer, and it
+  enters through a Cloudflare tunnel or the host's TLS front
+  ([public ingress](./network/public-ingress.md)).
 - **Secrets never in the repo.** The repo is public. Every secret reaches its user through
   1Password, Pulumi's encrypted state or a root-only file on the host, and never through a command
   line, because the host's journal records each SSH command line ([secrets](./secrets.md)).

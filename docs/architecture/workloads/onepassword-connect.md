@@ -52,11 +52,12 @@ which moves imp-host to a bridge of its own.
 - **The relay's port is local.** The host's narrowing table admits the relay's port from Podman's
   subnet only, on Podman's bridge. Every container on that bridge can reach it, and each still needs
   the bearer.
-- **Pods are refused.** A NetworkPolicy selects the Connect pod and admits no ingress, so k3s's
-  policy controller, kube-router, refuses every pod that calls the Service. The relay still passes,
-  because kube-router accepts a packet whose source is one of the node's own addresses before it
-  applies any policy, and the relay dials from the host. A pod on the host's network shares those
-  addresses, so the policy cannot refuse it, and only the bearer token stops it.
+- **Pods on the pod network are refused.** A NetworkPolicy selects the Connect pod and admits no
+  ingress, so k3s's policy controller, kube-router, refuses every pod-network pod that calls the
+  Service. The relay still passes, because kube-router accepts a packet whose source is one of the
+  node's own addresses before it applies any policy, and the relay dials from the host. A pod on the
+  host's network shares those addresses, so the policy cannot refuse it, and only the bearer token
+  stops it.
 
 ## Credentials
 
