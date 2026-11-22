@@ -5,7 +5,7 @@ own files. It runs as the `files` StatefulSet in k3s, on a retained local-path v
 files and their SQLite metadata. Role tokens gate every write: one `owner` token, and an `agent`
 token for each repo's agents. The cluster holds only their SHA-256 hashes. The `files-backup`
 CronJob backs the volume up every night with restic to a `files` repository in R2. Setting the stack
-config `files` approves the deploy, and leaving it unset keeps the service out of the cluster.
+config `files` turns the deploy on, and leaving it unset keeps the service out of the cluster.
 
 ## What holds what
 
@@ -145,6 +145,8 @@ ssh root@geoffcloud k3s kubectl -n files create job --from=cronjob/files-backup 
 ssh root@geoffcloud k3s kubectl -n files logs -f job/<job-name>
 ```
 
+`<job-name>` is the name that the create command prints.
+
 Expect the log to end with restic's retention table and `snapshot <id> saved` above it.
 
 ## Restore from a backup
@@ -165,7 +167,9 @@ snapshot is lost. Back up first if those uploads still matter.
 
    Expect `pod/files-0 condition met`.
 
-2. Restore. Set `args: ["ls"]` in the Job to list the snapshots first, and `SNAPSHOT` to pick one:
+2. Restore. To list the snapshots, first create the Job with `args: ["ls"]` set in the YAML. Then
+   set `SNAPSHOT` to the one you pick, set `args` back to `["restore"]`, and create the Job again.
+   Each create prints the Job's name, which is `<job-name>` below:
 
    ```bash
    ssh root@geoffcloud k3s kubectl create -f - < deploy/files/restore-job.yaml

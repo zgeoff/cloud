@@ -9,10 +9,11 @@ the callers alone.
 
 A verb runs the command it wraps unchanged and passes its exit code through. Every check the wrapped
 script makes still runs, and this page lists the preconditions that no script checks. Two verbs add
-one check of their own: `up` and `cancel-prod-lock` refuse with exit 1, and name each run, while a
-`Deploy prod` run is queued or in progress, since either would fight that run for the prod stack.
-The check asks GitHub for each status that a run holds before it completes: in progress, queued,
-waiting, pending and requested. A usage error exits 2.
+one check of the estate's state: `up` and `cancel-prod-lock` refuse with exit 1, and name each run,
+while a `Deploy prod` run is queued or in progress, since either would fight that run for the prod
+stack. The check asks GitHub for each status that a run holds before it completes: in progress,
+queued, waiting, pending and requested. A usage error exits 2, such as a wrong number of arguments
+or a malformed one.
 
 **CAUTION:** Every verb but a dry run acts on the live estate or on GitHub. Read the preconditions
 of a verb before you run it.
@@ -141,7 +142,7 @@ printf '%s\n' "$value" | bun run ops:host -- 'install -m 600 /dev/stdin /root/<f
 
 - Wraps `ssh -o BatchMode=yes root@geoffcloud '<command>'`, or the host in `GEOFFCLOUD_HOST`. Your
   stdin reaches the command.
-- The verb takes exactly one argument: the whole remote command, quoted.
+- The verb takes exactly one argument after any `--dry-run`: the whole remote command, quoted.
 
 **WARNING:** Tailscale SSH logs each session's full command line, and Alloy ships that log to Loki.
 Never put a secret in the command. Send the secret on stdin, as the second example does.

@@ -109,6 +109,8 @@ first.
 
 ## Results
 
+Add each drill's restores, times and results here, newest first.
+
 Drill of 2026-10-16, on a Debian 12.12 VM in Sydney, 2 vCPU, 4 GB, 40 GB:
 
 | Restore            | Source                                      | Time    | Result                                                                                         |
@@ -118,9 +120,10 @@ Drill of 2026-10-16, on a Debian 12.12 VM in Sydney, 2 vCPU, 4 GB, 40 GB:
 | root-disk snapshot | `pre-tank-cloud`, 240 GB                    | none    | not run                                                                                        |
 
 The root-disk snapshot restore did not run. An on-demand VM caps at 40 GB and the snapshot is 240
-GB, and the owner chose neither a monthly VM nor the snapshot download. The encryption of `tank/imp`
-and the moves onto `tank/cloud` and an encrypted zvol each keep their old copy until their checks
-pass, so none of them rolls back from a root-disk snapshot.
+GB, and the owner chose neither a monthly VM nor the snapshot download. That gap blocks no disk
+migration: the encryption of `tank/imp` and the moves onto `tank/cloud` and an encrypted zvol each
+keep their old copy until their checks pass, so none of them needs a root-disk snapshot to roll
+back.
 
 The VM lived from 11:14:22Z to 11:17:38Z, under one hourly block at A$0.0213. After the delete,
 `GET /vm/<vm_id>` returned `http 404` and `GET /vm` listed geoffcloud only.
