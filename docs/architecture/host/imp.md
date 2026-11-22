@@ -4,9 +4,9 @@ impd, imp's daemon, runs every imp on the host as a Firecracker microVM, and it 
 it: one `imp-host` container under the host's rootful Podman, set up by imp's NixOS module. impd
 schedules its own microVMs, needs KVM and a ZFS pool, and runs its own tailnet node, so it sits
 outside k3s. Its state is one SQLite database, a set of secret files and its images, on its own ZFS
-dataset, and this repo's part is to pin it, wire it to the host and keep a copy of that database
-before every upgrade. [The host](./host.md) covers the disks and the switch, and
-[secrets](../secrets.md) covers how impd's secret files arrive.
+dataset. This repo pins impd, wires it to the host and copies that database before every upgrade.
+[The host](./host.md) covers the disks and the switch, and [secrets](../secrets.md) covers how
+impd's secret files arrive.
 
 ## Two pins
 
@@ -36,10 +36,10 @@ Three relays on the host's address on that bridge carry the broker's requests fo
 names to Services in the cluster, because imp's forward table drops imp-host's own traffic to the
 cluster's ranges: `op-connect.imp.internal` to 1Password Connect, `pepys.imp.internal` to pepys
 ingest and `boxxy.imp.internal` to the boxxy worker Service
-([firewalls](../network/firewalls.md#the-narrowing-table)). The pepys and boxxy secrets ask for an
-imp identity token, which the next paragraph covers.
+([firewalls](../network/firewalls.md#the-narrowing-table)). The pepys and boxxy secrets each require
+an imp identity token, which the next paragraph covers.
 
-impd signs an imp identity token for each request of a broker secret that asks for one, and names
+impd signs an imp identity token for each request of a broker secret that requires one, and names
 itself `geoffcloud` in the token. A service behind the broker pins impd's public keys under that
 name, from `impz identity jwks`, and so tells one imp from another. A change of the name orphans
 what each service stored under it.
@@ -60,14 +60,14 @@ impd holds the host's memory budget for imps and refuses a boot that would excee
 imp sleeps to disk and frees its memory. The ZFS cache has a cap of its own, so the pool and the
 imps never compete for the rest of the host's memory.
 
-impd boots every imp of fixed memory on huge pages, apart from the one case of a snapshot on base
-pages that the pool's paragraph below gives, and restores and wakes it through a page handler
+impd boots every imp of fixed memory on huge pages, apart from the case of a snapshot on base pages
+described with the pool below, and restores and wakes it through a page handler
 ([imp's huge pages](https://github.com/zgeoff/impz/blob/main/docs/architecture/lifecycle/huge-pages.md)).
-A guest on huge pages takes one fault on the host where a guest on base pages takes 512, which is
-most of a template restore's time on this nested host. nixie's sandboxes, the imps named `nixie-*`,
-have fixed memory and run on huge pages. Every other kind of imp is elastic and runs on base pages:
-the agent imps that atc sessions run in, the dev imps, the harness imps, the agent image check's
-imp, the preview service's imps and impd's image builders.
+A guest on huge pages takes one fault on the host where a guest on base pages takes 512, and those
+faults take most of a template restore's time on this nested host. nixie's sandboxes, the imps named
+`nixie-*`, have fixed memory and run on huge pages. Every other kind of imp is elastic and runs on
+base pages: the agent imps that atc sessions run in, the dev imps, the harness imps, the agent image
+check's imp, the preview service's imps and impd's image builders.
 
 impd keeps part of the huge page pool for nixie's sandboxes, because a person waits on each nixie
 turn and an agent imp does not
@@ -84,9 +84,9 @@ in that part of the budget. A switch that lowers the pool frees its unused pages
 host, with no reboot. Each page in the pool is lost to the host's ordinary memory while the pool
 holds it, whether imps use it or not. Firecracker maps the pool without a reservation, so a guest
 that faults past an empty pool dies of SIGBUS. impd admits a fixed-memory imp's boot or wake into
-the pool only when free pool pages cover it, and a pool made on demand would fail when memory
-fragments, so the pool is fixed. A fixed-memory imp whose snapshot is on base pages wakes there when
-that part of the budget has room, and otherwise boots cold onto the pool.
+the pool only when free pool pages cover it. The pool is fixed because a pool made on demand would
+fail when memory fragments. A fixed-memory imp whose snapshot is on base pages wakes there when that
+part of the budget has room, and otherwise boots cold onto the pool.
 
 The imps yield CPU to the cluster rather than hold a cap. Rootful Podman starts its containers,
 imp-host the only one, in `machine.slice`, whose CPU weight of 10 sits below the weight of

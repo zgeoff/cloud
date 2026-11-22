@@ -12,14 +12,14 @@ next. NixOS keeps each earlier system as a generation, so a switch is one step t
 The VM has two disks with different owners:
 
 - **The root disk** holds NixOS, the pool's key, the host's tailnet identity, its SSH host keys and
-  the atc daemon's state. disko lays it out at install, and an Onidel snapshot copies it whole
-  before a risky change.
+  the atc daemon's state. disko lays it out at install. Before a risky change, take an Onidel
+  snapshot, which copies it whole.
 - **The second disk** holds the ZFS pool `tank`, with impd's dataset and the `tank/cloud` datasets:
   k3s's data directory, the host's secret files and the copies of impd's database. NixOS imports the
   pool and never formats the disk, so a reinstall that rebuilds the root disk leaves every imp and
   the cluster in place. The host keeps the ZFS host ID the pool was created under, so the import
-  needs no force, and the import finds the disk by partition UUID, because a virtio disk has no
-  serial to name it by.
+  needs no force. The import finds the disk by partition UUID, because a virtio disk has no serial
+  to name it by.
 
 ZFS encrypts every dataset on the pool that holds data, and the host loads the key from the root
 disk at boot, so neither disk alone exposes the data
@@ -30,11 +30,11 @@ the VM's Secure Boot blocks, so Secure Boot stays off
 
 ### Disk read-ahead
 
-The host holds two disks at the small read-ahead that is the default of the `disk-read-ahead` module
-in `nixos/modules/`: the root disk, vda, and the zvol that holds k3s's data, `tank/cloud/rancher`.
-The host configuration in `nixos/hosts/geoffcloud/` lists both. Left alone, vda's read-ahead is as
-large as a journal window, and the zvol's is larger still: the kernel sets it to twice the optimal
-I/O size that ZFS reports for the zvol.
+The `disk-read-ahead` module in `nixos/modules/` holds two disks at its default read-ahead, which is
+small: the root disk, vda, and the zvol that holds k3s's data, `tank/cloud/rancher`. The host
+configuration in `nixos/hosts/geoffcloud/` lists both. Left alone, vda's read-ahead is as large as a
+journal window, and the zvol's is larger still: the kernel sets it to twice the optimal I/O size
+that ZFS reports for the zvol.
 
 A udev rule sets the value at each add or change event of each disk, and matches the zvol by the
 `/dev/zvol/` link that ZFS's own udev rule makes. The rule acts only on a device event, so the
@@ -44,7 +44,7 @@ loads, and the rule sets it then.
 
 The value matters because of how the kernel serves a page fault in a mapped file. It reads up to the
 read-ahead size around the faulting page, and it charges every page it reads to the memory cgroup of
-the process that faulted. Two workloads fault in mapped files on these disks:
+the process that faulted. Alloy and Prometheus fault in mapped files on these disks:
 
 - Alloy ships the host journal to Loki ([observability](../workloads/observability.md)), and reads
   the journal on vda through sd-journal, which maps each journal file in windows. At the derived
@@ -62,8 +62,8 @@ The pool's disk, vdb, keeps the read-ahead the kernel derives, because ZFS does 
   internet ([the tailnet](../network/tailnet.md)).
 - **k3s** runs as a single-node server with no Traefik and no ServiceLB, because cloudflared is the
   only ingress. Its NodePorts bind to the tailnet's address range only, since kube-proxy routes a
-  NodePort through forwarding, which the input firewall never sees. Pods resolve names through
-  public resolvers, because the host resolves through MagicDNS, which a pod cannot reach.
+  NodePort through forwarding, which bypasses the input firewall. Pods resolve names through public
+  resolvers, because the host resolves through MagicDNS, which a pod cannot reach.
 - **imp-host** runs impd and its microVMs in a container under the host's rootful Podman
   ([imp on the host](./imp.md)).
 - **The atc daemon** runs as a NixOS service with its own system user, sandboxed by systemd
@@ -101,17 +101,17 @@ touches the host:
 3. It copies the built system's closure to the host over Tailscale SSH.
 4. It asks the copied system's dry activation which units the activation would stop or restart. It
    holds the switch when k3s is one of them, because nixie can stay down for minutes after k3s
-   restarts. The operator lets that restart through only in a planned k3s window.
+   restarts. Let that restart through only in a planned k3s window.
 5. It points the host's system profile at the built system first, so a reboot after a failed
    activation still boots the new system, and then activates it in a transient systemd unit, so a
    dropped SSH session cannot stop the activation halfway.
 6. It fails unless the host runs exactly the built system, and prints any failed unit.
 
 The flake is evaluated once, by the build, so the host activates the exact store path that was built
-and checked. Every Nix command runs from a snapshot of the commit rather than from the working tree,
-which is why a switch by hand after a failed build, or a second evaluation to switch, would break
-the link between the commit and the running system.
-[The switch runbook](../../runbooks/workflows.md#switch-the-host) gives the commands.
+and checked. Every Nix command runs from the snapshot of the commit. Never switch by hand after a
+failed build, or evaluate a second time to switch: either breaks the link between the commit and the
+running system. [The switch runbook](../../runbooks/workflows.md#switch-the-host) gives the
+commands.
 
 ## Checks
 
@@ -121,11 +121,11 @@ impd, so the script's failure paths run before it ever runs on the real host. Th
 
 The checks gate the host switch rather than the merge, because no merge changes the host: only the
 switch script does, and an operator runs it by hand. CI builds the checks on `main` every night and
-on a dispatch, and on each pull request that changes an input of the checks, so a break shows before
-the merge; the merge never waits for that run. A Renovate pull request starts none, and the nightly
-run checks its bump. The switch script refuses a commit unless a green scheduled or dispatched run
-on `main` covers it: the run checked that commit, or an ancestor with no input of the checks changed
-since.
+on a dispatch. It also builds them on each pull request that changes an input of the checks, so a
+break shows before the merge. The merge never waits for that run. A Renovate pull request starts
+none, and the nightly run checks its bump. The switch script refuses a commit unless a green
+scheduled or dispatched run on `main` covers it: the run checked that commit, or an ancestor with no
+input of the checks changed since.
 
 A run skips the build when an earlier green run covers the commit, or when an earlier run built and
 passed the same derivations, because Nix builds a derivation to the same result wherever it runs. So
