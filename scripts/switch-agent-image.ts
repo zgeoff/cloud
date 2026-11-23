@@ -28,18 +28,23 @@ export function switchAgentImage(options: Readonly<SwitchAgentImageOptions>): Pr
 
     const target = await loadCloudTarget(config);
 
+    await requireImpImage(options, image);
+
+    // impd never evicts a pinned image, and the daemon boots this one by name. A config that
+    // already names the image gets the pin too, since a refused or lost pin leaves it evictable.
+    await runOrExit(options, buildImpArgv(['image', 'pin', image]));
+
     if (target.image === image && target.guestATC === guestATC) {
       options.printOut(`the cloud target already runs ${image}\n`);
 
       return 0;
     }
 
-    await requireImpImage(options, image);
-
-    // impd never evicts a pinned image, and the daemon boots this one by name
-    await runOrExit(options, buildImpArgv(['image', 'pin', image]));
-
     const backup = await writeCloudTargetImage({ config, image, guestATC, now: options.now() });
+
+    // an agent image build that read the targets before this write may unpin the image after the
+    // first pin, so the pin repeats once the config names the image
+    await runOrExit(options, buildImpArgv(['image', 'pin', image]));
 
     options.printOut(
       `backed up ${config} to ${backup}\n` +

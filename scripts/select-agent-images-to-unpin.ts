@@ -17,11 +17,16 @@ const keptPassingImages = 2;
 export function selectAgentImagesToUnpin(retention: Readonly<AgentImageRetention>): string[] {
   const records = toAgentImageRecords(retention.images);
 
-  // an image passed its check when it is pinned, since only a passing build pins its image
+  // A pin shows a passing check, except on an image that switch-agent-image pinned for a target:
+  // that one is kept as a target image and takes no slot of the passing ones.
   const passing = records
-    .filter((record) => record.pinned || record.name === retention.newImage)
-    .toSorted((left, right) => right.createdAt.localeCompare(left.createdAt))
-    .filter((record) => record.name !== retention.newImage);
+    .filter(
+      (record) =>
+        record.pinned &&
+        record.name !== retention.newImage &&
+        !retention.targetImages.includes(record.name),
+    )
+    .toSorted((left, right) => right.createdAt.localeCompare(left.createdAt));
 
   const kept = new Set([
     retention.newImage,
@@ -33,8 +38,6 @@ export function selectAgentImagesToUnpin(retention: Readonly<AgentImageRetention
     .filter((record) => record.pinned && !kept.has(record.name))
     .map((record) => record.name);
 }
-
-const agentImagePattern = /^agent-[\da-f]{7,40}$/u;
 
 interface AgentImageRecord {
   readonly name: string;
@@ -53,7 +56,7 @@ function toAgentImageRecords(images: unknown): readonly AgentImageRecord[] {
     const name = findJSONField(record, 'name');
     const createdAt = findJSONField(record, 'createdAt');
 
-    return typeof name === 'string' && agentImagePattern.test(name)
+    return typeof name === 'string' && name.startsWith('agent-')
       ? [
           {
             name,

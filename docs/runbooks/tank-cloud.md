@@ -173,7 +173,7 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
    Expect an `AVAIL` larger than the growth. Never read the space from `FREE` in `zpool list`:
    `FREE` is higher, because it counts space that reservations and ZFS's slop already hold.
 
-3. Set the new size, where `<size>` is the whole new size, such as `40G`:
+3. Set the new size, where `<size>` is the whole new size, such as `80G` from a 60G zvol:
 
    **CAUTION:** A `<size>` smaller than the size that step 1 printed cuts the end off the ext4
    filesystem and destroys data. The zvol only grows. Check that `<size>` is larger than the current

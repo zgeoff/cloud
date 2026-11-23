@@ -100,14 +100,23 @@ elastic at 1024 MiB and growing to 2048 MiB, so it stays off the host's huge pag
 that commit's `scripts/check-agent-image.ts` there, and removes the imp. Its last line is
 `agent-<short sha> <digest> check passed`; record that line on the PR. A passed check pins the image
 in impd, because a daemon's target boots it by name, and impd's image eviction would otherwise
-remove it while no imp uses it. It then unpins every other pinned `agent-<short sha>` image except
-the newest two that passed, the new one included, and each image that an atc target boots, so impd's
-eviction can remove the rest when `tank/imp` fills. It reads the targets' images from
-`targets.*.image` in `~/.config/atc/config.json` and from the `image` line of
-`nixos/hosts/geoffcloud/configuration.nix` in the clone. An unpin never deletes an image, and a
-failed unpin is logged and leaves the build's result alone. A failed check removes the image, unless
-`--keep` keeps it for a look, and every failure exits 1. It refuses a commit that is not on `main`,
-and an image or check imp name that already exists.
+remove it while no imp uses it. It then unpins every other pinned `agent-*` image except the newest
+two that passed, the new one included, and each image that an atc target boots, so impd's eviction
+can remove the rest when `tank/imp` fills.
+
+The build reads a target's image from `targets.*.image` in `~/.config/atc/config.json` and in each
+file that `AGENT_IMAGE_TARGET_CONFIGS` lists (paths separated by `:`), and from the `image` line of
+`nixos/hosts/geoffcloud/configuration.nix` in the clone, at its current text and in its last three
+commits. An image that only `switch-agent-image.ts` pinned counts as a target image, not as a
+passing one. The build reads the targets again before each unpin and after it, and pins the image
+again if a target names it now. A target on another machine is invisible to the build: list that
+machine's config in `AGENT_IMAGE_TARGET_CONFIGS` where the build can read it, or the image can lose
+its pin. When the build cannot read a config, or the git log fails, it unpins nothing and logs why.
+An unpin never deletes an image, and a failed unpin is logged and leaves the build's result alone. A
+passing image stays once it is pinned, so an interrupt during the unpins does not remove it.
+
+A failed check removes the image, unless `--keep` keeps it for a look, and every failure exits 1. It
+refuses a commit that is not on `main`, and an image or check imp name that already exists.
 
 `impz image build` prints no progress off a terminal, so the build runs quietly for several minutes.
 `AGENT_IMAGE_BUILD_TIMEOUT` (45m by default) stops a build that hangs. impd can still finish that
@@ -185,9 +194,10 @@ into a fresh imp. Without it, a compiled daemon uploads its binary, about 100 MB
 imp's first session starts.
 
 1. Run `bun scripts/switch-agent-image.ts agent-<short sha>` on the machine that runs the daemon. It
-   refuses an image the host lacks, pins the image so impd never evicts it, copies the config to
-   `config.json.bak-<UTC stamp>-pre-<image>`, then sets `targets.cloud.image` and
-   `targets.cloud.guestATC` and changes nothing else. A second argument names another config file.
+   refuses an image the host lacks, pins the image so impd never evicts it (also when the config
+   already names it), copies the config to `config.json.bak-<UTC stamp>-pre-<image>`, then sets
+   `targets.cloud.image` and `targets.cloud.guestATC` and changes nothing else. A second argument
+   names another config file.
 2. Restart the daemon when no session needs it, with the command the script prints,
    `atc daemon restart`. It restarts the daemon through its systemd unit and restores the fleet;
    `--dry-run` first lists the sessions a restart interrupts. The script never restarts it. The

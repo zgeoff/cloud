@@ -18,11 +18,44 @@ async function setupTest() {
 
   const out: string[] = [];
   const err: string[] = [];
+  const clone = join(directory, 'clone');
+
+  // the clone of a main whose NixOS file names each image in its own commit
+  const createClone = async (nixImages: string[]) => {
+    await mkdir(join(repo.seed, 'images/agent'), { recursive: true });
+    await mkdir(join(repo.seed, 'scripts'));
+    await mkdir(join(repo.seed, 'nixos/hosts/geoffcloud'), { recursive: true });
+    await writeFile(join(repo.seed, '.bun-version'), '1.4.9\n');
+
+    await writeFile(
+      join(repo.seed, 'images/agent/Dockerfile'),
+      'FROM ghcr.io/zgeoff/imp-base:0.33.0\n',
+    );
+
+    await writeFile(join(repo.seed, 'scripts/check-agent-image.ts'), '');
+
+    for (const image of nixImages) {
+      // oxlint-disable-next-line no-await-in-loop
+      await writeFile(
+        join(repo.seed, 'nixos/hosts/geoffcloud/configuration.nix'),
+        `      image = "${image}";\n`,
+      );
+
+      // oxlint-disable-next-line no-await-in-loop
+      await repo.git(['-C', repo.seed, 'add', '-A']);
+      // oxlint-disable-next-line no-await-in-loop
+      await repo.git(['-C', repo.seed, 'commit', '-qm', `set ${image}`]);
+    }
+
+    await repo.git(['-C', repo.seed, 'push', '-q', 'origin', 'main']);
+    await repo.git(['clone', '-q', repo.origin, clone]);
+  };
 
   return {
     directory,
     repo,
-    clone: join(directory, 'clone'),
+    clone,
+    createClone,
     out,
     err,
     printOut: (text: string) => {
@@ -781,4 +814,248 @@ test('it logs an unpin that fails, goes on to the next image, and still passes t
   expect(exitCode).toBe(0);
   expect(ctx.err.join('')).toContain('could not unpin agent-3333333: impz: NOT_FOUND');
   expect(ctx.err.join('')).toContain('unpinned agent-4444444');
+});
+
+test('it keeps the image of a target that the host config named in an earlier commit', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone(['agent-1111111', 'agent-4444444']);
+
+  const imp = buildStubImp({
+    images: Array.from({ length: 5 }, (_unused, index) => ({
+      name: `agent-${String(index + 1).repeat(7)}`,
+      digest: `imp-build-${index + 1}`,
+      isPinned: true,
+      createdAt: `2026-11-0${index + 1}T00:00:00Z`,
+    })),
+  });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  const unpinCalls = stub.calls.filter((call) => call.argv[2] === 'unpin');
+
+  expect(exitCode).toBe(0);
+  expect(unpinCalls.map((call) => call.argv[3])).toStrictEqual(['agent-2222222', 'agent-3333333']);
+});
+
+test('it keeps every image pinned when a target config is not JSON', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone(['agent-1111111']);
+
+  const config = join(ctx.directory, 'custom-atc.json');
+
+  await writeFile(config, '{ broken');
+
+  const imp = buildStubImp({
+    images: Array.from({ length: 4 }, (_unused, index) => ({
+      name: `agent-${String(index + 1).repeat(7)}`,
+      digest: `imp-build-${index + 1}`,
+      isPinned: true,
+      createdAt: `2026-11-0${index + 1}T00:00:00Z`,
+    })),
+  });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    targetConfigs: [config],
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect(exitCode).toBe(0);
+  expect(stub.calls.filter((call) => call.argv[2] === 'unpin')).toStrictEqual([]);
+  expect(ctx.err.join('')).toContain('kept every agent image pinned');
+});
+
+test('it reads the targets of a custom atc config file', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone(['agent-1111111']);
+
+  const config = join(ctx.directory, 'custom-atc.json');
+
+  await writeFile(config, JSON.stringify({ targets: { lab: { image: 'agent-2222222' } } }));
+
+  const imp = buildStubImp({
+    images: Array.from({ length: 4 }, (_unused, index) => ({
+      name: `agent-${String(index + 1).repeat(7)}`,
+      digest: `imp-build-${index + 1}`,
+      isPinned: true,
+      createdAt: `2026-11-0${index + 1}T00:00:00Z`,
+    })),
+  });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    targetConfigs: [config],
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect(
+    stub.calls.filter((call) => call.argv[2] === 'unpin').map((call) => call.argv[3]),
+  ).toStrictEqual(['agent-3333333']);
+});
+
+test('it goes on to the next unpin when the runner rejects one', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone(['agent-1111111']);
+
+  const imp = buildStubImp({
+    images: Array.from({ length: 5 }, (_unused, index) => ({
+      name: `agent-${String(index + 1).repeat(7)}`,
+      digest: `imp-build-${index + 1}`,
+      isPinned: true,
+      createdAt: `2026-11-0${index + 1}T00:00:00Z`,
+    })),
+  });
+
+  const stub = buildStubRunner(
+    (call) =>
+      call.argv.join(' ') === 'impz image unpin agent-2222222'
+        ? Promise.reject(new Error('spawn failed'))
+        : undefined,
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect(exitCode).toBe(0);
+  expect(ctx.err.join('')).toContain('could not unpin agent-2222222: spawn failed');
+  expect(ctx.err.join('')).toContain('unpinned agent-3333333');
+});
+
+test('it pins an image again when a target names it while the unpins run', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone(['agent-1111111']);
+
+  const config = join(ctx.directory, 'custom-atc.json');
+
+  const imp = buildStubImp({
+    images: Array.from({ length: 5 }, (_unused, index) => ({
+      name: `agent-${String(index + 1).repeat(7)}`,
+      digest: `imp-build-${index + 1}`,
+      isPinned: true,
+      createdAt: `2026-11-0${index + 1}T00:00:00Z`,
+    })),
+  });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    targetConfigs: [config],
+    run: async (argv, options) => {
+      const result = await stub.run(argv, options);
+
+      // a switch writes its config just after the unpin
+      if (argv.join(' ') === 'impz image unpin agent-2222222') {
+        await writeFile(config, JSON.stringify({ targets: { cloud: { image: 'agent-2222222' } } }));
+      }
+
+      return result;
+    },
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect(imp.images.find((image) => image.name === 'agent-2222222')?.isPinned).toBe(true);
+  expect(ctx.err.join('')).toContain('pinned agent-2222222 again');
+});
+
+test('it does not remove the passing image when an interrupt lands during the unpins', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone(['agent-1111111']);
+
+  let armed = false;
+  const armedAtUnpin: boolean[] = [];
+
+  const imp = buildStubImp({
+    images: Array.from({ length: 5 }, (_unused, index) => ({
+      name: `agent-${String(index + 1).repeat(7)}`,
+      digest: `imp-build-${index + 1}`,
+      isPinned: true,
+      createdAt: `2026-11-0${index + 1}T00:00:00Z`,
+    })),
+  });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    run: (argv, options) => {
+      if (argv[2] === 'unpin') {
+        armedAtUnpin.push(armed);
+      }
+
+      return stub.run(argv, options);
+    },
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => {
+      armed = true;
+
+      return () => {
+        armed = false;
+      };
+    },
+  });
+
+  expect(exitCode).toBe(0);
+  expect(armedAtUnpin).toStrictEqual([false, false, false]);
 });

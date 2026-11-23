@@ -11,6 +11,7 @@ process.exitCode = await createAgentImage({
   args: process.argv.slice(2),
   cwd: process.cwd(),
   home: homedir(),
+  targetConfigs: (process.env['AGENT_IMAGE_TARGET_CONFIGS'] ?? '').split(':').filter(Boolean),
   buildTimeout: process.env['AGENT_IMAGE_BUILD_TIMEOUT'],
 });
 
