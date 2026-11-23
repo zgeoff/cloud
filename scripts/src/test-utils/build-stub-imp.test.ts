@@ -20,7 +20,7 @@ test('it lists each image with the name, ref and digest the scripts read', async
   const result = await stub.run(['impz', 'image', 'ls', '--json']);
 
   expect(result.stdout.toString()).toBe(
-    '[{"name":"agent-abc1234","ref":"imp/agent-abc1234:latest","digest":"imp-build-2"}]\n',
+    '[{"name":"agent-abc1234","ref":"imp/agent-abc1234:latest","digest":"imp-build-2","createdAt":"2026-01-01T00:00:00.000Z","pinned":false}]\n',
   );
 });
 
@@ -301,4 +301,20 @@ test('it fails closed with exit 97 on any other imp call, and leaves other progr
   });
 
   expect(other.stderr.toString()).toBe('unexpected: ["git","status"]\n');
+});
+
+test('it unpins a pinned image and lists it as unpinned', async () => {
+  const imp = buildStubImp({
+    images: [{ name: 'agent-abc1234', digest: 'imp-build-2', isPinned: true }],
+  });
+
+  const stub = buildStubRunner(imp.handler);
+
+  const result = await stub.run(['impz', 'image', 'unpin', 'agent-abc1234']);
+
+  expect(result.exitCode).toBe(0);
+
+  expect(imp.images).toStrictEqual([
+    { name: 'agent-abc1234', digest: 'imp-build-2', isPinned: false },
+  ]);
 });

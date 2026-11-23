@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+import { recordAgentImageRetention } from './agent-image-retention-state.ts';
 import { buildImpArgv } from './imp-cli.ts';
 import { parseBuildAgentImageArgs } from './parse-build-agent-image-args.ts';
 import { requireFreeAgentImageNames } from './require-free-agent-image-names.ts';
@@ -7,6 +9,7 @@ import { runAgentImageCheck } from './run-agent-image-check.ts';
 import type { ScriptIO } from './run-or-exit.ts';
 import { runOrExit } from './run-or-exit.ts';
 import type { InterruptibleIO } from './subscribe-to-interrupts.ts';
+import { unpinOldAgentImages } from './unpin-old-agent-images.ts';
 import { withExitCode } from './with-exit-code.ts';
 import { withWorkDir } from './with-work-dir.ts';
 
@@ -14,6 +17,12 @@ export interface CreateAgentImageOptions extends InterruptibleIO {
   readonly args: readonly string[];
 
   readonly cwd: string;
+
+  // the home folder whose atc config names the images its targets boot
+  readonly home?: string | undefined;
+
+  // more atc config files whose targets boot agent images
+  readonly targetConfigs?: readonly string[] | undefined;
 
   readonly buildTimeout?: string | undefined;
 }
@@ -58,7 +67,37 @@ async function runBuildAndCheck(options: Readonly<CreateAgentImageOptions>, run:
 
     const passed = await runAgentImageCheck(options, { ...run, source: built.source });
 
-    return await printCheckResult(options, { ...run, digest: built.digest, passed });
+    if (passed) {
+      // impd's image eviction removes an unpinned image that no imp has used for an hour, and a
+      // daemon's target boots this one by name
+      await runOrExit(options, buildImpArgv(['image', 'pin', run.image]));
+
+      // a passing check makes the image a passing one, whatever a switch recorded before
+      await forgetSwitchOnly(options, run.image);
+
+      // The image stays from here on, so an interrupt during the unpins must not remove it.
+      dropCleanup();
+
+      // pinned images pile up until the pool fills, so only the newest passing images and the
+      // ones that atc targets boot stay pinned
+      await unpinOldAgentImages(options, {
+        newImage: run.image,
+        home: options.home,
+        targetFiles: {
+          atcConfigs: [
+            ...(options.home === undefined ? [] : [join(options.home, '.config/atc/config.json')]),
+            ...(options.targetConfigs ?? []),
+          ],
+          nix: { clone: options.cwd, file: 'nixos/hosts/geoffcloud/configuration.nix' },
+        },
+      });
+
+      options.printOut(`${run.image} ${built.digest} check passed\n`);
+
+      return 0;
+    }
+
+    return await printFailedCheck(options, { ...run, digest: built.digest });
   } finally {
     dropCleanup();
   }
@@ -68,24 +107,27 @@ async function removeImage(io: Readonly<ScriptIO>, image: string) {
   await runOrExit(io, buildImpArgv(['image', 'rm', image]));
 }
 
-interface CheckResult {
+async function forgetSwitchOnly(options: Readonly<CreateAgentImageOptions>, image: string) {
+  if (options.home === undefined) {
+    return;
+  }
+
+  try {
+    await recordAgentImageRetention(options.home, { passedImage: image });
+  } catch (error) {
+    options.printErr(
+      `could not clear ${image} from the switch-only images: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
+}
+
+interface FailedCheck {
   readonly image: string;
   readonly digest: string;
   readonly keep: boolean;
-  readonly passed: boolean;
 }
 
-async function printCheckResult(io: Readonly<ScriptIO>, result: CheckResult) {
-  if (result.passed) {
-    // impd's image eviction removes an unpinned image that no imp has used for an hour, and a
-    // daemon's target boots this one by name
-    await runOrExit(io, buildImpArgv(['image', 'pin', result.image]));
-
-    io.printOut(`${result.image} ${result.digest} check passed\n`);
-
-    return 0;
-  }
-
+async function printFailedCheck(io: Readonly<ScriptIO>, result: FailedCheck) {
   if (result.keep) {
     io.printOut(`${result.image} ${result.digest} check failed; kept the image\n`);
 

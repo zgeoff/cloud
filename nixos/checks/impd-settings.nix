@@ -54,15 +54,15 @@ let
       '';
     }
     {
-      title = "it hands impd both image eviction marks, 80 and 65 percent";
+      title = "it hands impd both image eviction marks, 79 and 64 percent";
       script = ''
         assert_equal ${toString (builtins.length envScripts)} 1
         settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
         grep '^IMP_IMAGE_EVICT_' "$settings" | sort > actual
 
         diff -u - actual <<'EOF'
-        IMP_IMAGE_EVICT_HIGH_PERCENT=80
-        IMP_IMAGE_EVICT_LOW_PERCENT=65
+        IMP_IMAGE_EVICT_HIGH_PERCENT=79
+        IMP_IMAGE_EVICT_LOW_PERCENT=64
         EOF
       '';
     }
