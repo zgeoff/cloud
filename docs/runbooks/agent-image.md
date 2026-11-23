@@ -100,9 +100,14 @@ elastic at 1024 MiB and growing to 2048 MiB, so it stays off the host's huge pag
 that commit's `scripts/check-agent-image.ts` there, and removes the imp. Its last line is
 `agent-<short sha> <digest> check passed`; record that line on the PR. A passed check pins the image
 in impd, because a daemon's target boots it by name, and impd's image eviction would otherwise
-remove it while no imp uses it. A failed check removes the image, unless `--keep` keeps it for a
-look, and every failure exits 1. It refuses a commit that is not on `main`, and an image or check
-imp name that already exists.
+remove it while no imp uses it. It then unpins every other pinned `agent-<short sha>` image except
+the newest two that passed, the new one included, and each image that an atc target boots, so impd's
+eviction can remove the rest when `tank/imp` fills. It reads the targets' images from
+`targets.*.image` in `~/.config/atc/config.json` and from the `image` line of
+`nixos/hosts/geoffcloud/configuration.nix` in the clone. An unpin never deletes an image, and a
+failed unpin is logged and leaves the build's result alone. A failed check removes the image, unless
+`--keep` keeps it for a look, and every failure exits 1. It refuses a commit that is not on `main`,
+and an image or check imp name that already exists.
 
 `impz image build` prints no progress off a terminal, so the build runs quietly for several minutes.
 `AGENT_IMAGE_BUILD_TIMEOUT` (45m by default) stops a build that hangs. impd can still finish that
@@ -180,9 +185,9 @@ into a fresh imp. Without it, a compiled daemon uploads its binary, about 100 MB
 imp's first session starts.
 
 1. Run `bun scripts/switch-agent-image.ts agent-<short sha>` on the machine that runs the daemon. It
-   refuses an image the host lacks, copies the config to `config.json.bak-<UTC stamp>-pre-<image>`,
-   then sets `targets.cloud.image` and `targets.cloud.guestATC` and changes nothing else. A second
-   argument names another config file.
+   refuses an image the host lacks, pins the image so impd never evicts it, copies the config to
+   `config.json.bak-<UTC stamp>-pre-<image>`, then sets `targets.cloud.image` and
+   `targets.cloud.guestATC` and changes nothing else. A second argument names another config file.
 2. Restart the daemon when no session needs it, with the command the script prints,
    `atc daemon restart`. It restarts the daemon through its systemd unit and restores the fleet;
    `--dry-run` first lists the sessions a restart interrupts. The script never restarts it. The
@@ -342,10 +347,9 @@ entry.
 3. After the PR merges, wait for the host's build line in the journal
    ([The host's build](#the-hosts-build)), and record it on the PR.
 4. Switch the `cloud` target.
-5. Keep the image the target ran before, for a rollback. Remove an older one with
-   `impz image rm agent-<short sha>`; imp refuses to remove an image that an imp uses. The build
-   pinned it, so impd's image eviction never removes it: to leave an image that no target boots to
-   the eviction instead, unpin it with `impz image unpin agent-<short sha>`.
+5. Keep the image the target ran before, for a rollback. The next build keeps the newest two passing
+   images, so the previous image stays pinned until two newer ones exist. Remove an older one with
+   `impz image rm agent-<short sha>`; imp refuses to remove an image that an imp uses.
 
 ## Roll back
 
