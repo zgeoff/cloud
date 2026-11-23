@@ -112,15 +112,19 @@ that `AGENT_IMAGE_TARGET_CONFIGS` lists (paths separated by `:`) and in each con
 record in `~/.local/state/cloud/agent-image-retention.json`.
 
 An image that `switch-agent-image.ts` pinned because no passing check had pinned it is a target
-image while a target boots it, and takes no slot among the passing images. The build reads the
-targets again before each unpin and after it, and pins the image again if a target names it now;
-when impd refuses that pin, the log says so, and the image needs `impz image pin <image>`. A target
-on another machine is invisible to the build: list that machine's config in
+image while a target boots it, and takes no slot among the passing images.
+
+The build reads the targets again before each unpin and after it, and pins the image again if a
+target names it now. When impd refuses that pin, the build tries it three times, and then exits 1
+and names the image, which needs `impz image pin <image>`.
+
+A target on another machine is invisible to the build: list that machine's config in
 `AGENT_IMAGE_TARGET_CONFIGS` where the build can read it, or the image can lose its pin. When the
 build cannot read a config, cannot fetch the `deployed/host` tag, or cannot read the file at it, it
-unpins nothing and logs why. An unpin never deletes an image, and a failed unpin is logged and
-leaves the build's result alone. A passing image stays once it is pinned, so an interrupt during the
-unpins does not remove it.
+unpins nothing and logs why.
+
+An unpin never deletes an image, and a failed unpin is logged and leaves the build's result alone. A
+passing image stays once it is pinned, so an interrupt during the unpins does not remove it.
 
 `switch-agent-image.ts` pins the image before it changes the config and again after, and puts the
 old config back when impd refuses the second pin.

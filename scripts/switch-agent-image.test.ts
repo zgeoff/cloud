@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createFakeClock } from '@zgeoff/testing/clock';
-import { loadAgentImageRetentionState } from './agent-image-retention-state.ts';
+import { readAgentImageRetentionState } from './agent-image-retention-state.ts';
 import { buildStubImp } from './src/test-utils/build-stub-imp.ts';
 import type { StubCall } from './src/test-utils/build-stub-runner.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
@@ -44,6 +44,7 @@ test('it backs up the config, then points the cloud target at the image and keep
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234', config],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07.123Z') }).now,
     run: stub.run,
     printOut,
@@ -101,6 +102,7 @@ test('it switches the config in its home by default', async () => {
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -133,6 +135,7 @@ test('it leaves a config that already runs the image alone, and pins the image a
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut,
@@ -164,6 +167,7 @@ test('it leaves the config alone when impd refuses the pin', async () => {
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -193,6 +197,7 @@ test('it sets guestATC when the config names the image without it', async () => 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut,
@@ -231,6 +236,7 @@ test('it says the cloud target had no image before', async () => {
   await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut,
@@ -257,6 +263,7 @@ test('it refuses an image the imp host lacks, and changes nothing', async () => 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -285,6 +292,7 @@ test('it stops with imp’s own exit code when the imp host cannot list its imag
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -313,6 +321,7 @@ test.each([
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -340,6 +349,7 @@ test('it refuses a missing config', async () => {
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -366,6 +376,7 @@ test.each([
   const exitCode = await switchAgentImage({
     args,
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -408,6 +419,7 @@ test('it restores the config when impd accepts the first pin and refuses the sec
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -438,6 +450,7 @@ test('it records the config file and an image that no passing check pinned', asy
 
   const options = {
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -447,7 +460,7 @@ test('it records the config file and an image that no passing check pinned', asy
   await switchAgentImage({ ...options, args: ['agent-abc1234', config] });
   await switchAgentImage({ ...options, args: ['agent-def5678', config] });
 
-  const state = await loadAgentImageRetentionState(ctx.home);
+  const state = await readAgentImageRetentionState(ctx.home);
 
   expect(state).toStrictEqual({ configs: [config], switchOnlyImages: ['agent-abc1234'] });
 });

@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { createFakeClock } from '@zgeoff/testing/clock';
 import { recordAgentImageRetention } from './agent-image-retention-state.ts';
 import { createAgentImage } from './create-agent-image.ts';
 import { buildRealProgramHandler } from './src/test-utils/build-real-program-handler.ts';
@@ -9,6 +10,7 @@ import { buildStubCheckAgentImage } from './src/test-utils/build-stub-check-agen
 import { buildStubImp } from './src/test-utils/build-stub-imp.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 import { createSeededGitOrigin } from './src/test-utils/create-seeded-git-origin.ts';
+import { switchAgentImage } from './switch-agent-image.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'create-agent-image-'));
@@ -836,9 +838,17 @@ test('it logs an unpin that fails, goes on to the next image, and still passes t
     registerCleanup: () => () => {},
   });
 
-  expect(exitCode).toBe(0);
-  expect(ctx.err.join('')).toContain('could not unpin agent-3333333: impz: NOT_FOUND');
-  expect(ctx.err.join('')).toContain('unpinned agent-4444444');
+  expect({
+    exitCode,
+    unpinLogs: ctx.err.filter((line) => line.includes('unpin')),
+  }).toStrictEqual({
+    exitCode: 0,
+    unpinLogs: [
+      'unpinned agent-2222222; impd may evict it when it frees disk\n',
+      'could not unpin agent-3333333: impz: NOT_FOUND: image agent-3333333 not found\n',
+      'unpinned agent-4444444; impd may evict it when it frees disk\n',
+    ],
+  });
 });
 
 test('it keeps the image of a target that the host config named in an earlier commit', async () => {
@@ -912,7 +922,7 @@ test('it keeps every image pinned when a target config is not JSON', async () =>
 
   expect(exitCode).toBe(0);
   expect(stub.calls.filter((call) => call.argv[2] === 'unpin')).toStrictEqual([]);
-  expect(ctx.err.join('')).toContain('kept every agent image pinned');
+  expect(ctx.err.join('')).toInclude('kept every agent image pinned');
 });
 
 test('it reads the targets of a custom atc config file', async () => {
@@ -988,8 +998,8 @@ test('it goes on to the next unpin when the runner rejects one', async () => {
   });
 
   expect(exitCode).toBe(0);
-  expect(ctx.err.join('')).toContain('could not unpin agent-2222222: spawn failed');
-  expect(ctx.err.join('')).toContain('unpinned agent-3333333');
+  expect(ctx.err.join('')).toInclude('could not unpin agent-2222222: spawn failed');
+  expect(ctx.err.join('')).toInclude('unpinned agent-3333333');
 });
 
 test('it pins an image again when a target names it while the unpins run', async () => {
@@ -1034,7 +1044,7 @@ test('it pins an image again when a target names it while the unpins run', async
   });
 
   expect(imp.images.find((image) => image.name === 'agent-2222222')?.isPinned).toBe(true);
-  expect(ctx.err.join('')).toContain('pinned agent-2222222 again');
+  expect(ctx.err.join('')).toInclude('pinned agent-2222222 again');
 });
 
 test('it does not remove the passing image when an interrupt lands during the unpins', async () => {
@@ -1200,7 +1210,7 @@ test('it keeps every image pinned when the deployed host tag cannot be fetched',
 
   expect(exitCode).toBe(0);
   expect(stub.calls.filter((call) => call.argv[2] === 'unpin')).toStrictEqual([]);
-  expect(ctx.err.join('')).toContain('kept every agent image pinned: git fetch of deployed/host');
+  expect(ctx.err.join('')).toInclude('kept every agent image pinned: git fetch of deployed/host');
 });
 
 test('it counts an image that only a switch pinned as no passing image once its target moved away', async () => {
@@ -1244,7 +1254,7 @@ test('it counts an image that only a switch pinned as no passing image once its 
   expect(imp.images.find((image) => image.name === 'agent-4444444')?.isPinned).toBe(true);
 });
 
-test('it says so when impd refuses the pin that repairs an unpin a switch overtook', async () => {
+test('it tries again when impd refuses the pin that repairs an unpin a switch overtook', async () => {
   const ctx = await setupTest();
 
   await ctx.createClone(['agent-1111111']);
@@ -1266,22 +1276,29 @@ test('it says so when impd refuses the pin that repairs an unpin a switch overto
     buildStubCheckAgentImage(0),
   );
 
-  await createAgentImage({
+  let pins = 0;
+
+  const exitCode = await createAgentImage({
     args: [],
     cwd: ctx.clone,
     targetConfigs: [config],
     run: async (argv, options) => {
       if (argv.join(' ') === 'impz image pin agent-2222222') {
-        return {
-          exitCode: 1,
-          stdout: Buffer.from(''),
-          stderr: Buffer.from('impz: pin refused\n'),
-          timedOut: false,
-        };
+        pins += 1;
+
+        if (pins <= 1) {
+          return {
+            exitCode: 1,
+            stdout: Buffer.from(''),
+            stderr: Buffer.from('impz: pin refused\n'),
+            timedOut: false,
+          };
+        }
       }
 
       const result = await stub.run(argv, options);
 
+      // a switch writes its config just after the unpin
       if (argv.join(' ') === 'impz image unpin agent-2222222') {
         await writeFile(config, JSON.stringify({ targets: { cloud: { image: 'agent-2222222' } } }));
       }
@@ -1293,7 +1310,130 @@ test('it says so when impd refuses the pin that repairs an unpin a switch overto
     registerCleanup: () => () => {},
   });
 
-  expect(imp.images.find((image) => image.name === 'agent-2222222')?.isPinned).toBe(false);
-  expect(ctx.err.join('')).toContain('could not pin agent-2222222 again');
-  expect(ctx.err.join('')).not.toContain('pinned agent-2222222 again');
+  expect({
+    exitCode,
+    pinned: imp.images.find((image) => image.name === 'agent-2222222')?.isPinned,
+  }).toStrictEqual({
+    exitCode: 0,
+    pinned: true,
+  });
+});
+
+test('it fails the build and names the image when impd keeps refusing the repairing pin', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone(['agent-1111111']);
+
+  const config = join(ctx.directory, 'custom-atc.json');
+
+  const imp = buildStubImp({
+    images: Array.from({ length: 5 }, (_unused, index) => ({
+      name: `agent-${String(index + 1).repeat(7)}`,
+      digest: `imp-build-${index + 1}`,
+      isPinned: true,
+      createdAt: `2026-11-0${index + 1}T00:00:00Z`,
+    })),
+  });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  let pins = 0;
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    targetConfigs: [config],
+    run: async (argv, options) => {
+      if (argv.join(' ') === 'impz image pin agent-2222222') {
+        pins += 1;
+
+        if (pins >= 1) {
+          return {
+            exitCode: 1,
+            stdout: Buffer.from(''),
+            stderr: Buffer.from('impz: pin refused\n'),
+            timedOut: false,
+          };
+        }
+      }
+
+      const result = await stub.run(argv, options);
+
+      // a switch writes its config just after the unpin
+      if (argv.join(' ') === 'impz image unpin agent-2222222') {
+        await writeFile(config, JSON.stringify({ targets: { cloud: { image: 'agent-2222222' } } }));
+      }
+
+      return result;
+    },
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect({ exitCode, stderr: ctx.err.join('') }).toStrictEqual({
+    exitCode: 1,
+    stderr: expect.toInclude('a target boots agent-2222222 but impd refused to pin it again'),
+  });
+});
+
+test('it keeps the image of a target that a switch recorded from another folder with a relative config path', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone(['agent-1111111']);
+
+  const home = join(ctx.directory, 'home');
+  const elsewhere = join(ctx.directory, 'elsewhere');
+
+  await mkdir(elsewhere);
+
+  await writeFile(
+    join(elsewhere, 'custom.json'),
+    JSON.stringify({ targets: { cloud: { image: 'agent-1111111' } } }),
+  );
+
+  const imp = buildStubImp({
+    images: Array.from({ length: 4 }, (_unused, index) => ({
+      name: `agent-${String(index + 1).repeat(7)}`,
+      digest: `imp-build-${index + 1}`,
+      isPinned: true,
+      createdAt: `2026-11-0${index + 1}T00:00:00Z`,
+    })),
+  });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  await switchAgentImage({
+    args: ['agent-1111111', 'custom.json'],
+    home,
+    cwd: elsewhere,
+    now: createFakeClock({ startMs: Date.parse('2026-11-10T00:00:00Z') }).now,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    home,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect(
+    stub.calls.filter((call) => call.argv[2] === 'unpin').map((call) => call.argv[3]),
+  ).toStrictEqual(['agent-2222222', 'agent-3333333']);
+
+  expect(imp.images.find((image) => image.name === 'agent-1111111')?.isPinned).toBe(true);
 });

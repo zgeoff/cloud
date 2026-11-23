@@ -211,18 +211,19 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
    Add `USED` and `AVAIL`. The sum is the size.
 
 7. Open the comment above `settings.IMP_IMAGE_EVICT_HIGH_PERCENT` in
-   `nixos/hosts/geoffcloud/configuration.nix`. The comment gives three figures: the size of
-   `tank/imp`, impd's disk reserve of 5 % of the size, and the space between the two percents.
+   `nixos/hosts/geoffcloud/configuration.nix`. The comment gives four figures: the size of
+   `tank/imp`, impd's disk reserve of 5 % of the size, the space above the reserve when eviction
+   starts, and the space that one eviction frees.
 
-   When the size differs from the comment's, correct the three figures in a pull request.
+   When the size differs from the comment's, correct the four figures in a pull request.
 
    Then take `IMP_IMAGE_EVICT_HIGH_PERCENT` from 95. The points between 100 and that percent, less
    the 5 points of impd's reserve, are the space above the reserve when eviction starts: at 79 and
-   131.5 GiB, 16 points are about 21 GiB. The gap to `IMP_IMAGE_EVICT_LOW_PERCENT` is what one
-   eviction frees: 15 points, about 20 GiB. The comment says that space holds the 20 GiB disk of a
-   builder imp. When the space is under 20 GiB, lower `IMP_IMAGE_EVICT_HIGH_PERCENT` until it holds
-   20 GiB. Lower `IMP_IMAGE_EVICT_LOW_PERCENT` by the same number of points, in the same pull
-   request.
+   131.5 GiB, 16 points are about 21 GiB. The gap to `IMP_IMAGE_EVICT_LOW_PERCENT` is the most that
+   one eviction frees: 15 points, about 20 GiB. It frees less when too few images qualify for
+   removal. The comment says that space holds the 20 GiB disk of a builder imp. When the space is
+   under 20 GiB, lower `IMP_IMAGE_EVICT_HIGH_PERCENT` until it holds 20 GiB. Lower
+   `IMP_IMAGE_EVICT_LOW_PERCENT` by the same number of points, in the same pull request.
 
 ## If the key fails to load at boot
 

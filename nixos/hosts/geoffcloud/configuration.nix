@@ -299,7 +299,8 @@ in
     # to about 131.5 GiB, and impd's disk reserve is 5 % of that, about 6.6 GiB. At 79 % the 16
     # points above the reserve hold about 21 GiB, so a 20 GiB builder disk still fits (80 % would
     # leave under 20 GiB), and eviction starts before impd's low-disk warning at twice the reserve.
-    # The 15-point gap frees about 20 GiB, so one eviction serves a builder's add.
+    # The 15-point gap is the most one eviction frees, about 20 GiB, and it frees less when too few
+    # images qualify for removal.
     settings.IMP_IMAGE_EVICT_HIGH_PERCENT = 79;
     settings.IMP_IMAGE_EVICT_LOW_PERCENT = 64;
     # imps are agent sandboxes: they must not reach the k3s pod and service ranges

@@ -23,7 +23,7 @@ export function getRetentionStateFile(home: string): string {
 // Reads what the switch and build scripts on this machine left for each other. A missing file
 // holds nothing, and a file that cannot be read or parsed throws, so the caller keeps every image
 // rather than guess.
-export async function loadAgentImageRetentionState(
+export async function readAgentImageRetentionState(
   home: string,
 ): Promise<AgentImageRetentionState> {
   let text: string;
@@ -53,7 +53,7 @@ export async function recordAgentImageRetention(
   home: string,
   change: Readonly<AgentImageRetentionChange>,
 ): Promise<void> {
-  const state = await loadAgentImageRetentionState(home);
+  const state = await readAgentImageRetentionState(home);
 
   const configs = new Set(state.configs);
   const switchOnly = new Set(state.switchOnlyImages);

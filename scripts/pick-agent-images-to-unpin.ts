@@ -1,6 +1,6 @@
 import { findJSONField } from './find-json-field.ts';
 
-export interface AgentImageRetention {
+export interface AgentImagePool {
   // the record list from `impz image ls --json`
   readonly images: unknown;
 
@@ -17,7 +17,7 @@ export interface AgentImageRetention {
 // the passing images to keep, the new one included
 const keptPassingImages = 2;
 
-export function selectAgentImagesToUnpin(retention: Readonly<AgentImageRetention>): string[] {
+export function pickAgentImagesToUnpin(retention: Readonly<AgentImagePool>): string[] {
   const records = toAgentImageRecords(retention.images);
 
   // A pin shows a passing check, except on an image that switch-agent-image pinned for a target:

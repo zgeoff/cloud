@@ -1,45 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { deployedHostTag } from './constants.ts';
 import { findJSONField } from './find-json-field.ts';
 import type { ScriptIO } from './run-or-exit.ts';
-
-export interface TargetImageFiles {
-  // an atc config file: JSON with targets.<name>.image
-  readonly atcConfigs: readonly string[];
-
-  // a NixOS file that sets `image = "agent-..."` for the atc daemon's targets, and the clone that
-  // holds it
-  readonly nix: { readonly clone: string; readonly file: string };
-}
-
-// the tag that scripts/switch-geoffcloud.sh moves to the commit the host runs
-const deployedHostTag = 'refs/tags/deployed/host';
-
-// Fetches the tag that marks the commit the host runs, so the host's own target image is read
-// from that commit. It throws when the fetch fails.
-export async function pullDeployedHostTag(
-  io: Readonly<Pick<ScriptIO, 'run'>>,
-  clone: string,
-): Promise<void> {
-  const fetched = await io.run([
-    'git',
-    '-C',
-    clone,
-    'fetch',
-    '-q',
-    'origin',
-    `+${deployedHostTag}:${deployedHostTag}`,
-  ]);
-
-  if (fetched.exitCode !== 0) {
-    throw new Error(`git fetch of deployed/host failed: ${fetched.stderr.toString().trim()}`);
-  }
-}
+import type { TargetImageFiles } from './types.ts';
 
 // Reads the agent images that atc targets boot: the config files, and the NixOS file in the clone
 // and at the commit the host runs. A config file that does not exist names none. Anything else that
 // cannot be read throws, so the caller keeps every image rather than guess.
-export async function loadTargetAgentImages(
+export async function readTargetAgentImages(
   io: Readonly<Pick<ScriptIO, 'run'>>,
   files: Readonly<TargetImageFiles>,
 ): Promise<string[]> {
