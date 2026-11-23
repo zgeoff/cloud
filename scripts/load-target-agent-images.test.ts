@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadTargetAgentImages } from './load-target-agent-images.ts';
+import { loadTargetAgentImages, pullDeployedHostTag } from './load-target-agent-images.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 
 async function setupTest() {
@@ -13,7 +13,7 @@ async function setupTest() {
   return { directory };
 }
 
-test('it reads the image of every atc target, of the NixOS file, and of its last changes', async () => {
+test('it reads the image of every atc target, of the NixOS file, and of the NixOS file at the commit the host runs', async () => {
   const ctx = await setupTest();
 
   await writeFile(
@@ -29,7 +29,7 @@ test('it reads the image of every atc target, of the NixOS file, and of its last
   );
 
   const stub = buildStubRunner(() => ({
-    stdout: '-        image = "agent-1";\n+        image = "agent-6106be2d";\n',
+    stdout: '        image = "agent-1";\n',
   }));
 
   const images = await loadTargetAgentImages(stub, {
@@ -37,22 +37,10 @@ test('it reads the image of every atc target, of the NixOS file, and of its last
     nix: { clone: ctx.directory, file: 'configuration.nix' },
   });
 
-  expect(images).toStrictEqual(['agent-2f367d8', 'agent-6106be2d', 'agent-1', 'agent-6106be2d']);
+  expect(images).toStrictEqual(['agent-2f367d8', 'agent-6106be2d', 'agent-1']);
 
   expect(stub.calls.map((call) => call.argv)).toStrictEqual([
-    [
-      'git',
-      '-C',
-      ctx.directory,
-      'log',
-      '-n',
-      '3',
-      '-p',
-      '-U0',
-      '--format=',
-      '--',
-      'configuration.nix',
-    ],
+    ['git', '-C', ctx.directory, 'show', 'refs/tags/deployed/host:configuration.nix'],
   ]);
 });
 
@@ -86,13 +74,42 @@ test('it throws for a config that is not JSON, so no image is guessed', async ()
   expect(loading).rejects.toThrow();
 });
 
-test('it throws when the git log of the NixOS file fails', () => {
+test('it throws when the NixOS file is missing at the deployed host tag', () => {
   const loading = loadTargetAgentImages(
     buildStubRunner(() => ({ exitCode: 128, stderr: 'fatal: not a git repository\n' })),
     { atcConfigs: [], nix: { clone: '/clone', file: 'configuration.nix' } },
   );
 
   expect(loading).rejects.toThrow(
-    'git log of configuration.nix failed: fatal: not a git repository',
+    'git show of configuration.nix at deployed/host failed: fatal: not a git repository',
+  );
+});
+
+test('it fetches the deployed host tag into the clone', async () => {
+  const stub = buildStubRunner(() => ({}));
+
+  await pullDeployedHostTag(stub, '/clone');
+
+  expect(stub.calls.map((call) => call.argv)).toStrictEqual([
+    [
+      'git',
+      '-C',
+      '/clone',
+      'fetch',
+      '-q',
+      'origin',
+      '+refs/tags/deployed/host:refs/tags/deployed/host',
+    ],
+  ]);
+});
+
+test('it throws when the deployed host tag cannot be fetched', () => {
+  const loading = pullDeployedHostTag(
+    buildStubRunner(() => ({ exitCode: 128, stderr: "fatal: couldn't find remote ref\n" })),
+    '/clone',
+  );
+
+  expect(loading).rejects.toThrow(
+    "git fetch of deployed/host failed: fatal: couldn't find remote ref",
   );
 });

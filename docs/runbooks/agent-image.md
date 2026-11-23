@@ -104,16 +104,26 @@ remove it while no imp uses it. It then unpins every other pinned `agent-*` imag
 two that passed, the new one included, and each image that an atc target boots, so impd's eviction
 can remove the rest when `tank/imp` fills.
 
-The build reads a target's image from `targets.*.image` in `~/.config/atc/config.json` and in each
-file that `AGENT_IMAGE_TARGET_CONFIGS` lists (paths separated by `:`), and from the `image` line of
-`nixos/hosts/geoffcloud/configuration.nix` in the clone, at its current text and in its last three
-commits. An image that only `switch-agent-image.ts` pinned counts as a target image, not as a
-passing one. The build reads the targets again before each unpin and after it, and pins the image
-again if a target names it now. A target on another machine is invisible to the build: list that
-machine's config in `AGENT_IMAGE_TARGET_CONFIGS` where the build can read it, or the image can lose
-its pin. When the build cannot read a config, or the git log fails, it unpins nothing and logs why.
-An unpin never deletes an image, and a failed unpin is logged and leaves the build's result alone. A
-passing image stays once it is pinned, so an interrupt during the unpins does not remove it.
+The build reads a target's image from `targets.*.image` in `~/.config/atc/config.json`, in each file
+that `AGENT_IMAGE_TARGET_CONFIGS` lists (paths separated by `:`) and in each config file that
+`switch-agent-image.ts` changed on this machine, and from the `image` line of
+`nixos/hosts/geoffcloud/configuration.nix` in the clone and at the commit that origin's
+`deployed/host` tag marks, which is the commit the host runs. `switch-agent-image.ts` keeps its
+record in `~/.local/state/cloud/agent-image-retention.json`.
+
+An image that `switch-agent-image.ts` pinned because no passing check had pinned it is a target
+image while a target boots it, and takes no slot among the passing images. The build reads the
+targets again before each unpin and after it, and pins the image again if a target names it now;
+when impd refuses that pin, the log says so, and the image needs `impz image pin <image>`. A target
+on another machine is invisible to the build: list that machine's config in
+`AGENT_IMAGE_TARGET_CONFIGS` where the build can read it, or the image can lose its pin. When the
+build cannot read a config, cannot fetch the `deployed/host` tag, or cannot read the file at it, it
+unpins nothing and logs why. An unpin never deletes an image, and a failed unpin is logged and
+leaves the build's result alone. A passing image stays once it is pinned, so an interrupt during the
+unpins does not remove it.
+
+`switch-agent-image.ts` pins the image before it changes the config and again after, and puts the
+old config back when impd refuses the second pin.
 
 A failed check removes the image, unless `--keep` keeps it for a look, and every failure exits 1. It
 refuses a commit that is not on `main`, and an image or check imp name that already exists.

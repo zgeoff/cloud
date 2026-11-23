@@ -9,6 +9,9 @@ export interface AgentImageRetention {
 
   // every image that an atc target boots
   readonly targetImages: readonly string[];
+
+  // images that only a switch pinned, with no passing check
+  readonly switchOnlyImages: readonly string[];
 }
 
 // the passing images to keep, the new one included
@@ -18,13 +21,13 @@ export function selectAgentImagesToUnpin(retention: Readonly<AgentImageRetention
   const records = toAgentImageRecords(retention.images);
 
   // A pin shows a passing check, except on an image that switch-agent-image pinned for a target:
-  // that one is kept as a target image and takes no slot of the passing ones.
+  // that one takes no slot of the passing ones, whether a target boots it or has moved away.
   const passing = records
     .filter(
       (record) =>
         record.pinned &&
         record.name !== retention.newImage &&
-        !retention.targetImages.includes(record.name),
+        !retention.switchOnlyImages.includes(record.name),
     )
     .toSorted((left, right) => right.createdAt.localeCompare(left.createdAt));
 

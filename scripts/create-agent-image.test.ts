@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { recordAgentImageRetention } from './agent-image-retention-state.ts';
 import { createAgentImage } from './create-agent-image.ts';
 import { buildRealProgramHandler } from './src/test-utils/build-real-program-handler.ts';
 import { buildStubCheckAgentImage } from './src/test-utils/build-stub-check-agent-image.ts';
@@ -45,9 +46,15 @@ async function setupTest() {
       await repo.git(['-C', repo.seed, 'add', '-A']);
       // oxlint-disable-next-line no-await-in-loop
       await repo.git(['-C', repo.seed, 'commit', '-qm', `set ${image}`]);
+
+      // the host runs the first of the images
+      if (image === nixImages[0]) {
+        // oxlint-disable-next-line no-await-in-loop
+        await repo.git(['-C', repo.seed, 'tag', 'deployed/host']);
+      }
     }
 
-    await repo.git(['-C', repo.seed, 'push', '-q', 'origin', 'main']);
+    await repo.git(['-C', repo.seed, 'push', '-q', 'origin', 'main', 'deployed/host']);
     await repo.git(['clone', '-q', repo.origin, clone]);
   };
 
@@ -72,7 +79,13 @@ test('it builds the head of main from its archive, checks it on a fresh imp, rem
 
   await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
   await mkdir(join(ctx.repo.seed, 'scripts'));
+  await mkdir(join(ctx.repo.seed, 'nixos/hosts/geoffcloud'), { recursive: true });
   await writeFile(join(ctx.repo.seed, '.bun-version'), '1.4.9\n');
+
+  await writeFile(
+    join(ctx.repo.seed, 'nixos/hosts/geoffcloud/configuration.nix'),
+    '      image = "agent-1111111";\n',
+  );
 
   await writeFile(
     join(ctx.repo.seed, 'images/agent/Dockerfile'),
@@ -83,7 +96,8 @@ test('it builds the head of main from its archive, checks it on a fresh imp, rem
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
-  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'tag', 'deployed/host']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main', 'deployed/host']);
   await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
 
   await writeFile(join(ctx.clone, 'images/agent/Dockerfile'), 'FROM uncommitted\n');
@@ -226,7 +240,8 @@ test('it removes the image and the imp when the check fails', async () => {
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
-  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'tag', 'deployed/host']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main', 'deployed/host']);
   await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
 
   const sha = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', 'HEAD']);
@@ -286,7 +301,8 @@ test('it keeps the image when the check fails with --keep', async () => {
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
-  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'tag', 'deployed/host']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main', 'deployed/host']);
   await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
 
   const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
@@ -336,7 +352,8 @@ test('it fails without an imp when the build fails', async () => {
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
-  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'tag', 'deployed/host']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main', 'deployed/host']);
   await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
 
   const sha = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', 'HEAD']);
@@ -378,7 +395,8 @@ test('it leaves the image to an interrupt from the build on, newest of the steps
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
-  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'tag', 'deployed/host']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main', 'deployed/host']);
   await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
 
   const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
@@ -434,7 +452,8 @@ test('it fails when the build outlives AGENT_IMAGE_BUILD_TIMEOUT, and gives the 
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
-  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'tag', 'deployed/host']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main', 'deployed/host']);
   await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
 
   const sha = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', 'HEAD']);
@@ -481,7 +500,8 @@ test('it gives the build 45 minutes when AGENT_IMAGE_BUILD_TIMEOUT is unset', as
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
-  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'tag', 'deployed/host']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main', 'deployed/host']);
   await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
 
   const imp = buildStubImp({ images: [], buildError: 'imp: BUILD_FAILED' });
@@ -513,7 +533,8 @@ test('it refuses a commit that is not on main, before any imp call', async () =>
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
-  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'tag', 'deployed/host']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main', 'deployed/host']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'switch', '-qc', 'topic']);
 
   await writeFile(
@@ -561,7 +582,8 @@ test('it refuses an image name that is taken', async () => {
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
-  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'tag', 'deployed/host']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main', 'deployed/host']);
   await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
 
   const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
@@ -603,7 +625,8 @@ test('it refuses a check imp name that is taken', async () => {
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
-  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'tag', 'deployed/host']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main', 'deployed/host']);
   await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
 
   const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
@@ -707,7 +730,8 @@ test('it unpins every older agent image except the newest passing one, the targe
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
-  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'tag', 'deployed/host']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main', 'deployed/host']);
   await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
 
   await mkdir(join(ctx.directory, 'home/.config/atc'), { recursive: true });
@@ -780,7 +804,8 @@ test('it logs an unpin that fails, goes on to the next image, and still passes t
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
-  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'tag', 'deployed/host']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main', 'deployed/host']);
   await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
 
   const images = [1, 2, 3, 4, 5].map((day) => ({
@@ -1058,4 +1083,217 @@ test('it does not remove the passing image when an interrupt lands during the un
 
   expect(exitCode).toBe(0);
   expect(armedAtUnpin).toStrictEqual([false, false, false]);
+});
+
+test('it keeps the image of a target whose config a switch recorded, without AGENT_IMAGE_TARGET_CONFIGS', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone(['agent-1111111']);
+
+  const home = join(ctx.directory, 'home');
+  const config = join(ctx.directory, 'lab-atc.json');
+
+  await writeFile(config, JSON.stringify({ targets: { cloud: { image: 'agent-2222222' } } }));
+  await recordAgentImageRetention(home, { config });
+
+  const imp = buildStubImp({
+    images: Array.from({ length: 4 }, (_unused, index) => ({
+      name: `agent-${String(index + 1).repeat(7)}`,
+      digest: `imp-build-${index + 1}`,
+      isPinned: true,
+      createdAt: `2026-11-0${index + 1}T00:00:00Z`,
+    })),
+  });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    home,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect(exitCode).toBe(0);
+
+  expect(
+    stub.calls.filter((call) => call.argv[2] === 'unpin').map((call) => call.argv[3]),
+  ).toStrictEqual(['agent-3333333']);
+});
+
+test('it keeps the image of a host that runs a config many commits older than main', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone([
+    'agent-1111111',
+    'agent-2222222',
+    'agent-3333333',
+    'agent-4444444',
+    'agent-5555555',
+  ]);
+
+  const imp = buildStubImp({
+    images: Array.from({ length: 5 }, (_unused, index) => ({
+      name: `agent-${String(index + 1).repeat(7)}`,
+      digest: `imp-build-${index + 1}`,
+      isPinned: true,
+      createdAt: `2026-11-0${index + 1}T00:00:00Z`,
+    })),
+  });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect(
+    imp.images.filter((image) => image.isPinned === true).map((image) => image.name),
+  ).toContain('agent-1111111');
+});
+
+test('it keeps every image pinned when the deployed host tag cannot be fetched', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone(['agent-1111111']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', ':refs/tags/deployed/host']);
+
+  const imp = buildStubImp({
+    images: Array.from({ length: 4 }, (_unused, index) => ({
+      name: `agent-${String(index + 1).repeat(7)}`,
+      digest: `imp-build-${index + 1}`,
+      isPinned: true,
+      createdAt: `2026-11-0${index + 1}T00:00:00Z`,
+    })),
+  });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect(exitCode).toBe(0);
+  expect(stub.calls.filter((call) => call.argv[2] === 'unpin')).toStrictEqual([]);
+  expect(ctx.err.join('')).toContain('kept every agent image pinned: git fetch of deployed/host');
+});
+
+test('it counts an image that only a switch pinned as no passing image once its target moved away', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone(['agent-1111111']);
+
+  const home = join(ctx.directory, 'home');
+
+  await recordAgentImageRetention(home, { switchOnlyImage: 'agent-3333333' });
+
+  const imp = buildStubImp({
+    images: Array.from({ length: 4 }, (_unused, index) => ({
+      name: `agent-${String(index + 1).repeat(7)}`,
+      digest: `imp-build-${index + 1}`,
+      isPinned: true,
+      createdAt: `2026-11-0${index + 1}T00:00:00Z`,
+    })),
+  });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    home,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect(
+    stub.calls.filter((call) => call.argv[2] === 'unpin').map((call) => call.argv[3]),
+  ).toStrictEqual(['agent-2222222', 'agent-3333333']);
+
+  expect(imp.images.find((image) => image.name === 'agent-4444444')?.isPinned).toBe(true);
+});
+
+test('it says so when impd refuses the pin that repairs an unpin a switch overtook', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone(['agent-1111111']);
+
+  const config = join(ctx.directory, 'custom-atc.json');
+
+  const imp = buildStubImp({
+    images: Array.from({ length: 5 }, (_unused, index) => ({
+      name: `agent-${String(index + 1).repeat(7)}`,
+      digest: `imp-build-${index + 1}`,
+      isPinned: true,
+      createdAt: `2026-11-0${index + 1}T00:00:00Z`,
+    })),
+  });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    targetConfigs: [config],
+    run: async (argv, options) => {
+      if (argv.join(' ') === 'impz image pin agent-2222222') {
+        return {
+          exitCode: 1,
+          stdout: Buffer.from(''),
+          stderr: Buffer.from('impz: pin refused\n'),
+          timedOut: false,
+        };
+      }
+
+      const result = await stub.run(argv, options);
+
+      if (argv.join(' ') === 'impz image unpin agent-2222222') {
+        await writeFile(config, JSON.stringify({ targets: { cloud: { image: 'agent-2222222' } } }));
+      }
+
+      return result;
+    },
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect(imp.images.find((image) => image.name === 'agent-2222222')?.isPinned).toBe(false);
+  expect(ctx.err.join('')).toContain('could not pin agent-2222222 again');
+  expect(ctx.err.join('')).not.toContain('pinned agent-2222222 again');
 });

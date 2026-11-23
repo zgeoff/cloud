@@ -11,6 +11,7 @@ test('it keeps the new image and the newest other passing image, and unpins the 
     ],
     newImage: 'agent-ddddddd',
     targetImages: [],
+    switchOnlyImages: [],
   });
 
   expect(unpin).toStrictEqual(['agent-aaaaaaa', 'agent-bbbbbbb']);
@@ -26,6 +27,7 @@ test('it keeps an image that a target boots, however old', () => {
     ],
     newImage: 'agent-ddddddd',
     targetImages: ['agent-aaaaaaa'],
+    switchOnlyImages: [],
   });
 
   expect(unpin).toStrictEqual(['agent-bbbbbbb']);
@@ -41,6 +43,7 @@ test('it ignores an image that failed its check when it picks the newest passing
     ],
     newImage: 'agent-ddddddd',
     targetImages: [],
+    switchOnlyImages: [],
   });
 
   expect(unpin).toStrictEqual(['agent-aaaaaaa']);
@@ -56,6 +59,7 @@ test('it leaves unpinned images and images that are not agent images alone', () 
     ],
     newImage: 'agent-ddddddd',
     targetImages: [],
+    switchOnlyImages: [],
   });
 
   expect(unpin).toStrictEqual([]);
@@ -70,6 +74,7 @@ test('it keeps the new image when the list shows it as unpinned and older than a
     ],
     newImage: 'agent-ddddddd',
     targetImages: [],
+    switchOnlyImages: [],
   });
 
   expect(unpin).toStrictEqual(['agent-bbbbbbb']);
@@ -80,24 +85,40 @@ test('it unpins nothing from a list that is not an array', () => {
     images: { error: 'nope' },
     newImage: 'agent-ddddddd',
     targetImages: [],
+    switchOnlyImages: [],
   });
 
   expect(unpin).toStrictEqual([]);
 });
 
-test('it gives an image that only a switch pinned no slot among the passing ones', () => {
+test('it gives an image that only a switch pinned no slot, and unpins it once its target has moved away', () => {
   const unpin = selectAgentImagesToUnpin({
     images: [
       { name: 'agent-aaaaaaa', createdAt: '2026-11-01T00:00:00Z', pinned: true },
       { name: 'agent-bbbbbbb', createdAt: '2026-11-02T00:00:00Z', pinned: true },
       { name: 'agent-ccccccc', createdAt: '2026-11-03T00:00:00Z', pinned: true },
-      { name: 'agent-ddddddd', createdAt: '2026-11-04T00:00:00Z', pinned: true },
     ],
-    newImage: 'agent-aaaaaaa',
-    targetImages: ['agent-ccccccc'],
+    newImage: 'agent-ccccccc',
+    targetImages: [],
+    switchOnlyImages: ['agent-bbbbbbb'],
   });
 
   expect(unpin).toStrictEqual(['agent-bbbbbbb']);
+});
+
+test('it keeps an image that only a switch pinned while a target boots it', () => {
+  const unpin = selectAgentImagesToUnpin({
+    images: [
+      { name: 'agent-aaaaaaa', createdAt: '2026-11-01T00:00:00Z', pinned: true },
+      { name: 'agent-bbbbbbb', createdAt: '2026-11-02T00:00:00Z', pinned: true },
+      { name: 'agent-ccccccc', createdAt: '2026-11-03T00:00:00Z', pinned: true },
+    ],
+    newImage: 'agent-ccccccc',
+    targetImages: ['agent-bbbbbbb'],
+    switchOnlyImages: ['agent-bbbbbbb'],
+  });
+
+  expect(unpin).toStrictEqual([]);
 });
 
 test('it unpins an agent image whose name has no commit hash', () => {
@@ -110,6 +131,7 @@ test('it unpins an agent image whose name has no commit hash', () => {
     ],
     newImage: 'agent-ddddddd',
     targetImages: [],
+    switchOnlyImages: [],
   });
 
   expect(unpin).toStrictEqual(['agent-1', 'agent-bbbbbbb']);

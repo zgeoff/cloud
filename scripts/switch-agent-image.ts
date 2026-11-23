@@ -1,10 +1,13 @@
 // Run it on the machine that runs the atc daemon, once the agent image build printed "check
 // passed" for the image.
+import { copyFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Clock } from '@zgeoff/std';
 import { systemClock } from '@zgeoff/std';
+import { recordAgentImageRetention } from './agent-image-retention-state.ts';
 import { ExitError } from './exit-error.ts';
+import { findJSONField } from './find-json-field.ts';
 import { findRecord } from './find-record.ts';
 import { buildImpArgv, loadImpJSON } from './imp-cli.ts';
 import { loadCloudTarget } from './load-cloud-target.ts';
@@ -27,8 +30,14 @@ export function switchAgentImage(options: Readonly<SwitchAgentImageOptions>): Pr
     const [image, config] = parseArgs(options.args, options.home);
 
     const target = await loadCloudTarget(config);
+    const record = await requireImpImage(options, image);
 
-    await requireImpImage(options, image);
+    // A build on this machine reads the target from this file, and treats an image that no passing
+    // check pinned as a switch-only one. Both go on record before the pin.
+    await recordAgentImageRetention(options.home, {
+      config,
+      ...(findJSONField(record, 'pinned') === true ? {} : { switchOnlyImage: image }),
+    });
 
     // impd never evicts a pinned image, and the daemon boots this one by name. A config that
     // already names the image gets the pin too, since a refused or lost pin leaves it evictable.
@@ -44,7 +53,14 @@ export function switchAgentImage(options: Readonly<SwitchAgentImageOptions>): Pr
 
     // an agent image build that read the targets before this write may unpin the image after the
     // first pin, so the pin repeats once the config names the image
-    await runOrExit(options, buildImpArgv(['image', 'pin', image]));
+    try {
+      await runOrExit(options, buildImpArgv(['image', 'pin', image]));
+    } catch (error) {
+      // a refused pin leaves the image evictable, so the target keeps the image it ran
+      await copyFile(backup, config);
+
+      throw error;
+    }
 
     options.printOut(
       `backed up ${config} to ${backup}\n` +
@@ -67,15 +83,19 @@ function parseArgs(args: readonly string[], home: string): readonly [string, str
   return [image, config];
 }
 
-async function requireImpImage(io: Readonly<ScriptIO>, image: string) {
+async function requireImpImage(io: Readonly<ScriptIO>, image: string): Promise<unknown> {
   const images = await loadImpJSON(io, ['image', 'ls']);
 
-  if (findRecord(images, 'name', image) === undefined) {
+  const record = findRecord(images, 'name', image);
+
+  if (record === undefined) {
     throw new ExitError(
       1,
       `the imp host has no image ${image}: build it with scripts/build-agent-image.ts first`,
     );
   }
+
+  return record;
 }
 
 if (import.meta.main) {

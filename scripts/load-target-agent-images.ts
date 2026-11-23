@@ -12,13 +12,33 @@ export interface TargetImageFiles {
   readonly nix: { readonly clone: string; readonly file: string };
 }
 
-// the commits of the NixOS file whose changes count: a change merged before the host switched
-// leaves the running target's image on a removed line
-const nixHistoryCommits = '3';
+// the tag that scripts/switch-geoffcloud.sh moves to the commit the host runs
+const deployedHostTag = 'refs/tags/deployed/host';
 
-// Reads the agent images that atc targets boot. A config file that does not exist names none. A
-// file that cannot be read, a config that is not JSON, or a git log that fails throws, so the
-// caller keeps every image rather than guess.
+// Fetches the tag that marks the commit the host runs, so the host's own target image is read
+// from that commit. It throws when the fetch fails.
+export async function pullDeployedHostTag(
+  io: Readonly<Pick<ScriptIO, 'run'>>,
+  clone: string,
+): Promise<void> {
+  const fetched = await io.run([
+    'git',
+    '-C',
+    clone,
+    'fetch',
+    '-q',
+    'origin',
+    `+${deployedHostTag}:${deployedHostTag}`,
+  ]);
+
+  if (fetched.exitCode !== 0) {
+    throw new Error(`git fetch of deployed/host failed: ${fetched.stderr.toString().trim()}`);
+  }
+}
+
+// Reads the agent images that atc targets boot: the config files, and the NixOS file in the clone
+// and at the commit the host runs. A config file that does not exist names none. Anything else that
+// cannot be read throws, so the caller keeps every image rather than guess.
 export async function loadTargetAgentImages(
   io: Readonly<Pick<ScriptIO, 'run'>>,
   files: Readonly<TargetImageFiles>,
@@ -26,28 +46,24 @@ export async function loadTargetAgentImages(
   const configs = await Promise.all(files.atcConfigs.map((file) => readText(file)));
   const nixFile = await readText(join(files.nix.clone, files.nix.file));
 
-  const history = await io.run([
+  const deployed = await io.run([
     'git',
     '-C',
     files.nix.clone,
-    'log',
-    '-n',
-    nixHistoryCommits,
-    '-p',
-    '-U0',
-    '--format=',
-    '--',
-    files.nix.file,
+    'show',
+    `${deployedHostTag}:${files.nix.file}`,
   ]);
 
-  if (history.exitCode !== 0) {
-    throw new Error(`git log of ${files.nix.file} failed: ${history.stderr.toString().trim()}`);
+  if (deployed.exitCode !== 0) {
+    throw new Error(
+      `git show of ${files.nix.file} at deployed/host failed: ${deployed.stderr.toString().trim()}`,
+    );
   }
 
   return [
     ...configs.flatMap((text) => getConfigImages(text)),
     ...getNixImages(nixFile),
-    ...getNixImages(history.stdout.toString()),
+    ...getNixImages(deployed.stdout.toString()),
   ];
 }
 
@@ -82,8 +98,7 @@ function getConfigImages(text: string): string[] {
   });
 }
 
-// a changed line of the file's history starts with + or -
-const nixImagePattern = /^[-+ ]?\s*image\s*=\s*"(?<image>agent-[^"]+)"\s*;/gmu;
+const nixImagePattern = /^\s*image\s*=\s*"(?<image>agent-[^"]+)"\s*;/gmu;
 
 function getNixImages(text: string): string[] {
   return [...text.matchAll(nixImagePattern)].map((match) => match.groups?.['image'] ?? '');

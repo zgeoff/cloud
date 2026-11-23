@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { recordAgentImageRetention } from './agent-image-retention-state.ts';
 import { buildImpArgv } from './imp-cli.ts';
 import { parseBuildAgentImageArgs } from './parse-build-agent-image-args.ts';
 import { requireFreeAgentImageNames } from './require-free-agent-image-names.ts';
@@ -71,6 +72,9 @@ async function runBuildAndCheck(options: Readonly<CreateAgentImageOptions>, run:
       // daemon's target boots this one by name
       await runOrExit(options, buildImpArgv(['image', 'pin', run.image]));
 
+      // a passing check makes the image a passing one, whatever a switch recorded before
+      await forgetSwitchOnly(options, run.image);
+
       // The image stays from here on, so an interrupt during the unpins must not remove it.
       dropCleanup();
 
@@ -78,6 +82,7 @@ async function runBuildAndCheck(options: Readonly<CreateAgentImageOptions>, run:
       // ones that atc targets boot stay pinned
       await unpinOldAgentImages(options, {
         newImage: run.image,
+        home: options.home,
         targetFiles: {
           atcConfigs: [
             ...(options.home === undefined ? [] : [join(options.home, '.config/atc/config.json')]),
@@ -100,6 +105,20 @@ async function runBuildAndCheck(options: Readonly<CreateAgentImageOptions>, run:
 
 async function removeImage(io: Readonly<ScriptIO>, image: string) {
   await runOrExit(io, buildImpArgv(['image', 'rm', image]));
+}
+
+async function forgetSwitchOnly(options: Readonly<CreateAgentImageOptions>, image: string) {
+  if (options.home === undefined) {
+    return;
+  }
+
+  try {
+    await recordAgentImageRetention(options.home, { passedImage: image });
+  } catch (error) {
+    options.printErr(
+      `could not clear ${image} from the switch-only images: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
 }
 
 interface FailedCheck {
