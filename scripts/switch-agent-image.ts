@@ -6,9 +6,10 @@ import type { Clock } from '@zgeoff/std';
 import { systemClock } from '@zgeoff/std';
 import { ExitError } from './exit-error.ts';
 import { findRecord } from './find-record.ts';
-import { loadImpJSON } from './imp-cli.ts';
+import { buildImpArgv, loadImpJSON } from './imp-cli.ts';
 import { loadCloudTarget } from './load-cloud-target.ts';
 import type { ScriptIO } from './run-or-exit.ts';
+import { runOrExit } from './run-or-exit.ts';
 import { runProcess } from './run-process.ts';
 import { withExitCode } from './with-exit-code.ts';
 import { writeCloudTargetImage } from './write-cloud-target-image.ts';
@@ -34,6 +35,9 @@ export function switchAgentImage(options: Readonly<SwitchAgentImageOptions>): Pr
     }
 
     await requireImpImage(options, image);
+
+    // impd never evicts a pinned image, and the daemon boots this one by name
+    await runOrExit(options, buildImpArgv(['image', 'pin', image]));
 
     const backup = await writeCloudTargetImage({ config, image, guestATC, now: options.now() });
 

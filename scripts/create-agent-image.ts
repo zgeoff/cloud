@@ -1,4 +1,6 @@
+import { join } from 'node:path';
 import { buildImpArgv } from './imp-cli.ts';
+import type { TargetImageFiles } from './load-target-agent-images.ts';
 import { parseBuildAgentImageArgs } from './parse-build-agent-image-args.ts';
 import { requireFreeAgentImageNames } from './require-free-agent-image-names.ts';
 import { resolveMainCommit } from './resolve-main-commit.ts';
@@ -7,6 +9,7 @@ import { runAgentImageCheck } from './run-agent-image-check.ts';
 import type { ScriptIO } from './run-or-exit.ts';
 import { runOrExit } from './run-or-exit.ts';
 import type { InterruptibleIO } from './subscribe-to-interrupts.ts';
+import { unpinOldAgentImages } from './unpin-old-agent-images.ts';
 import { withExitCode } from './with-exit-code.ts';
 import { withWorkDir } from './with-work-dir.ts';
 
@@ -14,6 +17,9 @@ export interface CreateAgentImageOptions extends InterruptibleIO {
   readonly args: readonly string[];
 
   readonly cwd: string;
+
+  // the home folder whose atc config names the images its targets boot
+  readonly home?: string | undefined;
 
   readonly buildTimeout?: string | undefined;
 }
@@ -58,7 +64,16 @@ async function runBuildAndCheck(options: Readonly<CreateAgentImageOptions>, run:
 
     const passed = await runAgentImageCheck(options, { ...run, source: built.source });
 
-    return await printCheckResult(options, { ...run, digest: built.digest, passed });
+    return await printCheckResult(options, {
+      ...run,
+      digest: built.digest,
+      passed,
+      targetFiles: {
+        atcConfigs:
+          options.home === undefined ? [] : [join(options.home, '.config/atc/config.json')],
+        nixFiles: [join(options.cwd, 'nixos/hosts/geoffcloud/configuration.nix')],
+      },
+    });
   } finally {
     dropCleanup();
   }
@@ -73,6 +88,7 @@ interface CheckResult {
   readonly digest: string;
   readonly keep: boolean;
   readonly passed: boolean;
+  readonly targetFiles: TargetImageFiles;
 }
 
 async function printCheckResult(io: Readonly<ScriptIO>, result: CheckResult) {
@@ -80,6 +96,10 @@ async function printCheckResult(io: Readonly<ScriptIO>, result: CheckResult) {
     // impd's image eviction removes an unpinned image that no imp has used for an hour, and a
     // daemon's target boots this one by name
     await runOrExit(io, buildImpArgv(['image', 'pin', result.image]));
+
+    // pinned images pile up until the pool fills, so only the newest passing images and the ones
+    // that atc targets boot stay pinned
+    await unpinOldAgentImages(io, { newImage: result.image, targetFiles: result.targetFiles });
 
     io.printOut(`${result.image} ${result.digest} check passed\n`);
 

@@ -115,6 +115,7 @@ test('it builds the head of main from its archive, checks it on a fresh imp, rem
     ['bun', join(source, 'scripts/check-agent-image.ts'), '--imp', `agent-check-${short}`],
     ['impz', 'rm', `agent-check-${short}`],
     ['impz', 'image', 'pin', `agent-${short}`],
+    ['impz', 'image', 'ls', '--json'],
   ]);
 
   expect(source).toStartWith(join(tmpdir(), 'agent-image-build-'));
@@ -649,4 +650,135 @@ test('it refuses an AGENT_IMAGE_BUILD_TIMEOUT that is not a duration, before any
   ]);
 
   expect(stub.calls).toStrictEqual([]);
+});
+
+test('it unpins every older agent image except the newest passing one, the target images and the new one', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
+  await mkdir(join(ctx.repo.seed, 'scripts'));
+  await mkdir(join(ctx.repo.seed, 'nixos/hosts/geoffcloud'), { recursive: true });
+  await writeFile(join(ctx.repo.seed, '.bun-version'), '1.4.9\n');
+
+  await writeFile(
+    join(ctx.repo.seed, 'images/agent/Dockerfile'),
+    'FROM ghcr.io/zgeoff/imp-base:0.33.0\n',
+  );
+
+  await writeFile(join(ctx.repo.seed, 'scripts/check-agent-image.ts'), '');
+
+  await writeFile(
+    join(ctx.repo.seed, 'nixos/hosts/geoffcloud/configuration.nix'),
+    '      image = "agent-1111111";\n',
+  );
+
+  await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
+
+  await mkdir(join(ctx.directory, 'home/.config/atc'), { recursive: true });
+
+  await writeFile(
+    join(ctx.directory, 'home/.config/atc/config.json'),
+    JSON.stringify({ targets: { cloud: { provider: 'imp', image: 'agent-2222222' } } }),
+  );
+
+  const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
+
+  const images = [1, 2, 3, 4, 5].map((day) => ({
+    name: `agent-${String(day).repeat(7)}`,
+    digest: `imp-build-${day}`,
+    isPinned: true,
+    createdAt: `2026-11-0${day}T00:00:00Z`,
+  }));
+
+  const imp = buildStubImp({ images });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    home: join(ctx.directory, 'home'),
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  const unpinCalls = stub.calls.filter((call) => call.argv[2] === 'unpin');
+
+  expect(exitCode).toBe(0);
+
+  expect(unpinCalls.map((call) => call.argv)).toStrictEqual([
+    ['impz', 'image', 'unpin', 'agent-3333333'],
+    ['impz', 'image', 'unpin', 'agent-4444444'],
+  ]);
+
+  expect(
+    imp.images.filter((image) => image.isPinned === true).map((image) => image.name),
+  ).toStrictEqual(['agent-1111111', 'agent-2222222', 'agent-5555555', `agent-${short}`]);
+});
+
+test('it logs an unpin that fails, goes on to the next image, and still passes the build', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
+  await mkdir(join(ctx.repo.seed, 'scripts'));
+  await mkdir(join(ctx.repo.seed, 'nixos/hosts/geoffcloud'), { recursive: true });
+  await writeFile(join(ctx.repo.seed, '.bun-version'), '1.4.9\n');
+
+  await writeFile(
+    join(ctx.repo.seed, 'images/agent/Dockerfile'),
+    'FROM ghcr.io/zgeoff/imp-base:0.33.0\n',
+  );
+
+  await writeFile(join(ctx.repo.seed, 'scripts/check-agent-image.ts'), '');
+
+  await writeFile(
+    join(ctx.repo.seed, 'nixos/hosts/geoffcloud/configuration.nix'),
+    '      image = "agent-1111111";\n',
+  );
+
+  await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
+
+  const images = [1, 2, 3, 4, 5].map((day) => ({
+    name: `agent-${String(day).repeat(7)}`,
+    digest: `imp-build-${day}`,
+    isPinned: true,
+    createdAt: `2026-11-0${day}T00:00:00Z`,
+  }));
+
+  const imp = buildStubImp({ images });
+
+  const stub = buildStubRunner(
+    (call) =>
+      call.argv.join(' ') === 'impz image unpin agent-3333333'
+        ? { exitCode: 1, stderr: 'impz: NOT_FOUND: image agent-3333333 not found\n' }
+        : undefined,
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect(exitCode).toBe(0);
+  expect(ctx.err.join('')).toContain('could not unpin agent-3333333: impz: NOT_FOUND');
+  expect(ctx.err.join('')).toContain('unpinned agent-4444444');
 });

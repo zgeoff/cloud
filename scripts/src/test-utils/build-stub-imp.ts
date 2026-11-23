@@ -7,6 +7,8 @@ interface StubImpImage {
   readonly digest: string;
 
   readonly isPinned?: boolean;
+
+  readonly createdAt?: string;
 }
 
 interface StubImpInstance {
@@ -64,7 +66,8 @@ const impCommands: readonly (readonly [string, ImpCommand])[] = [
   ['image ls --json', buildImageList],
   ['image build * --name *', (state, args) => runBuild(state, args[2] ?? '', args[4] ?? '')],
   ['image rm *', (state, args) => removeImage(state, args[2] ?? '')],
-  ['image pin *', (state, args) => pinImage(state, args[2] ?? '')],
+  ['image pin *', (state, args) => pinImage(state, args[2] ?? '', true)],
+  ['image unpin *', (state, args) => pinImage(state, args[2] ?? '', false)],
   [
     'new * --image * --memory * --max-memory *',
     (state, args) => createImp(state, args[1] ?? '', args[3] ?? ''),
@@ -86,10 +89,14 @@ function buildImpAnswer(state: StubImpState, call: StubCall): StubAnswer | Promi
 
 function buildImageList(state: StubImpState): StubAnswer {
   // only the fields of the real `image ls --json` output that the scripts read
-  const images = state.images.map((image) => ({
+  const images = state.images.map((image, index) => ({
     name: image.name,
     ref: `imp/${image.name}:latest`,
     digest: image.digest,
+
+    // an image without a date is newer than the ones before it in the list
+    createdAt: image.createdAt ?? new Date(Date.UTC(2026, 0, 1) + index * 1000).toISOString(),
+    pinned: image.isPinned === true,
   }));
 
   return { stdout: `${JSON.stringify(images)}\n` };
@@ -131,7 +138,7 @@ function removeImage(state: StubImpState, name: string): StubAnswer {
   return {};
 }
 
-function pinImage(state: StubImpState, name: string): StubAnswer {
+function pinImage(state: StubImpState, name: string, isPinned: boolean): StubAnswer {
   const index = state.images.findIndex((image) => image.name === name);
   const image = state.images[index];
 
@@ -141,7 +148,7 @@ function pinImage(state: StubImpState, name: string): StubAnswer {
     return { exitCode: 1, stderr: `impz: NOT_FOUND: image ${name} not found\n` };
   }
 
-  state.images[index] = { ...image, isPinned: true };
+  state.images[index] = { ...image, isPinned };
 
   return {};
 }
