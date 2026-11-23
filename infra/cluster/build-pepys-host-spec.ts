@@ -90,6 +90,10 @@ function buildHostContainer(inputs: PepysHostSpecInputs): input.core.v1.Containe
       { name: 'PEPYS_S2_BASIN', value: pepysWorkloads.s2.basin },
       { name: 'PEPYS_STORE_DIR', value: storeDirectory },
       { name: 'PEPYS_CONSUMERS', value: '/modules/consumers.json' },
+
+      // mimalloc lets the kernel back its sparse heap with 2 MiB transparent huge pages, which can
+      // push the host past its memory limit; 0 turns that off for this process only
+      { name: 'MIMALLOC_ALLOW_THP', value: '0' },
     ],
     envFrom: [{ secretRef: { name: inputs.envSecret } }],
     volumeMounts: [
