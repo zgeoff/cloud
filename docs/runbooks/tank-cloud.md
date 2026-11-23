@@ -64,16 +64,17 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
      -o keylocation=file:///var/lib/zfs-keys/tank.key -o compression=lz4 -o mountpoint=legacy tank/cloud
    zfs create -o mountpoint=legacy tank/cloud/host-secrets
    zfs create -o mountpoint=legacy tank/cloud/imp-db-backups
-   zfs create -V 30G tank/cloud/rancher
+   zfs create -V 60G tank/cloud/rancher
    ```
 
    `zfs create` loads the key of a new encryption root, so the children need no `load-key`. The
    children inherit the encryption and the compression. LZ4 stores the blocks of zeros that ext4
    writes as holes. The zvol reserves its whole size on the pool, because ext4 on a sparse zvol gets
-   write errors when the pool fills. The zvol is 30 GiB. local-path, the cluster's storage
-   provisioner, does not enforce the size a PVC requests, so the PVCs can request more than the zvol
-   holds, and they request 41 GiB. The zvol fills only by what the volumes write. When
-   `/var/lib/rancher` runs short of space, follow [Grow the rancher zvol](#grow-the-rancher-zvol).
+   write errors when the pool fills. The zvol is 60 GiB: a fresh pool creates it at that size, and
+   the live pool's zvol was grown to it. local-path, the cluster's storage provisioner, does not
+   enforce the size a PVC requests, so the PVCs can request more than the zvol holds, and they
+   request 41 GiB. The zvol fills only by what the volumes write. When `/var/lib/rancher` runs short
+   of space, follow [Grow the rancher zvol](#grow-the-rancher-zvol).
 
 4. Make the ext4 filesystem on the zvol:
 
@@ -161,7 +162,7 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
    zfs get -H -o value volsize tank/cloud/rancher
    ```
 
-   Expect one size, such as `30G`. The growth is the new size less this size.
+   Expect one size, such as `60G`. The growth is the new size less this size.
 
 2. Check that the pool has the space for the growth:
 
@@ -188,7 +189,7 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
    zfs get -H -o property,value volsize,refreservation tank/cloud/rancher
    ```
 
-   Expect the new `volsize`, and a `refreservation` a little above it, such as `30.5G` for `30G`. A
+   Expect the new `volsize`, and a `refreservation` a little above it, such as `60.9G` for `60G`. A
    `refreservation` of `none` or of the old size leaves the growth with no reserved space: set it
    with `zfs set refreservation=auto tank/cloud/rancher`.
 
@@ -215,11 +216,13 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
    When the size differs from the comment's, correct the three figures in a pull request.
 
-   Then take `IMP_IMAGE_EVICT_HIGH_PERCENT` from 95. That percent of the size is the space above
-   impd's reserve when eviction starts: at 80 and 162 GiB, 15 % is 24 GiB. The comment says that
-   space holds the 20 GiB disk of a builder imp. When the space is under 20 GiB, lower
-   `IMP_IMAGE_EVICT_HIGH_PERCENT` until it holds 20 GiB. Lower `IMP_IMAGE_EVICT_LOW_PERCENT` by the
-   same number of points, in the same pull request.
+   Then take `IMP_IMAGE_EVICT_HIGH_PERCENT` from 95. The points between 100 and that percent, less
+   the 5 points of impd's reserve, are the space above the reserve when eviction starts: at 79 and
+   131.5 GiB, 16 points are about 21 GiB. The gap to `IMP_IMAGE_EVICT_LOW_PERCENT` is what one
+   eviction frees: 15 points, about 20 GiB. The comment says that space holds the 20 GiB disk of a
+   builder imp. When the space is under 20 GiB, lower `IMP_IMAGE_EVICT_HIGH_PERCENT` until it holds
+   20 GiB. Lower `IMP_IMAGE_EVICT_LOW_PERCENT` by the same number of points, in the same pull
+   request.
 
 ## If the key fails to load at boot
 
