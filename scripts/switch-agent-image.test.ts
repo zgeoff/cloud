@@ -3,7 +3,9 @@ import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createFakeClock } from '@zgeoff/testing/clock';
+import { readAgentImageRetentionState } from './agent-image-retention-state.ts';
 import { buildStubImp } from './src/test-utils/build-stub-imp.ts';
+import type { StubCall } from './src/test-utils/build-stub-runner.ts';
 import { buildStubRunner } from './src/test-utils/build-stub-runner.ts';
 import { switchAgentImage } from './switch-agent-image.ts';
 
@@ -42,6 +44,7 @@ test('it backs up the config, then points the cloud target at the image and keep
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234', config],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07.123Z') }).now,
     run: stub.run,
     printOut,
@@ -75,7 +78,14 @@ test('it backs up the config, then points the cloud target at the image and keep
 
   expect(configInfo.mode & 0o777).toBe(0o600);
   expect(backupInfo.mode & 0o777).toBe(0o600);
-  expect(stub.calls.map((call) => call.argv)).toStrictEqual([['impz', 'image', 'ls', '--json']]);
+
+  expect(stub.calls.map((call) => call.argv)).toStrictEqual([
+    ['impz', 'image', 'ls', '--json'],
+    ['impz', 'image', 'pin', 'agent-abc1234'],
+    ['impz', 'image', 'pin', 'agent-abc1234'],
+  ]);
+
+  expect(imp.images.find((image) => image.name === 'agent-abc1234')?.isPinned).toBe(true);
 });
 
 test('it switches the config in its home by default', async () => {
@@ -92,6 +102,7 @@ test('it switches the config in its home by default', async () => {
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -109,7 +120,7 @@ test('it switches the config in its home by default', async () => {
   });
 });
 
-test('it leaves a config that already runs the image alone, without asking the imp host', async () => {
+test('it leaves a config that already runs the image alone, and pins the image again', async () => {
   const ctx = await setupTest();
 
   await writeFile(
@@ -117,12 +128,14 @@ test('it leaves a config that already runs the image alone, without asking the i
     '{"targets":{"cloud":{"image":"agent-abc1234","guestATC":"/usr/local/bin/atc"}}}\n',
   );
 
-  const stub = buildStubRunner();
+  const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
+  const stub = buildStubRunner(imp.handler);
   const printOut = mock<(text: string) => void>();
 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut,
@@ -134,7 +147,39 @@ test('it leaves a config that already runs the image alone, without asking the i
   expect(exitCode).toBe(0);
   expect(printOut.mock.calls).toStrictEqual([['the cloud target already runs agent-abc1234\n']]);
   expect(files).toStrictEqual(['config.json']);
-  expect(stub.calls).toStrictEqual([]);
+  expect(imp.images.find((image) => image.name === 'agent-abc1234')?.isPinned).toBe(true);
+});
+
+test('it leaves the config alone when impd refuses the pin', async () => {
+  const ctx = await setupTest();
+
+  const before = '{"targets":{"cloud":{"provider":"imp","image":"agent-old"}}}\n';
+
+  await writeFile(join(ctx.configDir, 'config.json'), before);
+
+  const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
+
+  const stub = buildStubRunner(
+    (call) => (call.argv[2] === 'pin' ? { exitCode: 1, stderr: 'impz: pin refused\n' } : undefined),
+    imp.handler,
+  );
+
+  const exitCode = await switchAgentImage({
+    args: ['agent-abc1234'],
+    home: ctx.home,
+    cwd: ctx.home,
+    now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
+    run: stub.run,
+    printOut: () => {},
+    printErr: () => {},
+  });
+
+  const after = await readFile(join(ctx.configDir, 'config.json'), 'utf8');
+  const files = await readdir(ctx.configDir);
+
+  expect(exitCode).toBe(1);
+  expect(after).toBe(before);
+  expect(files).toStrictEqual(['config.json']);
 });
 
 test('it sets guestATC when the config names the image without it', async () => {
@@ -152,6 +197,7 @@ test('it sets guestATC when the config names the image without it', async () => 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut,
@@ -190,6 +236,7 @@ test('it says the cloud target had no image before', async () => {
   await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut,
@@ -216,6 +263,7 @@ test('it refuses an image the imp host lacks, and changes nothing', async () => 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -244,6 +292,7 @@ test('it stops with imp’s own exit code when the imp host cannot list its imag
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -272,6 +321,7 @@ test.each([
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -299,6 +349,7 @@ test('it refuses a missing config', async () => {
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -325,6 +376,7 @@ test.each([
   const exitCode = await switchAgentImage({
     args,
     home: ctx.home,
+    cwd: ctx.home,
     now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
     run: stub.run,
     printOut: () => {},
@@ -338,4 +390,77 @@ test.each([
   ]);
 
   expect(stub.calls).toStrictEqual([]);
+});
+
+test('it restores the config when impd accepts the first pin and refuses the second', async () => {
+  const ctx = await setupTest();
+
+  const before = '{"targets":{"cloud":{"provider":"imp","image":"agent-old"}}}\n';
+
+  await writeFile(join(ctx.configDir, 'config.json'), before);
+
+  const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
+  let pins = 0;
+
+  const refuseSecondPin = (call: StubCall) => {
+    if (call.argv[2] === 'pin') {
+      pins += 1;
+    }
+
+    if (call.argv[2] === 'pin' && pins === 2) {
+      return { exitCode: 1, stderr: 'impz: pin refused\n' };
+    }
+
+    return imp.handler(call);
+  };
+
+  const stub = buildStubRunner(refuseSecondPin);
+
+  const exitCode = await switchAgentImage({
+    args: ['agent-abc1234'],
+    home: ctx.home,
+    cwd: ctx.home,
+    now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
+    run: stub.run,
+    printOut: () => {},
+    printErr: () => {},
+  });
+
+  const after = await readFile(join(ctx.configDir, 'config.json'), 'utf8');
+
+  expect(exitCode).toBe(1);
+  expect(after).toBe(before);
+});
+
+test('it records the config file and an image that no passing check pinned', async () => {
+  const ctx = await setupTest();
+
+  const config = join(ctx.home, 'lab-atc.json');
+
+  await writeFile(config, '{"targets":{"cloud":{"provider":"imp","image":"agent-old"}}}\n');
+
+  const imp = buildStubImp({
+    images: [
+      { name: 'agent-abc1234', digest: 'imp-build-2' },
+      { name: 'agent-def5678', digest: 'imp-build-3', isPinned: true },
+    ],
+  });
+
+  const stub = buildStubRunner(imp.handler);
+
+  const options = {
+    home: ctx.home,
+    cwd: ctx.home,
+    now: createFakeClock({ startMs: Date.parse('2026-10-10T05:06:07Z') }).now,
+    run: stub.run,
+    printOut: () => {},
+    printErr: () => {},
+  };
+
+  await switchAgentImage({ ...options, args: ['agent-abc1234', config] });
+  await switchAgentImage({ ...options, args: ['agent-def5678', config] });
+
+  const state = await readAgentImageRetentionState(ctx.home);
+
+  expect(state).toStrictEqual({ configs: [config], switchOnlyImages: ['agent-abc1234'] });
 });
