@@ -119,6 +119,60 @@ test.each([
     },
     ['agent-1', 'agent-bbbbbbb'],
   ],
+  [
+    'keeps the image that the agent alias names, and the previous passing image, with no target',
+    {
+      images: [
+        { name: 'agent-aaaaaaa', createdAt: '2026-11-01T00:00:00Z', pinned: true },
+        {
+          name: 'agent-bbbbbbb',
+          createdAt: '2026-11-02T00:00:00Z',
+          pinned: true,
+          aliases: ['agent'],
+        },
+        { name: 'agent-ccccccc', createdAt: '2026-11-03T00:00:00Z', pinned: true },
+        { name: 'agent-ddddddd', createdAt: '2026-11-04T00:00:00Z', pinned: true },
+      ],
+      newImage: 'agent-ddddddd',
+      targetImages: [],
+      switchOnlyImages: [],
+    },
+    ['agent-aaaaaaa'],
+  ],
+  [
+    'resolves a target set to the agent alias to the image the alias names',
+    {
+      images: [
+        { name: 'agent-aaaaaaa', createdAt: '2026-11-01T00:00:00Z', pinned: true },
+        {
+          name: 'agent-bbbbbbb',
+          createdAt: '2026-11-02T00:00:00Z',
+          pinned: true,
+          aliases: ['agent'],
+        },
+        { name: 'agent-ccccccc', createdAt: '2026-11-03T00:00:00Z', pinned: true },
+        { name: 'agent-ddddddd', createdAt: '2026-11-04T00:00:00Z', pinned: true },
+      ],
+      newImage: 'agent-ddddddd',
+      targetImages: ['agent'],
+      switchOnlyImages: [],
+    },
+    ['agent-aaaaaaa'],
+  ],
+  [
+    'unpins nothing it should keep when a target names an alias that no image holds',
+    {
+      images: [
+        { name: 'agent-aaaaaaa', createdAt: '2026-11-01T00:00:00Z', pinned: true },
+        { name: 'agent-ccccccc', createdAt: '2026-11-03T00:00:00Z', pinned: true },
+        { name: 'agent-ddddddd', createdAt: '2026-11-04T00:00:00Z', pinned: true },
+      ],
+      newImage: 'agent-ddddddd',
+      targetImages: ['agent'],
+      switchOnlyImages: [],
+    },
+    ['agent-aaaaaaa'],
+  ],
 ])('it %s', (_title, pool, expected) => {
   expect(pickAgentImagesToUnpin(pool)).toStrictEqual(expected);
 });

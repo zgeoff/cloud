@@ -84,3 +84,24 @@ test('it throws when the NixOS file is missing at the deployed host tag', () => 
     'git show of configuration.nix at deployed/host failed: fatal: not a git repository',
   );
 });
+
+test('it reads the agent alias as the image of a target that boots it, in a config and in the NixOS file', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'config.json'),
+    JSON.stringify({ targets: { cloud: { image: 'agent' } } }),
+  );
+
+  await writeFile(join(ctx.directory, 'configuration.nix'), '        image = "agent";\n');
+
+  const images = await readTargetAgentImages(
+    buildStubRunner(() => ({ stdout: '        image = "agent-1";\n' })),
+    {
+      atcConfigs: [join(ctx.directory, 'config.json')],
+      nix: { clone: ctx.directory, file: 'configuration.nix' },
+    },
+  );
+
+  expect(images).toStrictEqual(['agent', 'agent', 'agent-1']);
+});
