@@ -16,7 +16,7 @@ export interface AgentImageRetentionChange {
   readonly passedImage?: string;
 }
 
-export function getRetentionStateFile(home: string): string {
+function getRetentionStateFile(home: string): string {
   return join(home, '.local/state/cloud/agent-image-retention.json');
 }
 
