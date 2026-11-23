@@ -291,7 +291,7 @@ secrets file.
    ```
 
    Expect
-   `["connector_credentials","definitions_export_token","deployment_key","impd_token","settings"]`.
+   `["connector_credentials","definitions_export_app_key","deployment_key","impd_token","settings"]`.
 
 3. Commit the file through a PR. Once CI passes on `main`, the `Deploy prod` workflow applies it
    ([prod apply](./prod-apply.md)).
