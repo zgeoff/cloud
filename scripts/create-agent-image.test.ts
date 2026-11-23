@@ -1319,6 +1319,66 @@ test('it tries again when impd refuses the pin that repairs an unpin a switch ov
   });
 });
 
+test('it tries again when the pin that repairs an overtaken unpin fails to run', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone(['agent-1111111']);
+
+  const config = join(ctx.directory, 'custom-atc.json');
+
+  const imp = buildStubImp({
+    images: Array.from({ length: 5 }, (_unused, index) => ({
+      name: `agent-${String(index + 1).repeat(7)}`,
+      digest: `imp-build-${index + 1}`,
+      isPinned: true,
+      createdAt: `2026-11-0${index + 1}T00:00:00Z`,
+    })),
+  });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  let pins = 0;
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    targetConfigs: [config],
+    run: async (argv, options) => {
+      if (argv.join(' ') === 'impz image pin agent-2222222') {
+        pins += 1;
+
+        if (pins <= 1) {
+          throw new Error('pin runner rejected');
+        }
+      }
+
+      const result = await stub.run(argv, options);
+
+      // a switch writes its config just after the unpin
+      if (argv.join(' ') === 'impz image unpin agent-2222222') {
+        await writeFile(config, JSON.stringify({ targets: { cloud: { image: 'agent-2222222' } } }));
+      }
+
+      return result;
+    },
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect({
+    exitCode,
+    pinned: imp.images.find((image) => image.name === 'agent-2222222')?.isPinned,
+  }).toStrictEqual({
+    exitCode: 0,
+    pinned: true,
+  });
+});
+
 test('it fails the build and names the image when impd keeps refusing the repairing pin', async () => {
   const ctx = await setupTest();
 

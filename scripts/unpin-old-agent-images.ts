@@ -94,6 +94,8 @@ async function unpinImage(
   retention: Readonly<AgentImageRetention>,
   image: string,
 ): Promise<UnpinOutcome> {
+  let unpinned = false;
+
   try {
     // A switch can name the image after the list was read, so the targets are read again before the
     // unpin and after it. A switch that writes its config after the second read pins the image
@@ -114,6 +116,8 @@ async function unpinImage(
       return 'done';
     }
 
+    unpinned = true;
+
     io.printErr(`unpinned ${image}; impd may evict it when it frees disk\n`);
 
     const bootedAfter = await readTargetBoots(io, retention, image);
@@ -122,7 +126,8 @@ async function unpinImage(
   } catch (error) {
     io.printErr(`could not unpin ${image}: ${describe(error)}\n`);
 
-    return 'done';
+    // after the unpin, a failed read leaves unknown whether a target boots the image, so pin it again
+    return unpinned ? await repairPin(io, image) : 'done';
   }
 }
 
@@ -145,15 +150,15 @@ async function repairPin(io: Readonly<ScriptIO>, image: string): Promise<UnpinOu
   for (let attempt = 1; attempt <= repairAttempts; attempt += 1) {
     // a refused pin is tried again before the image is given up as unpinned
     // oxlint-disable-next-line no-await-in-loop
-    const repin = await io.run(buildImpArgv(['image', 'pin', image]));
+    const repin = await tryPin(io, image);
 
-    if (repin.exitCode === 0 && !repin.timedOut) {
+    if (repin.pinned) {
       io.printErr(`pinned ${image} again: a target boots it now\n`);
 
       return 'done';
     }
 
-    lastError = repin.stderr.toString().trim();
+    lastError = repin.error;
   }
 
   io.printErr(
@@ -162,4 +167,20 @@ async function repairPin(io: Readonly<ScriptIO>, image: string): Promise<UnpinOu
   );
 
   return 'stranded';
+}
+
+async function tryPin(
+  io: Readonly<ScriptIO>,
+  image: string,
+): Promise<{ readonly pinned: boolean; readonly error: string }> {
+  try {
+    const repin = await io.run(buildImpArgv(['image', 'pin', image]));
+
+    return {
+      pinned: repin.exitCode === 0 && !repin.timedOut,
+      error: repin.stderr.toString().trim(),
+    };
+  } catch (error) {
+    return { pinned: false, error: describe(error) };
+  }
 }
