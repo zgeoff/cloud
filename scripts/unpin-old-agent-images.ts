@@ -46,7 +46,6 @@ export async function unpinOldAgentImages(
 
   for (const image of stale) {
     // one image's failure leaves the others to unpin
-    // oxlint-disable-next-line no-await-in-loop
     if ((await unpinImage(io, retention, image)) === 'stranded') {
       stranded.push(image);
     }
@@ -127,7 +126,7 @@ async function unpinImage(
     io.printErr(`could not unpin ${image}: ${describe(error)}\n`);
 
     // after the unpin, a failed read leaves unknown whether a target boots the image, so pin it again
-    return unpinned ? await repairPin(io, image) : 'done';
+    return unpinned ? repairPin(io, image) : 'done';
   }
 }
 
@@ -149,7 +148,6 @@ async function repairPin(io: Readonly<ScriptIO>, image: string): Promise<UnpinOu
 
   for (let attempt = 1; attempt <= repairAttempts; attempt += 1) {
     // a refused pin is tried again before the image is given up as unpinned
-    // oxlint-disable-next-line no-await-in-loop
     const repin = await tryPin(io, image);
 
     if (repin.pinned) {

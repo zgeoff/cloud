@@ -38,20 +38,16 @@ async function setupTest() {
     await writeFile(join(repo.seed, 'scripts/check-agent-image.ts'), '');
 
     for (const image of nixImages) {
-      // oxlint-disable-next-line no-await-in-loop
       await writeFile(
         join(repo.seed, 'nixos/hosts/geoffcloud/configuration.nix'),
         `      image = "${image}";\n`,
       );
 
-      // oxlint-disable-next-line no-await-in-loop
       await repo.git(['-C', repo.seed, 'add', '-A']);
-      // oxlint-disable-next-line no-await-in-loop
       await repo.git(['-C', repo.seed, 'commit', '-qm', `set ${image}`]);
 
       // the host runs the first of the images
       if (image === nixImages[0]) {
-        // oxlint-disable-next-line no-await-in-loop
         await repo.git(['-C', repo.seed, 'tag', 'deployed/host']);
       }
     }
