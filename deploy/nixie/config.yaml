@@ -564,6 +564,11 @@ definitions:
   # nixie opens a pull request here for each skill it writes, with the token in the sops file
   export:
     repository: zgeoff/nixie-definitions
+# the memory index at the start of each session lists the gists of the assistant's memories; at
+# nixie's default of 3,000 tokens it folds topics once about 250 items are active, so this budget
+# keeps them open longer, at the cost of more tokens in each session's first prompt
+memory:
+  index_tokens: 8000
 # the SHA-256, in hex, of each API token that nixie answers only read procedures for. The one token
 # is the prod check's, in 1Password vault `nixie`, item `nixie-prod-read-token`.
 api:
