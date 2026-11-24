@@ -1,16 +1,16 @@
 {
   "atc-agent": {
-    "version": "7.25.1",
-    "sum": "a6915ad39976550da471b2d6632a0d105a92b8cc0d7a12444d92902f5762ed57"
+    "version": "7.26.0",
+    "sum": "5def62601baa108371d0febd089db8d38837b1ab9aa8196a29d6390e76784468"
   },
   "atc-daemon": {
-    "version": "7.25.1",
-    "sum": "a6915ad39976550da471b2d6632a0d105a92b8cc0d7a12444d92902f5762ed57"
+    "version": "7.26.0",
+    "sum": "5def62601baa108371d0febd089db8d38837b1ab9aa8196a29d6390e76784468"
   },
   "atc-gateway": {
-    "version": "7.25.1",
-    "sum": "0f7d2c4ffad4aaeb5cc88cf4447bfa31604f4d0dfd1ac4e6a6a3a3c00145858f",
-    "tag": "7.25.1"
+    "version": "7.26.0",
+    "sum": "44b3cb7cfc81c693381f8d70f4eef6784e3df56b167e4cd5bb66044bae67dfb2",
+    "tag": "7.26.0"
   },
   "atc-gateway-image": {
     "version": "7.25.1",
