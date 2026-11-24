@@ -5,14 +5,17 @@ import type { AliasVerdict, ImpAnswer } from './types.ts';
 test.each<readonly [string, ImpAnswer, AliasVerdict]>([
   ['is moved', { exitCode: 0, timedOut: false, stdout: '', stderr: '' }, { kind: 'ok' }],
   [
-    'is an unknown command that exits 2',
+    'is an unknown command that exits 2, which an impd with the feature must not answer',
     {
       exitCode: 2,
       timedOut: false,
       stdout: '',
       stderr: 'impz: unknown command image alias (see impz --help)\n',
     },
-    { kind: 'skip', reason: 'impz does not know image alias' },
+    {
+      kind: 'fail',
+      reason: 'impz image alias exited 2: impz: unknown command image alias (see impz --help)',
+    },
   ],
   [
     'is an unknown command that exits 1',

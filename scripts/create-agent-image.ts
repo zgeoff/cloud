@@ -79,7 +79,6 @@ async function runBuildAndCheck(options: Readonly<CreateAgentImageOptions>, run:
       // The image stays from here on, so an interrupt after this must not remove it.
       dropCleanup();
 
-      // a client that sets `"image": "agent"` gets the newest passing image
       await runAgentImageAliasMove(options, run.image);
 
       // pinned images pile up until the pool fills, so only the newest passing images and the

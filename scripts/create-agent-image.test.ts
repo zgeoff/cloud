@@ -1555,49 +1555,49 @@ test('it moves the agent alias off the previous image, after the pin and before 
   expect(imp.images.find((image) => image.name === 'agent-9999999')?.aliases).toStrictEqual([]);
 });
 
-test.each([
-  ['an impd without the imageAliases feature', { hasImageAliases: false }, false],
-  [
-    'an impz that exits 2 for the unknown command image alias',
-    {
-      aliasAnswer: { exitCode: 2, stderr: 'impz: unknown command image alias (see impz --help)\n' },
-    },
-    true,
-  ],
-])('it warns and passes the build on %s', async (_title, scenario, hasCalledAlias) => {
-  const ctx = await setupTest();
+test.each([['an impd without the imageAliases feature', { hasImageAliases: false }, false]])(
+  'it warns and passes the build on %s',
+  async (_title, scenario, hasCalledAlias) => {
+    const ctx = await setupTest();
 
-  const imp = buildStubImp({ images: [ctx.heldAlias], ...scenario });
+    const imp = buildStubImp({ images: [ctx.heldAlias], ...scenario });
 
-  await ctx.createClone(['agent-1111111']);
+    await ctx.createClone(['agent-1111111']);
 
-  const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
+    const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
 
-  const stub = buildStubRunner(
-    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
-    imp.handler,
-    buildStubCheckAgentImage(0),
-  );
+    const stub = buildStubRunner(
+      buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+      imp.handler,
+      buildStubCheckAgentImage(0),
+    );
 
-  const exitCode = await createAgentImage({
-    args: [],
-    cwd: ctx.clone,
-    run: stub.run,
-    printOut: ctx.printOut,
-    printErr: ctx.printErr,
-    registerCleanup: () => () => {},
-  });
+    const exitCode = await createAgentImage({
+      args: [],
+      cwd: ctx.clone,
+      run: stub.run,
+      printOut: ctx.printOut,
+      printErr: ctx.printErr,
+      registerCleanup: () => () => {},
+    });
 
-  const aliasCalls = stub.calls.filter((call) => call.argv.slice(1, 3).join(' ') === 'image alias');
+    const aliasCalls = stub.calls.filter(
+      (call) => call.argv.slice(1, 3).join(' ') === 'image alias',
+    );
 
-  expect(exitCode).toBe(0);
-  expect(aliasCalls.length > 0).toBe(hasCalledAlias);
-  expect(ctx.err.join('')).toContain('warning: ');
-  expect(ctx.err.join('')).toContain(`does not move to agent-${short}`);
-  expect(ctx.out).toStrictEqual([`agent-${short} imp-build-stub-agent-${short} check passed\n`]);
-  expect(imp.images.find((image) => image.aliases?.includes('agent'))?.name).toBe('agent-9999999');
-  expect(imp.images.find((image) => image.name === `agent-${short}`)?.isPinned).toBe(true);
-});
+    expect(exitCode).toBe(0);
+    expect(aliasCalls.length > 0).toBe(hasCalledAlias);
+    expect(ctx.err.join('')).toContain('warning: ');
+    expect(ctx.err.join('')).toContain(`does not move to agent-${short}`);
+    expect(ctx.out).toStrictEqual([`agent-${short} imp-build-stub-agent-${short} check passed\n`]);
+
+    expect(imp.images.find((image) => image.aliases?.includes('agent'))?.name).toBe(
+      'agent-9999999',
+    );
+
+    expect(imp.images.find((image) => image.name === `agent-${short}`)?.isPinned).toBe(true);
+  },
+);
 
 test.each([
   [
@@ -1605,6 +1605,12 @@ test.each([
     { aliasAnswer: { exitCode: 1, stderr: 'impz: CONFLICT: alias is reserved\n' } },
   ],
   ['an image alias that times out', { aliasAnswer: { exitCode: 143, timedOut: true } }],
+  [
+    'an impd with the feature whose impz exits 2 for the unknown command image alias',
+    {
+      aliasAnswer: { exitCode: 2, stderr: 'impz: unknown command image alias (see impz --help)\n' },
+    },
+  ],
   [
     'an image alias that times out with unknown command on stderr',
     {

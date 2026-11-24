@@ -1,10 +1,7 @@
 import type { AliasVerdict, ImpAnswer } from './types.ts';
 
-// impz exits 2 for a usage error, such as a command it does not know
-const impUsageExitCode = 2;
-
-// Reads the answer of `impz image alias`. Only an impz that exits with its usage error for an
-// unknown command skips the move: a timeout or any other failure fails it.
+// Reads the answer of `impz image alias`. It runs only on an impd that reports the imageAliases
+// feature, so every failure fails the move, an unknown command included.
 export function pickAliasVerdictForMove(move: Readonly<ImpAnswer>): AliasVerdict {
   if (move.timedOut) {
     return { kind: 'fail', reason: 'impz image alias timed out' };
@@ -14,11 +11,8 @@ export function pickAliasVerdictForMove(move: Readonly<ImpAnswer>): AliasVerdict
     return { kind: 'ok' };
   }
 
-  const stderr = move.stderr.trim();
-
-  if (move.exitCode === impUsageExitCode && /unknown command/iu.test(stderr)) {
-    return { kind: 'skip', reason: 'impz does not know image alias' };
-  }
-
-  return { kind: 'fail', reason: `impz image alias exited ${move.exitCode}: ${stderr}` };
+  return {
+    kind: 'fail',
+    reason: `impz image alias exited ${move.exitCode}: ${move.stderr.trim()}`,
+  };
 }

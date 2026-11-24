@@ -411,8 +411,10 @@ entry.
 4. Check that `impz image ls` shows `agent` on the new image. A `cloud` target set to `agent` boots
    it from the next spawn.
 5. Keep the image `agent` named before, for a rollback. The next build keeps the newest two passing
-   images, so the previous image stays pinned until two newer ones exist. Remove an older one with
-   `impz image rm agent-<short sha>`; imp refuses to remove an image that an imp uses.
+   images, so the previous image stays pinned until two newer ones exist. If a build passed its
+   check but failed to move the alias, the previous alias target counts as one of the older images
+   and a later build can unpin it: read its name from the PR record before then. Remove an older one
+   with `impz image rm agent-<short sha>`; imp refuses to remove an image that an imp uses.
 
 ## Roll back
 

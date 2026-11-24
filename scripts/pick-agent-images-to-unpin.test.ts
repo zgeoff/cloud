@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { pickAgentImagesToUnpin } from './pick-agent-images-to-unpin.ts';
+import { pickAgentImagesToUnpin, resolveTargetImages } from './pick-agent-images-to-unpin.ts';
 
 test.each([
   [
@@ -179,20 +179,6 @@ test.each([
     },
     ['agent-aaaaaaa', 'agent-bbbbbbb'],
   ],
-  [
-    'unpins the older images when a target names the agent alias and no image holds it',
-    {
-      images: [
-        { name: 'agent-aaaaaaa', createdAt: '2026-11-01T00:00:00Z', pinned: true },
-        { name: 'agent-ccccccc', createdAt: '2026-11-03T00:00:00Z', pinned: true },
-        { name: 'agent-ddddddd', createdAt: '2026-11-04T00:00:00Z', pinned: true },
-      ],
-      newImage: 'agent-ddddddd',
-      targetImages: ['agent'],
-      switchOnlyImages: [],
-    },
-    ['agent-aaaaaaa'],
-  ],
 ])('it %s', (_title, pool, expected) => {
   expect(pickAgentImagesToUnpin(pool)).toStrictEqual(expected);
 });
@@ -206,4 +192,22 @@ test('it unpins nothing from a list that is not an array', () => {
   });
 
   expect(unpin).toStrictEqual([]);
+});
+
+// The retention re-check before each unpin reads only the targets, so a target set to the agent
+// alias is what stops an unpin of the image the alias names.
+test.each([
+  [
+    'a target set to the agent alias boots the image that holds it',
+    ['agent'],
+    ['agent', 'agent-aaaaaaa'],
+  ],
+  ['no target set to the agent alias boots nothing through it', [], []],
+])('it resolves that %s', (_title, targets, expected) => {
+  const images = [
+    { name: 'agent-aaaaaaa', createdAt: '2026-11-01T00:00:00Z', pinned: true, aliases: ['agent'] },
+    { name: 'agent-bbbbbbb', createdAt: '2026-11-02T00:00:00Z', pinned: true },
+  ];
+
+  expect(resolveTargetImages(images, targets)).toStrictEqual(expected);
 });
