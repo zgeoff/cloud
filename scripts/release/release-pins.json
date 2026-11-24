@@ -30,19 +30,19 @@
     "digest": "sha256:3c5867cf1ae265da3a0564478a2cd5c24e0bdee1f95633f441d62f06e4ab9149"
   },
   "nixie": {
-    "version": "0.109.0",
-    "digest": "sha256:1cf52bc98a6c21e7944ff56103067e9aeaec3abd78005cd91b42607c0236152c"
+    "version": "0.110.0",
+    "digest": "sha256:f2106eecfd1cb68fa423b6f1c6912a720910cae9d365ecaf9373e707c41e871b"
   },
   "nixie-web": {
-    "version": "0.109.0",
-    "digest": "sha256:3a9914ed7ce797bcbcd667ed589560e43b49cf915de96f90c05e76e2727f2b6f"
+    "version": "0.110.0",
+    "digest": "sha256:b67acde718e12b71988bf68812e12c1f253aa89f91634f49688692e1d4576738"
   },
   "nixie-backup": {
-    "version": "0.109.0",
-    "digest": "sha256:8811315836b305baac0977c9706a3cf84e9ff245a57b078e24d6256a74527438"
+    "version": "0.110.0",
+    "digest": "sha256:47e8a37a961f9909e87c782e52e594f338421da0387a0f1d0ebfa2a85917a3c7"
   },
   "nixie-contract": {
-    "version": "0.109.0"
+    "version": "0.110.0"
   },
   "pepys-host": {
     "version": "0.4.5",
