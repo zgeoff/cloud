@@ -309,6 +309,31 @@ let
       '';
     }
     {
+      title = "it leaves the agent alias alone on a pinned image that only a switch pinned";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container/usr/local/bin home/.local/state/cloud
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        jq -n --arg name "$image" \
+          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true, aliases: []}]' > impd/images.json
+        jq -n --arg name "$image" '{configs: [], switchOnlyImages: [$name]}' > home/.local/state/cloud/agent-image-retention.json
+        printf 'imp_fixture_build_token' > credentials/imp-token
+
+        run_build
+
+        assert_equal "$status" 0
+        diff -u - stdout <<EOF
+        agent-image-build: impd holds $image, built from $pin; nothing to build
+        EOF
+        # no move and no build
+        assert [ ! -e build/calls ]
+        assert [ ! -L build/calls ]
+      '';
+    }
+    {
       title = "it records a failed move of the agent alias like a failed build, and names the file to remove";
       script = ''
         ${setupTest}

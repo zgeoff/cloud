@@ -189,8 +189,9 @@ deploys, the host's timer moves the alias on its next run: when impd holds the n
 pinned but `agent` is not on it, the timer runs
 `bun scripts/promote-agent-image.ts agent-<short sha>` and prints
 `agent-image-build: agent-<short sha> alias moved`. While impd still lacks aliases, each run prints
-the warning and `alias skipped` instead. The timer leaves an image that is not pinned alone, because
-only a passed check pins it. A failed move records the commit in
+the warning and `alias skipped` instead. The timer leaves an image alone that is not pinned, or that
+only a switch pinned (one listed in `switchOnlyImages` of the retention state), because only a
+passed check makes an image take the alias. A failed move records the commit in
 `/var/lib/agent-image-build/failed/<sha>` like a failed build, so read the journal, fix the cause,
 and remove that file to try again.
 

@@ -71,14 +71,23 @@ until images=$("$PODMAN" exec -e HOME=/root imp-host impz image ls --json 2> "$e
   try=$((try + 1))
   "$pause" 5
 done
+# the images that switch-agent-image pinned with no passing check: a pin does not show a check for
+# them. A file that cannot be read counts every pinned image as one of them.
+retention="$HOME/.local/state/cloud/agent-image-retention.json"
+if [ ! -e "$retention" ]; then
+  switch_only='[]'
+elif ! switch_only=$(jq -c '[.switchOnlyImages[]? | strings]' "$retention" 2> /dev/null); then
+  switch_only='null'
+fi
 # absent: no such image; aliased: it holds the agent alias; unaliased: it passed its check, which
 # pins it, and lacks the alias, as when its build ran on an impd without image aliases; unchecked:
-# it is not pinned
-state=$(jq -r --arg name "$image" '
+# it is not pinned, or only a switch pinned it
+state=$(jq -r --arg name "$image" --argjson switchOnly "$switch_only" '
   [.[] | select(.name == $name)] |
   if length == 0 then "absent"
   elif ((.[0].aliases // []) | index("agent")) != null then "aliased"
-  elif .[0].pinned == true then "unaliased"
+  elif .[0].pinned == true and $switchOnly != null and (($switchOnly | index($name)) == null)
+  then "unaliased"
   else "unchecked" end' <<< "$images")
 if [ "$state" = aliased ] || [ "$state" = unchecked ]; then
   echo "agent-image-build: impd holds $image, built from $sha; nothing to build"
