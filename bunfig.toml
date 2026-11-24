@@ -21,7 +21,6 @@ minimumReleaseAge = 604800
 # boxxy image compiles the server from them; @atcx/contract and @pepys/kit are
 # the atc and pepys contracts those packages are built against, and @wringer/core
 # the verify library that @boxxy/verifier-wringer wraps.
-# @noslop/cli 0.4.30 (published 2026-11-17) ages past the gate ~2026-11-24 — remove then (audit-fix)
 minimumReleaseAgeExcludes = [
   "@atcx/contract",
   "@boxxy/auth-oauth",
@@ -46,7 +45,6 @@ minimumReleaseAgeExcludes = [
   "@heynixie/contract",
   "@impz/client",
   "@impz/testing",
-  "@noslop/cli",
   "@pepys/kit",
   "@wringer/core",
   "@zgeoff/agent-hooks",
