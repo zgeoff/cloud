@@ -1551,7 +1551,11 @@ test('it moves the agent alias off the previous image, after the pin and before 
 
   expect(exitCode).toBe(0);
   expect(words.indexOf('alias')).toBeGreaterThan(words.indexOf('pin'));
-  expect(imp.images.find((image) => image.aliases?.includes('agent'))?.name).toBe(`agent-${short}`);
+
+  expect(imp.images.find((image) => image.aliases?.includes('agent') === true)?.name).toBe(
+    `agent-${short}`,
+  );
+
   expect(imp.images.find((image) => image.name === 'agent-9999999')?.aliases).toStrictEqual([]);
 });
 
@@ -1591,7 +1595,7 @@ test.each([['an impd without the imageAliases feature', { hasImageAliases: false
     expect(ctx.err.join('')).toContain(`does not move to agent-${short}`);
     expect(ctx.out).toStrictEqual([`agent-${short} imp-build-stub-agent-${short} check passed\n`]);
 
-    expect(imp.images.find((image) => image.aliases?.includes('agent'))?.name).toBe(
+    expect(imp.images.find((image) => image.aliases?.includes('agent') === true)?.name).toBe(
       'agent-9999999',
     );
 
@@ -1661,7 +1665,10 @@ test.each([
   expect(exitCode).toBe(1);
   expect(ctx.err.join('')).toContain(`could not move the agent alias to agent-${short}`);
   expect(imp.images.find((image) => image.name === `agent-${short}`)?.isPinned).toBe(true);
-  expect(imp.images.find((image) => image.aliases?.includes('agent'))?.name).toBe('agent-9999999');
+
+  expect(imp.images.find((image) => image.aliases?.includes('agent') === true)?.name).toBe(
+    'agent-9999999',
+  );
 });
 
 test('it keeps the alias target and the previous passing image pinned when a target boots agent', async () => {
