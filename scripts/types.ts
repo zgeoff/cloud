@@ -21,3 +21,9 @@ export type AliasVerdict =
   | { readonly kind: 'ok' }
   | { readonly kind: 'skip'; readonly reason: string }
   | { readonly kind: 'fail'; readonly reason: string };
+
+// what to print about the alias move, and how it came out
+export interface AliasMoveReport {
+  readonly outcome: 'moved' | 'skipped' | 'failed';
+  readonly message: string;
+}

@@ -1,4 +1,4 @@
-import { match } from 'ts-pattern';
+import { buildAliasMoveReport } from './build-alias-move-report.ts';
 import { agentImageAlias } from './constants.ts';
 import { ExitError } from './exit-error.ts';
 import { buildImpArgv } from './imp-cli.ts';
@@ -19,12 +19,12 @@ export async function runAgentImageAliasMove(
   const infoVerdict = pickAliasVerdictForInfo(info);
 
   if (infoVerdict.kind !== 'ok') {
-    return finish(io, image, infoVerdict);
+    return reportMove(io, image, infoVerdict);
   }
 
   const move = await runImp(io, ['image', 'alias', agentImageAlias, image]);
 
-  return finish(io, image, pickAliasVerdictForMove(move));
+  return reportMove(io, image, pickAliasVerdictForMove(move));
 }
 
 async function runImp(io: Readonly<ScriptIO>, args: readonly string[]): Promise<ImpAnswer> {
@@ -38,26 +38,18 @@ async function runImp(io: Readonly<ScriptIO>, args: readonly string[]): Promise<
   };
 }
 
-function finish(io: Readonly<ScriptIO>, image: string, verdict: AliasVerdict): 'moved' | 'skipped' {
-  return match(verdict)
-    .with({ kind: 'ok' }, () => {
-      io.printErr(`moved the ${agentImageAlias} alias to ${image}\n`);
+function reportMove(
+  io: Readonly<ScriptIO>,
+  image: string,
+  verdict: Readonly<AliasVerdict>,
+): 'moved' | 'skipped' {
+  const report = buildAliasMoveReport(verdict, image);
 
-      return 'moved' as const;
-    })
-    .with({ kind: 'skip' }, (step) => {
-      io.printErr(
-        `warning: ${step.reason}, so the ${agentImageAlias} alias stays where it was and does not move ` +
-          `to ${image}\n`,
-      );
+  if (report.outcome === 'failed') {
+    throw new ExitError(1, report.message);
+  }
 
-      return 'skipped' as const;
-    })
-    .with({ kind: 'fail' }, (step) => {
-      throw new ExitError(
-        1,
-        `could not move the ${agentImageAlias} alias to ${image}; the image stays pinned: ${step.reason}`,
-      );
-    })
-    .exhaustive();
+  io.printErr(report.message);
+
+  return report.outcome;
 }

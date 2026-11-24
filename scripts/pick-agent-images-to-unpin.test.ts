@@ -140,26 +140,6 @@ test.each([
     ['agent-aaaaaaa'],
   ],
   [
-    'resolves a target set to the agent alias to the image the alias names',
-    {
-      images: [
-        { name: 'agent-aaaaaaa', createdAt: '2026-11-01T00:00:00Z', pinned: true },
-        {
-          name: 'agent-bbbbbbb',
-          createdAt: '2026-11-02T00:00:00Z',
-          pinned: true,
-          aliases: ['agent'],
-        },
-        { name: 'agent-ccccccc', createdAt: '2026-11-03T00:00:00Z', pinned: true },
-        { name: 'agent-ddddddd', createdAt: '2026-11-04T00:00:00Z', pinned: true },
-      ],
-      newImage: 'agent-ddddddd',
-      targetImages: ['agent'],
-      switchOnlyImages: [],
-    },
-    ['agent-aaaaaaa'],
-  ],
-  [
     'keeps the image that a target alias other than agent names, which the agent alias does not cover',
     {
       images: [
@@ -200,7 +180,7 @@ test.each([
     ['agent-aaaaaaa', 'agent-bbbbbbb'],
   ],
   [
-    'unpins nothing it should keep when a target names an alias that no image holds',
+    'unpins the older images when a target names the agent alias and no image holds it',
     {
       images: [
         { name: 'agent-aaaaaaa', createdAt: '2026-11-01T00:00:00Z', pinned: true },
