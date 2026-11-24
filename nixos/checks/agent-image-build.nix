@@ -222,7 +222,7 @@ let
         echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
         git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
         jq -n --arg name "agent-$(git -C origin rev-parse --short HEAD)" \
-          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true}]' > impd/images.json
+          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true, aliases: ["agent"]}]' > impd/images.json
         printf '#!/bin/sh\n' > impd/container/usr/local/bin/impz
         echo c0ffee01 > impd/container-ids
         printf 'imp_fixture_build_token' > credentials/imp-token
@@ -258,7 +258,7 @@ let
         git -C origin add -A && git -C origin commit -q -m "add a note"
         image="agent-$(git -C origin rev-parse --short "$pin")"
         jq -n --arg name "$image" \
-          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true}]' > impd/images.json
+          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true, aliases: ["agent"]}]' > impd/images.json
         printf 'imp_fixture_build_token' > credentials/imp-token
 
         run_build
@@ -275,6 +275,110 @@ let
         # the copied CLI
         assert [ ! -e state/bin ]
         assert [ ! -L state/bin ]
+      '';
+    }
+    {
+      title = "it moves the agent alias, without a build, when impd holds the pinned image of the newest commit without the alias";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container/usr/local/bin
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        jq -n --arg name "$image" \
+          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true, aliases: []}]' > impd/images.json
+        printf '#!/bin/sh\n' > impd/container/usr/local/bin/impz
+        echo c0ffee01 > impd/container-ids
+        printf 'imp_fixture_build_token' > credentials/imp-token
+        echo "$image alias moved" > build/stdout
+
+        run_build
+
+        assert_equal "$status" 0
+        diff -u - stdout <<EOF
+        agent-image-build: moving the agent alias to $image
+        agent-image-build: $image alias moved
+        EOF
+        diff -u /dev/null stderr
+        # the call
+        assert_equal "$(jq -c .argv build/calls)" "[\"scripts/promote-agent-image.ts\",\"$image\"]"
+        # the failed builds
+        assert [ ! -e state/failed ]
+        assert [ ! -L state/failed ]
+      '';
+    }
+    {
+      title = "it leaves the agent alias alone on a pinned image that only a switch pinned";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container/usr/local/bin home/.local/state/cloud
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        jq -n --arg name "$image" \
+          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true, aliases: []}]' > impd/images.json
+        jq -n --arg name "$image" '{configs: [], switchOnlyImages: [$name]}' > home/.local/state/cloud/agent-image-retention.json
+        printf 'imp_fixture_build_token' > credentials/imp-token
+
+        run_build
+
+        assert_equal "$status" 0
+        diff -u - stdout <<EOF
+        agent-image-build: impd holds $image, built from $pin; nothing to build
+        EOF
+        # no move and no build
+        assert [ ! -e build/calls ]
+        assert [ ! -L build/calls ]
+      '';
+    }
+    {
+      title = "it records a failed move of the agent alias like a failed build, and names the file to remove";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container/usr/local/bin
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        jq -n --arg name "$image" \
+          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true}]' > impd/images.json
+        printf '#!/bin/sh\n' > impd/container/usr/local/bin/impz
+        echo c0ffee01 > impd/container-ids
+        printf 'imp_fixture_build_token' > credentials/imp-token
+        echo 1 > build/status
+
+        run_build
+
+        assert_equal "$status" 1
+        # the script's stdout
+        assert_equal "$(cat stdout)" "agent-image-build: moving the agent alias to $image"
+        # the script's stderr
+        assert_equal "$(cat stderr)" "agent-image-build: the move of the agent alias to $image from $pin failed with status 1: ; remove $PWD/state/failed/$pin to try it again"
+        assert [ -f "state/failed/$pin" ]
+      '';
+    }
+    {
+      title = "it builds and moves nothing when impd holds the image of the newest commit unpinned";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        jq -n --arg name "$image" \
+          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: false}]' > impd/images.json
+        printf 'imp_fixture_build_token' > credentials/imp-token
+
+        run_build
+
+        assert_equal "$status" 0
+        assert_equal "$(cat stdout)" "agent-image-build: impd holds $image, built from $pin; nothing to build"
+        # the build calls
+        assert [ ! -e build/calls ]
+        assert [ ! -L build/calls ]
       '';
     }
     {
@@ -513,7 +617,7 @@ let
         pin=$(git -C origin rev-parse HEAD)
         image="agent-$(git -C origin rev-parse --short "$pin")"
         jq -n --arg name "$image" \
-          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true}]' > impd/images.json
+          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true, aliases: ["agent"]}]' > impd/images.json
         echo 1 > impd/unreachable
         echo 1 > impd/unauthorized
         printf 'imp_fixture_build_token' > credentials/imp-token

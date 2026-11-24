@@ -20,7 +20,7 @@ test('it lists each image with the name, ref and digest the scripts read', async
   const result = await stub.run(['impz', 'image', 'ls', '--json']);
 
   expect(result.stdout.toString()).toBe(
-    '[{"name":"agent-abc1234","ref":"imp/agent-abc1234:latest","digest":"imp-build-2","createdAt":"2026-01-01T00:00:00.000Z","pinned":false}]\n',
+    '[{"name":"agent-abc1234","ref":"imp/agent-abc1234:latest","digest":"imp-build-2","createdAt":"2026-01-01T00:00:00.000Z","pinned":false,"aliases":[]}]\n',
   );
 });
 
@@ -317,4 +317,50 @@ test('it unpins a pinned image and lists it as unpinned', async () => {
   expect(imp.images).toStrictEqual([
     { name: 'agent-abc1234', digest: 'imp-build-2', isPinned: false },
   ]);
+});
+
+test('it moves an alias to one image, and lists it on that image only', async () => {
+  const imp = buildStubImp({
+    images: [
+      { name: 'agent-aaa1111', digest: 'imp-build-1', aliases: ['agent'] },
+      { name: 'agent-bbb2222', digest: 'imp-build-2' },
+    ],
+  });
+
+  const stub = buildStubRunner(imp.handler);
+
+  const moved = await stub.run(['impz', 'image', 'alias', 'agent', 'agent-bbb2222']);
+  const missing = await stub.run(['impz', 'image', 'alias', 'agent', 'agent-absent']);
+
+  expect(moved.exitCode).toBe(0);
+  expect(missing.exitCode).toBe(1);
+  expect(imp.images.map((image) => image.aliases)).toStrictEqual([[], ['agent']]);
+});
+
+test('it reports the imageAliases feature in info', async () => {
+  const stub = buildStubRunner(buildStubImp({ images: [], hasImageAliases: false }).handler);
+
+  const result = await stub.run(['impz', 'info', '--json']);
+
+  expect(result.stdout.toString()).toBe('{"features":{"imageAliases":false}}\n');
+});
+
+test('it answers info and image alias with the scenario answers in place of its own', async () => {
+  const stub = buildStubRunner(
+    buildStubImp({
+      images: [{ name: 'agent-aaa1111', digest: 'imp-build-1' }],
+      infoAnswer: { exitCode: 2, stderr: 'impz: unknown command inspect\n' },
+      aliasAnswer: { exitCode: 143, timedOut: true },
+    }).handler,
+  );
+
+  const info = await stub.run(['impz', 'info', '--json']);
+  const alias = await stub.run(['impz', 'image', 'alias', 'agent', 'agent-aaa1111']);
+
+  expect([info.exitCode, info.stderr.toString()]).toStrictEqual([
+    2,
+    'impz: unknown command inspect\n',
+  ]);
+
+  expect([alias.exitCode, alias.timedOut]).toStrictEqual([143, true]);
 });

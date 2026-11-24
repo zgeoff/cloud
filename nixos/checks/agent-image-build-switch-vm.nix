@@ -73,7 +73,7 @@ pkgs.testers.runNixOSTest {
     pin = machine.succeed("git -C /var/lib/fixture-origin rev-parse HEAD").strip()
     image = "agent-" + machine.succeed("git -C /var/lib/fixture-origin rev-parse --short HEAD").strip()
     machine.succeed(
-        f"jq -n --arg name {image} '[{{id: \"img-1\", name: $name, ref: \"\", digest: \"imp-build-aa\", source: \"build\", createdAt: \"2026-01-01T00:00:00.000Z\", sizeBytes: 0, pinned: true}}]' > ${impdState}/images.json"
+        f"jq -n --arg name {image} '[{{id: \"img-1\", name: $name, ref: \"\", digest: \"imp-build-aa\", source: \"build\", createdAt: \"2026-01-01T00:00:00.000Z\", sizeBytes: 0, pinned: true, aliases: [\"agent\"]}}]' > ${impdState}/images.json"
     )
 
 

@@ -9,6 +9,8 @@ interface StubImpImage {
   readonly isPinned?: boolean;
 
   readonly createdAt?: string;
+
+  readonly aliases?: readonly string[];
 }
 
 interface StubImpInstance {
@@ -23,6 +25,15 @@ export interface StubImpScenario {
   readonly buildError?: string;
 
   readonly buildTimesOut?: boolean;
+
+  // whether impd reports the imageAliases feature; true when omitted
+  readonly hasImageAliases?: boolean;
+
+  // the answer of `info --json` in place of the feature list
+  readonly infoAnswer?: StubAnswer;
+
+  // the answer of `image alias` in place of a move; impz exits 2 for a command it does not know
+  readonly aliasAnswer?: StubAnswer;
 }
 
 export interface StubImp {
@@ -67,10 +78,18 @@ const impCommands: readonly (readonly [string, ImpCommand])[] = [
   ['image build * --name *', (state, args) => runBuild(state, args[2] ?? '', args[4] ?? '')],
   ['image rm *', (state, args) => removeImage(state, args[2] ?? '')],
   ['image pin *', (state, args) => pinImage(state, args[2] ?? '', true)],
+  ['image alias * *', (state, args) => aliasImage(state, args[2] ?? '', args[3] ?? '')],
   ['image unpin *', (state, args) => pinImage(state, args[2] ?? '', false)],
   [
     'new * --image * --memory * --max-memory *',
     (state, args) => createImp(state, args[1] ?? '', args[3] ?? ''),
+  ],
+  [
+    'info --json',
+    (state) =>
+      state.scenario.infoAnswer ?? {
+        stdout: `${JSON.stringify({ features: { imageAliases: state.scenario.hasImageAliases ?? true } })}\n`,
+      },
   ],
   ['ls --json', (state) => ({ stdout: `${JSON.stringify(state.imps)}\n` })],
   ['rm *', (state, args) => removeImp(state, args[1] ?? '')],
@@ -97,6 +116,7 @@ function buildImageList(state: StubImpState): StubAnswer {
     // an image without a date is newer than the ones before it in the list
     createdAt: image.createdAt ?? new Date(Date.UTC(2026, 0, 1) + index * 1000).toISOString(),
     pinned: image.isPinned === true,
+    aliases: image.aliases ?? [],
   }));
 
   return { stdout: `${JSON.stringify(images)}\n` };
@@ -149,6 +169,28 @@ function pinImage(state: StubImpState, name: string, isPinned: boolean): StubAns
   }
 
   state.images[index] = { ...image, isPinned };
+
+  return {};
+}
+
+function aliasImage(state: StubImpState, alias: string, name: string): StubAnswer {
+  if (state.scenario.aliasAnswer !== undefined) {
+    return state.scenario.aliasAnswer;
+  }
+
+  if (!state.images.some((image) => image.name === name)) {
+    return { exitCode: 1, stderr: `impz: NOT_FOUND: image ${name} not found\n` };
+  }
+
+  // an alias names one image, so it leaves the image that held it
+  state.images.forEach((image, index) => {
+    const others = (image.aliases ?? []).filter((held) => held !== alias);
+
+    state.images[index] = {
+      ...image,
+      aliases: image.name === name ? [...others, alias] : others,
+    };
+  });
 
   return {};
 }

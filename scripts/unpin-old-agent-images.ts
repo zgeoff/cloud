@@ -1,7 +1,7 @@
 import { readAgentImageRetentionState } from './agent-image-retention-state.ts';
 import { ExitError } from './exit-error.ts';
 import { buildImpArgv, loadImpJSON } from './imp-cli.ts';
-import { pickAgentImagesToUnpin } from './pick-agent-images-to-unpin.ts';
+import { pickAgentImagesToUnpin, resolveTargetImages } from './pick-agent-images-to-unpin.ts';
 import { pullDeployedHostTag } from './pull-deployed-host-tag.ts';
 import { readTargetAgentImages } from './read-target-agent-images.ts';
 import type { ScriptIO } from './run-or-exit.ts';
@@ -137,7 +137,10 @@ async function readTargetBoots(
 ): Promise<boolean> {
   const targets = await readTargets(io, retention);
 
-  return targets.images.includes(image);
+  // an alias moves, so the image list is read again to resolve it
+  const images = await loadImpJSON(io, ['image', 'ls']);
+
+  return resolveTargetImages(images, targets.images).includes(image);
 }
 
 // how often the pin that repairs an overtaken unpin is tried

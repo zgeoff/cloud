@@ -11,7 +11,8 @@
 #   - status, optional: the exit status of the call, 0 without the file.
 #
 # The build script takes [--keep] and one commit on main (scripts/parse-build-agent-image-args.ts);
-# the stand-in answers the form without --keep only. Any other call fails with
+# the stand-in answers the form without --keep only. It answers `bun scripts/promote-agent-image.ts
+# <image>` the same way, for the move of the agent alias. Any other call fails with
 # "unexpected: <argv>" and status 97. Without $BUILD_STATE it exits 2.
 # nixos/checks/test-utils-check.nix tests it.
 { pkgs }:
@@ -27,7 +28,8 @@ pkgs.lib.getExe (
         echo "bun-answering-build-agent-image: set BUILD_STATE to the directory that holds the build's answer" >&2
         exit 2
       fi
-      if [ "$#" -ne 2 ] || [ "$1" != scripts/build-agent-image.ts ] || [ "''${2#-}" != "$2" ]; then
+      if [ "$#" -ne 2 ] || { [ "$1" != scripts/build-agent-image.ts ] && [ "$1" != scripts/promote-agent-image.ts ]; } ||
+        [ "''${2#-}" != "$2" ]; then
         echo "unexpected: $*" >&2
         exit 97
       fi

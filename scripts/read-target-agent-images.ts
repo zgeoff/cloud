@@ -5,9 +5,9 @@ import { findJSONField } from './find-json-field.ts';
 import type { ScriptIO } from './run-or-exit.ts';
 import type { TargetImageFiles } from './types.ts';
 
-// Reads the agent images that atc targets boot: the config files, and the NixOS file in the clone
-// and at the commit the host runs. A config file that does not exist names none. Anything else that
-// cannot be read throws, so the caller keeps every image rather than guess.
+// Reads the images or aliases, such as `agent`, that atc targets boot: the config files, and the
+// NixOS file in the clone and at the host's commit. A missing config file names none. Any other
+// read failure throws, so the caller keeps every image rather than guess.
 export async function readTargetAgentImages(
   io: Readonly<Pick<ScriptIO, 'run'>>,
   files: Readonly<TargetImageFiles>,
@@ -67,7 +67,7 @@ function getConfigImages(text: string): string[] {
   });
 }
 
-const nixImagePattern = /^\s*image\s*=\s*"(?<image>agent-[^"]+)"\s*;/gmu;
+const nixImagePattern = /^\s*image\s*=\s*"(?<image>agent(?:-[^"]+)?)"\s*;/gmu;
 
 function getNixImages(text: string): string[] {
   return [...text.matchAll(nixImagePattern)].map((match) => match.groups?.['image'] ?? '');

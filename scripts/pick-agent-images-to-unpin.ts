@@ -1,3 +1,4 @@
+import { agentImageAlias } from './constants.ts';
 import { findJSONField } from './find-json-field.ts';
 
 export interface AgentImagePool {
@@ -7,7 +8,7 @@ export interface AgentImagePool {
   // the image that just passed its check
   readonly newImage: string;
 
-  // every image that an atc target boots
+  // every image name or alias that an atc target boots
   readonly targetImages: readonly string[];
 
   // images that only a switch pinned, with no passing check
@@ -34,7 +35,12 @@ export function pickAgentImagesToUnpin(retention: Readonly<AgentImagePool>): str
   const kept = new Set([
     retention.newImage,
     ...passing.slice(0, keptPassingImages - 1).map((record) => record.name),
-    ...retention.targetImages,
+    ...resolveTargetImages(retention.images, retention.targetImages),
+
+    // the image the alias names stays, though a target may not boot it yet
+    ...records
+      .filter((record) => record.aliases.includes(agentImageAlias))
+      .map((record) => record.name),
   ]);
 
   return records
@@ -46,6 +52,21 @@ interface AgentImageRecord {
   readonly name: string;
   readonly createdAt: string;
   readonly pinned: boolean;
+  readonly aliases: readonly string[];
+}
+
+// A target's image is an image name or an alias, and an alias counts as the image it names now.
+// An alias that names no image resolves to nothing, and a name that is no alias stays as it is.
+export function resolveTargetImages(
+  images: unknown,
+  targetImages: readonly string[],
+): readonly string[] {
+  const records = toAgentImageRecords(images);
+
+  return targetImages.flatMap((target) => [
+    target,
+    ...records.filter((record) => record.aliases.includes(target)).map((record) => record.name),
+  ]);
 }
 
 function toAgentImageRecords(images: unknown): readonly AgentImageRecord[] {
@@ -65,8 +86,19 @@ function toAgentImageRecords(images: unknown): readonly AgentImageRecord[] {
             name,
             createdAt: typeof createdAt === 'string' ? createdAt : '',
             pinned: findJSONField(record, 'pinned') === true,
+            aliases: toAliases(findJSONField(record, 'aliases')),
           },
         ]
       : [];
   });
+}
+
+function toAliases(aliases: unknown): readonly string[] {
+  if (!Array.isArray(aliases)) {
+    return [];
+  }
+
+  const list: readonly unknown[] = aliases;
+
+  return list.filter((alias): alias is string => typeof alias === 'string');
 }

@@ -56,11 +56,21 @@ async function setupTest() {
     await repo.git(['clone', '-q', repo.origin, clone]);
   };
 
+  // the image that holds the agent alias before a build
+  const heldAlias = {
+    name: 'agent-9999999',
+    digest: 'imp-build-9',
+    isPinned: true,
+    aliases: ['agent'],
+    createdAt: '2026-10-01T00:00:00Z',
+  };
+
   return {
     directory,
     repo,
     clone,
     createClone,
+    heldAlias,
     out,
     err,
     printOut: (text: string) => {
@@ -130,13 +140,19 @@ test('it builds the head of main from its archive, checks it on a fresh imp, rem
     `building agent-${short} from ${sha}; impz image build shows no progress off a terminal\n` +
       `checking agent-${short} on a fresh imp, agent-check-${short}\n` +
       `agent-check-${short}\n` +
-      '== 0 failed\n',
+      '== 0 failed\n' +
+      `moved the agent alias to agent-${short}\n`,
   );
 
   expect(imp.builtDockerfiles).toStrictEqual(['FROM ghcr.io/zgeoff/imp-base:0.33.0\n']);
 
   expect(imp.images).toStrictEqual([
-    { name: `agent-${short}`, digest: `imp-build-stub-agent-${short}`, isPinned: true },
+    {
+      name: `agent-${short}`,
+      digest: `imp-build-stub-agent-${short}`,
+      isPinned: true,
+      aliases: ['agent'],
+    },
   ]);
 
   expect(imp.imps).toStrictEqual([]);
@@ -160,6 +176,8 @@ test('it builds the head of main from its archive, checks it on a fresh imp, rem
     ['bun', join(source, 'scripts/check-agent-image.ts'), '--imp', `agent-check-${short}`],
     ['impz', 'rm', `agent-check-${short}`],
     ['impz', 'image', 'pin', `agent-${short}`],
+    ['impz', 'info', '--json'],
+    ['impz', 'image', 'alias', 'agent', `agent-${short}`],
     ['impz', 'image', 'ls', '--json'],
   ]);
 
@@ -276,6 +294,7 @@ test('it removes the image and the imp when the check fails', async () => {
 
   expect(imp.images).toStrictEqual([]);
   expect(imp.imps).toStrictEqual([]);
+  expect(impCalls.filter((call) => call.argv.includes('alias'))).toStrictEqual([]);
 
   expect(impCalls.slice(-2).map((call) => call.argv)).toStrictEqual([
     ['impz', 'rm', `agent-check-${short}`],
@@ -1492,4 +1511,210 @@ test('it keeps the image of a target that a switch recorded from another folder 
   ).toStrictEqual(['agent-2222222', 'agent-3333333']);
 
   expect(imp.images.find((image) => image.name === 'agent-1111111')?.isPinned).toBe(true);
+});
+
+test('it moves the agent alias off the previous image, after the pin and before any unpin', async () => {
+  const ctx = await setupTest();
+
+  const imp = buildStubImp({
+    images: [
+      {
+        name: 'agent-9999999',
+        digest: 'imp-build-9',
+        isPinned: true,
+        aliases: ['agent'],
+        createdAt: '2026-10-01T00:00:00Z',
+      },
+    ],
+  });
+
+  await ctx.createClone(['agent-1111111']);
+
+  const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  const words = stub.calls.filter((call) => call.argv[0] === 'impz').map((call) => call.argv[2]);
+
+  expect(exitCode).toBe(0);
+  expect(words.indexOf('alias')).toBeGreaterThan(words.indexOf('pin'));
+
+  expect(imp.images.find((image) => image.aliases?.includes('agent') === true)?.name).toBe(
+    `agent-${short}`,
+  );
+
+  expect(imp.images.find((image) => image.name === 'agent-9999999')?.aliases).toStrictEqual([]);
+});
+
+test.each([['an impd without the imageAliases feature', { hasImageAliases: false }, false]])(
+  'it warns and passes the build on %s',
+  async (_title, scenario, hasCalledAlias) => {
+    const ctx = await setupTest();
+
+    const imp = buildStubImp({ images: [ctx.heldAlias], ...scenario });
+
+    await ctx.createClone(['agent-1111111']);
+
+    const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
+
+    const stub = buildStubRunner(
+      buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+      imp.handler,
+      buildStubCheckAgentImage(0),
+    );
+
+    const exitCode = await createAgentImage({
+      args: [],
+      cwd: ctx.clone,
+      run: stub.run,
+      printOut: ctx.printOut,
+      printErr: ctx.printErr,
+      registerCleanup: () => () => {},
+    });
+
+    const aliasCalls = stub.calls.filter(
+      (call) => call.argv.slice(1, 3).join(' ') === 'image alias',
+    );
+
+    expect(exitCode).toBe(0);
+    expect(aliasCalls.length > 0).toBe(hasCalledAlias);
+    expect(ctx.err.join('')).toContain('warning: ');
+    expect(ctx.err.join('')).toContain(`does not move to agent-${short}`);
+    expect(ctx.out).toStrictEqual([`agent-${short} imp-build-stub-agent-${short} check passed\n`]);
+
+    expect(imp.images.find((image) => image.aliases?.includes('agent') === true)?.name).toBe(
+      'agent-9999999',
+    );
+
+    expect(imp.images.find((image) => image.name === `agent-${short}`)?.isPinned).toBe(true);
+  },
+);
+
+test.each([
+  [
+    'an image alias that fails',
+    { aliasAnswer: { exitCode: 1, stderr: 'impz: CONFLICT: alias is reserved\n' } },
+  ],
+  ['an image alias that times out', { aliasAnswer: { exitCode: 143, timedOut: true } }],
+  [
+    'an impd with the feature whose impz exits 2 for the unknown command image alias',
+    {
+      aliasAnswer: { exitCode: 2, stderr: 'impz: unknown command image alias (see impz --help)\n' },
+    },
+  ],
+  [
+    'an image alias that times out with unknown command on stderr',
+    {
+      aliasAnswer: {
+        exitCode: 2,
+        timedOut: true,
+        stderr: 'impz: unknown command image alias (see impz --help)\n',
+      },
+    },
+  ],
+  [
+    'an unknown command that exits 1',
+    { aliasAnswer: { exitCode: 1, stderr: 'impz: unknown command image alias\n' } },
+  ],
+  [
+    'an info that is an unknown command',
+    { infoAnswer: { exitCode: 2, stderr: 'impz: unknown command inspect\n' } },
+  ],
+  [
+    'an info that exits 0 with an unknown command message',
+    { infoAnswer: { stderr: 'impz: unknown command inspect\n' } },
+  ],
+  ['an info that times out', { infoAnswer: { exitCode: 143, timedOut: true } }],
+])('it exits 1 and keeps the image pinned on %s', async (_title, scenario) => {
+  const ctx = await setupTest();
+
+  const imp = buildStubImp({ images: [ctx.heldAlias], ...scenario });
+
+  await ctx.createClone(['agent-1111111']);
+
+  const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect(exitCode).toBe(1);
+  expect(ctx.err.join('')).toContain(`could not move the agent alias to agent-${short}`);
+  expect(imp.images.find((image) => image.name === `agent-${short}`)?.isPinned).toBe(true);
+
+  expect(imp.images.find((image) => image.aliases?.includes('agent') === true)?.name).toBe(
+    'agent-9999999',
+  );
+});
+
+test('it keeps the alias target and the previous passing image pinned when a target boots agent', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createClone(['agent-1111111']);
+
+  const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
+
+  await mkdir(join(ctx.directory, 'home/.config/atc'), { recursive: true });
+
+  await writeFile(
+    join(ctx.directory, 'home/.config/atc/config.json'),
+    JSON.stringify({ targets: { cloud: { provider: 'imp', image: 'agent' } } }),
+  );
+
+  // the alias sits on the oldest image, as after a skipped move
+  const images = [1, 2, 3].map((day) => ({
+    name: `agent-${String(day).repeat(7)}`,
+    digest: `imp-build-${day}`,
+    isPinned: true,
+    createdAt: `2026-11-0${day}T00:00:00Z`,
+    aliases: day === 1 ? ['agent'] : [],
+  }));
+
+  const imp = buildStubImp({ images, hasImageAliases: false });
+
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    home: join(ctx.directory, 'home'),
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: () => () => {},
+  });
+
+  expect(exitCode).toBe(0);
+
+  expect(
+    imp.images.filter((image) => image.isPinned === true).map((image) => image.name),
+  ).toStrictEqual(['agent-1111111', 'agent-3333333', `agent-${short}`]);
 });
