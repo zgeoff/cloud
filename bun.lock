@@ -11,7 +11,7 @@
       "devDependencies": {
         "@commitlint/cli": "21.2.4",
         "@faker-js/faker": "10.6.0",
-        "@heynixie/contract": "0.112.0",
+        "@heynixie/contract": "0.113.0",
         "@impz/client": "catalog:",
         "@impz/testing": "catalog:",
         "@mswjs/interceptors": "0.45.12",
@@ -286,7 +286,7 @@
 
     "@hexagon/base64": ["@hexagon/base64@1.1.28", "", {}, "sha512-lhqDEAvWixy3bZ+UOYbPwUbBkwBq5C1LAJ/xPC8Oi+lL54oyakv/npbA0aU2hgCsx/1NUd4IBvV03+aUBWxerw=="],
 
-    "@heynixie/contract": ["@heynixie/contract@0.112.0", "", { "dependencies": { "@orpc/client": "1.16.2", "@orpc/contract": "1.16.2", "@orpc/openapi": "1.16.2", "@orpc/tanstack-query": "1.16.2", "@orpc/zod": "1.16.2", "@tanstack/query-core": "5.107.1", "zod": "4.6.7" } }, "sha512-zIH3DcUMjaAPtMraFke7cyrD9XNBaA8gKCU/RYFDbK1Fj5OR5+dW48BCuO6hbTeNLfnwBy8h+/rsZ+CyTewsYQ=="],
+    "@heynixie/contract": ["@heynixie/contract@0.113.0", "", { "dependencies": { "@orpc/client": "1.16.2", "@orpc/contract": "1.16.2", "@orpc/openapi": "1.16.2", "@orpc/tanstack-query": "1.16.2", "@orpc/zod": "1.16.2", "@tanstack/query-core": "5.108.0", "zod": "4.6.7" } }, "sha512-8Sn8W72zY4X4danQThy02/DCJnZeN553GssbRX7AUgGOLp27COPrRRE5zM+BQh0CHfiYXn6+5L/hqmuMmfCW7Q=="],
 
     "@humanfs/core": ["@humanfs/core@0.19.2", "", { "dependencies": { "@humanfs/types": "^0.15.0" } }, "sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA=="],
 
@@ -700,7 +700,7 @@
 
     "@stylistic/eslint-plugin": ["@stylistic/eslint-plugin@5.10.0", "", { "dependencies": { "@eslint-community/eslint-utils": "^4.9.1", "@typescript-eslint/types": "^8.56.0", "eslint-visitor-keys": "^4.2.1", "espree": "^10.4.0", "estraverse": "^5.3.0", "picomatch": "^4.0.3" }, "peerDependencies": { "eslint": "^9.0.0 || ^10.0.0" } }, "sha512-nPK52ZHvot8Ju/0A4ucSX1dcPV2/1clx0kLcH5wDmrE4naKso7TUC/voUyU1O9OTKTrR6MYip6LP0ogEMQ9jPQ=="],
 
-    "@tanstack/query-core": ["@tanstack/query-core@5.107.1", "", {}, "sha512-PSyAik11oQBEVOiVy5hjZWHmoUqOXqK1WYy4v55mcxozEfKaQgpUMsgnXhWjuESzSht8JfzqMS1m6M/9CpNgvg=="],
+    "@tanstack/query-core": ["@tanstack/query-core@5.108.0", "", {}, "sha512-X9zJUtEV/0D2q9pmGS/Bza8S4bNovSBhZOtdhtu0fzsHwizC6C+Eh/q5CX3MQBchsRMrirWVQmv7Fp4OStzV9g=="],
 
     "@tokenizer/inflate": ["@tokenizer/inflate@0.6.1", "", { "dependencies": { "debug": "^4.4.3", "strtok3": "^10.8.0", "token-types": "^6.2.0" } }, "sha512-EuqSyHdOXN61cc5/rsW6uUn1TJZJGZr56jlkUbsLwVJ6uHgvwQyFkYfOCf+zzPFAYjftPk1WeJnEhpLVvzbm1A=="],
 
