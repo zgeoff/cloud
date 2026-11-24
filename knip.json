@@ -28,6 +28,7 @@
       "entry": [
         "deploy/boxxy/server.ts",
         "scripts/build-agent-image.ts",
+        "scripts/promote-agent-image.ts",
         "scripts/src/test-utils/run-stub-kubectl-proxy.ts"
       ],
       "project": ["deploy/boxxy/**/*.ts", "scripts/**/*.ts", "scripts/e2e/**/*.ts"]
