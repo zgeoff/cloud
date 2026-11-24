@@ -184,8 +184,15 @@ was. When the move fails, the build exits 1 and names it, and the image stays pi
 `impz image ls` shows the alias on the image that holds it.
 
 An impd that lacks image aliases cannot move the alias. The build then prints a warning that starts
-with `warning:`, leaves `agent` where it was and exits 0. Check the host's impd version when you see
-that warning after the release that adds aliases has deployed.
+with `warning:`, leaves `agent` where it was and exits 0. After the release that adds aliases
+deploys, the host's timer moves the alias on its next run: when impd holds the newest build's image
+pinned but `agent` is not on it, the timer runs
+`bun scripts/promote-agent-image.ts agent-<short sha>` and prints
+`agent-image-build: agent-<short sha> alias moved`. While impd still lacks aliases, each run prints
+the warning and `alias skipped` instead. The timer leaves an image that is not pinned alone, because
+only a passed check pins it. A failed move records the commit in
+`/var/lib/agent-image-build/failed/<sha>` like a failed build, so read the journal, fix the cause,
+and remove that file to try again.
 
 Retention keeps the image that `agent` names and the previous passing image pinned. A target whose
 image is `agent` counts as booting the image that `agent` names when the build reads the targets.
@@ -212,6 +219,11 @@ holds no credential goes into `scripts/agent-image-gitleaks.toml` with its reaso
 file or folder.
 
 ## Set the `cloud` target to `agent`
+
+Before you set the target, check that `agent` names an image: `impz image ls` on the host shows
+`agent` on one image. When it shows none, or an older image than the newest build, see
+[The `agent` alias](#the-agent-alias) first, because a target set to `agent` boots nothing while the
+alias is unset.
 
 The `cloud` target lives in `~/.config/atc/config.json` on the machine that runs the atc daemon. Set
 its image to `agent` once:

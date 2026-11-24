@@ -2168,6 +2168,23 @@ let
       '';
     }
     {
+      title = "it buildStubAgentImageBun records the argv of a promotion of an image, and prints its stdout file";
+      script = ''
+        mkdir home tmp build
+        echo 'agent-0123abc alias moved' > build/stdout
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" BUILD_STATE="$PWD/build" \
+          ${stubAgentImageBun} scripts/promote-agent-image.ts agent-0123abc > out 2> err || status=$?
+
+        assert_equal "$status" 0
+        assert_equal "$(cat out)" 'agent-0123abc alias moved'
+        diff -u /dev/null err
+        # the recorded call
+        assert_equal "$(jq -c .argv build/calls)" '["scripts/promote-agent-image.ts","agent-0123abc"]'
+      '';
+    }
+    {
       title = "it buildStubAgentImageBun exits with its status file, and records a null impz when PATH holds none";
       script = ''
         mkdir home tmp build

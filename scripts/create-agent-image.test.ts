@@ -56,11 +56,21 @@ async function setupTest() {
     await repo.git(['clone', '-q', repo.origin, clone]);
   };
 
+  // the image that holds the agent alias before a build
+  const heldAlias = {
+    name: 'agent-9999999',
+    digest: 'imp-build-9',
+    isPinned: true,
+    aliases: ['agent'],
+    createdAt: '2026-10-01T00:00:00Z',
+  };
+
   return {
     directory,
     repo,
     clone,
     createClone,
+    heldAlias,
     out,
     err,
     printOut: (text: string) => {
@@ -1546,15 +1556,18 @@ test('it moves the agent alias off the previous image, after the pin and before 
 });
 
 test.each([
-  ['an impd without the imageAliases feature', { hasImageAliases: false }],
+  ['an impd without the imageAliases feature', { hasImageAliases: false }, false],
   [
-    'an impz that does not know image alias',
-    { aliasError: 'impz: unknown command alias (see impz --help)' },
+    'an impz that exits 2 for the unknown command image alias',
+    {
+      aliasAnswer: { exitCode: 2, stderr: 'impz: unknown command image alias (see impz --help)\n' },
+    },
+    true,
   ],
-])('it warns and passes the build on %s', async (_title, scenario) => {
+])('it warns and passes the build on %s', async (_title, scenario, hasCalledAlias) => {
   const ctx = await setupTest();
 
-  const imp = buildStubImp({ images: [], ...scenario });
+  const imp = buildStubImp({ images: [ctx.heldAlias], ...scenario });
 
   await ctx.createClone(['agent-1111111']);
 
@@ -1575,17 +1588,50 @@ test.each([
     registerCleanup: () => () => {},
   });
 
+  const aliasCalls = stub.calls.filter((call) => call.argv.slice(1, 3).join(' ') === 'image alias');
+
   expect(exitCode).toBe(0);
+  expect(aliasCalls.length > 0).toBe(hasCalledAlias);
   expect(ctx.err.join('')).toContain('warning: ');
   expect(ctx.err.join('')).toContain(`does not move to agent-${short}`);
   expect(ctx.out).toStrictEqual([`agent-${short} imp-build-stub-agent-${short} check passed\n`]);
-  expect(imp.images.map((image) => image.isPinned)).toStrictEqual([true]);
+  expect(imp.images.find((image) => image.aliases?.includes('agent'))?.name).toBe('agent-9999999');
+  expect(imp.images.find((image) => image.name === `agent-${short}`)?.isPinned).toBe(true);
 });
 
-test('it exits 1 and keeps the image pinned when the alias move fails', async () => {
+test.each([
+  [
+    'an image alias that fails',
+    { aliasAnswer: { exitCode: 1, stderr: 'impz: CONFLICT: alias is reserved\n' } },
+  ],
+  ['an image alias that times out', { aliasAnswer: { exitCode: 143, timedOut: true } }],
+  [
+    'an image alias that times out with unknown command on stderr',
+    {
+      aliasAnswer: {
+        exitCode: 2,
+        timedOut: true,
+        stderr: 'impz: unknown command image alias (see impz --help)\n',
+      },
+    },
+  ],
+  [
+    'an unknown command that exits 1',
+    { aliasAnswer: { exitCode: 1, stderr: 'impz: unknown command image alias\n' } },
+  ],
+  [
+    'an info that is an unknown command',
+    { infoAnswer: { exitCode: 2, stderr: 'impz: unknown command inspect\n' } },
+  ],
+  [
+    'an info that exits 0 with an unknown command message',
+    { infoAnswer: { stderr: 'impz: unknown command inspect\n' } },
+  ],
+  ['an info that times out', { infoAnswer: { exitCode: 143, timedOut: true } }],
+])('it exits 1 and keeps the image pinned on %s', async (_title, scenario) => {
   const ctx = await setupTest();
 
-  const imp = buildStubImp({ images: [], aliasError: 'impz: CONFLICT: alias is reserved' });
+  const imp = buildStubImp({ images: [ctx.heldAlias], ...scenario });
 
   await ctx.createClone(['agent-1111111']);
 
@@ -1608,7 +1654,8 @@ test('it exits 1 and keeps the image pinned when the alias move fails', async ()
 
   expect(exitCode).toBe(1);
   expect(ctx.err.join('')).toContain(`could not move the agent alias to agent-${short}`);
-  expect(imp.images.map((image) => image.isPinned)).toStrictEqual([true]);
+  expect(imp.images.find((image) => image.name === `agent-${short}`)?.isPinned).toBe(true);
+  expect(imp.images.find((image) => image.aliases?.includes('agent'))?.name).toBe('agent-9999999');
 });
 
 test('it keeps the alias target and the previous passing image pinned when a target boots agent', async () => {

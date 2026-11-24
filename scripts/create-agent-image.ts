@@ -1,10 +1,10 @@
 import { join } from 'node:path';
 import { recordAgentImageRetention } from './agent-image-retention-state.ts';
 import { buildImpArgv } from './imp-cli.ts';
-import { moveAgentImageAlias } from './move-agent-image-alias.ts';
 import { parseBuildAgentImageArgs } from './parse-build-agent-image-args.ts';
 import { requireFreeAgentImageNames } from './require-free-agent-image-names.ts';
 import { resolveMainCommit } from './resolve-main-commit.ts';
+import { runAgentImageAliasMove } from './run-agent-image-alias-move.ts';
 import { runAgentImageBuild } from './run-agent-image-build.ts';
 import { runAgentImageCheck } from './run-agent-image-check.ts';
 import type { ScriptIO } from './run-or-exit.ts';
@@ -80,7 +80,7 @@ async function runBuildAndCheck(options: Readonly<CreateAgentImageOptions>, run:
       dropCleanup();
 
       // a client that sets `"image": "agent"` gets the newest passing image
-      await moveAgentImageAlias(options, run.image);
+      await runAgentImageAliasMove(options, run.image);
 
       // pinned images pile up until the pool fills, so only the newest passing images and the
       // ones that atc targets boot stay pinned

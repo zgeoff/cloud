@@ -160,6 +160,46 @@ test.each([
     ['agent-aaaaaaa'],
   ],
   [
+    'keeps the image that a target alias other than agent names, which the agent alias does not cover',
+    {
+      images: [
+        {
+          name: 'agent-aaaaaaa',
+          createdAt: '2026-11-01T00:00:00Z',
+          pinned: true,
+          aliases: ['stable'],
+        },
+        { name: 'agent-bbbbbbb', createdAt: '2026-11-02T00:00:00Z', pinned: true },
+        { name: 'agent-ccccccc', createdAt: '2026-11-03T00:00:00Z', pinned: true },
+        { name: 'agent-ddddddd', createdAt: '2026-11-04T00:00:00Z', pinned: true },
+      ],
+      newImage: 'agent-ddddddd',
+      targetImages: ['stable'],
+      switchOnlyImages: [],
+    },
+    ['agent-bbbbbbb'],
+  ],
+  [
+    'unpins the image that a removed target alias named, when no target boots it',
+    {
+      images: [
+        {
+          name: 'agent-aaaaaaa',
+          createdAt: '2026-11-01T00:00:00Z',
+          pinned: true,
+          aliases: ['stable'],
+        },
+        { name: 'agent-bbbbbbb', createdAt: '2026-11-02T00:00:00Z', pinned: true },
+        { name: 'agent-ccccccc', createdAt: '2026-11-03T00:00:00Z', pinned: true },
+        { name: 'agent-ddddddd', createdAt: '2026-11-04T00:00:00Z', pinned: true },
+      ],
+      newImage: 'agent-ddddddd',
+      targetImages: [],
+      switchOnlyImages: [],
+    },
+    ['agent-aaaaaaa', 'agent-bbbbbbb'],
+  ],
+  [
     'unpins nothing it should keep when a target names an alias that no image holds',
     {
       images: [

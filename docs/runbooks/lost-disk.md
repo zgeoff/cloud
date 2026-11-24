@@ -204,8 +204,8 @@ checkout of `main`.
 
     Expect the last line `<image> <digest> check passed`, with the configured name. The home-pc
     daemon's `cloud` target has its own image, which
-    [Switch the `cloud` target](./agent-image.md#switch-the-cloud-target) sets. Build that commit as
-    well when it differs.
+    [Set the `cloud` target to `agent`](./agent-image.md#set-the-cloud-target-to-agent) sets. Build
+    that commit as well when it differs.
 
 11. Put the atc daemon's bearer back on the host first. The 1Password item `atc-daemon-token`
     survives, but its host copy was on the pool, and the credential installer stops when only one
@@ -250,7 +250,7 @@ finds the two bearer copies equal and skips them. Start the daemon with
 
     Expect `IMP_URL=<url> IMP_TOKEN="$(cat <token_file>)" impz token whoami` to print
     `home-pc-cloud`. Then spawn a session on `cloud`, as step 3 of
-    [Switch the `cloud` target](./agent-image.md#switch-the-cloud-target) does.
+    [Set the `cloud` target to `agent`](./agent-image.md#set-the-cloud-target-to-agent) does.
 
 13. Mint nixie's token into its sops file, through
     [Mint nixie's impd token](./nixie.md#mint-nixies-impd-token), and land the file through a PR.

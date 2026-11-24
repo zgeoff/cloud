@@ -13,6 +13,11 @@
 # commit: the run leaves no record, exits 0 and names both container IDs, and the next run builds
 # the commit again. So does a run whose imp-host has no container once impd listed its images.
 #
+# An image that impd holds pinned, which only a passed check does, but without the agent alias, as
+# when its build ran on an impd without image aliases, gets no build: the script runs
+# scripts/promote-agent-image.ts for the image, with the same CLI and token, and prints that script's
+# result line. A failed move leaves a record like a failed build.
+#
 # To build, it copies imp's CLI out of the imp-host container with its mode, so the CLI always
 # matches the impd it calls, checks out main's head, and runs that head's
 # scripts/build-agent-image.ts for the commit,
@@ -66,7 +71,16 @@ until images=$("$PODMAN" exec -e HOME=/root imp-host impz image ls --json 2> "$e
   try=$((try + 1))
   "$pause" 5
 done
-if jq -e --arg name "$image" 'any(.[]; .name == $name)' <<< "$images" > /dev/null; then
+# absent: no such image; aliased: it holds the agent alias; unaliased: it passed its check, which
+# pins it, and lacks the alias, as when its build ran on an impd without image aliases; unchecked:
+# it is not pinned
+state=$(jq -r --arg name "$image" '
+  [.[] | select(.name == $name)] |
+  if length == 0 then "absent"
+  elif ((.[0].aliases // []) | index("agent")) != null then "aliased"
+  elif .[0].pinned == true then "unaliased"
+  else "unchecked" end' <<< "$images")
+if [ "$state" = aliased ] || [ "$state" = unchecked ]; then
   echo "agent-image-build: impd holds $image, built from $sha; nothing to build"
   exit 0
 fi
@@ -101,15 +115,28 @@ mv "$STATE_DIR/bin/impz.new" "$STATE_DIR/bin/impz"
 git -C "$clone" checkout -q -f --detach origin/main
 token=$(cat "$CREDENTIALS_DIRECTORY/imp-token")
 
-echo "agent-image-build: building $image from $sha"
+# an image that passed its check without the alias needs the move only, not a build
+if [ "$state" = unaliased ]; then
+  doing="moving the agent alias to $image"
+  what="the move of the agent alias to $image from $sha"
+  again="try it again"
+  script=(scripts/promote-agent-image.ts "$image")
+else
+  doing="building $image from $sha"
+  what="the build of $image from $sha"
+  again="build it again"
+  script=(scripts/build-agent-image.ts "$sha")
+fi
+
+echo "agent-image-build: $doing"
 status=0
 result=$(cd "$clone" && PATH="$STATE_DIR/bin:$PATH" IMP_URL="$IMP_URL" IMP_TOKEN="$token" \
-  "$BUN" scripts/build-agent-image.ts "$sha") || status=$?
+  "$BUN" "${script[@]}") || status=$?
 if [ "$status" -ne 0 ]; then
-  leave_if_imp_host_changed "the build of $image from $sha failed with status $status"
+  leave_if_imp_host_changed "$what failed with status $status"
   mkdir -p "$STATE_DIR/failed"
   date -u +%Y-%m-%dT%H:%M:%SZ > "$failed"
-  echo "agent-image-build: the build of $image from $sha failed with status $status: $result; remove $failed to build it again" >&2
+  echo "agent-image-build: $what failed with status $status: $result; remove $failed to $again" >&2
   exit 1
 fi
 echo "agent-image-build: $result"

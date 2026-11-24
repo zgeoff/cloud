@@ -29,8 +29,11 @@ export interface StubImpScenario {
   // whether impd reports the imageAliases feature; true when omitted
   readonly hasImageAliases?: boolean;
 
-  // an `image alias` answer that is an error, with its stderr
-  readonly aliasError?: string;
+  // the answer of `info --json` in place of the feature list
+  readonly infoAnswer?: StubAnswer;
+
+  // the answer of `image alias` in place of a move; impz exits 2 for a command it does not know
+  readonly aliasAnswer?: StubAnswer;
 }
 
 export interface StubImp {
@@ -83,9 +86,10 @@ const impCommands: readonly (readonly [string, ImpCommand])[] = [
   ],
   [
     'info --json',
-    (state) => ({
-      stdout: `${JSON.stringify({ features: { imageAliases: state.scenario.hasImageAliases ?? true } })}\n`,
-    }),
+    (state) =>
+      state.scenario.infoAnswer ?? {
+        stdout: `${JSON.stringify({ features: { imageAliases: state.scenario.hasImageAliases ?? true } })}\n`,
+      },
   ],
   ['ls --json', (state) => ({ stdout: `${JSON.stringify(state.imps)}\n` })],
   ['rm *', (state, args) => removeImp(state, args[1] ?? '')],
@@ -170,8 +174,8 @@ function pinImage(state: StubImpState, name: string, isPinned: boolean): StubAns
 }
 
 function aliasImage(state: StubImpState, alias: string, name: string): StubAnswer {
-  if (state.scenario.aliasError !== undefined) {
-    return { exitCode: 1, stderr: `${state.scenario.aliasError}\n` };
+  if (state.scenario.aliasAnswer !== undefined) {
+    return state.scenario.aliasAnswer;
   }
 
   if (!state.images.some((image) => image.name === name)) {

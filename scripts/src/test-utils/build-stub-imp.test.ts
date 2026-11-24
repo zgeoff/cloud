@@ -344,3 +344,23 @@ test('it reports the imageAliases feature in info', async () => {
 
   expect(result.stdout.toString()).toBe('{"features":{"imageAliases":false}}\n');
 });
+
+test('it answers info and image alias with the scenario answers in place of its own', async () => {
+  const stub = buildStubRunner(
+    buildStubImp({
+      images: [{ name: 'agent-aaa1111', digest: 'imp-build-1' }],
+      infoAnswer: { exitCode: 2, stderr: 'impz: unknown command inspect\n' },
+      aliasAnswer: { exitCode: 143, timedOut: true },
+    }).handler,
+  );
+
+  const info = await stub.run(['impz', 'info', '--json']);
+  const alias = await stub.run(['impz', 'image', 'alias', 'agent', 'agent-aaa1111']);
+
+  expect([info.exitCode, info.stderr.toString()]).toStrictEqual([
+    2,
+    'impz: unknown command inspect\n',
+  ]);
+
+  expect([alias.exitCode, alias.timedOut]).toStrictEqual([143, true]);
+});
