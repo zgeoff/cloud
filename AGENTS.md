@@ -77,12 +77,9 @@ docs/
 
 - lefthook runs the light checks before a commit and a push. Leave the heavier checks to CI, because
   the host may have little memory.
-- Run each operator action that has a `bun run ops:<verb>` script through that script, never the
-  script or workflow behind it: `ops:switch-host` for a host switch, `ops:nixos-checks` for a
-  `NixOS checks` dispatch, and `ops:preview` and `ops:up` for a preview and an apply of the prod
-  stack. Find each verb, what it wraps and its preconditions in
-  [`docs/runbooks/ops.md`](docs/runbooks/ops.md). Run a command that has no verb, such as
-  `bun run drift`, as written in this file.
+- An agent session runs an operator action, such as a host switch, a workflow dispatch or an apply,
+  through its `bun run ops:<verb>` script, never the script or workflow behind it. Find each verb,
+  what it wraps and its preconditions in [`docs/runbooks/ops.md`](docs/runbooks/ops.md).
 - `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and the type check.
   oxlint runs both through `tsrs-lint` in tsgolint's place, because stock tsgolint runs out of
   memory under 2 GiB. The `tsrs` package ships `tsrs-lint`, and oxlint finds it on its own. The
@@ -117,10 +114,10 @@ docs/
 
 ## Host switches
 
-- Switch the host with `bun run ops:switch-host` from a clean checkout of `main`. It runs
-  `scripts/switch-geoffcloud.sh`, the switch script, which builds a `git archive` snapshot of the
-  commit with `nix build --no-link` in a `nixos/nix` container. Only after the build exits 0 does it
-  copy that exact store path to the host and activate it. `--build-only` stops after the build.
+- Switch the host with `bash scripts/switch-geoffcloud.sh` from a clean checkout of `main`. It
+  builds a `git archive` snapshot of the commit with `nix build --no-link` in a `nixos/nix`
+  container. Only after the build exits 0 does it copy that exact store path to the host and
+  activate it. `--build-only` stops after the build.
 - Never use `nixos-rebuild build`, because the repo mounts read-only. Never switch by hand after a
   failed build, and never re-evaluate the flake to switch.
 - The script refuses an atc daemon pin of another atc major than the running atc gateway's image, so
@@ -135,7 +132,8 @@ docs/
 - The NixOS checks gate the switch, not the merge: the script refuses a commit unless a green
   `NixOS checks` run on `main` covers it, or the merged pull request that produced it has a green
   `nixos` check and no NixOS input differs between that PR's head and the commit. Dispatch a run
-  with `bun run ops:nixos-checks` when neither covers the commit, and never switch around the gate.
+  with `gh workflow run nixos-checks.yml --ref main` when neither covers the commit, and never
+  switch around the gate.
 - Before a switch that changes imp, copy impd's database with
   `bash scripts/copy-impd-db.sh <label>`. It takes a `VACUUM INTO` copy inside imp-host while impd
   runs, and records its integrity check, schema migration and imp version in `COPY-INFO`. Never tar
@@ -170,11 +168,10 @@ docs/
   the prod stack at once. `bun run ops:up` refuses then.
 - Apply by hand inside the same bracket, in this order, and record both drift results:
   1. `bun run drift` from a clean checkout of the `deployed/prod` tag.
-  2. `bun run ops:preview -- --refresh` from a clean `main`. Expect only the reviewed changes.
-  3. `bun run ops:up`.
+  2. `bun run preview -- --refresh` from a clean `main`. Expect only the reviewed changes.
+  3. `bun run up`.
   4. `bun run drift` again.
-  5. Move the `deployed/prod` tag to the applied commit, as
-     [`docs/runbooks/workflows.md`](docs/runbooks/workflows.md) shows.
+  5. Move the tag.
 
 ## Choices that need the owner
 

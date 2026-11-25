@@ -74,11 +74,8 @@ only.
   modes, and the imp agent sessions run as root.
 - Stand in for `getent hosts` and for curl to a URL that isn't loopback. In the `getent` stand-in's
   own test, call the real `getent` with `-s files`, which reads the hosts file and never asks DNS.
-- When a case checks the requests that gh itself sends, run the real `gh` against the loopback API
-  that [`start-stub-github-api.sh`](../../../scripts/src/test-utils/shell/start-stub-github-api.sh)
-  starts, with `GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1`, so it sends no telemetry and
-  makes no update check. In every other case, use the gh stand-in from
-  [Shell stand-ins](#shell-stand-ins).
+- Run the real `gh` only with `GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1`, so it sends
+  no telemetry and makes no update check.
 - Give a TLS stand-in's certificate to the client through `SSL_CERT_FILE`, with `SSL_CERT_DIR` set to
   an empty case folder, so the client trusts that certificate and no system one.
 
@@ -152,10 +149,9 @@ scripts in `scripts/host/`.
 - Poll with `wait_for` from [`wait-for.sh`](../../../scripts/src/test-utils/shell/wait-for.sh), and step time
   with [`create_stub_clock`](../../../scripts/src/test-utils/shell/create-stub-clock.sh).
 
-A NixOS check's cases can call only the shell helpers that
+A NixOS check's cases can call only `wait_for` of the shell helpers, because
 [`build-shell-lib-source.nix`](../../../nixos/checks/test-utils/build-shell-lib-source.nix) copies
-into the checks. To call another helper there, add it to that file, following
-[nixos-checks.md](./references/nixos-checks.md).
+only `wait-for.sh` into the checks.
 
 ## Shell stand-ins
 

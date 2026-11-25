@@ -51,8 +51,7 @@ To add a gated check:
 5. Copy the job's steps into `checks`, each with an `if:` on `github.event.repository.private` and
    `steps.decide.outputs.<gate> != 'false'`. Reuse the setup steps in `checks`.
 
-For a check with no gate, skip steps 1 and 2. In step 3, copy the `if:` of the `bun` job. In step
-5, use `steps.decide.outputs.reused != 'true'` in place of the gate, as the `Format` step does,
-because `checks` skips its install when a green run has checked the same tree.
+For a check with no gate, skip steps 1 and 2. In step 5, use
+`steps.decide.outputs.reused != 'true'` in place of the gate, as the `Format` step does, because `checks` skips its install when a green run has checked the same tree.
 
 Never make the `NixOS checks` workflow a required check. It blocks only the deploy to the host.
