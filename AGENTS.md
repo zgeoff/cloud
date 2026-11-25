@@ -164,8 +164,7 @@ docs/
   `deleteBeforeReplace: true`, or its replacement fails on the taken name. For the reason, see
   [the apply job](docs/architecture/infrastructure-as-code.md#the-apply-job).
 
-- Never apply by hand while a `Deploy prod` run is queued or in progress, because both would change
-  the prod stack at once. `bun run ops:up` refuses then.
+- Never run `bun run up` while a `Deploy prod` run is in progress.
 - Apply by hand inside the same bracket, in this order, and record both drift results:
   1. `bun run drift` from a clean checkout of the `deployed/prod` tag.
   2. `bun run preview -- --refresh` from a clean `main`. Expect only the reviewed changes.
