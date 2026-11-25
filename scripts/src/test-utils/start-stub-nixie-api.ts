@@ -24,6 +24,7 @@ export interface StubNixieAPI {
   readonly waitForStream: () => Promise<void>;
 
   readonly appendRecord: () => void;
+  readonly publishChanged: (topics: readonly string[]) => void;
 
   readonly createSession: () => string;
 }
@@ -66,6 +67,11 @@ export function startStubNixieAPI(options: StubNixieAPIOptions): StubNixieAPI {
     appendRecord: () => {
       createRecord(state);
     },
+    publishChanged: (topics) => {
+      for (const stream of state.streams) {
+        stream.sendChanged(topics);
+      }
+    },
     createSession: () => createSessionRow(state).token,
   };
 }
@@ -76,7 +82,7 @@ function declareRoutes(state: StubState) {
     makeRoute(state, 'sessions/revoke', (_request, input) => updateRevoked(state, input)),
     makeRoute(state, 'sessions/list', (request) => buildSessionsResponse(state, request)),
     makeRoute(state, 'conversation/read', (_request, input) => buildReadResponse(state, input)),
-    makeRoute(state, 'log/follow', (request, input) => startFollow(state, { request, input })),
+    makeRoute(state, 'live/follow', (request, input) => startFollow(state, { request, input })),
   ];
 }
 
@@ -213,6 +219,9 @@ function startFollow(state: StubState, call: FollowCall): Response {
   });
 
   state.streams.push(stream);
+
+  // nixie's page form sends opened first, then the thread's records after the sequence
+  stream.sendOpened();
 
   for (const sequence of state.sequences.filter(
     (row) => row > Number(call.input('afterSequence')),
