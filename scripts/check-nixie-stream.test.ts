@@ -50,7 +50,7 @@ test('it holds the stream open, reads the same record count before and after, an
   expect(stub.calls).toStrictEqual([
     'sessions/enrol',
     'conversation/read',
-    'log/follow',
+    'live/follow',
     'conversation/read',
     'sessions/revoke',
   ]);
@@ -60,7 +60,9 @@ test('it holds the stream open, reads the same record count before and after, an
     ['conversation records before: 3\n'],
     [
       expect.toSatisfy((line: string) =>
-        /^stream held for 0\.\d s: \d+ keepalives, longest wait 0\.\d s, 0 records\n$/u.test(line),
+        /^stream held for 0\.\d s: opened, \d+ keepalives, longest wait 0\.\d s, 0 records, 0 changes\n$/u.test(
+          line,
+        ),
       ),
     ],
     ['conversation records after: 3\n'],

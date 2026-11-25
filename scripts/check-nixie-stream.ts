@@ -177,7 +177,9 @@ async function printCount(
 }
 
 function formatStream(report: StreamReport): string {
-  return `stream ${report.end} for ${formatSeconds(report.openMs)}: ${report.keepalives} keepalives, longest wait ${formatSeconds(report.longestGapMs)}, ${report.records} records`;
+  const opened = report.opened ? 'opened' : 'never opened';
+
+  return `stream ${report.end} for ${formatSeconds(report.openMs)}: ${opened}, ${report.keepalives} keepalives, longest wait ${formatSeconds(report.longestGapMs)}, ${report.records} records, ${report.changes} changes`;
 }
 
 function formatSeconds(durationMs: number): string {
@@ -205,6 +207,7 @@ interface Outcome {
 function collectFailures(outcome: Outcome): string[] {
   const failures = [
     outcome.stream.end === 'held' ? null : `the stream did not stay open: ${outcome.stream.end}`,
+    outcome.stream.opened ? null : 'the stream never sent its opened event',
     outcome.stream.longestGapMs <= outcome.options.maxGapMs
       ? null
       : `the stream went more than ${formatSeconds(outcome.options.maxGapMs)} without a keepalive`,

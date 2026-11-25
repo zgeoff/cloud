@@ -1,3 +1,4 @@
+import { findJSONField } from './find-json-field.ts';
 import { encodeNixieRequest } from './nixie-api/encode-nixie-request.ts';
 import type { RPCResult } from './send-nixie-rpc.ts';
 
@@ -14,7 +15,11 @@ export interface StreamReport {
   readonly keepalives: number;
 
   readonly longestGapMs: number;
+
+  // whether the stream's first event was the opened event that says it listens for commits
+  readonly opened: boolean;
   readonly records: number;
+  readonly changes: number;
 
   readonly end: 'held' | 'closed' | `failed: ${string}`;
 }
@@ -36,7 +41,9 @@ export async function readNixieStream(
     openedAt: performance.now(),
     buffer: '',
     keepaliveTimes: [],
+    opened: false,
     records: 0,
+    changes: 0,
   });
 
   clearTimeout(timer);
@@ -60,13 +67,13 @@ async function startStream(hold: Readonly<StreamHold>): Promise<RPCResult<Stream
   const request = await encodeNixieRequest({
     url: hold.url,
     token: hold.token,
-    procedure: 'log/follow',
+    procedure: 'live/follow',
     input: { afterSequence: hold.afterSequence, thread: 'conversation' },
     signal: stopping.signal,
   });
 
   const response = await fetch(request).catch(
-    (error: unknown) => new Error(`log/follow failed: ${String(error)}`),
+    (error: unknown) => new Error(`live/follow failed: ${String(error)}`),
   );
 
   if (response instanceof Error) {
@@ -78,7 +85,7 @@ async function startStream(hold: Readonly<StreamHold>): Promise<RPCResult<Stream
   if (!response.ok || !type.startsWith('text/event-stream') || response.body === null) {
     await response.body?.cancel();
 
-    return { ok: false, error: `log/follow answered ${response.status} ${type}`.trim() };
+    return { ok: false, error: `live/follow answered ${response.status} ${type}`.trim() };
   }
 
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -102,7 +109,9 @@ interface Tally {
   readonly buffer: string;
 
   readonly keepaliveTimes: readonly number[];
+  readonly opened: boolean;
   readonly records: number;
+  readonly changes: number;
 }
 
 async function readEvents(source: StreamSource, tally: Tally): Promise<StreamReport> {
@@ -134,7 +143,9 @@ function buildReport(tally: Tally, end: StreamReport['end']): StreamReport {
     openMs,
     keepalives: tally.keepaliveTimes.length,
     longestGapMs: Math.max(...times.slice(1).map((time, index) => time - (times[index] ?? 0))),
+    opened: tally.opened,
     records: tally.records,
+    changes: tally.changes,
     end,
   };
 }
@@ -159,23 +170,74 @@ function countChunk(tally: Tally, text: string): TallyStep {
 function countEvent(tally: Tally, block: string): TallyStep {
   const lines = block.split('\n').filter((line) => line !== '');
 
-  // oRPC sends a keepalive as an SSE comment, and a record as a `message` event
+  // oRPC sends a keepalive as an SSE comment, and each live event as a `message` event
   if (lines.length > 0 && lines.every((line) => line.startsWith(':'))) {
     const keepaliveTimes = [...tally.keepaliveTimes, performance.now() - tally.openedAt];
 
     return { tally: { ...tally, keepaliveTimes }, failure: null };
   }
 
-  const event = lines
-    .find((line) => line.startsWith('event:'))
-    ?.slice('event:'.length)
-    .trim();
+  const event = readField(lines, 'event');
 
-  if (event === 'message') {
+  if (event !== 'message') {
+    const name = event === undefined ? 'an event with no name' : `a ${event} event`;
+
+    return { tally, failure: `the stream sent ${name}` };
+  }
+
+  return countLiveEvent(tally, readLiveKind(lines));
+}
+
+function readField(lines: readonly string[], name: string): string | undefined {
+  return lines
+    .find((line) => line.startsWith(`${name}:`))
+    ?.slice(name.length + 1)
+    .trim();
+}
+
+function countLiveEvent(tally: Tally, kind: string | undefined): TallyStep {
+  // nixie sends opened once, first, when the stream listens for commits
+  if (kind === 'opened' && !tally.opened && tally.records === 0 && tally.changes === 0) {
+    return { tally: { ...tally, opened: true }, failure: null };
+  }
+
+  if (kind === 'opened') {
+    return { tally, failure: 'the stream sent opened after another event' };
+  }
+
+  if (!tally.opened) {
+    return { tally, failure: `the stream sent ${formatKind(kind)} before opened` };
+  }
+
+  if (kind === 'record') {
     return { tally: { ...tally, records: tally.records + 1 }, failure: null };
   }
 
-  const name = event === undefined ? 'an event with no name' : `a ${event} event`;
+  if (kind === 'changed') {
+    return { tally: { ...tally, changes: tally.changes + 1 }, failure: null };
+  }
 
-  return { tally, failure: `the stream sent ${name}` };
+  return { tally, failure: `the stream sent ${formatKind(kind)}` };
+}
+
+function formatKind(kind: string | undefined): string {
+  return kind === undefined ? 'an event with no kind' : `a ${kind} event`;
+}
+
+function readLiveKind(lines: readonly string[]): string | undefined {
+  // an SSE event's data lines join with newlines, and oRPC writes the event as {json, meta}
+  const data = lines
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice('data:'.length).replace(/^ /u, ''))
+    .join('\n');
+
+  try {
+    const parsed: unknown = JSON.parse(data);
+    const kind = findJSONField(findJSONField(parsed, 'json'), 'kind');
+
+    return typeof kind === 'string' ? kind : undefined;
+  } catch {
+    // data that is not JSON names no kind, which fails the check
+    return undefined;
+  }
 }

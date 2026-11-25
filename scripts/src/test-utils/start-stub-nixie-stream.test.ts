@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { startStubNixieStream } from './start-stub-nixie-stream.ts';
 
-test('it opens with an empty comment and writes a record as a message event with its sequence as the id, as oRPC 1.15.4 does', async () => {
+test('it opens with an empty comment and writes each live event as a message event, a record with its sequence as the id, as oRPC 1.15.4 does', async () => {
   const stream = startStubNixieStream({
     keepaliveMs: null,
     closeAfterMs: null,
@@ -12,13 +12,20 @@ test('it opens with an empty comment and writes a record as a message event with
     stream.stop();
   });
 
+  stream.sendOpened();
   stream.sendRecord(4);
+  stream.sendChanged(['tasks']);
   stream.stop();
 
   const text = await new Response(stream.body).text();
 
   expect(text).toBe(
-    ': \n\nevent: message\nid: 4\ndata: {"json":{"record":{"kind":"message","message":{"text":"record 4"},"recordedAt":"2026-10-12T00:00:04.000Z","sequence":4,"thread":"conversation"}},"meta":[[1,"record","recordedAt"]]}\n\n',
+    [
+      ': \n\n',
+      'event: message\ndata: {"json":{"kind":"opened"}}\n\n',
+      'event: message\nid: 4\ndata: {"json":{"kind":"record","record":{"kind":"message","message":{"text":"record 4"},"recordedAt":"2026-10-12T00:00:04.000Z","sequence":4,"thread":"conversation"}},"meta":[[1,"record","recordedAt"]]}\n\n',
+      'event: message\ndata: {"json":{"kind":"changed","topics":["tasks"]}}\n\n',
+    ].join(''),
   );
 });
 

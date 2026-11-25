@@ -408,11 +408,12 @@ check prints the name of an imp it could not remove: remove it with
    ```
 
    The check enrols a device session with a code from nixie's pod, counts the conversation's
-   records, holds the conversation's stream open for 30 s, counts the records again, and revokes the
-   session. It sends no message. Expect the last line `stream check passed`, after a `stream held`
-   line with at least 5 keepalives and 0 records, and the same count on the `records before` and
-   `records after` lines. A message sent from a device during the hold fails the check, so run it
-   while nobody uses nixie.
+   records, holds a live stream on the conversation open for 30 s, counts the records again, and
+   revokes the session. It sends no message. Expect the last line `stream check passed`, after a
+   `stream held` line that says `opened` and has at least 5 keepalives and 0 records, and the same
+   count on the `records before` and `records after` lines. The `changes` count on that line is any
+   number: a change with no record, such as a spend update, passes. A message sent from a device
+   during the hold fails the check, so run it while nobody uses nixie.
 
 2. Check the fetch sandbox's egress:
 

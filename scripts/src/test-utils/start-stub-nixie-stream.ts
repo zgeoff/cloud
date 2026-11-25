@@ -13,7 +13,9 @@ export interface StubStreamOptions {
 
 export interface StubStream {
   readonly body: ReadableStream<Uint8Array>;
+  readonly sendOpened: () => void;
   readonly sendRecord: (sequence: number) => void;
+  readonly sendChanged: (topics: readonly string[]) => void;
   readonly stop: () => void;
 }
 
@@ -60,8 +62,14 @@ export function startStubNixieStream(options: StubStreamOptions): StubStream {
 
   return {
     body,
+    sendOpened: () => {
+      sendText(state, renderLiveEvent({ json: { kind: 'opened' } }));
+    },
     sendRecord: (sequence) => {
       sendText(state, renderRecordEvent(sequence));
+    },
+    sendChanged: (topics) => {
+      sendText(state, renderLiveEvent({ json: { kind: 'changed', topics } }));
     },
     stop: () => {
       stopStream(state);
@@ -89,10 +97,19 @@ function stopStream(state: StreamState): void {
   }
 }
 
+function renderLiveEvent(event: unknown): string {
+  // an event with no record carries no id, so a reconnect cannot resume from it
+  return `event: message\ndata: ${JSON.stringify(event)}\n\n`;
+}
+
 function renderRecordEvent(sequence: number): string {
   const record = buildStubNixieRecord(sequence);
-  const data = JSON.stringify({ json: { record }, meta: [[1, 'record', 'recordedAt']] });
 
-  // oRPC 1.15.4's server-sent event: the record's sequence as its id, the record as {json, meta}
+  const data = JSON.stringify({
+    json: { kind: 'record', record },
+    meta: [[1, 'record', 'recordedAt']],
+  });
+
+  // oRPC 1.15.4's server-sent event: the record's sequence as its id, the event as {json, meta}
   return `event: message\nid: ${sequence}\ndata: ${data}\n\n`;
 }
