@@ -8,7 +8,7 @@ test('it writes the key from stdin to the credential field of the zgeoff grafana
 
   expect(buildMCPTokenSyncArgs({ tokenID, key })).toStrictEqual({
     create:
-      'key=$(cat) && op item edit grafana-mcp --vault zgeoff "credential=$key" < /dev/null > /dev/null',
+      'key=$(cat) && op item edit grafana-mcp --vault agents "credential=$key" < /dev/null > /dev/null',
     stdin: key,
     triggers: [tokenID],
     logging: 'none',

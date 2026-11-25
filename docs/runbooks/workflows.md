@@ -309,7 +309,7 @@ after a change to either.
 | the k3s kubeconfig                                             | `bash scripts/connect-k3s.sh`, then a preview. Read it before any apply                                                                                                                                                                            |
 | `GHCR_PULL_TOKEN`                                              | the apply bracket in [the GHCR pull token](./ghcr-pull-token.md#rotate-the-token), then a pull check                                                                                                                                               |
 | imp's tailnet key (`tag:imp`)                                  | `bun run up` mints a new one after expiry and writes it to `imp-tailscale-authkey`                                                                                                                                                                 |
-| Grafana's MCP token (`zgeoff` vault, `grafana-mcp`)            | `bun run up -- --replace 'urn:pulumi:prod::geoff-cloud::grafana:oss/serviceAccountToken:ServiceAccountToken::mcp-viewer'`, from a 1Password session that reads `cloud` and writes `zgeoff`; the MCP server reads the new token at its next connect |
+| Grafana's MCP token (`agents` vault, `grafana-mcp`)            | `bun run up -- --replace 'urn:pulumi:prod::geoff-cloud::grafana:oss/serviceAccountToken:ServiceAccountToken::mcp-viewer'`, from a 1Password session that reads `cloud` and writes `zgeoff`; the MCP server reads the new token at its next connect |
 
 A rotation of the atc daemon's gateway or imp token needs `systemctl restart atc-daemon` on the
 host, because the daemon reads copies of the token files made when it starts
