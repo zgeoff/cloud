@@ -1,8 +1,9 @@
-import { expect, mock, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { checkNixieStream } from './check-nixie-stream.ts';
 import { network } from './src/test-utils/network.ts';
 import { startStubNixieAPI } from './src/test-utils/start-stub-nixie-api.ts';
+import { startStubNixieStream } from './src/test-utils/start-stub-nixie-stream.ts';
 
 test('it holds the stream open, reads the same record count before and after, and revokes its session', async () => {
   const stub = startStubNixieAPI({
@@ -132,6 +133,51 @@ test('it fails when nixie closes the stream before the hold ends', async () => {
 
   expect(printErr.mock.calls).toStrictEqual([
     ['check-nixie-stream: the stream did not stay open: closed\n'],
+  ]);
+});
+
+test('it fails when the stream never sends its opened event, and still revokes its session', async () => {
+  const stub = startStubNixieAPI({
+    url: 'https://nixie.test',
+    enrolCodes: ['ABCD-2345'],
+    sequences: [1],
+    keepaliveMs: 50,
+    closeAfterMs: null,
+  });
+
+  network.use(
+    http.post('https://nixie.test/rpc/live/follow', (info) => {
+      const stream = startStubNixieStream({
+        keepaliveMs: 50,
+        closeAfterMs: null,
+        signal: info.request.signal,
+      });
+
+      onTestFinished(() => {
+        stream.stop();
+      });
+
+      return new HttpResponse(stream.body, { headers: { 'content-type': 'text/event-stream' } });
+    }),
+  );
+
+  const printErr = mock<(text: string) => void>();
+
+  const exitCode = await checkNixieStream({
+    url: 'https://nixie.test',
+    holdMs: 400,
+    maxGapMs: 200,
+    minKeepalives: 3,
+    runRemote: () => Promise.resolve({ exitCode: 0, stdout: 'ABCD-2345\n', stderr: '' }),
+    printOut: mock<(text: string) => void>(),
+    printErr,
+  });
+
+  expect(exitCode).toBe(1);
+  expect(stub.sessions).toStrictEqual([{ sessionID: expect.toBeString(), revoked: true }]);
+
+  expect(printErr.mock.calls).toStrictEqual([
+    ['check-nixie-stream: the stream never sent its opened event\n'],
   ]);
 });
 

@@ -270,8 +270,8 @@ if (import.meta.main) {
   process.exitCode = await checkNixieStream({
     url: process.argv[2] ?? 'https://nixie.geoff.cloud',
 
-    // nixie sends a keepalive every 5 s, and its web client counts a stream that misses three in a
-    // row as dead
+    // nixie's contract sets these in liveStreamTiming: a keepalive every 5 s, and a web client that
+    // counts a stream with no byte for 15 s as dead
     holdMs: 30_000,
     maxGapMs: 15_000,
     minKeepalives: 5,
