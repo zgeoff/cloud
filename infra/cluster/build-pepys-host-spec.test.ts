@@ -29,6 +29,7 @@ test('it starts the host with run --up on the listed consumers, beside the API i
       { name: 'PEPYS_S2_BASIN', value: 'pepys-facts' },
       { name: 'PEPYS_STORE_DIR', value: '/store' },
       { name: 'PEPYS_CONSUMERS', value: '/modules/consumers.json' },
+      { name: 'MIMALLOC_ALLOW_THP', value: '0' },
     ],
     envFrom: [{ secretRef: { name: fixture.envSecret } }],
   });

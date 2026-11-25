@@ -52,12 +52,11 @@ folder per version under `/opt/bun`. `bun` and `bunx` are a shim that reads the 
 `.bun-version` from the current folder up to `/` and runs that version. Without a `.bun-version`,
 the shim runs the newest version the image holds.
 
-When the checkout pins a version the image lacks, the shim also runs the newest version, after a
-note on stderr that names both versions, so a session keeps working. When a repo moves its
-`.bun-version` to a version the image lacks, add that version to the Dockerfile's Bun pins, then
-switch to the image the host builds from it. For cloud's own `.bun-version`, CI's image check fails
-until the image holds the pinned version, so add the version to the Renovate pull request that bumps
-that pin.
+A pin the image lacks also runs the newest version, after a note on stderr that names both versions,
+so a session keeps working. When a repo moves its `.bun-version` to a version the image lacks, add
+that version to the Dockerfile's Bun pins, then build the image and wait for `agent` to move. For
+cloud's own `.bun-version`, CI's image check fails until the image holds the pinned version, so a
+Renovate bump of that pin adds the version in the same pull request.
 
 ## Locked packages
 
@@ -101,9 +100,39 @@ elastic at 1024 MiB and growing to 2048 MiB, so it stays off the host's huge pag
 that commit's `scripts/check-agent-image.ts` there, and removes the imp. Its last line is
 `agent-<short sha> <digest> check passed`; record that line on the PR. A passed check pins the image
 in impd, because a daemon's target boots it by name, and impd's image eviction would otherwise
-remove it while no imp uses it. A failed check removes the image, unless `--keep` keeps it for a
-look, and every failure exits 1. It refuses a commit that is not on `main`, and an image or check
-imp name that already exists.
+remove it while no imp uses it. It then moves the `agent` alias to the image, so a target whose
+image is `agent` boots it from the next spawn on, as [The `agent` alias](#the-agent-alias)
+describes. Last, it unpins every other pinned `agent-*` image except the newest two that passed, the
+new one included, and each image that an atc target boots, so impd's eviction can remove the rest
+when `tank/imp` fills.
+
+The build reads a target's image from `targets.*.image` in `~/.config/atc/config.json`, in each file
+that `AGENT_IMAGE_TARGET_CONFIGS` lists (paths separated by `:`) and in each config file that
+`switch-agent-image.ts` changed on this machine, and from the `image` line of
+`nixos/hosts/geoffcloud/configuration.nix` in the clone and at the commit that origin's
+`deployed/host` tag marks, which is the commit the host runs. `switch-agent-image.ts` keeps its
+record in `~/.local/state/cloud/agent-image-retention.json`.
+
+An image that `switch-agent-image.ts` pinned because no passing check had pinned it is a target
+image while a target boots it, and takes no slot among the passing images.
+
+The build reads the targets again before each unpin and after it, and pins the image again if a
+target names it now. When impd refuses that pin, the build tries it three times, and then exits 1
+and names the image, which needs `impz image pin <image>`.
+
+A target on another machine is invisible to the build: list that machine's config in
+`AGENT_IMAGE_TARGET_CONFIGS` where the build can read it, or the image can lose its pin. When the
+build cannot read a config, cannot fetch the `deployed/host` tag, or cannot read the file at it, it
+unpins nothing and logs why.
+
+An unpin never deletes an image, and a failed unpin is logged and leaves the build's result alone. A
+passing image stays once it is pinned, so an interrupt during the unpins does not remove it.
+
+`switch-agent-image.ts` pins the image before it changes the config and again after, and puts the
+old config back when impd refuses the second pin.
+
+A failed check removes the image, unless `--keep` keeps it for a look, and every failure exits 1. It
+refuses a commit that is not on `main`, and an image or check imp name that already exists.
 
 `impz image build` prints no progress off a terminal, so the build runs quietly for several minutes.
 `AGENT_IMAGE_BUILD_TIMEOUT` (45m by default) stops a build that hangs. impd can still finish that
@@ -148,6 +177,28 @@ once. Read the build's output in the journal, fix the cause, then remove that fi
 builds the commit again. A failure before the build, such as an imp-host that does not answer,
 records nothing, and the next run tries again.
 
+## The `agent` alias
+
+Each image that passes its check becomes `agent` on the host: the build runs
+`impz image alias agent agent-<short sha>` after the pin. A failed check leaves `agent` where it
+was. When the move fails, the build exits 1 and names it, and the image stays pinned.
+`impz image ls` shows the alias on the image that holds it.
+
+An impd that lacks image aliases cannot move the alias. The build then prints a warning that starts
+with `warning:`, leaves `agent` where it was and exits 0. After the release that adds aliases
+deploys, the host's timer moves the alias on its next run: when impd holds the newest build's image
+pinned but `agent` is not on it, the timer runs
+`bun scripts/promote-agent-image.ts agent-<short sha>` and prints
+`agent-image-build: agent-<short sha> alias moved`. While impd still lacks aliases, each run prints
+the warning and `alias skipped` instead. The timer leaves an image alone that is not pinned, or that
+only a switch pinned (one listed in `switchOnlyImages` of the retention state), because only a
+passed check makes an image take the alias. A failed move records the commit in
+`/var/lib/agent-image-build/failed/<sha>` like a failed build, so read the journal, fix the cause,
+and remove that file to try again.
+
+Retention keeps the image that `agent` names and the previous passing image pinned. A target whose
+image is `agent` counts as booting the image that `agent` names when the build reads the targets.
+
 ## Check
 
 The check prints one line per item and exits non-zero on any failure:
@@ -169,30 +220,49 @@ to prove what the allowlist exempts and what it still reports. When gitleaks rep
 file that holds no credential, add it to `scripts/agent-image-gitleaks.toml` with its reason,
 narrowed to that file or folder.
 
-## Switch the `cloud` target
+## Set the `cloud` target to `agent`
 
-The `cloud` target lives in `~/.config/atc/config.json` on the machine that runs the atc daemon:
+Before you set the target, check that `agent` names an image: `impz image ls` on the host shows
+`agent` on one image. When it shows none, or an older image than the newest build, see
+[The `agent` alias](#the-agent-alias) first, because a target set to `agent` boots nothing while the
+alias is unset.
+
+The `cloud` target lives in `~/.config/atc/config.json` on the machine that runs the atc daemon. Set
+its image to `agent` once:
 
 ```json
-"cloud": { "provider": "imp", "image": "agent-<short sha>", "guestATC": "/usr/local/bin/atc", "...": "..." }
+"cloud": { "provider": "imp", "image": "agent", "guestATC": "/usr/local/bin/atc", "...": "..." }
 ```
 
 `guestATC` points the session hooks at the image's atc, so the daemon never copies its own binary
 into a fresh imp. Without it, a compiled daemon uploads its binary, about 100 MB, before each new
 imp's first session starts.
 
+Restart the daemon after that edit, because it reads its targets at startup only. After it, each
+passing build moves the alias, and the next spawn boots the new image with no config edit and no
+restart. Spawn a session on `cloud`, and check that its imp runs the image that `impz image ls`
+shows `agent` on: `impz ls` shows the image of each imp.
+
+## Pin a target to one image
+
+To hold the `cloud` target on one image, such as for a rollback or a test of a build, set its image
+to that image's name: `agent-<short sha>`. `scripts/switch-agent-image.ts` does it.
+
 1. Run `bun scripts/switch-agent-image.ts agent-<short sha>` on the machine that runs the daemon. It
-   refuses an image the host lacks, copies the config to `config.json.bak-<UTC stamp>-pre-<image>`,
-   then sets `targets.cloud.image` and `targets.cloud.guestATC` and changes nothing else. A second
-   argument names another config file.
+   refuses an image the host lacks, pins the image so impd never evicts it (also when the config
+   already names it), copies the config to `config.json.bak-<UTC stamp>-pre-<image>`, then sets
+   `targets.cloud.image` and `targets.cloud.guestATC` and changes nothing else. A second argument
+   names another config file.
 2. Restart the daemon when no session needs it, with the command the script prints,
    `atc daemon restart`. It restarts the daemon through its systemd unit and restores the fleet;
    `--dry-run` first lists the sessions a restart interrupts. The script never restarts it. The
    daemon reads its targets at startup only, so the change reaches the next spawn after the restart.
-3. Spawn a session on `cloud`, and check that its imp runs the new image: `impz ls` shows the image
-   of each imp.
+3. Spawn a session on `cloud`, and check that its imp runs the image: `impz ls` shows the image of
+   each imp.
 
-A switch changes new imps only. An imp keeps the image it was created from.
+To follow the newest passing image again, set the image back to `agent` and restart the daemon.
+
+A change of image reaches new imps only. An imp keeps the image it was created from.
 
 ## A new atc release
 
@@ -242,13 +312,10 @@ is the release, such as `4.5.0`.
    Expect `ARG ATC_VERSION=$VERSION`. The image check proves that the image's atc answers with the
    version its Dockerfile pins, so this line proves the image ships the release.
 
-3. Switch the `cloud` target, and leave the daemon running:
-
-   ```bash
-   bun scripts/switch-agent-image.ts agent-<short sha>
-   ```
-
-   The script prints `atc daemon restart`. Run it in step 4.
+3. Check that the `cloud` target's image is `agent`, and that `impz image ls` shows `agent` on
+   `agent-<short sha>`. Leave the daemon running. To pin the target to this image instead, run
+   `bun scripts/switch-agent-image.ts agent-<short sha>`, which prints `atc daemon restart`. Wait
+   for step 4 to run it.
 
 4. Install the release binary over the one the daemon's systemd unit starts, then restart the
    daemon:
@@ -343,22 +410,25 @@ entry.
    image or its check; run it locally first to find a failure sooner.
 3. After the PR merges, wait for the host's build line in the journal
    ([The host's build](#the-hosts-build)), and record it on the PR.
-4. Switch the `cloud` target.
-5. Keep the image the target ran before, for a rollback. Remove an older one with
-   `impz image rm agent-<short sha>`; imp refuses to remove an image that an imp uses. The build
-   pinned it, so impd's image eviction never removes it: to leave an image that no target boots to
-   the eviction instead, unpin it with `impz image unpin agent-<short sha>`.
+4. Check that `impz image ls` shows `agent` on the new image. A `cloud` target set to `agent` boots
+   it from the next spawn.
+5. Keep the image `agent` named before, for a rollback. The next build keeps the newest two passing
+   images, so the previous image stays pinned until two newer ones exist. If a build passed its
+   check but failed to move the alias, the previous alias target counts as one of the older images
+   and a later build can unpin it: read its name from the PR record before then. Remove an older one
+   with `impz image rm agent-<short sha>`; imp refuses to remove an image that an imp uses.
 
 ## Roll back
 
-To roll back, point the `cloud` target at the image it ran before: the `agent-<short sha>` its PR
+A rollback pins the `cloud` target to the image `agent` named before: the `agent-<short sha>` its PR
 records, `agent-1` before the first image named for a commit, or `coder` before the first agent
 image. For an image without atc, such as `agent-1` or `coder`, also remove `guestATC` from the
 target, so the daemon copies its binary in again.
 
 1. Check that the earlier image is still on the host: `impz image ls`.
-2. Set `targets.cloud.image` to it, as in the switch, remove `guestATC` for an image without atc,
-   and restart the daemon.
+2. Pin the target to it with `scripts/switch-agent-image.ts`, as in
+   [Pin a target to one image](#pin-a-target-to-one-image), and restart the daemon. The next passing
+   build moves `agent` but leaves the pinned target where it is.
 3. Spawn a session on `cloud`, and check its imp's image with `impz ls`.
 
 Imps created from the new image keep it. Remove them, or let their sessions end, when the image is

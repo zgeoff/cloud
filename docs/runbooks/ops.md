@@ -126,8 +126,9 @@ bun run ops:switch-agent-image -- agent-<short sha> <atc config file>
 - Wraps `bun scripts/switch-agent-image.ts`. Run it on the machine that runs the atc daemon.
 - The script refuses an image that `imp image ls` does not list, and backs up the config before it
   writes it.
-- Build and check the image first, and restart the daemon after, with the steps in
-  [Switch the `cloud` target](./agent-image.md#switch-the-cloud-target).
+- Use it to pin a target to one image, as
+  [Pin a target to one image](./agent-image.md#pin-a-target-to-one-image) describes. A target set to
+  `agent` needs no switch. Build and check the image first, and restart the daemon after.
 
 ## `bun run ops:host`
 

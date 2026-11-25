@@ -27,11 +27,11 @@ test('#encodeNixieRequest builds a sessions/enrol call as oRPC encodes it', asyn
   });
 });
 
-test('#encodeNixieRequest builds a log/follow call with the session token', async () => {
+test('#encodeNixieRequest builds a live/follow call with the session token', async () => {
   const request = await encodeNixieRequest({
     url: 'https://nixie.test',
     token: 'a7c3e9f1-token',
-    procedure: 'log/follow',
+    procedure: 'live/follow',
     input: { afterSequence: 3, thread: 'conversation' },
   });
 
@@ -42,7 +42,7 @@ test('#encodeNixieRequest builds a log/follow call with the session token', asyn
     body: await request.text(),
   }).toStrictEqual({
     method: 'POST',
-    url: 'https://nixie.test/rpc/log/follow',
+    url: 'https://nixie.test/rpc/live/follow',
     headers: {
       authorization: 'Bearer a7c3e9f1-token',
       'content-type': 'application/json',
@@ -73,7 +73,7 @@ test('#encodeNixieRequest builds a request that the caller can stop', async () =
   const request = await encodeNixieRequest({
     url: 'https://nixie.test',
     token: 'a7c3e9f1-token',
-    procedure: 'log/follow',
+    procedure: 'live/follow',
     input: { afterSequence: 3, thread: 'conversation' },
     signal: stopping.signal,
   });

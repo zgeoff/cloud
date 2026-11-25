@@ -1,56 +1,56 @@
 {
   "atc-agent": {
-    "version": "7.25.1",
-    "sum": "a6915ad39976550da471b2d6632a0d105a92b8cc0d7a12444d92902f5762ed57"
+    "version": "7.26.0",
+    "sum": "5def62601baa108371d0febd089db8d38837b1ab9aa8196a29d6390e76784468"
   },
   "atc-daemon": {
-    "version": "7.25.1",
-    "sum": "a6915ad39976550da471b2d6632a0d105a92b8cc0d7a12444d92902f5762ed57"
+    "version": "7.26.0",
+    "sum": "5def62601baa108371d0febd089db8d38837b1ab9aa8196a29d6390e76784468"
   },
   "atc-gateway": {
-    "version": "7.25.1",
-    "sum": "0f7d2c4ffad4aaeb5cc88cf4447bfa31604f4d0dfd1ac4e6a6a3a3c00145858f",
-    "tag": "7.25.1"
+    "version": "7.26.0",
+    "sum": "44b3cb7cfc81c693381f8d70f4eef6784e3df56b167e4cd5bb66044bae67dfb2",
+    "tag": "7.26.0"
   },
   "atc-gateway-image": {
-    "version": "7.25.1",
-    "digest": "sha256:cf6c210bcec99bd3fd6cc11514fdf1d3248d4c6517a1ff40b463cf35192793db"
+    "version": "7.26.0",
+    "digest": "sha256:b8c6ace899330352cc013c75c658cb3cfb3484f7f8545ebf4a0cf5bcf6df8388"
   },
   "atc-gateway-backup-image": {
     "tag": "2.24.0-r2",
     "digest": "sha256:ac47d4a0409e81be7304c46372f2d855083cd45315fe30529dc3279ccae9f377"
   },
   "imp-host": {
-    "version": "7.7.0",
-    "digest": "sha256:e32f055de3def1b117269516e0dcc9fc71351612c5509edf783ec2ba75147c5b",
-    "commit": "70f0e8e6"
+    "version": "7.8.0",
+    "digest": "sha256:82e351969a5747e084daccbb9910cf5ea1e6cfecda1e7b61a5801be3c3c278a0",
+    "commit": "806fa4ba"
   },
   "imp-base": {
-    "version": "7.7.0",
-    "digest": "sha256:3c5867cf1ae265da3a0564478a2cd5c24e0bdee1f95633f441d62f06e4ab9149"
+    "version": "7.8.0",
+    "digest": "sha256:ba5296a2be6d15898b9f3768d453b359ba9d2829f6ab2a1a24cd4a64b7747c76"
   },
   "nixie": {
-    "version": "0.96.0",
-    "digest": "sha256:45d7e8cd31c08cdd1f3956bb44d45ec48883a63b760bce3d0351343c6b3c3d78"
+    "version": "0.117.0",
+    "digest": "sha256:a1e008d8990f4f933cef6fe435a6314327f4a440e01717e93a6dd47b3894c94a"
   },
   "nixie-web": {
-    "version": "0.96.0",
-    "digest": "sha256:cfd6d42947eff97ec5cc82736bfe00a1dac207bbb8a6b31dced33b88761c3f4a"
+    "version": "0.117.0",
+    "digest": "sha256:eaa4f3d8edbdc09ec3430dd013020424d047ab0bd289cb54d5341d8cc1400ef2"
   },
   "nixie-backup": {
-    "version": "0.96.0",
-    "digest": "sha256:d996382d1979dd0e91158bd2def8d31ba9c2189027e9477188e363d71e0d4a23"
+    "version": "0.117.0",
+    "digest": "sha256:98169a67310b9e7a9e99b48ac4983fe09568bdff6efd95d7d49211a60af8da70"
   },
   "nixie-contract": {
-    "version": "0.96.0"
+    "version": "0.117.0"
   },
   "pepys-host": {
     "version": "0.4.5",
     "sum": "931e39b295baf4690483dd006bbae88a7e51ef59c5b71b9996c28b1966a14cd0"
   },
   "boxxy-cli": {
-    "version": "0.2.12",
-    "sum": "bec0a0ef988d39b98112b96aa7dccec297cef63130b03d8a8e4a54d338621579",
+    "version": "0.3.6",
+    "sum": "484597ab0cd3adf5edc16ea32ea23a54380c41cf3f7f107d5e1542fff6003b40",
     "pluginSum": "ab8f281102a71182e1465fb8c5a254b012adfc7766737da88acf3dd5adcd4153"
   },
   "auto-mode": {

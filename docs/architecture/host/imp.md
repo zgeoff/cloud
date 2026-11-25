@@ -107,8 +107,10 @@ The high mark sits low enough that a builder imp's disk still fits above impd's 
 
 impd never removes a pinned image, so each image that a config outside impd boots by name carries a
 pin. The preview service's image unit pins the preview image, and the agent image build pins each
-image that passes its check. nixie adds its sandbox images with its own token, which cannot pin, so
-delivery pins each release's new sandbox images as root, as
+image that passes its check, then unpins the older ones that no atc target boots, keeping the newest
+two, so a pile of pinned agent images never fills the pool
+([the build](../../runbooks/agent-image.md#build)). nixie adds its sandbox images with its own
+token, which cannot pin, so delivery pins each release's new sandbox images as root, as
 [nixie's runbook](../../runbooks/nixie.md#pin-nixies-sandbox-images) describes. nixie adds an
 evicted image again before it creates a sandbox on it, so an image that misses its pin costs a pull.
 

@@ -3,7 +3,7 @@ config:
   geoff-cloud:cluster: managed
   geoff-cloud:hostOnTailnet: 'true'
   geoff-cloud:atcGateway:
-    image: ghcr.io/zgeoff/atc-gateway:7.25.1@sha256:cf6c210bcec99bd3fd6cc11514fdf1d3248d4c6517a1ff40b463cf35192793db
+    image: ghcr.io/zgeoff/atc-gateway:7.26.0@sha256:b8c6ace899330352cc013c75c658cb3cfb3484f7f8545ebf4a0cf5bcf6df8388
     backupImage: ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2@sha256:ac47d4a0409e81be7304c46372f2d855083cd45315fe30529dc3279ccae9f377
     publicURL: https://atc.geoff.cloud
     daemons:
@@ -21,9 +21,9 @@ config:
       wringer-ro: 103b0b349a550d29ba54f9f0a4d16efc66c661f9f073198e0ff9675d3d45ef30
   geoff-cloud:discordAlerts: 'true'
   geoff-cloud:nixie:
-    image: ghcr.io/zgeoff/nixie:0.96.0@sha256:45d7e8cd31c08cdd1f3956bb44d45ec48883a63b760bce3d0351343c6b3c3d78
-    webImage: ghcr.io/zgeoff/nixie-web:0.96.0@sha256:cfd6d42947eff97ec5cc82736bfe00a1dac207bbb8a6b31dced33b88761c3f4a
-    backupImage: ghcr.io/zgeoff/nixie-backup:0.96.0@sha256:d996382d1979dd0e91158bd2def8d31ba9c2189027e9477188e363d71e0d4a23
+    image: ghcr.io/zgeoff/nixie:0.117.0@sha256:a1e008d8990f4f933cef6fe435a6314327f4a440e01717e93a6dd47b3894c94a
+    webImage: ghcr.io/zgeoff/nixie-web:0.117.0@sha256:eaa4f3d8edbdc09ec3430dd013020424d047ab0bd289cb54d5341d8cc1400ef2
+    backupImage: ghcr.io/zgeoff/nixie-backup:0.117.0@sha256:98169a67310b9e7a9e99b48ac4983fe09568bdff6efd95d7d49211a60af8da70
     hostname: nixie.geoff.cloud
   geoff-cloud:files:
     image: ghcr.io/zgeoff/cloud-files:14e4a70e35d5ef66b443efeb4de4ff9668d46783@sha256:012c1f1f7a08bf6f1c792b4f883396dc1b0592e3f3405d59278c7c1622af0171
@@ -53,7 +53,7 @@ config:
     serviceClientDigests:
       wringer-ro: bd9b7496b91be8979ea3f37cb5cdf55b3a35bc22b154846f671bb4e31cea3689
   geoff-cloud:boxxy:
-    image: ghcr.io/zgeoff/cloud-boxxy:051585d92a6f3836028a0fbbdffcd160c15c8cc8@sha256:47b496099d789d1344d31d8a6137cf774058df0282775b2202b5120776383d71
+    image: ghcr.io/zgeoff/cloud-boxxy:34836adade2b50dead09291b8d2126c424d07b67@sha256:81b8be87fd2c46847572c77b3df329cc44d88003185d5e7c9306f5b8deead443
     runner: geoffcloud
     atc:
       trustedFolders: {}

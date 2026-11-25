@@ -283,7 +283,7 @@ in
     backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
     # pinned by digest: the module's default names only its release's tag, which a later push
     # could move
-    image = "ghcr.io/zgeoff/imp-host:7.7.0@sha256:e32f055de3def1b117269516e0dcc9fc71351612c5509edf783ec2ba75147c5b";
+    image = "ghcr.io/zgeoff/imp-host:7.8.0@sha256:82e351969a5747e084daccbb9910cf5ea1e6cfecda1e7b61a5801be3c3c278a0";
     # the module's default ("imp") is taken in the tailnet
     settings.IMP_TAILSCALE_HOSTNAME = topology.tailnet.nodes.imp.hostname;
     # HTTPS on the tailnet only (imp#16): imps at <name>.imps.geoff.cloud, impd's API at
@@ -296,12 +296,13 @@ in
     settings.IMP_DNS_PROVIDER = "cloudflare";
     # image eviction, in percent of tank/imp (docs/architecture/host/imp.md). tank/imp sees the
     # pool less ZFS's slop and the rancher zvol's reservation: its used and available space add up
-    # to about 162 GiB, and impd's disk reserve is 5 % of that, about 8 GiB. At 80 % a 20 GiB
-    # builder disk still fits above the reserve (85 % would refuse it), and eviction starts before
-    # impd's low-disk warning at twice the reserve. The 15-point gap frees about 24 GiB, so one
-    # eviction serves many adds.
-    settings.IMP_IMAGE_EVICT_HIGH_PERCENT = 80;
-    settings.IMP_IMAGE_EVICT_LOW_PERCENT = 65;
+    # to about 131.5 GiB, and impd's disk reserve is 5 % of that, about 6.6 GiB. At 79 % the 16
+    # points above the reserve hold about 21 GiB, so a 20 GiB builder disk still fits (80 % would
+    # leave under 20 GiB), and eviction starts before impd's low-disk warning at twice the reserve.
+    # The 15-point gap is the most one eviction frees, about 20 GiB, and it frees less when too few
+    # images qualify for removal.
+    settings.IMP_IMAGE_EVICT_HIGH_PERCENT = 79;
+    settings.IMP_IMAGE_EVICT_LOW_PERCENT = 64;
     # imps are agent sandboxes: they must not reach the k3s pod and service ranges
     forwardDeny = [
       k3sPodCIDR
@@ -731,7 +732,7 @@ in
     contractRepos = [ "zgeoff/nixie" ];
     contractModelSecret = "preview-model";
     # the imp-base release that images/agent/Dockerfile builds on; the imp release pin moves both
-    impRegistryImage = "ghcr.io/zgeoff/imp-base:7.7.0@sha256:3c5867cf1ae265da3a0564478a2cd5c24e0bdee1f95633f441d62f06e4ab9149";
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:7.8.0@sha256:ba5296a2be6d15898b9f3768d453b359ba9d2829f6ab2a1a24cd4a64b7747c76";
     webhookSecretFile = "/var/lib/tank-cloud/host-secrets/preview/webhook-secret";
     githubAppClientIDFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-client-id";
     githubAppKeyFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-key";

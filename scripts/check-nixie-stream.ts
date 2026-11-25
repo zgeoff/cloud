@@ -177,7 +177,9 @@ async function printCount(
 }
 
 function formatStream(report: StreamReport): string {
-  return `stream ${report.end} for ${formatSeconds(report.openMs)}: ${report.keepalives} keepalives, longest wait ${formatSeconds(report.longestGapMs)}, ${report.records} records`;
+  const opened = report.opened ? 'opened' : 'never opened';
+
+  return `stream ${report.end} for ${formatSeconds(report.openMs)}: ${opened}, ${report.keepalives} keepalives, longest wait ${formatSeconds(report.longestGapMs)}, ${report.records} records, ${report.changes} changes`;
 }
 
 function formatSeconds(durationMs: number): string {
@@ -205,6 +207,7 @@ interface Outcome {
 function collectFailures(outcome: Outcome): string[] {
   const failures = [
     outcome.stream.end === 'held' ? null : `the stream did not stay open: ${outcome.stream.end}`,
+    outcome.stream.opened ? null : 'the stream never sent its opened event',
     outcome.stream.longestGapMs <= outcome.options.maxGapMs
       ? null
       : `the stream went more than ${formatSeconds(outcome.options.maxGapMs)} without a keepalive`,
@@ -267,8 +270,8 @@ if (import.meta.main) {
   process.exitCode = await checkNixieStream({
     url: process.argv[2] ?? 'https://nixie.geoff.cloud',
 
-    // nixie sends a keepalive every 5 s, and its web client counts a stream that misses three in a
-    // row as dead
+    // nixie's contract sets these in liveStreamTiming: a keepalive every 5 s, and a web client that
+    // counts a stream with no byte for 15 s as dead
     holdMs: 30_000,
     maxGapMs: 15_000,
     minKeepalives: 5,
