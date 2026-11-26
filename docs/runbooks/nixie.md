@@ -318,6 +318,10 @@ When the pod's age identity changes, put its public half in `deploy/nixie/.sops.
    added and that cloud does not call needs no change. The release check's nixie bump makes both
    changes ([Release check](./release-check.md)).
 
+   When the release changes `apps/model-gateway` in nixie, also pin the gateway in
+   `nixos/packages/model-gateway.nix` to the same release, and switch the host before the apply.
+   nixie refuses the status of an older gateway and pauses with the cause `spending`.
+
 2. Preview, then apply:
 
    ```bash
