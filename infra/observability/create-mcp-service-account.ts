@@ -4,7 +4,7 @@ import { Provider, oss } from '@pulumiverse/grafana';
 import { buildGrafanaProviderArgs } from './build-grafana-provider-args.ts';
 import { buildMCPAccountArgs } from './build-mcp-account-args.ts';
 import { buildMCPTokenSpec } from './build-mcp-token-spec.ts';
-import { buildMCPTokenSyncArgs } from './build-mcp-token-sync-args.ts';
+import { buildMCPTokenSyncSpec } from './build-mcp-token-sync-spec.ts';
 
 interface MCPServiceAccountInputs {
   readonly grafanaURL: string;
@@ -29,8 +29,7 @@ export function createMCPServiceAccount(inputs: MCPServiceAccountInputs): Comman
 
   const token = new oss.ServiceAccountToken('mcp-viewer', tokenSpec.args, tokenSpec.options);
 
-  return new Command(
-    'grafana-mcp-token-to-1password',
-    buildMCPTokenSyncArgs({ tokenID: token.id, key: token.key }),
-  );
+  const syncSpec = buildMCPTokenSyncSpec({ tokenID: token.id, key: token.key });
+
+  return new Command('grafana-mcp-token-to-1password', syncSpec.args, syncSpec.options);
 }

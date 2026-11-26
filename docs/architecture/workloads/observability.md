@@ -58,9 +58,9 @@ on a cluster volume with no backup too, so the account and its token outlive a p
 volume's class keeps it when its claim is deleted. The database is one SQLite file, which two
 Grafana processes can corrupt when they write it at once. A rollout stops the old pod before it
 starts the new one, so only one pod writes the file. If the volume is lost, `mcp-viewer` and its
-token are gone until an [apply by hand](../../runbooks/workflows.md#apply-by-hand) with a refresh:
-the refresh finds the account missing, so Pulumi makes a new account and token and copies the token
-into the `grafana-mcp` item.
+token are gone until an [apply by hand](../../runbooks/workflows.md#apply-by-hand) with a refresh
+and `GRAFANA_MCP_OP_TOKEN` set: the refresh finds the account missing, so Pulumi makes a new account
+and token and copies the token into the `grafana-mcp` item.
 
 ## Probes of impd
 
