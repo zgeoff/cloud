@@ -143,6 +143,12 @@ A gateway rewrites its store in the newest version it knows at its first start, 
 older release refuses to start on that store. To roll the pin back, restore the store from before
 the upgrade, which loses the spend counted since.
 
+**CAUTION:** Roll the gateway back only while nixie still runs the release before. A nixie of the
+newer release refuses the status of an older gateway and pauses, and its migrations leave a database
+that the older nixie cannot read
+([upgrades](https://github.com/zgeoff/nixie/blob/main/docs/runbooks/upgrades.md#past-a-declared-break)).
+Once nixie runs the newer release, fix the gateway forward.
+
 1. Before you merge a PR that moves the gateway pin, copy the store, keeping its owner and mode. The
    command refuses to replace a copy that exists, so a second run never overwrites it with a moved
    store:
@@ -153,9 +159,10 @@ the upgrade, which loses the spend counted since.
 
    `<version>` is the release the switch moves to. Expect no output.
 
-2. To roll back, revert the whole PR that moved the pin, since an older gateway refuses the config
-   keys of a newer one, and merge the revert. Build the host first, so that the unit stops only once
-   the build has passed:
+2. To roll back, revert the gateway's part of the PR that moved the pin: the pin, and the changes to
+   the module, the host config and its check. An older gateway refuses the config keys of a newer
+   one. Keep nixie's own pins. Merge the revert, then build the host, so that the unit stops only
+   once the build has passed:
 
    ```bash
    bun run ops:switch-host -- --build-only
