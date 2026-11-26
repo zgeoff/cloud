@@ -434,7 +434,7 @@ let
         '';
     }
     {
-      title = "it renders the geoffcloud config with the nixie zone, a loopback control listener and a priced route per nixie profile, each with a day limit of 60 and a month limit of 600 dollars";
+      title = "it renders the geoffcloud config with the nixie zone, a loopback control listener and a priced route per nixie profile, each with a day limit of 5 and a month limit of 50 dollars, except fable-5-2 with 60 and 600";
       script =
         let
           fable52 = {
@@ -487,8 +487,12 @@ let
               output = 2.5;
             };
           };
-          # the dollar limits nixie's config set for all its spend before they moved to each route
+          # the limits of every route but fable-5-2
           geoffcloudLimits = {
+            day = 5;
+            month = 50;
+          };
+          fable52Limits = {
             day = 60;
             month = 600;
           };
@@ -523,7 +527,7 @@ let
             countBySandbox = true;
             override = "/var/lib/model-gateway/override.json";
             routes = {
-              fable-5-2 = route "claude-fable-5-2" fable52;
+              fable-5-2 = (route "claude-fable-5-2" fable52) // { limits = fable52Limits; };
               fable-5-1 = route "claude-fable-5-1" fable51;
               opus-5-5 = route "claude-opus-5-5" opus55;
               opus-4-6 = route "claude-opus-4-6" opus4;
@@ -715,8 +719,8 @@ let
         assert_equal "$(cat status-status)" 200
         # the status
         assert_equal "$(jq -c '{zone, lost, fable: (.routes["fable-5-2"] | {day: (.day | {dollars, limit, cap, tripped}), month: (.month | {dollars, limit, tripped})})}' status)" '{"zone":"Australia/Sydney","lost":false,"fable":{"day":{"dollars":0,"limit":60,"cap":120,"tripped":false},"month":{"dollars":0,"limit":600,"tripped":false}}}'
-        # every route has the same limits
-        assert_equal "$(jq -c '[.routes[] | {day: .day.limit, month: .month.limit}] | unique' status)" '[{"day":60,"month":600}]'
+        # every route but fable-5-2 has the lower limits
+        assert_equal "$(jq -c '[.routes | to_entries[] | select(.key != "fable-5-2") | {day: .value.day.limit, month: .value.month.limit}] | unique' status)" '[{"day":5,"month":50}]'
         # the above-cap limit's code
         assert_equal "$(cat above-cap-status)" 409
         # the refusal

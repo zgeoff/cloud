@@ -745,10 +745,15 @@ in
   # host-secrets, staged by the runbook; until it exists, the unit is skipped.
   services.model-gateway =
     let
-      # each route's own day and month limits, in US dollars: the day and month dollar limits that
-      # nixie's config set for all its spend before nixie 0.120.0 moved the limits to each route.
-      # dayCap is left at the gateway's default of twice the day, the $120 day cap from before
+      # each route's own day and month limits, in US dollars. A route gets the default limits unless
+      # it names its own: only fable-5-2 does, at the $60 a day and $600 a month that every route had
+      # before the owner lowered the rest on 26 Nov 2026. dayCap is left at the gateway's default of
+      # twice the day
       limits = {
+        day = 5;
+        month = 50;
+      };
+      fable52Limits = {
         day = 60;
         month = 600;
       };
@@ -847,7 +852,7 @@ in
       # one route per profile in deploy/nixie/config.yaml, keyed by the profile's ID, which nixie
       # puts in each request's path
       routes = {
-        fable-5-2 = anthropic "claude-fable-5-2" fable52;
+        fable-5-2 = (anthropic "claude-fable-5-2" fable52) // { limits = fable52Limits; };
         fable-5-1 = anthropic "claude-fable-5-1" fable51;
         opus-5-5 = anthropic "claude-opus-5-5" opus55;
         opus-4-6 = anthropic "claude-opus-4-6" opus4;
