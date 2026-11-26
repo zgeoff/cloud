@@ -740,22 +740,34 @@ in
   };
 
   # nixie's model gateway (docs/runbooks/model-gateway.md): every model request of
-  # production nixie passes it, through the impd model secrets' upstream, and it refuses past the
-  # day and month limits nixie sets, which the caps below bound. The control token sits on
+  # production nixie passes it, through the impd model secrets' upstream, and it refuses a route's
+  # requests past that route's own day and month dollar limits below. The control token sits on
   # host-secrets, staged by the runbook; until it exists, the unit is skipped.
   services.model-gateway =
     let
+      # each route's own day and month limits, in US dollars: the day and month dollar limits that
+      # nixie's config set for all its spend before nixie 0.120.0 moved the limits to each route.
+      # dayCap is left at the gateway's default of twice the day, the $120 day cap from before
+      limits = {
+        day = 60;
+        month = 600;
+      };
       # Anthropic's list prices, in dollars per million tokens, from the model pricing table of
       # https://platform.claude.com/docs/en/about-claude/pricing (read 17 Nov 2026), the same
       # prices deploy/nixie/config.yaml gives each profile
-      anthropic = model: prices: { inherit model prices; };
+      anthropic = model: prices: { inherit model prices limits; };
       # a model outside Claude through OpenRouter's Messages endpoint, at /api/v1/messages, pinned to
       # one provider: the profile's provider_pin and the route's providerPin name the same endpoint.
       # Each price is the highest of the endpoints the pin matches, from
       # https://openrouter.ai/api/v1/models/<model>/endpoints (read 18 Nov 2026); deploy/nixie/config.yaml
       # gives each profile the same prices and pin, and says why
       openrouter = model: providerPin: prices: {
-        inherit model providerPin prices;
+        inherit
+          model
+          providerPin
+          prices
+          limits
+          ;
         upstream = "https://openrouter.ai/api";
       };
       fable52 = {
@@ -816,17 +828,6 @@ in
       enable = true;
       # nixie's time zone: deploy/nixie/config.yaml sets no time section, so nixie's default
       zone = "Australia/Sydney";
-      # twice nixie's day and month dollar and token limits
-      caps = {
-        day = {
-          dollars = 120;
-          tokens = 160000000;
-        };
-        month = {
-          dollars = 1200;
-          tokens = 1200000000;
-        };
-      };
       modelListen = {
         interface = topology.podman.bridge;
         address = topology.podman.bridgeAddress;
@@ -997,6 +998,7 @@ in
           upstream = "https://chatgpt.com/backend-api/codex";
           model = "gpt-6-luna";
           maxOutputTokens = 128000;
+          inherit limits;
           prices = {
             input = 0.1;
             cache_write = 0.125;
