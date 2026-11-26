@@ -150,10 +150,26 @@ async function checkStream(
 
   const after = await printCount(options, session, 'after');
 
-  return (
-    after !== undefined &&
-    printFailures(options, collectFailures({ options, stream: stream.value, before, after }))
+  if (after === undefined) {
+    return false;
+  }
+
+  const pause = await readPause(options, session);
+
+  if (pause === undefined) {
+    return false;
+  }
+
+  const passed = printFailures(
+    options,
+    collectFailures({ options, stream: stream.value, before, after, pause }),
   );
+
+  if (passed) {
+    options.printOut('nixie is running\n');
+  }
+
+  return passed;
 }
 
 async function printCount(
@@ -186,6 +202,52 @@ function formatSeconds(durationMs: number): string {
   return `${(durationMs / 1000).toFixed(1)} s`;
 }
 
+// a nixie that spending, an owner or a restore paused answers every call and holds its stream open,
+// and it works no turn until it resumes, so no other step of this check can tell
+interface Pause {
+  readonly cause: string;
+  readonly since: string;
+}
+
+async function readPause(
+  options: Readonly<CheckNixieStreamOptions>,
+  session: Readonly<CheckSession>,
+): Promise<Pause | null | undefined> {
+  const state = await sendNixieRPC({
+    url: session.url,
+    token: session.token,
+    procedure: 'nixie/read',
+    input: undefined,
+
+    // a stalled answer must not keep the session from its revoke
+    signal: AbortSignal.timeout(10_000),
+    parse: parseState,
+  });
+
+  if (!state.ok) {
+    options.printErr(`check-nixie-stream: cannot read whether nixie is paused: ${state.error}\n`);
+
+    return undefined;
+  }
+
+  return state.value.pause;
+}
+
+function parseState(output: unknown): { readonly pause: Pause | null } | undefined {
+  const paused = findJSONField(output, 'paused');
+
+  if (paused === null) {
+    return { pause: null };
+  }
+
+  const cause = findJSONField(paused, 'cause');
+  const since = findJSONField(paused, 'since');
+
+  return typeof cause === 'string' && since instanceof Date
+    ? { pause: { cause, since: since.toISOString() } }
+    : undefined;
+}
+
 function printFailures(
   options: Readonly<CheckNixieStreamOptions>,
   failures: readonly string[],
@@ -202,6 +264,7 @@ interface Outcome {
   readonly stream: StreamReport;
   readonly before: RecordCount;
   readonly after: RecordCount;
+  readonly pause: Pause | null;
 }
 
 function collectFailures(outcome: Outcome): string[] {
@@ -220,6 +283,9 @@ function collectFailures(outcome: Outcome): string[] {
     outcome.after.records === outcome.before.records
       ? null
       : `the conversation went from ${outcome.before.records} to ${outcome.after.records} records`,
+    outcome.pause === null
+      ? null
+      : `nixie is paused, cause ${outcome.pause.cause}, since ${outcome.pause.since}`,
   ];
 
   return failures.filter((failure) => failure !== null);
