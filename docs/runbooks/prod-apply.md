@@ -194,10 +194,10 @@ Never dispatch a held plan that replaces imp's `tag:imp` key, which the apply wr
 the vault keeps the old value. [Apply it by hand](./workflows.md#apply-by-hand), from a 1Password
 session that writes the `cloud` vault.
 
-A held plan that creates or replaces the token of Grafana's MCP account is safe to dispatch. The
-job's account cannot write the `agents` vault either, so the apply skips the copy into the
-`grafana-mcp` item and prints `grafana-mcp-token-to-1password: skipped`. After the run, copy the
-token as [Rotate a credential](./workflows.md#rotate-a-credential) describes.
+A dispatched apply of a held plan that creates or replaces the token of Grafana's MCP account ends
+green, but skips the copy into the `agents` vault. Grafana deletes the old token first, so the MCP
+server fails to connect until you copy the new token, as
+[Rotate a credential](./workflows.md#rotate-a-credential) describes.
 
 ## Rotate the job's credentials
 

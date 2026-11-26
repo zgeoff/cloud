@@ -228,9 +228,8 @@ Grafana's NodePort on the host ([the tailnet](./network/tailnet.md)).
 Some writes stay with a person. The program copies each new `tag:imp` key into the `cloud` vault,
 and each new token of Grafana's MCP account into the `agents` vault. The job's account can write
 neither vault, but a new key or token replaces the command that copies it, and the guard holds that
-replace. The token's copy runs only when the applier sets `GRAFANA_MCP_OP_TOKEN` to a 1Password
-token that writes `agents`, and otherwise skips with a message, so a dispatched apply never stops
-there. An edit to that command's text alone never runs the copy again. A NixOS switch and an
+replace. Without a token that writes `agents`, the apply skips the token's copy
+([rotate a credential](../runbooks/workflows.md#rotate-a-credential)). A NixOS switch and an
 agent-image rollout run by hand ([workflows](../runbooks/workflows.md)).
 
 ## Guards
