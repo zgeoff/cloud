@@ -218,6 +218,9 @@ async function readPause(
     token: session.token,
     procedure: 'nixie/read',
     input: undefined,
+
+    // a stalled answer must not keep the session from its revoke
+    signal: AbortSignal.timeout(10_000),
     parse: parseState,
   });
 
