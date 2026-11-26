@@ -527,7 +527,9 @@ let
             countBySandbox = true;
             override = "/var/lib/model-gateway/override.json";
             routes = {
-              fable-5-2 = (route "claude-fable-5-2" fable52) // { limits = fable52Limits; };
+              fable-5-2 = (route "claude-fable-5-2" fable52) // {
+                limits = fable52Limits;
+              };
               fable-5-1 = route "claude-fable-5-1" fable51;
               opus-5-5 = route "claude-opus-5-5" opus55;
               opus-4-6 = route "claude-opus-4-6" opus4;

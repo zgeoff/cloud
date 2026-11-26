@@ -852,7 +852,9 @@ in
       # one route per profile in deploy/nixie/config.yaml, keyed by the profile's ID, which nixie
       # puts in each request's path
       routes = {
-        fable-5-2 = (anthropic "claude-fable-5-2" fable52) // { limits = fable52Limits; };
+        fable-5-2 = (anthropic "claude-fable-5-2" fable52) // {
+          limits = fable52Limits;
+        };
         fable-5-1 = anthropic "claude-fable-5-1" fable51;
         opus-5-5 = anthropic "claude-opus-5-5" opus55;
         opus-4-6 = anthropic "claude-opus-4-6" opus4;
