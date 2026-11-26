@@ -237,8 +237,9 @@ The gateway sends a request only on a route whose ID equals the profile's ID, an
 route's table. A profile with no route gets a 404 on every call.
 
 1. In one PR, add the profile to `deploy/nixie/config.yaml` and a route to `services.model-gateway`,
-   with the same ID, model and prices. Give the route the shared `limits` value that the `anthropic`
-   and `openrouter` helpers in the host config add, a `day` and a `month` in dollars. A model
+   with the same ID, model and prices. Give the route the limits that its helper in the host config adds: a
+   Claude model uses `anthropic`, which sets the subscription limits, and a model through OpenRouter
+   uses `openrouter`, which sets the lower ones. Each is a `day` and a `month` in dollars. A model
    outside Claude goes through OpenRouter: its base URL is `https://openrouter.ai`, with no path,
    and its route's upstream is `https://openrouter.ai/api`. Pin it to one provider endpoint: the
    profile's `provider_pin` and the route's `providerPin` name the same endpoint tag, such as

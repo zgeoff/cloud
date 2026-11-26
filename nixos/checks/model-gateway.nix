@@ -719,8 +719,12 @@ let
         assert_equal "$(cat status-status)" 200
         # the status
         assert_equal "$(jq -c '{zone, lost, fable: (.routes["fable-5-2"] | {day: (.day | {dollars, limit, cap, tripped}), month: (.month | {dollars, limit, tripped})})}' status)" '{"zone":"Australia/Sydney","lost":false,"fable":{"day":{"dollars":0,"limit":200,"cap":400,"tripped":false},"month":{"dollars":0,"limit":3000,"tripped":false}}}'
-        # every Anthropic route and the plan route has the subscription limits, and every other route the lower ones
-        assert_equal "$(jq -c '[.routes | to_entries[] | {day: .value.day.limit, month: .value.month.limit}] | unique' status)" '[{"day":5,"month":50},{"day":200,"month":3000}]'
+        # each route's own limits: the subscription limits on an Anthropic route and the plan route, the lower ones on an OpenRouter route
+        assert_equal "$(jq -cS '[.routes | to_entries[] | {key, value: {day: .value.day.limit, month: .value.month.limit}}] | from_entries' status)" ${
+          lib.escapeShellArg (
+            builtins.toJSON (lib.mapAttrs (_: route: { inherit (route.limits) day month; }) gateway.routes)
+          )
+        }
         # the above-cap limit's code
         assert_equal "$(cat above-cap-status)" 409
         # the refusal
