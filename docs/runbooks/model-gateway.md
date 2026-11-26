@@ -21,7 +21,8 @@ refuses the status of an older gateway and pauses.
 
 **CAUTION:** The gateway fails closed. While it is stopped, while its store is unreadable, and while
 the lost mark stands, every model request of nixie fails. Stop or restart the unit only in a host
-switch, or in a step below that tells you to: clearing the lost mark, or rotating the control token.
+switch, or in a step below that tells you to: rolling the gateway back, clearing the lost mark, or
+rotating the control token.
 
 ## What holds what
 
@@ -135,6 +136,34 @@ for the cause, and check the provider's usage page, before you clear the mark.
 
 3. Start the unit: `ssh root@geoffcloud systemctl start model-gateway < /dev/null`, and read the
    status. Expect `"lost": false`.
+
+## Roll the gateway back
+
+A gateway rewrites its store in the newest version it knows at its first start, and a gateway of an
+older release refuses to start on that store. A rollback of the pin therefore needs the store from
+before the upgrade, and loses the spend counted since.
+
+1. Before a switch that moves the gateway pin, copy the store, keeping its owner and mode:
+
+   ```bash
+   ssh root@geoffcloud 'cp -p /var/lib/model-gateway/store.json /var/lib/model-gateway/store.json.pre-<version>' < /dev/null
+   ```
+
+   `<version>` is the release the switch moves to. Expect no output.
+
+2. To roll back, revert the pin in a PR and merge it. Stop the unit, put the copy back, then switch
+   the host:
+
+   ```bash
+   ssh root@geoffcloud 'systemctl stop model-gateway && cp -p /var/lib/model-gateway/store.json.pre-<version> /var/lib/model-gateway/store.json' < /dev/null
+   bun run ops:switch-host
+   ```
+
+   Expect the switch to pass, and [the status](#read-the-status) to show `"lost": false`.
+
+The override file changes shape with the store: a gateway ignores an override in an earlier shape
+and logs `override.unreadable`, so the day falls back to its configured limit. Write an override
+again with `model-gateway raise` after the switch when you still need it.
 
 ## Send nixie's model requests through the gateway
 

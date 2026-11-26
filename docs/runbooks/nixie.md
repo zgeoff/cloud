@@ -323,6 +323,11 @@ When the pod's age identity changes, put its public half in `deploy/nixie/.sops.
    `Deploy prod` workflow applies the new image with no step 2 by hand, so switch the host with
    `bun run ops:switch-host` as soon as that run ends. Until the switch, nixie refuses the older
    gateway's status and stays paused with the cause `spending`, and the switch clears the pause.
+   When the PR also changes `deploy/nixie/config.yaml`, the guard holds the run
+   ([prod apply](./prod-apply.md#answer-a-held-run)). Then switch the host first, and dispatch the
+   held run after the switch, so nixie never runs against the older gateway. Before the switch, copy
+   the gateway's store, as [roll the gateway back](./model-gateway.md#roll-the-gateway-back)
+   describes.
 
 2. Preview, then apply:
 
