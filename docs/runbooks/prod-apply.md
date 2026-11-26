@@ -189,15 +189,15 @@ lists each reason. The next push's run starts once the held run ends.
 
 3. To drop the change, revert it in a PR. The revert's own run then finds nothing to hold.
 
-Never dispatch a held plan that writes a key or a token into 1Password:
+Never dispatch a held plan that replaces imp's `tag:imp` key, which the apply writes into the
+`cloud` vault. The job's account cannot write that vault, so the dispatched apply fails partway and
+the vault keeps the old value. [Apply it by hand](./workflows.md#apply-by-hand), from a 1Password
+session that writes the `cloud` vault.
 
-- a plan that replaces imp's `tag:imp` key, which the apply writes into the `cloud` vault;
-- a plan that creates or replaces the token of Grafana's MCP account, which the apply writes into
-  the `agents` vault.
-
-The job's account can write neither vault, so the dispatched apply fails partway and the vault keeps
-the old value. [Apply it by hand](./workflows.md#apply-by-hand), from a 1Password session that reads
-the `cloud` vault and writes the vault that the plan writes.
+A held plan that creates or replaces the token of Grafana's MCP account is safe to dispatch. The
+job's account cannot write the `agents` vault either, so the apply skips the copy into the
+`grafana-mcp` item and prints `grafana-mcp-token-to-1password: skipped`. After the run, copy the
+token as [Rotate a credential](./workflows.md#rotate-a-credential) describes.
 
 ## Rotate the job's credentials
 

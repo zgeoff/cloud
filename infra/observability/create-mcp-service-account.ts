@@ -32,5 +32,8 @@ export function createMCPServiceAccount(inputs: MCPServiceAccountInputs): Comman
   return new Command(
     'grafana-mcp-token-to-1password',
     buildMCPTokenSyncArgs({ tokenID: token.id, key: token.key }),
+
+    // with an update command set, a trigger change would only update the Command
+    { replaceOnChanges: ['triggers'] },
   );
 }

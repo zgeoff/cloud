@@ -299,17 +299,28 @@ webhook have a third copy in the host's credentials file for the
 [scheduled drift check](./drift-check.md#rotate-the-checks-credentials): install that file again
 after a change to either.
 
-| Credential                                                     | Deliver it with                                                                                                                                                                                                                                    |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| a provider credential: Onidel, Cloudflare, Tailscale, R2 state | nothing: the next run reads the new value through `op run`. Revoke the old one at its source                                                                                                                                                       |
-| `ALERT_WEBHOOK_URL`                                            | `bun run up`, which updates the Worker's secret, and Alertmanager's Secret when `discordAlerts` is on                                                                                                                                              |
-| `ALERT_MENTION_USER_ID`                                        | `bun run up`, which updates Alertmanager's Secret and restarts it when `discordAlerts` is on                                                                                                                                                       |
-| `PULUMI_CONFIG_PASSPHRASE`                                     | do not replace the item: the stack's secrets are encrypted with it. Changing it needs a migration                                                                                                                                                  |
-| imp's Cloudflare DNS token                                     | `bash scripts/install-imp-dns-token.sh`; impd rereads the file, no restart                                                                                                                                                                         |
-| the k3s kubeconfig                                             | `bash scripts/connect-k3s.sh`, then a preview. Read it before any apply                                                                                                                                                                            |
-| `GHCR_PULL_TOKEN`                                              | the apply bracket in [the GHCR pull token](./ghcr-pull-token.md#rotate-the-token), then a pull check                                                                                                                                               |
-| imp's tailnet key (`tag:imp`)                                  | `bun run up` mints a new one after expiry and writes it to `imp-tailscale-authkey`                                                                                                                                                                 |
-| Grafana's MCP token (`agents` vault, `grafana-mcp`)            | `bun run up -- --replace 'urn:pulumi:prod::geoff-cloud::grafana:oss/serviceAccountToken:ServiceAccountToken::mcp-viewer'`, from a 1Password session that reads `cloud` and writes `agents`; the MCP server reads the new token at its next connect |
+| Credential                                                     | Deliver it with                                                                                                                                                                                                             |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a provider credential: Onidel, Cloudflare, Tailscale, R2 state | nothing: the next run reads the new value through `op run`. Revoke the old one at its source                                                                                                                                |
+| `ALERT_WEBHOOK_URL`                                            | `bun run up`, which updates the Worker's secret, and Alertmanager's Secret when `discordAlerts` is on                                                                                                                       |
+| `ALERT_MENTION_USER_ID`                                        | `bun run up`, which updates Alertmanager's Secret and restarts it when `discordAlerts` is on                                                                                                                                |
+| `PULUMI_CONFIG_PASSPHRASE`                                     | do not replace the item: the stack's secrets are encrypted with it. Changing it needs a migration                                                                                                                           |
+| imp's Cloudflare DNS token                                     | `bash scripts/install-imp-dns-token.sh`; impd rereads the file, no restart                                                                                                                                                  |
+| the k3s kubeconfig                                             | `bash scripts/connect-k3s.sh`, then a preview. Read it before any apply                                                                                                                                                     |
+| `GHCR_PULL_TOKEN`                                              | the apply bracket in [the GHCR pull token](./ghcr-pull-token.md#rotate-the-token), then a pull check                                                                                                                        |
+| imp's tailnet key (`tag:imp`)                                  | `bun run up` mints a new one after expiry and writes it to `imp-tailscale-authkey`                                                                                                                                          |
+| Grafana's MCP token (`agents` vault, `grafana-mcp`)            | `bun run up -- --replace 'urn:pulumi:prod::geoff-cloud::grafana:oss/serviceAccountToken:ServiceAccountToken::mcp-viewer'`, with `GRAFANA_MCP_OP_TOKEN` set as below; the MCP server reads the new token at its next connect |
+
+The apply copies Grafana's MCP token into the `grafana-mcp` item only when `GRAFANA_MCP_OP_TOKEN`
+holds a 1Password service account token that writes the `agents` vault. Without it, the apply skips
+the copy and prints `grafana-mcp-token-to-1password: skipped`. After an apply that skipped it, such
+as a run of the apply job, set the variable and copy the token again:
+
+```sh
+bun run up -- --replace 'urn:pulumi:prod::geoff-cloud::command:local:Command::grafana-mcp-token-to-1password'
+```
+
+Run it as an [apply by hand](#apply-by-hand). Expect `+-1 replaced` and no `skipped` line.
 
 A rotation of the atc daemon's gateway or imp token needs `systemctl restart atc-daemon` on the
 host, because the daemon reads copies of the token files made when it starts
