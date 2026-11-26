@@ -36,20 +36,14 @@ let
     cached_input = 0.3;
     output = 15;
   };
+  limits = {
+    day = 10;
+    month = 100;
+  };
   settings = {
     enable = true;
     package = stubGateway;
     zone = "Europe/London";
-    caps = {
-      day = {
-        dollars = 10;
-        tokens = 1000;
-      };
-      month = {
-        dollars = 100;
-        tokens = 10000;
-      };
-    };
     modelListen = {
       interface = "podman0";
       address = "10.88.0.1";
@@ -68,7 +62,7 @@ let
     };
     routes.sonnet = {
       model = "claude-sonnet-fixture";
-      inherit prices;
+      inherit prices limits;
     };
   };
 
@@ -220,7 +214,6 @@ let
             };
             store = "/var/lib/model-gateway/store.json";
             periods.zone = "Europe/London";
-            caps = settings.caps;
             control = {
               listen = {
                 hostname = "127.0.0.1";
@@ -233,7 +226,7 @@ let
             routes.sonnet = {
               model = "claude-sonnet-fixture";
               upstream = "https://api.anthropic.com";
-              inherit prices;
+              inherit prices limits;
             };
           }}
           EOF
@@ -353,7 +346,7 @@ let
         '';
     }
     {
-      title = "it loads each plan route key as a credential, renders the api, largest output and login of the route, and refuses a login on another api or outside the state directory";
+      title = "it loads each plan route key as a credential, renders the api, largest output, limits and login of the route, and refuses a login on another api or outside the state directory";
       script =
         let
           planRoute = {
@@ -362,6 +355,11 @@ let
             model = "gpt-fixture";
             maxOutputTokens = 1000;
             inherit prices;
+            limits = {
+              day = 5;
+              month = 50;
+              dayCap = 7;
+            };
             login = {
               file = "/var/lib/model-gateway/login-plan.json";
               routeKeyFile = "/run/fixture/plan-route-key";
@@ -398,7 +396,7 @@ let
               sonnet = {
                 model = "claude-sonnet-fixture";
                 upstream = "https://api.anthropic.com";
-                inherit prices;
+                inherit prices limits;
               };
               plan = {
                 api = "openai-responses";
@@ -406,6 +404,11 @@ let
                 model = "gpt-fixture";
                 maxOutputTokens = 1000;
                 inherit prices;
+                limits = {
+                  day = 5;
+                  month = 50;
+                  dayCap = 7;
+                };
                 login = {
                   file = "/var/lib/model-gateway/login-plan.json";
                   routeKeyFile = "/run/credentials/model-gateway.service/plan-route-key";
@@ -431,7 +434,7 @@ let
         '';
     }
     {
-      title = "it renders the geoffcloud config with the nixie zone, the caps, a loopback control listener and a priced route per nixie profile";
+      title = "it renders the geoffcloud config with the nixie zone, a loopback control listener and a priced route per nixie profile, each with a day limit of 60 and a month limit of 600 dollars";
       script =
         let
           fable52 = {
@@ -484,13 +487,20 @@ let
               output = 2.5;
             };
           };
+          # the dollar limits nixie's config set for all its spend before they moved to each route
+          geoffcloudLimits = {
+            day = 60;
+            month = 600;
+          };
           route = model: prices: {
             inherit model prices;
+            limits = geoffcloudLimits;
             upstream = "https://api.anthropic.com";
           };
           # each model's pinned OpenRouter endpoint and its price, as the host config gives them
           openrouterRoute = model: providerPin: prices: {
             inherit model providerPin prices;
+            limits = geoffcloudLimits;
             upstream = "https://openrouter.ai/api";
           };
         in
@@ -503,16 +513,6 @@ let
             };
             store = "/var/lib/model-gateway/store.json";
             periods.zone = "Australia/Sydney";
-            caps = {
-              day = {
-                dollars = 120;
-                tokens = 160000000;
-              };
-              month = {
-                dollars = 1200;
-                tokens = 1200000000;
-              };
-            };
             control = {
               listen = {
                 hostname = "127.0.0.1";
@@ -667,6 +667,7 @@ let
                 upstream = "https://chatgpt.com/backend-api/codex";
                 model = "gpt-6-luna";
                 maxOutputTokens = 128000;
+                limits = geoffcloudLimits;
                 prices = {
                   input = 0.1;
                   cache_write = 0.125;
@@ -695,7 +696,7 @@ let
         '';
     }
     {
-      title = "it answers the geoffcloud control listener only with the token, in the nixie zone, and refuses a limit above the cap";
+      title = "it answers the geoffcloud control listener only with the token, in the nixie zone, with the limits of each route, and refuses a raise above the day cap of a route";
       script = ''
         mkdir home tmp
         start_stub_server ${./test-utils/run-stub-model-api.py} /v1/messages ${lib.escapeShellArg fableReply} "$PWD/requests"
@@ -703,20 +704,23 @@ let
 
         curl -s -o unauthorized -w '%{http_code}' "$control/status" > unauthorized-status
         curl -s -o status -w '%{http_code}' -H @auth-header "$control/status" > status-status
-        curl -s -o above-cap -w '%{http_code}' -X PUT -H @auth-header \
-          -d '{"day":{"dollars":121,"tokens":80000000},"month":{"dollars":600,"tokens":600000000}}' \
-          "$control/limits" > above-cap-status
+        day_start=$(jq -r '.routes["fable-5-2"].day.start' status)
+        curl -s -o above-cap -w '%{http_code}' -X POST -H @auth-header \
+          -d "{\"route\":\"fable-5-2\",\"start\":\"$day_start\",\"dollars\":121}" \
+          "$control/raise" > above-cap-status
 
         # the tokenless status's code
         assert_equal "$(cat unauthorized-status)" 401
         # the status's code
         assert_equal "$(cat status-status)" 200
         # the status
-        assert_equal "$(jq -c '{zone, lost, day: (.periods.day | {limit, cap}), month: (.periods.month | {limit, cap}), tripped}' status)" '{"zone":"Australia/Sydney","lost":false,"day":{"limit":null,"cap":{"dollars":120,"tokens":160000000}},"month":{"limit":null,"cap":{"dollars":1200,"tokens":1200000000}},"tripped":null}'
+        assert_equal "$(jq -c '{zone, lost, fable: (.routes["fable-5-2"] | {day: (.day | {dollars, limit, cap, tripped}), month: (.month | {dollars, limit, tripped})})}' status)" '{"zone":"Australia/Sydney","lost":false,"fable":{"day":{"dollars":0,"limit":60,"cap":120,"tripped":false},"month":{"dollars":0,"limit":600,"tripped":false}}}'
+        # every route has the same limits
+        assert_equal "$(jq -c '[.routes[] | {day: .day.limit, month: .month.limit}] | unique' status)" '[{"day":60,"month":600}]'
         # the above-cap limit's code
         assert_equal "$(cat above-cap-status)" 409
         # the refusal
-        assert_equal "$(jq -c . above-cap)" '{"error":"above_cap","period":"day","cap":{"dollars":120,"tokens":160000000}}'
+        assert_equal "$(jq -c . above-cap)" '{"error":"above_cap","route":"fable-5-2","cap":120}'
         diff -u /dev/null gateway.err
       '';
     }
@@ -727,8 +731,6 @@ let
         start_stub_server ${./test-utils/run-stub-model-api.py} /v1/messages ${lib.escapeShellArg fableReply} "$PWD/requests"
         ${startGateway}
         : > requests
-        curl -s -o /dev/null -X PUT -H @auth-header \
-          -d '{"day":{"dollars":60,"tokens":80000000},"month":{"dollars":600,"tokens":600000000}}' "$control/limits"
 
         curl -s -o reply -w '%{http_code}' -X POST "http://127.0.0.1:$gateway_port/nixie-0a1b2c/fable-5-2/v1/messages" \
           -H 'content-type: application/json' -d ${lib.escapeShellArg fableRequest} > status
@@ -742,24 +744,24 @@ let
       '';
     }
     {
-      title = "it counts a Fable 5.2 request of a registered sandbox at the Fable 5.2 prices in the day, the month and the sandbox";
+      title = "it counts a Fable 5.2 request of a registered sandbox at the Fable 5.2 prices in the day and month of its route and in the sandbox";
       script = ''
         mkdir home tmp
         start_stub_server ${./test-utils/run-stub-model-api.py} /v1/messages ${lib.escapeShellArg fableReply} "$PWD/requests"
         ${startGateway}
-        curl -s -o /dev/null -X PUT -H @auth-header \
-          -d '{"day":{"dollars":60,"tokens":80000000},"month":{"dollars":600,"tokens":600000000}}' "$control/limits"
         curl -s -o /dev/null -X PUT -H @auth-header -d '{"limit":null}' "$control/sandboxes/nixie-0a1b2c"
 
         curl -s -o reply -w '%{http_code}' -X POST "http://127.0.0.1:$gateway_port/nixie-0a1b2c/fable-5-2/v1/messages" \
           -H 'content-type: application/json' -d ${lib.escapeShellArg fableRequest} > status
-        wait_for 10 "the reply's count" jq -e '.periods.day.tokens > 0' store.json
+        wait_for 10 "the reply's count" jq -e '.sandboxes["nixie-0a1b2c"].tokens > 0' store.json
 
         # the gateway's status
         assert_equal "$(cat status)" 200
         # 1,000 input tokens at $8 and 100 output tokens at $40 per million
         # the count
-        assert_equal "$(jq -c '{day: (.periods.day | {dollars, tokens}), month: (.periods.month | {dollars, tokens}), sandbox: (.sandboxes["nixie-0a1b2c"] | {dollars, tokens})}' store.json)" '{"day":{"dollars":0.012,"tokens":1100},"month":{"dollars":0.012,"tokens":1100},"sandbox":{"dollars":0.012,"tokens":1100}}'
+        assert_equal "$(jq -c '{day: .routes["fable-5-2"].day.micros, month: .routes["fable-5-2"].month.micros, sandbox: (.sandboxes["nixie-0a1b2c"] | {micros, tokens})}' store.json)" '{"day":12000,"month":12000,"sandbox":{"micros":12000,"tokens":1100}}'
+        # another route's count
+        assert_equal "$(jq -c '.routes["opus-5-5"] | {day: .day.micros, month: .month.micros}' store.json)" '{"day":0,"month":0}'
         # the stand-in's requests
         assert_equal "$(cat requests)" "POST /v1/messages"
         diff -u /dev/null gateway.err
@@ -772,8 +774,6 @@ let
         start_stub_server ${./test-utils/run-stub-model-api.py} /responses '{}' "$PWD/requests"
         ${startGateway}
         : > requests
-        curl -s -o /dev/null -X PUT -H @auth-header \
-          -d '{"day":{"dollars":60,"tokens":80000000},"month":{"dollars":600,"tokens":600000000}}' "$control/limits"
         curl -s -o /dev/null -X PUT -H @auth-header -d '{"limit":null}' "$control/sandboxes/nixie-0a1b2c"
         plan_request='{"model":"gpt-6-luna","input":"hi","stream":true}'
         printf 'Authorization: Bearer %s\n' another-key > wrong-key-header

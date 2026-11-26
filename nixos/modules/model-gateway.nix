@@ -1,7 +1,8 @@
 # nixie's model gateway (docs/runbooks/model-gateway.md): one process on the host that
-# every model request of production nixie passes. It counts a day and a month in periods.zone,
-# refuses past the limits nixie sets on its control listener, and refuses any limit above the caps
-# that only this config holds. It listens twice:
+# every model request of production nixie passes. It counts each route's day and month in
+# periods.zone, in US dollars, and refuses a route's requests past that route's own limits, which
+# only this config holds. A raise from nixie on the control listener lifts a route's day no higher
+# than its dayCap. It listens twice:
 #
 # - the model listener on imp-host's bridge, where imp-host's broker sends each nixie sandbox's
 #   model requests (the impd model secrets' upstream). inet cloud_host admits the bridge's subnet
@@ -45,16 +46,7 @@ let
       description = "The model's ${price} price, in dollars per million tokens.";
     }
   );
-  measuresOptions = {
-    dollars = lib.mkOption {
-      type = lib.types.either lib.types.ints.positive lib.types.float;
-      description = "The dollars the period may reach.";
-    };
-    tokens = lib.mkOption {
-      type = lib.types.ints.positive;
-      description = "The tokens the period may reach.";
-    };
-  };
+  dollarsType = lib.types.either lib.types.ints.positive lib.types.float;
 
   routeType = lib.types.submodule {
     options = {
@@ -109,6 +101,26 @@ let
         default = null;
         description = "The ChatGPT plan login the route holds, which makes it a plan route; null for none.";
       };
+      limits = lib.mkOption {
+        type = lib.types.submodule {
+          options = {
+            day = lib.mkOption {
+              type = dollarsType;
+              description = "The dollars the route's day may reach.";
+            };
+            month = lib.mkOption {
+              type = dollarsType;
+              description = "The dollars the route's month may reach.";
+            };
+            dayCap = lib.mkOption {
+              type = lib.types.nullOr dollarsType;
+              default = null;
+              description = "The most a raise from nixie may lift the route's day to; null for the gateway's default, twice day.";
+            };
+          };
+        };
+        description = "The route's own day and month limits, in US dollars; the gateway refuses every request on a route with none, and no limit spans routes.";
+      };
       prices = lib.mkOption {
         type = lib.types.submodule {
           options = priceRateOptions // {
@@ -141,6 +153,7 @@ let
     {
       inherit (route) model upstream;
       prices = lib.filterAttrs (_: rates: rates != null) route.prices;
+      limits = lib.filterAttrs (_: dollars: dollars != null) route.limits;
     }
     // lib.optionalAttrs (route.providerPin != null) { inherit (route) providerPin; }
     // lib.optionalAttrs (route.api != null) { inherit (route) api; }
@@ -161,7 +174,6 @@ let
       };
       store = "${stateDirectory}/store.json";
       periods.zone = cfg.zone;
-      inherit (cfg) caps;
       control = {
         listen = {
           hostname = "127.0.0.1";
@@ -200,11 +212,6 @@ in
       type = lib.types.str;
       example = "Australia/Sydney";
       description = "The IANA zone whose midnight resets the day and the month; nixie's time zone.";
-    };
-
-    caps = {
-      day = measuresOptions;
-      month = measuresOptions;
     };
 
     modelListen = {
