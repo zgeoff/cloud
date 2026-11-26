@@ -6,7 +6,7 @@ import { network } from './network.ts';
 import type { StubStream } from './start-stub-nixie-stream.ts';
 import { startStubNixieStream } from './start-stub-nixie-stream.ts';
 
-export interface StubPause {
+interface StubPause {
   readonly cause: 'owner' | 'restore' | 'spending';
   readonly since: string;
 }
