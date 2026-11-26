@@ -434,7 +434,7 @@ let
         '';
     }
     {
-      title = "it renders the geoffcloud config with the nixie zone, a loopback control listener and a priced route per nixie profile, each with a day limit of 5 and a month limit of 50 dollars, except fable-5-2 with 60 and 600";
+      title = "it renders the geoffcloud config with the nixie zone, a loopback control listener and a priced route per nixie profile, each with a day limit of 200 and a month limit of 3000 dollars on an Anthropic route and the plan route, and 5 and 50 on an OpenRouter route";
       script =
         let
           fable52 = {
@@ -487,24 +487,24 @@ let
               output = 2.5;
             };
           };
-          # the limits of every route but fable-5-2
-          geoffcloudLimits = {
+          # the limits of every Anthropic route and the plan route, and of every OpenRouter route
+          subscriptionLimits = {
+            day = 200;
+            month = 3000;
+          };
+          openrouterLimits = {
             day = 5;
             month = 50;
           };
-          fable52Limits = {
-            day = 60;
-            month = 600;
-          };
           route = model: prices: {
             inherit model prices;
-            limits = geoffcloudLimits;
+            limits = subscriptionLimits;
             upstream = "https://api.anthropic.com";
           };
           # each model's pinned OpenRouter endpoint and its price, as the host config gives them
           openrouterRoute = model: providerPin: prices: {
             inherit model providerPin prices;
-            limits = geoffcloudLimits;
+            limits = openrouterLimits;
             upstream = "https://openrouter.ai/api";
           };
         in
@@ -527,9 +527,7 @@ let
             countBySandbox = true;
             override = "/var/lib/model-gateway/override.json";
             routes = {
-              fable-5-2 = (route "claude-fable-5-2" fable52) // {
-                limits = fable52Limits;
-              };
+              fable-5-2 = route "claude-fable-5-2" fable52;
               fable-5-1 = route "claude-fable-5-1" fable51;
               opus-5-5 = route "claude-opus-5-5" opus55;
               opus-4-6 = route "claude-opus-4-6" opus4;
@@ -673,7 +671,7 @@ let
                 upstream = "https://chatgpt.com/backend-api/codex";
                 model = "gpt-6-luna";
                 maxOutputTokens = 128000;
-                limits = geoffcloudLimits;
+                limits = subscriptionLimits;
                 prices = {
                   input = 0.1;
                   cache_write = 0.125;
@@ -712,7 +710,7 @@ let
         curl -s -o status -w '%{http_code}' -H @auth-header "$control/status" > status-status
         day_start=$(jq -r '.routes["fable-5-2"].day.start' status)
         curl -s -o above-cap -w '%{http_code}' -X POST -H @auth-header \
-          -d "{\"route\":\"fable-5-2\",\"start\":\"$day_start\",\"dollars\":121}" \
+          -d "{\"route\":\"fable-5-2\",\"start\":\"$day_start\",\"dollars\":401}" \
           "$control/raise" > above-cap-status
 
         # the tokenless status's code
@@ -720,13 +718,13 @@ let
         # the status's code
         assert_equal "$(cat status-status)" 200
         # the status
-        assert_equal "$(jq -c '{zone, lost, fable: (.routes["fable-5-2"] | {day: (.day | {dollars, limit, cap, tripped}), month: (.month | {dollars, limit, tripped})})}' status)" '{"zone":"Australia/Sydney","lost":false,"fable":{"day":{"dollars":0,"limit":60,"cap":120,"tripped":false},"month":{"dollars":0,"limit":600,"tripped":false}}}'
-        # every route but fable-5-2 has the lower limits
-        assert_equal "$(jq -c '[.routes | to_entries[] | select(.key != "fable-5-2") | {day: .value.day.limit, month: .value.month.limit}] | unique' status)" '[{"day":5,"month":50}]'
+        assert_equal "$(jq -c '{zone, lost, fable: (.routes["fable-5-2"] | {day: (.day | {dollars, limit, cap, tripped}), month: (.month | {dollars, limit, tripped})})}' status)" '{"zone":"Australia/Sydney","lost":false,"fable":{"day":{"dollars":0,"limit":200,"cap":400,"tripped":false},"month":{"dollars":0,"limit":3000,"tripped":false}}}'
+        # every Anthropic route and the plan route has the subscription limits, and every other route the lower ones
+        assert_equal "$(jq -c '[.routes | to_entries[] | {day: .value.day.limit, month: .value.month.limit}] | unique' status)" '[{"day":5,"month":50},{"day":200,"month":3000}]'
         # the above-cap limit's code
         assert_equal "$(cat above-cap-status)" 409
         # the refusal
-        assert_equal "$(jq -c . above-cap)" '{"error":"above_cap","route":"fable-5-2","cap":120}'
+        assert_equal "$(jq -c . above-cap)" '{"error":"above_cap","route":"fable-5-2","cap":400}'
         diff -u /dev/null gateway.err
       '';
     }
