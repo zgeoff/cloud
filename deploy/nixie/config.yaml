@@ -551,11 +551,11 @@ models:
     taskRun:
       default: { dollars: 5 }
       max: { dollars: 25 }
-    # the spending stop's limits, nixie's defaults. The model gateway on the host caps the dollars
-    # and tokens at twice these (services.model-gateway in nixos/hosts/geoffcloud/configuration.nix);
-    # turnCap is the most today's turns can reach with a raise from the client
-    day: { dollars: 60, tokens: 80000000, turns: 1000, turnCap: 2000 }
-    month: { dollars: 600, tokens: 600000000, turns: 20000 }
+    # the spending stop's turn limits, nixie's defaults; turnCap is the most today's turns can reach
+    # with a raise from the client. The dollar limits are each route's own, in the model gateway's
+    # config (services.model-gateway in nixos/hosts/geoffcloud/configuration.nix)
+    day: { turns: 1000, turnCap: 2000 }
+    month: { turns: 20000 }
 definitions:
   source:
     kind: path

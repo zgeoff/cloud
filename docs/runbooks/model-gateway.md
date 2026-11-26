@@ -3,10 +3,12 @@
 nixie's model gateway runs on the host as the `model-gateway` unit, from the release binary that
 [`nixos/packages/model-gateway.nix`](../../nixos/packages/model-gateway.nix) pins. Every model
 request of production nixie passes it: imp-host's broker sends each request of a nixie sandbox to
-the gateway's model listener, the gateway counts the reply's dollars and tokens in a day and a month
-that reset at midnight in nixie's time zone, and it refuses every request once a count reaches the
-limit nixie set. nixie sets its limits on the control listener, and the gateway refuses any limit
-above the caps in its own config.
+the gateway's model listener, the gateway counts the reply's dollars in its route's day and month,
+which reset at midnight in nixie's time zone, and it refuses a route's requests once either count
+reaches that route's limit. Each route's limits sit in the gateway's own config, and no limit spans
+routes. nixie reads the gateway's status on the control listener, and can raise a route's day up to
+its day cap. The gateway pin and nixie's image come from the same nixie release: nixie refuses the
+status of an older gateway, and pauses.
 [nixie's model gateway](https://github.com/zgeoff/nixie/blob/main/docs/architecture/policy/model-gateway.md)
 describes the gateway, and
 [`nixos/modules/model-gateway.nix`](../../nixos/modules/model-gateway.nix) describes the unit, its
@@ -23,9 +25,9 @@ outside a host switch.
 | vault `cloud`, item `model-gateway-control`, field `credential`              | the control token, 64 hex characters                                         |
 | `/var/lib/tank-cloud/host-secrets/model-gateway/control-token`               | the same token on the host, mode 0400 root, which the unit loads             |
 | `deploy/nixie/secrets.sops.yaml`, key `["settings"]["gateway-control"]`      | nixie's copy of the control token, which nixie sends to the control relay    |
-| `/var/lib/model-gateway/store.json`                                          | the counts, the limits nixie set, each sandbox's count, the lost mark        |
-| `/var/lib/model-gateway/override.json`                                       | the limit past a cap that `model-gateway raise` wrote, when one exists       |
-| `services.model-gateway` in `nixos/hosts/geoffcloud/configuration.nix`       | the zone, the caps and one priced route per nixie model profile              |
+| `/var/lib/model-gateway/store.json`                                          | each route's day and month count, each sandbox's count, the lost mark        |
+| `/var/lib/model-gateway/override.json`                                       | a route's day limit past its cap, written by `model-gateway raise`           |
+| `services.model-gateway` in `nixos/hosts/geoffcloud/configuration.nix`       | the zone and one priced, limited route per nixie model profile               |
 | vault `cloud`, item `model-gateway-gpt-6-luna-route-key`, field `credential` | the route key of the plan route `gpt-6-luna`, 64 hex characters              |
 | `/var/lib/tank-cloud/host-secrets/model-gateway/gpt-6-luna-route-key`        | the same key on the host, mode 0400 root, which the unit loads               |
 | `/var/lib/model-gateway/chatgpt-login-gpt-6-luna.json`                       | the ChatGPT plan login of `gpt-6-luna`, mode 0600, which the gateway rotates |
@@ -76,26 +78,31 @@ printf 'Authorization: Bearer %s\n' "$(cat /var/lib/tank-cloud/host-secrets/mode
 EOF
 ```
 
-Expect JSON with the zone `Australia/Sydney`, each period's `start`, `spent`, `limit` and `cap`,
-`"lost": false` and `"tripped": null`. `limit` is null until nixie sets it at its start. While a
-period's limit is null, the gateway refuses every model request with a 503.
+Expect JSON with the zone `Australia/Sydney`, `"lost": false`, and under `routes` one entry per
+route, whose `day` and `month` each hold `start`, `resetsAt`, `dollars`, `limit`, `cap` and
+`tripped`. Expect each `limit` equal to the route's limit in the host config, unless a raise or an
+override lifts the day, and `tripped` false on each period under its limit. A period at its limit
+shows `tripped` true, and the gateway refuses the route's requests until the reset or a raise. The
+gateway refuses every request on a route that has no limits with a 503.
 
 Check the listeners with `ssh root@geoffcloud 'ss -ltn' < /dev/null`. Expect `10.88.0.1:8789`, the
 model listener, `127.0.0.1:8790`, the control listener, and the relay's socket on the host's tailnet
 address at port 8791.
 
-## Raise a period past its cap
+## Raise a route's day past its cap
 
-The control listener refuses a limit above a cap. To let nixie spend past it for the current day or
-month, write the override as the unit's user, so the gateway can read the file:
+The control listener refuses a raise above a route's day cap. To let nixie spend past it on one
+route for the current day, write the override as the unit's user, so the gateway can read the file:
 
 ```bash
-ssh root@geoffcloud 'runuser -u model-gateway -- model-gateway raise --config "$(systemctl show -P ExecStart model-gateway | grep -o "/nix/store/[^ ]*model-gateway.yaml")" --period day --dollars 200 --tokens 250000000' < /dev/null
+route=<route_id> dollars=<dollars>
+ssh root@geoffcloud "runuser -u model-gateway -- model-gateway raise --config \"\$(systemctl show -P ExecStart model-gateway | grep -o '/nix/store/[^ ]*model-gateway.yaml')\" --route $route --dollars $dollars" < /dev/null
 ```
 
-Expect a JSON line with the event `override.written`, the period, its start and the limit. The
-gateway reads the override before each request and ignores it once its period ends. To raise for
-good, change the caps in the host config and switch the host.
+`<route_id>` is the route's key under `routes` in the host config, and `<dollars>` is the day's new
+limit. Expect a JSON line with the event `override.written`. The gateway reads the override before
+each request and ignores it once its day ends. A month limit has no override: change the route's
+`limits` in the host config and switch the host, which also raises a limit for good.
 
 ## Clear the lost mark
 
@@ -167,9 +174,9 @@ minute. Run this when no task works, and never send a test turn to production ni
 6. Check, once the new pod is ready:
    - `host_imp secret ls < /dev/null | grep '^nixie-model-'` shows each secret with its host, then
      `-> http://10.88.0.1:8789`;
-   - [the status](#read-the-status) shows the limits nixie set and `"tripped": null`;
-   - nixie's log holds no `spend.stop_tripped` and no `spend.limits_unsent` after its first poll;
-   - the status's `spent` rises as nixie works.
+   - [the status](#read-the-status) shows each route's limits, and `tripped` false on each period;
+   - nixie's log holds no `spend.gateway_unanswered` after its start;
+   - the `dollars` of a route that nixie uses rises as nixie works.
 
 ## Roll back the spending stop
 
@@ -196,9 +203,10 @@ minute. Run this when no task works, and never send a test turn to production ni
      Expect `host_imp secret ls` to list each saved imp under its secret again.
 - **nixie came up paused with the cause `spending`:** fix the cause first. `unreachable` means nixie
   cannot reach the control relay: check the relay's socket, the firewall admission and nixie's
-  network policy. A limit trip at the start means a limit or a zone that differs from the gateway's.
-  A revert does not end the pause: with no `spendStop`, nothing clears it. After a revert, the pause
-  stands until the owner resumes nixie, from the client or with `nixie resume` on the host.
+  network policy. A trip at the start means a route at its dollar limit, nixie at its turn limit, or
+  a zone that differs from the gateway's. A revert does not end the pause: with no `spendStop`,
+  nothing clears it. After a revert, the pause stands until the owner resumes nixie, from the client
+  or with `nixie resume` on the host.
 
 **CAUTION:** Never roll nixie's image back while a pause with the cause `spending` stands. The older
 release refuses to open the database.
@@ -229,21 +237,22 @@ The gateway sends a request only on a route whose ID equals the profile's ID, an
 route's table. A profile with no route gets a 404 on every call.
 
 1. In one PR, add the profile to `deploy/nixie/config.yaml` and a route to `services.model-gateway`,
-   with the same ID, model and prices. A model outside Claude goes through OpenRouter: its base URL
-   is `https://openrouter.ai`, with no path, and its route's upstream is
-   `https://openrouter.ai/api`. Pin it to one provider endpoint: the profile's `provider_pin` and
-   the route's `providerPin` name the same endpoint tag, such as `novita/fp8`, and the prices are
-   that endpoint's own.
+   with the same ID, model and prices. Give the route the shared `limits` value that the `anthropic`
+   and `openrouter` helpers in the host config add, a `day` and a `month` in dollars. A model
+   outside Claude goes through OpenRouter: its base URL is `https://openrouter.ai`, with no path,
+   and its route's upstream is `https://openrouter.ai/api`. Pin it to one provider endpoint: the
+   profile's `provider_pin` and the route's `providerPin` name the same endpoint tag, such as
+   `novita/fp8`, and the prices are that endpoint's own.
 2. Before the merge, add the profile's model secret and set nixie's token, as
    [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) describes.
 3. After the merge, switch the host with `bun run ops:switch-host`, so the gateway has the route,
    then dispatch the held `Deploy prod` run for the config. The new config restarts the unit, and a
    reply still open past its stop wait sets the lost mark, so switch while no task works.
 
-**CAUTION:** A successful reply whose usage the gateway cannot read sets the lost mark, which stops
-every model call of nixie. Before you add a model from a new provider, send it one plain and one
-streamed request through a local gateway on the release binary, and check that the store's count
-rose and holds no `lost`.
+**CAUTION:** A successful reply whose usage the gateway can neither read nor bound with an estimate
+sets the lost mark, which stops every model call of nixie. Before you add a model from a new
+provider, send it one plain and one streamed request through a local gateway on the release binary,
+and check that the store's count rose and holds no `lost`.
 
 ## Add the ChatGPT plan route
 
@@ -330,12 +339,13 @@ the switch.
 
 ## Failures
 
-| Symptom                                              | Cause                                          | Fix                                                                      |
-| ---------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------ |
-| the unit is skipped, `ConditionPathExists` unmet     | the token file is missing                      | [set up the control token](#set-up-the-control-token)                    |
-| the unit restarts, `Failed to start server`          | imp-host has not made podman0 yet              | none: the unit retries every 5 s until the bridge exists                 |
-| `proxy.failed` with a config error                   | the rendered config fails the release's schema | fix `services.model-gateway`, then switch                                |
-| every request gets a 503, `limit` null in the status | nixie has not set its limits                   | read nixie's log for `spend.limits_unsent`                               |
-| every request gets a 503, `"lost": true`             | the count fell behind the spend                | [clear the lost mark](#clear-the-lost-mark)                              |
-| a 403 that names a sandbox the store lacks           | nixie did not register the sandbox             | read nixie's log for the sandbox's registration                          |
-| the unit fails, `Failed to set up credentials`       | a plan route's key file is missing             | install it, as [the plan route](#add-the-chatgpt-plan-route) step 2 does |
+| Symptom                                                      | Cause                                          | Fix                                                                      |
+| ------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------ |
+| the unit is skipped, `ConditionPathExists` unmet             | the token file is missing                      | [set up the control token](#set-up-the-control-token)                    |
+| the unit restarts, `Failed to start server`                  | imp-host has not made podman0 yet              | none: the unit retries every 5 s until the bridge exists                 |
+| `proxy.failed` with a config error                           | the rendered config fails the release's schema | fix `services.model-gateway`, then switch                                |
+| every request on one route gets a 503                        | the route has no `limits` in the host config   | give the route `limits` in `services.model-gateway`, then switch         |
+| nixie paused, `the gateway sent a reply that is not its own` | the gateway pin is an older release than nixie | pin the gateway to nixie's release, then switch                          |
+| every request gets a 503, `"lost": true`                     | the count fell behind the spend                | [clear the lost mark](#clear-the-lost-mark)                              |
+| a 403 that names a sandbox the store lacks                   | nixie did not register the sandbox             | read nixie's log for the sandbox's registration                          |
+| the unit fails, `Failed to set up credentials`               | a plan route's key file is missing             | install it, as [the plan route](#add-the-chatgpt-plan-route) step 2 does |
