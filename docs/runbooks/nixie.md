@@ -319,15 +319,14 @@ When the pod's age identity changes, put its public half in `deploy/nixie/.sops.
    changes ([Release check](./release-check.md)).
 
    When the release changes `apps/model-gateway` in nixie, also pin the gateway in
-   `nixos/packages/model-gateway.nix` to the same release, in the same PR. Once the PR merges, the
-   `Deploy prod` workflow applies the new image with no step 2 by hand, so switch the host with
-   `bun run ops:switch-host` as soon as that run ends. Until the switch, nixie refuses the older
-   gateway's status and stays paused with the cause `spending`, and the switch clears the pause.
-   When the PR also changes `deploy/nixie/config.yaml`, the guard holds the run
-   ([prod apply](./prod-apply.md#answer-a-held-run)). Then switch the host first, and dispatch the
-   held run after the switch, so nixie never runs against the older gateway. Before the switch, copy
+   `nixos/packages/model-gateway.nix` to the same release, in the same PR. Before you merge it, copy
    the gateway's store, as [roll the gateway back](./model-gateway.md#roll-the-gateway-back)
-   describes.
+   describes. Once the PR merges, the `Deploy prod` workflow applies the new image with no step 2 by
+   hand, so switch the host with `bun run ops:switch-host` as soon as that run ends. Until the
+   switch, nixie refuses the older gateway's status and stays paused with the cause `spending`, and
+   the switch clears the pause. When the PR also changes `deploy/nixie/config.yaml`, the guard holds
+   the run ([prod apply](./prod-apply.md#answer-a-held-run)). Switch the host first, then dispatch
+   the held run, so nixie never runs against the older gateway.
 
 2. Preview, then apply:
 

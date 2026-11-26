@@ -140,26 +140,41 @@ for the cause, and check the provider's usage page, before you clear the mark.
 ## Roll the gateway back
 
 A gateway rewrites its store in the newest version it knows at its first start, and a gateway of an
-older release refuses to start on that store. A rollback of the pin therefore needs the store from
-before the upgrade, and loses the spend counted since.
+older release refuses to start on that store. To roll the pin back, restore the store from before
+the upgrade, which loses the spend counted since.
 
-1. Before a switch that moves the gateway pin, copy the store, keeping its owner and mode:
+1. Before you merge a PR that moves the gateway pin, copy the store, keeping its owner and mode. The
+   command refuses to replace a copy that exists, so a second run never overwrites it with a moved
+   store:
 
    ```bash
-   ssh root@geoffcloud 'cp -p /var/lib/model-gateway/store.json /var/lib/model-gateway/store.json.pre-<version>' < /dev/null
+   ssh root@geoffcloud 'cp -p --update=none-fail /var/lib/model-gateway/store.json /var/lib/model-gateway/store.json.pre-<version>' < /dev/null
    ```
 
    `<version>` is the release the switch moves to. Expect no output.
 
-2. To roll back, revert the pin in a PR and merge it. Stop the unit, put the copy back, then switch
-   the host:
+2. To roll back, revert the whole PR that moved the pin, since an older gateway refuses the config
+   keys of a newer one, and merge the revert. Build the host first, so that the unit stops only once
+   the build has passed:
 
    ```bash
-   ssh root@geoffcloud 'systemctl stop model-gateway && cp -p /var/lib/model-gateway/store.json.pre-<version> /var/lib/model-gateway/store.json' < /dev/null
-   bun run ops:switch-host
+   bun run ops:switch-host -- --build-only
    ```
 
-   Expect the switch to pass, and [the status](#read-the-status) to show `"lost": false`.
+   Expect the system path.
+
+3. Stop the unit and put the copy back. The command stops nothing when the copy is missing:
+
+   ```bash
+   ssh root@geoffcloud 'test -s /var/lib/model-gateway/store.json.pre-<version> && systemctl stop model-gateway && cp -p /var/lib/model-gateway/store.json.pre-<version> /var/lib/model-gateway/store.json' < /dev/null
+   ```
+
+   Expect no output, and exit 0.
+
+4. Switch the host: `bun run ops:switch-host`. Expect the switch to pass, and
+   [the status](#read-the-status) of that release to show `"lost": false`. When the switch fails,
+   start the unit again with `ssh root@geoffcloud systemctl start model-gateway < /dev/null`. It
+   runs the newer gateway on the older store copy until you fix the switch.
 
 The override file changes shape with the store: a gateway ignores an override in an earlier shape
 and logs `override.unreadable`, so the day falls back to its configured limit. Write an override
