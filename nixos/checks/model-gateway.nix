@@ -742,7 +742,7 @@ let
         '';
     }
     {
-      title = "it answers the geoffcloud control listener only with the token, in the nixie zone, with the limits of each provider and route and each route's provider, and refuses a raise above a provider's day cap or of a route with no limit of its own";
+      title = "it answers the geoffcloud control listener only with the token, in the nixie zone, with the limits of each provider and route and the provider of each route, and refuses a raise above the day cap of a provider or of a route with no limit of its own";
       script = ''
         mkdir home tmp
         start_stub_server ${./test-utils/run-stub-model-api.py} /v1/messages ${lib.escapeShellArg fableReply} "$PWD/requests"
