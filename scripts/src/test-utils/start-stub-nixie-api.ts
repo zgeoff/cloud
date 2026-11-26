@@ -6,6 +6,11 @@ import { network } from './network.ts';
 import type { StubStream } from './start-stub-nixie-stream.ts';
 import { startStubNixieStream } from './start-stub-nixie-stream.ts';
 
+export interface StubPause {
+  readonly cause: 'owner' | 'restore' | 'spending';
+  readonly since: string;
+}
+
 export interface StubNixieAPIOptions {
   readonly url: string;
 
@@ -15,6 +20,9 @@ export interface StubNixieAPIOptions {
   readonly sequences: readonly number[];
   readonly keepaliveMs: number | null;
   readonly closeAfterMs: number | null;
+
+  // what nixie/read answers as paused, null for a running nixie
+  readonly paused?: StubPause | null;
 }
 
 export interface StubNixieAPI {
@@ -80,6 +88,7 @@ function declareRoutes(state: StubState) {
   return [
     makeRoute(state, 'sessions/enrol', (_request, input) => createSession(state, input)),
     makeRoute(state, 'sessions/revoke', (_request, input) => updateRevoked(state, input)),
+    makeRoute(state, 'nixie/read', () => buildNixieResponse(state)),
     makeRoute(state, 'sessions/list', (request) => buildSessionsResponse(state, request)),
     makeRoute(state, 'conversation/read', (_request, input) => buildReadResponse(state, input)),
     makeRoute(state, 'live/follow', (request, input) => startFollow(state, { request, input })),
@@ -164,6 +173,15 @@ function updateRevoked(state: StubState, input: Input): Response {
   return HttpResponse.json({
     json: { revokedAt: new Date().toISOString() },
     meta: [[1, 'revokedAt']],
+  });
+}
+
+function buildNixieResponse(state: StubState): Response {
+  const paused = state.options.paused ?? null;
+
+  return HttpResponse.json({
+    json: { paused },
+    meta: paused === null ? [] : [[1, 'paused', 'since']],
   });
 }
 

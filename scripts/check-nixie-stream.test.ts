@@ -53,6 +53,7 @@ test('it holds the stream open, reads the same record count before and after, an
     'conversation/read',
     'live/follow',
     'conversation/read',
+    'nixie/read',
     'sessions/revoke',
   ]);
 
@@ -67,9 +68,44 @@ test('it holds the stream open, reads the same record count before and after, an
       ),
     ],
     ['conversation records after: 3\n'],
+    ['nixie is running\n'],
     [`revoked check session ${session?.sessionID}\n`],
     ['stream check passed\n'],
   ]);
+});
+
+test('it fails when nixie is paused, names the cause and since, and still revokes its session', async () => {
+  const stub = startStubNixieAPI({
+    url: 'https://nixie.test',
+    enrolCodes: ['ABCD-2345'],
+    sequences: [1, 2, 3],
+    keepaliveMs: 50,
+    closeAfterMs: null,
+    paused: { cause: 'spending', since: '2026-11-26T08:00:00.000Z' },
+  });
+
+  const printOut = mock<(text: string) => void>();
+  const printErr = mock<(text: string) => void>();
+
+  const exitCode = await checkNixieStream({
+    url: 'https://nixie.test',
+    holdMs: 400,
+    maxGapMs: 200,
+    minKeepalives: 3,
+    runRemote: () => Promise.resolve({ exitCode: 0, stdout: 'ABCD-2345\n', stderr: '' }),
+    printOut,
+    printErr,
+  });
+
+  expect(exitCode).toBe(1);
+  expect(stub.sessions).toStrictEqual([{ sessionID: expect.toBeString(), revoked: true }]);
+
+  expect(printErr.mock.calls).toStrictEqual([
+    ['check-nixie-stream: nixie is paused, cause spending, since 2026-11-26T08:00:00.000Z\n'],
+  ]);
+
+  expect(printOut.mock.calls.flat()).not.toContain('nixie is running\n');
+  expect(printOut.mock.calls.flat()).not.toContain('stream check passed\n');
 });
 
 test('it fails when a record arrives during the hold, and still revokes its session', async () => {
