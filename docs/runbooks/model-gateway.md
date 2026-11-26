@@ -3,21 +3,20 @@
 nixie's model gateway runs on the host as the `model-gateway` unit, from the release binary that
 [`nixos/packages/model-gateway.nix`](../../nixos/packages/model-gateway.nix) pins. Every model
 request of production nixie passes it: imp-host's broker sends each request of a nixie sandbox to
-the gateway's model listener, the gateway counts the reply's dollars in the day and month of its
-route and of the route's provider, which reset at midnight in nixie's time zone.
+the gateway's model listener, and the gateway counts the reply's dollars in the day and month of its
+route and of the route's provider, which reset at midnight in nixie's time zone. Read
 [nixie's model gateway](https://github.com/zgeoff/nixie/blob/main/docs/architecture/policy/model-gateway.md)
-describes the gateway, and
-[`nixos/modules/model-gateway.nix`](../../nixos/modules/model-gateway.nix) describes the unit, its
-listeners and their firewall paths.
+for the gateway, and [`nixos/modules/model-gateway.nix`](../../nixos/modules/model-gateway.nix) for
+the unit, its listeners and their firewall paths.
 
 A provider is a place the requests go: `anthropic`, the ChatGPT plan `chatgpt-plan`, or
 `openrouter`. Every route names one, and the gateway refuses a route's requests once its provider's
 day or month reaches the provider's limit, or the route's own count reaches the route's limit, where
-the route sets one. The limits sit in the gateway's own config: each provider's, and each OpenRouter
+the route sets one. Set the limits in the gateway's own config: each provider's, and each OpenRouter
 route's own beneath `openrouter`'s. nixie reads the gateway's status on the control listener, and
-can raise a provider's day, or a day of a route with limits of its own, up to its day cap. The
-gateway pin and nixie's image come from the same nixie release: nixie refuses the status of an older
-gateway, and pauses.
+can raise a provider's day, or a day of a route with limits of its own, up to its day cap. Take the
+gateway pin and nixie's image from the same nixie release, because nixie refuses the status of an
+older gateway and pauses.
 
 **CAUTION:** The gateway fails closed. While it is stopped, while its store is unreadable, and while
 the lost mark stands, every model request of nixie fails. Stop or restart the unit only in a host
@@ -107,12 +106,12 @@ provider=<provider_id> dollars=<dollars>
 ssh root@geoffcloud "runuser -u model-gateway -- model-gateway raise --config \"\$(systemctl show -P ExecStart model-gateway | grep -o '/nix/store/[^ ]*model-gateway.yaml')\" --provider $provider --dollars $dollars" < /dev/null
 ```
 
-`<provider_id>` is the provider's key under `providers` in the host config, and `<dollars>` is the
-day's new limit. To raise an OpenRouter route's own day, pass `--route <route_id>` in place of
-`--provider`; a route with no limits of its own has no day to raise. Expect a JSON line with the
-event `override.written`. The gateway reads the override before each request and ignores it once its
-day ends. A month limit has no override: change the `limits` in the host config and switch the host,
-which also raises a limit for good.
+Replace `<provider_id>` with the provider's key under `providers` in the host config, and
+`<dollars>` with the day's new limit. To raise an OpenRouter route's own day, pass
+`--route <route_id>` in place of `--provider`; a route with no limits of its own has no day to
+raise. Expect a JSON line with the event `override.written`. The gateway reads the override before
+each request and ignores it once its day ends. A month limit has no override. To raise it, change
+the `limits` in the host config and switch the host, which also raises a limit for good.
 
 ## Clear the lost mark
 
@@ -240,7 +239,7 @@ they differ. Rotate both in one window:
    `ssh root@geoffcloud systemctl restart model-gateway < /dev/null`.
 3. Set nixie's copy, as [change a secret](./nixie.md#change-a-secret) does for the key
    `["settings"]["gateway-control"]`, and merge its PR. With `spendStop` set, nixie stays paused as
-   `unreachable` from step 2 until its new pod starts, and the stop clears on its own.
+   `unreachable` from step 2 until its new pod starts, when the pause clears on its own.
 
 ## Add a model profile
 
@@ -248,15 +247,15 @@ The gateway sends a request only on a route whose ID equals the profile's ID, an
 route's table. A profile with no route gets a 404 on every call.
 
 1. In one PR, add the profile to `deploy/nixie/config.yaml` and a route to `services.model-gateway`,
-   with the same ID and model. The route holds the prices, and the profile none: nixie refuses
-   `prices` on a profile beside the gateway. Build the route with its helper in the host config: a
-   Claude model uses `anthropic`, which names the provider `anthropic` and adds no limits of its
-   own, and a model through OpenRouter uses `openrouter`, which names the provider `openrouter` and
-   adds the route's own `day` and `month` in dollars beneath the provider's. A model outside Claude
-   goes through OpenRouter: its base URL is `https://openrouter.ai`, with no path, and its route's
-   upstream is `https://openrouter.ai/api`. Pin it to one provider endpoint: the profile's
-   `provider_pin` and the route's `providerPin` name the same endpoint tag, such as `novita/fp8`,
-   and the prices are that endpoint's own.
+   with the same ID and model. Put the prices on the route and none on the profile, because nixie
+   refuses `prices` on a profile beside the gateway. Build the route with its helper in the host
+   config. For a Claude model, use `anthropic`, which names the provider `anthropic` and adds no
+   limits of its own. For a model through OpenRouter, use `openrouter`, which names the provider
+   `openrouter` and adds the route's own `day` and `month` in dollars beneath the provider's. A
+   model outside Claude goes through OpenRouter: its base URL is `https://openrouter.ai`, with no
+   path, and its route's upstream is `https://openrouter.ai/api`. Pin it to one provider endpoint:
+   set the profile's `provider_pin` and the route's `providerPin` to the same endpoint tag, such as
+   `novita/fp8`, and use that endpoint's own prices.
 2. Before the merge, add the profile's model secret and set nixie's token, as
    [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) describes.
 3. After the merge, switch the host with `bun run ops:switch-host`, so the gateway has the route,
