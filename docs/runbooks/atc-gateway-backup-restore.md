@@ -1,30 +1,31 @@
 # atc-gateway: backup and restore
 
-The gateway's durable state is two SQLite files on its volume. This runbook covers what is backed
-up, where, and how to restore it. The procedure is tested by
-`scripts/e2e/journey-atc-gateway-restore.bats` and `images/atc-gateway/backup/backup.bats` against a
-local restic repository, and a restore of a real backup from R2 into a scratch claim matched the
-live `mcp-auth.db` row for row.
+The gateway's durable state is two SQLite files on its volume. Use this runbook to see what is
+backed up and where, to take a backup before a risky change, and to restore after a loss. The tests
+`scripts/e2e/journey-atc-gateway-restore.bats` and `images/atc-gateway/backup/backup.bats` run the
+procedure against a local restic repository. A restore of a real backup from R2 into a scratch claim
+matched the live `mcp-auth.db` row for row.
 
 ## Data boundary
 
-| Data                                                          | Where it lives                                                | Backed up by this runbook                                 | Secret-bearing |
-| ------------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------- | -------------- |
-| `mcp-auth.db`: OAuth clients, consents, grants, token records | gateway volume (`atc-gateway-state` claim)                    | yes                                                       | yes            |
-| `gateway.db`: the routing and outcome of each keyed request   | gateway volume                                                | yes                                                       | yes            |
-| daemon bearer tokens, restic password, R2 keys                | 1Password `cloud` vault → k8s Secrets / host credential files | no: 1Password is the source                               | yes            |
-| the impd token `atc-cloud`                                    | impd's database → host credential file                        | no: impd issues it; the credential script makes a new one | yes            |
-| daemon registry entries (non-secret)                          | stack config → ConfigMap                                      | no: the repo is the source                                | no             |
-| harness imps and their disks                                  | imp's ZFS pool on geoffcloud                                  | no: imp's own restic backups (`impz backup`)              | per imp        |
-| atc's daemon state on geoffcloud                              | `/var/lib/atc-daemon` on the root disk                        | no (decide with atc's daemon PR)                          | possibly       |
+| Data                                                          | Where it lives                                                                        | Backed up by this runbook                                 | Secret-bearing |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------- | -------------- |
+| `mcp-auth.db`: OAuth clients, consents, grants, token records | gateway volume (`atc-gateway-state` claim)                                            | yes                                                       | yes            |
+| `gateway.db`: the routing and outcome of each keyed request   | gateway volume                                                                        | yes                                                       | yes            |
+| daemon bearer tokens, restic password, R2 keys                | 1Password `cloud` vault → k8s Secrets; the daemon tokens also → host credential files | no: 1Password is the source                               | yes            |
+| the impd token `atc-cloud`                                    | impd's database → host credential file                                                | no: impd issues it; the credential script makes a new one | yes            |
+| daemon registry entries (non-secret)                          | stack config → ConfigMap                                                              | no: the repo is the source                                | no             |
+| harness imps and their disks                                  | imp's ZFS pool on geoffcloud                                                          | no: imp's own restic backups (`impz backup`)              | per imp        |
+| atc's daemon state on geoffcloud                              | `/var/lib/atc-daemon` on the root disk                                                | no (decide with atc's daemon PR)                          | possibly       |
 
 Rules:
 
 - The backup takes only `*.db` files from the volume, each copied with `sqlite3 .backup` and checked
-  with `PRAGMA integrity_check` before upload. Nothing else on the volume is uploaded.
+  with `PRAGMA integrity_check` before upload.
 - restic encrypts on the cluster before upload, with a password that lives only in 1Password and the
   backup Secret. R2 holds ciphertext.
-- Credentials are never in a backup. A restore needs 1Password for the restic password.
+- No credential that 1Password holds goes in a backup. The databases hold OAuth token records, which
+  restic's encryption protects. A restore needs 1Password for the restic password.
 - The volume sits on the encrypted zvol on `vdb`, which Onidel never snapshots, so an Onidel
   snapshot holds no copy of the state
   ([protection at rest](../architecture/secrets.md#protection-at-rest)).
@@ -43,6 +44,8 @@ Rules:
 ssh root@geoffcloud k3s kubectl -n atc create job --from=cronjob/atc-gateway-backup backup-manual-$(date +%s)
 ssh root@geoffcloud k3s kubectl -n atc logs -f job/<job-name>
 ```
+
+Replace `<job-name>` with the name that the create command prints.
 
 ## Restore
 
@@ -77,6 +80,6 @@ lost: those clients sign in again. Take a fresh backup first if the current stat
 
 ## Restore test
 
-Before the gateway carries real clients, run one restore into a scratch claim and confirm the
-gateway starts on it and lists its OAuth clients. The fixture test does the same locally on every
-change to the images.
+The fixture tests run a restore into a local repository on every change to the images. To test a
+real backup from R2, restore it into a scratch claim, and confirm that the gateway starts on it and
+lists its OAuth clients.

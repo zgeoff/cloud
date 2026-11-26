@@ -1,8 +1,8 @@
 # Public ingress
 
-The estate has two ways in from the internet: three Cloudflare tunnels that cloudflared holds open
-from inside the cluster, and a TLS front on the host's public HTTPS port. The host opens no inbound
-port for the tunnels, so a tunnel route exists only as a rule in a tunnel's configuration and a DNS
+Traffic from the internet reaches the estate through three Cloudflare tunnels that cloudflared holds
+open from inside the cluster, or through a TLS front on the host's public HTTPS port. The host opens
+no inbound port for the tunnels. A tunnel route is a rule in a tunnel's configuration plus a DNS
 record that points at that tunnel, and Pulumi declares both. The TLS front serves `imp.geoff.cloud`,
 imp's own MCP and OAuth route, which a hosted assistant signs in to and calls directly at
 `https://imp.geoff.cloud/mcp`. Each workload behind a route brings its own authentication.
@@ -131,9 +131,8 @@ The files service has no Access login either, because GitHub's image proxy fetch
 pull request without one. A read needs only the link, whose random ID nobody can guess, and every
 upload, listing, expiry change or removal needs one of the service's two role tokens.
 
-Each public route's registry entry names its auth layer, and the Pulumi program fails on a public
-entry without one ([the exposure registry](./firewalls.md#the-exposure-registry)), so a new route
-states who authenticates its calls before it can go public.
+Before a route can go public, give its registry entry an auth layer: the Pulumi program fails on a
+public entry without one ([the exposure registry](./firewalls.md#the-exposure-registry)).
 
 ### The gateway's route boundary
 
@@ -198,12 +197,12 @@ an `/rpc` path matches a rule, or when a browser path reaches the API without Ac
 
 Three self-hosted Access applications cover the browser paths: one on `atc.geoff.cloud`, one on
 `boxxy.geoff.cloud` and one on `pepys.geoff.cloud`. Access covers each path and every path under it.
-Each application's one policy allows the owner's address, which the stack config holds as a secret
-in `atcGatewayOwnerEmail`, signed in with Access's one-time PIN, and the application offers no other
-login. The applications share the account's one one-time PIN login. Access denies every identity
-that no allow policy matches, so any other address gets no PIN-backed session. The machine paths lie
-outside the application, so they get no login redirect, no challenge and no Access cookie
-requirement.
+Each application has one policy, which allows the owner's address signed in with Access's one-time
+PIN, and offers no other login. The stack config holds that address as a secret in
+`atcGatewayOwnerEmail`. The applications share the account's one one-time PIN login. Access denies
+every identity that no allow policy matches, so any other address gets no PIN-backed session. The
+machine paths lie outside the application, so they get no login redirect, no challenge and no Access
+cookie requirement.
 
 cloudflared checks the Access token on the browser rule itself. A request on a browser path reaches
 the gateway only with a token that Access signed for this application, so a request that skipped
@@ -215,8 +214,8 @@ request, asks for explicit consent, and checks PKCE, the redirect, the Host and 
 scope and the resource before it issues a token, and the boxxy door makes the same checks
 ([the public door](../workloads/boxxy.md#the-public-door)). Each keeps its grants and tokens in its
 own database, so a change to an Access application or its policy leaves every grant and token valid.
-A rollback of this edge control reverts the Access resources and the tunnel's two rules together,
-and leaves the workload's own authentication as it is.
+To roll back Access on a hostname, revert its Access resources and its tunnel's two rules together.
+The workload's own authentication stays as it is.
 
 ### Other ways to the gateway
 
@@ -234,16 +233,18 @@ controls the gateway's pod, Secrets and logs.
 
 ## Adding a route
 
-Each public service gets one host of its own, `<service>.geoff.cloud`, and a service that speaks MCP
-serves it at `/mcp` on that host, as `atc.geoff.cloud/mcp` and `imp.geoff.cloud/mcp` do. A service's
-OAuth issuer and its discovery metadata name the same host.
+Give a new public service a host of its own under `geoff.cloud`, such as `<service>.geoff.cloud`.
+Give a service with a second public job, such as a webhook, a second host for it, as
+`pepys-webhook.geoff.cloud` has. Serve MCP at `/mcp` on the service's main host, as
+`atc.geoff.cloud/mcp` and `imp.geoff.cloud/mcp` do. Name the same host in the service's OAuth issuer
+and in its discovery metadata.
 
-A new public route is the exception in this estate. A service stays on the host or the tailnet
-unless its PR states why it must be public, and the route is then a tunnel rule ahead of the
-catch-all and a proxied record for its hostname, reviewed in the same preview. The hostname needs a
-public entry in the [exposure registry](./firewalls.md#the-exposure-registry) that names its auth
-layer, and the Pulumi program refuses a route to any other hostname. A route that must hold a stream
-open longer than Cloudflare's proxy allows goes through the host's TLS front instead, as a
-front-route entry, which gives the front its hostname, upstream and paths and Pulumi its DNS
-records. impd's tailnet names under `imps.geoff.cloud` never pass through either way in
+A new public route is the exception in this estate. Keep a service on the host or the tailnet unless
+its PR states why it must be public. Then add a tunnel rule ahead of the catch-all and a proxied
+record for its hostname, and review both in the same preview. Give the hostname a public entry in
+the [exposure registry](./firewalls.md#the-exposure-registry), with its auth layer: the Pulumi
+program refuses a route to any other hostname. Send a route that must hold a stream open longer than
+Cloudflare's proxy allows through the host's TLS front instead, as a front-route entry. That entry
+gives the front its hostname, upstream and paths, and gives Pulumi its DNS records. impd's tailnet
+names under `imps.geoff.cloud` never pass through either way in
 ([imp on the host](../host/imp.md#dns-and-certificates)).

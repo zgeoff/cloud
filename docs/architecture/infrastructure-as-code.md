@@ -1,12 +1,13 @@
 # Infrastructure as code
 
-One Pulumi program, in `infra/`, declares every cloud resource and every workload in the k3s
-cluster, and one stack, `prod`, holds the live state. Pulumi runs on Bun, and every run reads its
+One Pulumi program, in `infra/`, declares the estate's cloud resources and every workload in the k3s
+cluster, apart from the few under [What the program never owns](#what-the-program-never-owns), and
+one stack, `prod`, holds the live state. Pulumi runs on Bun, and every run of the program reads its
 inputs from 1Password through `op run`, so the program sees each secret only for the length of a
 run. A preview changes nothing. The apply job applies each merged change on its own, unless its plan
 guard holds the change for a person, and the guards at the top of the program stop a run whose
-inputs would plan a mass delete. [The host](./host/host.md) covers the NixOS host, which Pulumi does
-not drive.
+missing inputs would plan a mass delete. [The host](./host/host.md) covers the NixOS host, which
+Pulumi does not drive.
 
 ## What the program owns
 
@@ -35,30 +36,32 @@ the VM's second disk was added by hand and the provider never sees it. The VM it
 hand and imported, and almost every input replaces it, so the program protects it and keeps it on a
 delete: a typo in its inputs fails the preview instead of destroying the host.
 
-The provider is frozen: it takes version bumps of its dependencies and nothing else, so it gains no
-resource and no API call. It covers the one VM and its firewall, which rarely change, and whether
-the estate needs a second VM decides what the provider must grow into. Replacing the provider waits
-on that decision too.
+The provider is frozen: it takes version bumps of its dependencies and nothing else. It covers the
+one VM and its firewall, which rarely change. What the provider grows into, and whether it is
+replaced, both wait on whether the estate needs a second VM.
 
-The program writes one value back outside Pulumi. imp's reusable tailnet key, which imp's dev
-instances join by, is minted by Pulumi and copied into its 1Password item on each new key, so the
-item always holds the live key.
+Whenever Pulumi mints a new value for either of two secrets, the program writes it into a 1Password
+item outside Pulumi, so the item always holds the live value. imp's reusable tailnet key, which
+imp's dev instances join by, goes into the `cloud` vault. The token of Grafana's MCP account goes
+into the `zgeoff` vault.
 
 ## What the program never owns
 
+- **The VM's second disk.** Onidel's API has no calls for block volumes, so the disk was added by
+  hand.
 - **The host's configuration.** The NixOS flake owns it, and a host switch applies it
   ([the host](./host/host.md)).
 - **impd's DNS records.** impd writes the records for its own hostnames and its ACME challenges at
   run time, so a Pulumi declaration of them would fight impd on every apply
   ([imp on the host](./host/imp.md#dns-and-certificates)).
-- **The owner's PC.** The gateway dials the PC's daemon over the tailnet, and the policy names the
-  PC by address, but nothing here configures it.
+- **The owner's PC.** The gateway dials the PC's daemon over the tailnet, and the tailnet policy
+  holds the PC's address, but nothing here configures it.
 
 ## State and drift
 
 Pulumi keeps its state in an R2 bucket and encrypts each secret in it with a passphrase from
-1Password. The state therefore holds the secrets Pulumi generated, such as Grafana's admin password,
-and only the passphrase opens them; replacing the passphrase would strand every secret in the state.
+1Password. The state holds the secrets Pulumi generated, such as Grafana's admin password, and only
+the passphrase opens them, so replacing the passphrase would strand every secret in the state.
 
 Drift is any difference between the live resources and the code. The drift check is a preview that
 refreshes from the live APIs first and fails on any change, so it passes only against the revision
@@ -81,19 +84,20 @@ secret in the state. The check therefore runs on the host, from a root-only cred
 and never on a GitHub runner. Its scoped read tokens live only in that file and in their items in
 the vault `cloud`, so no workflow reads them. The passphrase and the alert webhook are shared: the
 apply job reads its own copies of both from `cloud-deploy`, because every apply needs the
-passphrase. [The drift check runbook](../runbooks/drift-check.md) lists each credential and its
-scope.
+passphrase. Each credential and its scope are in
+[the drift check runbook](../runbooks/drift-check.md).
 
 The scheduled check and the apply job share one lock, the prod lock, so neither uses the state while
 the other does. An apply changes resources before it writes them into the state, so a check that
 refreshed during an apply would report the apply's own changes as drift. Pulumi's own state lock
-cannot serve, for two reasons: a refresh that only previews never takes it, and the check's token
-for the state bucket can only read. The prod lock is therefore a Kubernetes Lease in k3s, which both
-sides reach: the host as root, and the apply job over the tailnet with the admin kubeconfig it
-already holds. A side that finds the Lease held waits for the holder to release it. Each side holds
-the Lease for a set time, and the other side takes it over once that time runs out, so a runner that
-dies holding it blocks the scheduled check only until then. The apply job holds the lock from its
-first drift check to its last step, and the scheduled check holds it around its refresh.
+cannot serve: a refresh that only previews never takes it, and the check's token for the state
+bucket can only read. The prod lock is therefore a Kubernetes Lease in k3s, which both sides reach:
+the host as root, and the apply job over the tailnet with the admin kubeconfig it already holds. A
+side that finds the Lease held waits for the holder to release it. Each side holds the Lease for a
+set time that covers its longest run, and never renews it. For the apply job, that time is the job's
+time limit. The other side takes the Lease over once that time runs out, so a runner that dies
+holding it blocks the scheduled check only until then. The apply job holds the lock from its first
+drift check to its last step, and the scheduled check holds it around its refresh.
 
 Some resources are declared to avoid drift on their own. The host's auth keys are single-use, so
 after the host joins they read as used, and the program never mints them again until a reinstall
@@ -126,11 +130,11 @@ flowchart LR
 
 The tag `deployed/prod` marks the last revision the job applied, and it moves only after an apply
 and its second drift check pass. It is therefore the baseline for both the path filter and the first
-drift check. The job compares the tag with the commit, not the commit with its parent, so a run that
-GitHub dropped from the queue loses nothing: the next run applies every change since the tag. A
-commit that is already at or behind the tag skips, and a tag outside the commit's history fails the
-run, because only a person can say which revision is live. A person sets the tag once, at the last
-revision applied by hand.
+drift check. The job's decision covers every commit since the tag, not only the commit's change from
+its parent, so a run that GitHub dropped from the queue loses nothing: the next run applies every
+change since the tag. A commit that is already at or behind the tag skips, and a tag outside the
+commit's history fails the run, because only a person can say which revision is live. A person sets
+the tag once, at the last revision applied by hand.
 
 GitHub environments here offer branch policies and secrets but no required reviewers, so a guard on
 the plan takes the reviewer's place. It reads the refreshed preview and holds the apply on any of
@@ -158,27 +162,28 @@ the replacement first, and that create fails on the name the old object still ho
 that replace. Two Secrets of [nixie](./workloads/nixie.md) hold the encrypted
 `deploy/nixie/secrets.sops.yaml`, and the program sets no name on either, so a merge that changes
 only that file applies without a person. A merge that changes `deploy/nixie/config.yaml` is held:
-nixie's backup job keeps a copy of the file in the ConfigMap `nixie-backup-config`, whose name the
-restore Job names, so the plan replaces an object whose name the program sets.
+nixie's backup job keeps a copy of the file in the ConfigMap `nixie-backup-config`, which the
+restore Job looks up by name, so the program sets that name and the guard holds the replace.
 
-A held run ends as held, not failed: the job succeeds, its summary names the revision to dispatch,
+A held run ends as held, not failed: the job succeeds, its summary gives the revision to dispatch,
 Discord gets the hold, and the next push's run takes its turn. A manual dispatch of the workflow on
-`main` applies whatever its own preview plans, so the person who dispatches it has read the held
-plan first. The dispatch applies only once CI has passed on main's tip, because a dispatch skips the
-trigger that waits for CI. A later push runs on its own and applies when its own plan passes the
-guard. Until someone applies or reverts the held change, though, that plan still holds the change,
-because the tag sits behind it and the preview covers the whole stack, so the later run ends held
-too. A failed apply or a failed second drift check leaves the tag where it was, so the next run's
-first drift check fails and holds until a person repairs the stack.
+`main` applies whatever its own preview plans, so read the held plan before you dispatch one. The
+dispatch applies only once CI has passed on main's tip, because a dispatch skips the trigger that
+waits for CI. A later push gets its own run, which applies when its own plan passes the guard. Until
+someone applies or reverts the held change, though, that plan still includes the change, because the
+tag sits behind it and the preview covers the whole stack. The later run therefore ends held too. A
+failed apply or a failed second drift check leaves the tag where it was, so the next run's first
+drift check fails and holds until a person repairs the stack.
 
 After the tag moves, the job checks that the applied commit's nixie client still speaks the API of
 the nixie it deployed. It waits for nixie's rollout, then sends nixie a few calls through the k3s
 API's service proxy, because the job's tailnet grants reach only k3s's API and Grafana. Each call
-carries no session, and each names a procedure that only reads, so the check changes nothing in
+carries no session, and each calls a procedure that only reads, so the check changes nothing in
 nixie even if nixie stopped asking for a session. The check passes when nixie refuses every call
 with the contract's unauthorized error, which shows that the route, the client header, the RPC
-encoding and each procedure still hold. A failed check fails the workflow's check job, not the apply
-job, because the apply is done by then, and Discord gets the failure.
+encoding and each procedure still hold. The check is a step of the apply job, and a failure there
+leaves the apply job green, because the apply is done by then. The workflow's `check` job reads the
+step's outcome and fails, and Discord gets the failure.
 
 The apply plans again from a fresh refresh, so the guard covers the preview and not the apply
 itself. A change made outside Pulumi in the minutes between the two reaches the apply unguarded.
@@ -189,8 +194,8 @@ nixie's certificate, a server error from the Cloudflare API to a read, or a fail
 A preview changes nothing, and a refresh writes only what it reads into the state, so a second try
 is safe. The refresh runs as a step of its own for that reason, and the apply that follows it skips
 its own refresh. The apply never runs twice, because a failed apply can leave the stack half
-changed. Pulumi's update plans would close that gap, but they are experimental, and a plan they
-reject stops the apply partway, which leaves the stack half changed.
+changed. Pulumi's update plans would close the gap between the preview and the apply, but they are
+experimental, and a plan they reject stops the apply partway, which leaves the stack half changed.
 
 One run of the job runs at a time, and GitHub never cancels one in progress, because a cancelled
 apply leaves the stack half changed. The job's concurrency group holds the whole job, from its
@@ -204,8 +209,8 @@ order. The job runs its own scripts from the workflow's revision and takes only 
 from the commit it applies, because GitHub runs `main`'s copy of the workflow for every run, and an
 older commit's scripts might not match it.
 
-The decision counts every commit since the tag that touches a Pulumi input, as the `prod-apply` gate
-of the repo's path-gate manifest lists them, not the difference between the two trees. A commit that
+The decision counts every commit since the tag that touches a Pulumi input, meaning a path in the
+`prod-apply` gate of the repo's path-gate manifest, and never compares the two trees. A commit that
 reverts an input change while that change applies therefore still gets its own apply, and a decision
 of nothing to apply stays right after the tag moves forward.
 
@@ -224,11 +229,12 @@ The job points `.env` at that vault before it resolves anything. Its tailnet nod
 federated identity, with no stored key, as `tag:cloud-deploy`, whose grants reach the k3s API and
 Grafana's NodePort on the host ([the tailnet](./network/tailnet.md)).
 
-Some writes stay with a person. The program copies each new `tag:imp` key into the `cloud` vault,
-and each new token of Grafana's MCP account into the `zgeoff` vault. The job's account can write
-neither vault, but a new key or token replaces the command that copies it, and the guard holds that
-replace. A NixOS switch and an agent-image rollout run by hand
-([workflows](../runbooks/workflows.md)).
+Some writes stay with a person. The job's account can write neither vault that the program copies a
+new key or token into. A new key or token also replaces the command that copies it, and the guard
+holds that replace. A manual dispatch runs under the same account, so a person applies that change
+by hand, from a 1Password session that can write the vault the plan writes
+([apply by hand](../runbooks/workflows.md#apply-by-hand)). A NixOS switch and an agent-image rollout
+run by hand ([workflows](../runbooks/workflows.md)).
 
 ## Guards
 

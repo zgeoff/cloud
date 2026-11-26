@@ -17,11 +17,11 @@ and the sign-in pages to clients on the internet. The tailnet route carries the 
 - [Reach `/rpc` while the tailnet route is off](#reach-rpc-while-the-tailnet-route-is-off) gives a
   port-forward to the API.
 
+For what each route is made of, read
 [The API's public route](../architecture/workloads/pepys.md#the-apis-public-route) and
-[The API's tailnet route](../architecture/workloads/pepys.md#the-apis-tailnet-route) explain what
-each route is made of.
-[The pepys API's route boundary](../architecture/network/public-ingress.md#the-pepys-apis-route-boundary)
-lists what each path of the public route checks.
+[The API's tailnet route](../architecture/workloads/pepys.md#the-apis-tailnet-route). For what each
+path of the public route checks, read
+[The pepys API's route boundary](../architecture/network/public-ingress.md#the-pepys-apis-route-boundary).
 
 ## Turn on the API's public route
 
@@ -29,8 +29,8 @@ The route is on while [stack config](./workflows.md#change-stack-config) `pepys.
 host: the key `apiHostname` in the `geoff-cloud:pepys` object of `infra/Pulumi.prod.yaml`.
 
 **CAUTION:** These steps add a public route. The `Deploy prod` run of the change holds at the tunnel
-route change, and step 4 answers the held run. Get the owner's approval before you answer it, as
-[the prod apply job](./prod-apply.md) describes.
+route change, and you answer the held run in step 4. Get the owner's approval before you answer it,
+as [the prod apply job](./prod-apply.md) describes.
 
 **CAUTION:** Add the key only beside a `cloud-pepys` image of pepys 0.3.1 or later. The Pulumi
 program accepts an image of pepys 0.3.0, but the API in that image stops when it starts.
@@ -83,10 +83,10 @@ program accepts an image of pepys 0.3.0, but the API in that image stops when it
 
 ## Sign a client in to the API
 
-[Turn on the API's public route](#turn-on-the-apis-public-route) first, because the admin commands
-need the route. Each command below runs `pepys-api` in the container `api` of the pod
-`pepys-host-0`, beside the running server. It works on `mcp-auth.db`, the database of the API's
-OAuth server.
+[Turn on the API's public route](#turn-on-the-apis-public-route) first: the route gives the API its
+auth folder, which holds `mcp-auth.db`, and steps 3 and 5 reach the API over it. Each command below
+runs `pepys-api` in the container `api` of the pod `pepys-host-0`, beside the running server.
+`pepys-api` works on `mcp-auth.db`, the database of the API's OAuth server.
 
 1. List the passkeys:
 
@@ -119,15 +119,15 @@ OAuth server.
    claude mcp add --transport http --client-id <client_id> --callback-port <port> pepys https://pepys.geoff.cloud/mcp
    ```
 
-   Leave out `--client-secret`: the OAuth server gives no client a secret. Expect the first
-   connection to open the owner's browser on `/oauth2/authorize`.
+   Leave out `--client-secret`: the OAuth server gives no MCP client a secret. Only a service client
+   signs in with a secret, as the next section describes. Expect the first connection to open the
+   owner's browser on `/oauth2/authorize`.
 
 ## Add a service client
 
-A service client signs in at `/mcp` with the read scope.
-[The API's public route](../architecture/workloads/pepys.md#the-apis-public-route) explains the
-service-token file that holds its digest. The route must be on, and the image must hold pepys 0.4.3
-or later.
+A service client signs in at `/mcp` with the read scope. For the service-token file that holds its
+digest, read [The API's public route](../architecture/workloads/pepys.md#the-apis-public-route).
+Before you start, turn on the public route, and check that the image holds pepys 0.4.3 or later.
 
 1. Keep the client's secret in the 1Password vault of the client's owner, never in this repo. Take
    the sha256 digest of the secret, in hex, `<digest>`.
@@ -140,7 +140,8 @@ or later.
 
 3. Run `bun run preview`. Expect it to create the ConfigMap `pepys-service-tokens`, or to replace it
    when the field held a client already, and to update the StatefulSet `pepys-host`.
-4. Merge it. `Deploy prod` applies it once CI passes on `main`, and the pod `pepys-host-0` rolls.
+4. Merge the pull request. `Deploy prod` applies it once CI passes on `main`, and the pod
+   `pepys-host-0` rolls. A replaced ConfigMap gets a new name, so the replace does not hold the run.
 5. Check the API's start log:
 
    ```sh

@@ -1,32 +1,35 @@
 # nixie
 
+Use this runbook to deploy, upgrade, check and restore nixie, and to manage its secrets, impd token
+and sandbox images. Any operator of geoff.cloud uses it.
+
 nixie runs in k3s from the stack config `nixie` and the files in `deploy/nixie/`, and answers at
 `https://nixie.geoff.cloud` on the tailnet. [nixie](../architecture/workloads/nixie.md) explains the
 pods, the secrets and the route. Run the Pulumi steps from a clean checkout of `main`, as
 [change infrastructure](./workflows.md#change-infrastructure) describes.
 
 **CAUTION:** The secrets file holds the deployment key, which wraps every key in nixie's key store.
-A leaked age key decrypts every earlier commit of the file, so recovery from a leak rotates every
-secret the file ever held. Never print a decrypted value, and never put one on a command line.
+A leaked age key decrypts every earlier commit of the file, so after a leak, rotate every secret the
+file ever held. Never print a decrypted value, and never put one on a command line.
 
 ## What holds what
 
-| Where                                                | Holds                                                                                                                                                 |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| vault `cloud`, item `nixie-age-host`                 | the age identity that the pod holds; its public half is in `deploy/nixie/.sops.yaml`                                                                  |
-| vault `cloud`, item `nixie-age-recovery`             | the age identity that stays off the host; restores need only it                                                                                       |
-| vault `cloud`, item `nixie-deployment-key`           | the deployment key, 32 random bytes in base64                                                                                                         |
-| vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind every profile on `api.anthropic.com`; impd's model secrets hold copies of it                                            |
-| vault `cloud`, item `nixie-openrouter-credential`    | the OpenRouter key behind every profile on `openrouter.ai`; impd's model secrets hold copies of it                                                    |
-| vault `cloud`, item `nixie-definitions-deploy-key`   | git-sync's read-only deploy key for `zgeoff/nixie-definitions`                                                                                        |
-| vault `nixie`, item `nixie-definitions-export-token` | the token nixie opens skill pull requests in `zgeoff/nixie-definitions` with                                                                          |
-| vault `nixie`, item `nixie-prod-read-token`          | the API token that nixie answers only read procedures for; `config.yaml` lists its SHA-256                                                            |
-| vault `nixie`, item `nixie-prod-kubeconfig`          | a kubeconfig for the `nixie-verify` account, whose token lasts 90 days                                                                                |
-| vault `cloud`, item `nixie-restic`                   | the restic password of nixie's backup data repository                                                                                                 |
-| vault `cloud`, item `nixie-key-restic`               | the restic password of nixie's backup key repository                                                                                                  |
-| vault `cloud`, item `r2-nixie-backup`                | the R2 key, endpoint and bucket of both of nixie's backup repositories                                                                                |
-| `deploy/nixie/secrets.sops.yaml`                     | the deployment key, nixie's impd token, the definitions export token, the owner's settings, the model gateway's control token and the Kagi search key |
-| impd                                                 | the token `nixie`, one model secret per profile, sent to the model gateway, and nixie's sandbox images                                                |
+| Where                                                | Holds                                                                                                                                                                                                   |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| vault `cloud`, item `nixie-age-host`                 | the age identity that the pod holds; its public half is in `deploy/nixie/.sops.yaml`                                                                                                                    |
+| vault `cloud`, item `nixie-age-recovery`             | the age identity that stays off the host; restores need only it                                                                                                                                         |
+| vault `cloud`, item `nixie-deployment-key`           | the deployment key, 32 random bytes in base64                                                                                                                                                           |
+| vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind every profile on `api.anthropic.com`; impd's model secrets hold copies of it                                                                                              |
+| vault `cloud`, item `nixie-openrouter-credential`    | the OpenRouter key behind every profile on `openrouter.ai`; impd's model secrets hold copies of it                                                                                                      |
+| vault `cloud`, item `nixie-definitions-deploy-key`   | git-sync's read-only deploy key for `zgeoff/nixie-definitions`                                                                                                                                          |
+| vault `nixie`, item `nixie-definitions-export-token` | the token nixie opens skill pull requests in `zgeoff/nixie-definitions` with                                                                                                                            |
+| vault `nixie`, item `nixie-prod-read-token`          | the API token that nixie answers only read procedures for; `config.yaml` lists its SHA-256                                                                                                              |
+| vault `nixie`, item `nixie-prod-kubeconfig`          | a kubeconfig for the `nixie-verify` account, whose token lasts 90 days                                                                                                                                  |
+| vault `cloud`, item `nixie-restic`                   | the restic password of nixie's backup data repository                                                                                                                                                   |
+| vault `cloud`, item `nixie-key-restic`               | the restic password of nixie's backup key repository                                                                                                                                                    |
+| vault `cloud`, item `r2-nixie-backup`                | the R2 key, endpoint and bucket of both of nixie's backup repositories                                                                                                                                  |
+| `deploy/nixie/secrets.sops.yaml`                     | the deployment key, nixie's impd token, the definitions export token, the owner's settings, which hold the model gateway's control token, and the connector credentials, which hold the Kagi search key |
+| impd                                                 | the token `nixie`, one model secret per profile, sent to the model gateway, and nixie's sandbox images                                                                                                  |
 
 ## Set up the helpers
 
@@ -49,10 +52,10 @@ journal.
 ## Add nixie's model secrets to impd
 
 nixie reaches its models through impd's broker, which adds the model credential to each request a
-sandbox sends to a profile's model host, `api.anthropic.com` or `openrouter.ai`, and sends the
-request to the [model gateway](./model-gateway.md) in place of that host. Each host has its own
-credential in vault `cloud`. impd keeps one model secret for each profile that `config.yaml` lists,
-under the name that
+sandbox sends to a profile's model host, `api.anthropic.com`, `openrouter.ai` or `chatgpt.com`, and
+sends the request to the [model gateway](./model-gateway.md) in place of that host. Each host has
+its own item in vault `cloud`. impd keeps one model secret for each profile that `config.yaml`
+lists, under the name that
 [nixie's names in impd](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/impd-names.md#model-secrets)
 defines. nixie derives the name from the profile, the header and the host, never from the
 credential, so the name stays the same when the credential changes. nixie's token cannot add a
@@ -80,9 +83,9 @@ Before the first deploy, and after a profile joins `config.yaml`, add the model 
    secrets=$(printf '%s\n' "$secret_names" | paste -sd, -)
    ```
 
-   Expect no `no credential item` line. A profile on another host needs its own item, and a case for
-   it here. A Codex profile has no `auth_header`, because the broker always sends its secret as a
-   bearer header. The `chatgpt.com` item holds the route key of the model gateway's
+   Expect no `no credential item` line. For a profile on another host, add its own item, and a case
+   for it here. A Codex profile has no `auth_header`, because the broker always sends its secret as
+   a bearer header. The `chatgpt.com` item holds the route key of the model gateway's
    [plan route](./model-gateway.md#add-the-chatgpt-plan-route), not a model credential.
 
 2. Add each secret that impd lacks:
@@ -96,7 +99,6 @@ Before the first deploy, and after a profile joins `config.yaml`, add the model 
    ```
 
    Expect a table row for each new name. For each name impd already holds, expect
-
    `impz: CONFLICT: secret <name> already exists`, and the loop goes on to the next name.
 
 3. List the secrets:
@@ -111,8 +113,8 @@ Before the first deploy, and after a profile joins `config.yaml`, add the model 
 
 ## Rotate the model credential
 
-nixie's secrets file holds no model credential, so a rotation replaces each model secret's value in
-impd under the same name. The names, nixie's token and every grant stay as they are, and the
+nixie's secrets file holds no model credential, so to rotate one, replace each model secret's value
+in impd under the same name. The names, nixie's token and every grant stay as they are, and the
 rotation needs no PR, no deploy and no restart. The steps below rotate the Claude setup token. To
 rotate the OpenRouter key, run them with the item `nixie-openrouter-credential` and the host
 `openrouter.ai` in place of `nixie-model-credential` and `api.anthropic.com`.
@@ -129,8 +131,7 @@ writes into its real memory.
    op read op://cloud/nixie-model-credential/credential | tr -d '\n' | sha256sum | cut -c1-8
    ```
 
-   Expect the digest of the new token, which `op read` of the item you copied it from prints with
-   the same pipeline.
+   Expect the digest that the same pipeline prints for the item you copied the new token from.
 
 3. Record the model secrets, and in the `IMPS` column the imps each one is granted to:
 
@@ -175,10 +176,10 @@ previews keep the old token.
 
 ## Pin nixie's sandbox images
 
-nixie adds its sandbox images to impd with its own token, which cannot pin an image. You pin them
-with `host_imp`, which runs `impz` as root inside imp-host, so that impd's image eviction never
-removes one and a new sandbox never waits for a pull. Before nixie creates a sandbox on an evicted
-image, nixie adds the image again, so an image that misses its pin costs only a pull.
+nixie adds its sandbox images to impd with its own token, which cannot pin an image. Pin them with
+`host_imp`, which runs `impz` as root inside imp-host, so that impd's image eviction never removes
+one and a new sandbox never waits for a pull. Before nixie creates a sandbox on an evicted image,
+nixie adds the image again, so an image that misses its pin costs only a pull.
 
 Run this section after you deploy a nixie bump PR that has the label `sandbox-images-changed`
 ([Release check](./release-check.md)), once step 3 of [Deploy or upgrade](#deploy-or-upgrade) shows
@@ -390,11 +391,11 @@ cause and dispatch again. The new StatefulSet mounts the same claim.
 
 ## Check a deploy
 
-The `Deploy prod` workflow runs nixie's API check and nixie's own prod doctor after each apply, and
-[the prod apply runbook](./prod-apply.md) reads their failures. Two more checks prove a deploy end
-to end. Run both after each deploy or upgrade of nixie, from a repo checkout on a tailnet device
-that reaches `root@geoffcloud` over SSH. They create nothing in the cluster and write nothing to
-nixie's conversation, and CI never runs them, because they need the live host.
+The `Deploy prod` workflow runs nixie's API check and nixie's own prod doctor after each apply. Read
+their failures with [the prod apply runbook](./prod-apply.md). Two more checks prove a deploy end to
+end. Run both after each deploy or upgrade of nixie, from a repo checkout on a tailnet device that
+reaches `root@geoffcloud` over SSH. They create nothing in the cluster and write nothing to nixie's
+conversation, and CI never runs them, because they need the live host.
 
 **CAUTION:** A check that stops early can leave its session or its imp behind. The stream check
 prints the ID of a session it could not revoke: revoke it from nixie's device list. The sandbox
@@ -423,8 +424,8 @@ check prints the name of an imp it could not remove: remove it with
 
    The check creates one imp, `fetch-check-<8 hex>`, from nixie's fetch image under imp's `public`
    policy, as nixie's web fetch tool does. The imp must read `https://example.com/`, and must not
-   connect to impd, the node's addresses, nixie's pod and Service, or a tailnet address. It removes
-   the imp at the end. Expect `public page: https://example.com/ answered 200 true`, every
+   connect to impd, the node's addresses, nixie's pod and Service, or a tailnet address. The check
+   removes the imp at the end. Expect `public page: https://example.com/ answered 200 true`, every
    `from the sandbox` line `blocked`, and the last line `fetch sandbox check passed`.
 
    Each target must first connect from the host, because an address with no listener refuses the
@@ -485,9 +486,8 @@ work of one that stopped part way.
 ## Keep nixie's data out of copies
 
 A forget in nixie removes an item everywhere nixie holds it, but a copy taken outside nixie keeps
-it. Two kinds of copy exist, and each has its rule. An Onidel snapshot of the root disk holds no
-copy, because nixie's volume sits on the encrypted zvol on `vdb`
-([protection at rest](../architecture/secrets.md#protection-at-rest)).
+it. An Onidel snapshot of the root disk holds no copy, because nixie's volume sits on the encrypted
+zvol on `vdb` ([protection at rest](../architecture/secrets.md#protection-at-rest)).
 
 ### imp backups
 

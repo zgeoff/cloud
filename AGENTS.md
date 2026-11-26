@@ -2,15 +2,18 @@
 
 Infrastructure as code for `geoff.cloud`, the owner's general-purpose private cloud on the tailnet:
 one Onidel VM running a single-node k3s cluster, with imp microVMs on the host as the first
-workload. `docs/architecture/overview.md` describes the system, and Linear holds the planned work.
+workload. Read `docs/architecture/overview.md` for how the system fits together. Linear holds the
+planned work.
 
 ## Required reading
 
-The rules a task needs are not repeated here. Load the skill for the work before starting it.
+Each skill below holds the rules for one kind of work, and this file doesn't repeat them. Load the
+skill for the work before starting it. The rest of this file holds the rules that cover the whole
+repo.
 
 | Skill                | Load before                                                                                |
 | -------------------- | ------------------------------------------------------------------------------------------ |
-| `code-style`         | writing, reviewing, or renaming any TypeScript — the shared function-verb taxonomy         |
+| `code-style`         | writing, reviewing, or renaming any TypeScript: it holds the function-name verb table      |
 | `project-code-style` | the same as `code-style`: cloud adds and replaces no code-style rule                       |
 | `testing`            | designing, writing, or reviewing tests                                                     |
 | `project-testing`    | the same as `testing`: cloud's lanes, harnesses and stand-ins, and the rules it replaces   |
@@ -27,7 +30,7 @@ When you write or edit a skill:
    delivers them there at the `zgeoff/skills` commit that `zgeoff/tools` pins, so install none of
    them yourself.
 2. Do every step in the "Check it" section of `.agents/skills/skill-writing/SKILL.md`. In its last
-   step, you fill in the `## Checks` section of the PR template.
+   step, fill in the `## Checks` section of the PR template.
 
 ## Repo structure
 
@@ -59,8 +62,8 @@ docs/
 
 ## Packages
 
-- Pin exact versions, with no `^` or `~` ranges. `bun add` saves exact versions, so the rule covers
-  hand-written edits.
+- Pin exact versions, with no `^` or `~` ranges. `bun add` saves exact versions. Check each version
+  you write by hand.
 
 ## Import boundaries
 
@@ -75,22 +78,22 @@ docs/
 - lefthook runs the light checks before a commit and a push. Leave the heavier checks to CI, because
   the host may have little memory.
 - An agent session runs an operator action, such as a host switch, a workflow dispatch or an apply,
-  through its `bun run ops:<verb>` script, never the script or workflow behind it.
-  [`docs/runbooks/ops.md`](docs/runbooks/ops.md) lists each verb, what it wraps and its
-  preconditions.
+  through its `bun run ops:<verb>` script, never the script or workflow behind it. Find each verb,
+  what it wraps and its preconditions in [`docs/runbooks/ops.md`](docs/runbooks/ops.md).
 - `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and the type check.
-  oxlint runs both through `tsrs-lint`, which the `tsrs` package ships and oxlint finds on its own,
-  in tsgolint's place, because stock tsgolint runs out of memory under 2 GiB. The script builds the
-  SDK first, so the type check reads its declarations and not its generated sources, then sets
-  `TSRS_FAST=1`, tsrs's fast mode. `lint:full` is CI-only: never run it locally.
+  oxlint runs both through `tsrs-lint` in tsgolint's place, because stock tsgolint runs out of
+  memory under 2 GiB. The `tsrs` package ships `tsrs-lint`, and oxlint finds it on its own. The
+  script builds the SDK first, so the type check reads its declarations and not its generated
+  sources. Then it sets `TSRS_FAST=1`, tsrs's fast mode. `lint:full` is CI-only: never run it
+  locally.
 
 ## Public repo and secrets
 
 - This repo is public. Secrets live in the 1Password `cloud` vault. `.env` holds only `op://`
   references, resolved with `op run --env-file=.env -- <command>`.
 - Never print a secret, and never log a whole Onidel VM object: the API returns the root password.
-- A new service in the cloud stays host-local or on the tailnet by default. A public route, such as
-  a tunnel hostname or a public DNS record, needs a stated reason in its PR.
+- Keep a new service in the cloud host-local or on the tailnet by default. To give it a public
+  route, such as a tunnel hostname or a public DNS record, state the reason in its PR.
 
 ## Host safety
 
@@ -107,14 +110,14 @@ docs/
   SSH's stdin, as `scripts/install-atc-gateway-credentials.ts` does, or read it from a root-only
   file on the host.
 - impd owns the DNS records `imps.geoff.cloud`, `*.imps.geoff.cloud` and
-  `_acme-challenge.imps.geoff.cloud`. Pulumi never declares them.
+  `_acme-challenge.imps.geoff.cloud`. Never declare them in Pulumi.
 
 ## Host switches
 
 - Switch the host with `bash scripts/switch-geoffcloud.sh` from a clean checkout of `main`. It
   builds a `git archive` snapshot of the commit with `nix build --no-link` in a `nixos/nix`
-  container, and only after the build exits 0 copies that exact store path to the host and activates
-  it. `--build-only` stops after the build.
+  container. Only after the build exits 0 does it copy that exact store path to the host and
+  activate it. `--build-only` stops after the build.
 - Never use `nixos-rebuild build`, because the repo mounts read-only. Never switch by hand after a
   failed build, and never re-evaluate the flake to switch.
 - The script refuses an atc daemon pin of another atc major than the running atc gateway's image, so
@@ -126,45 +129,48 @@ docs/
 - The script holds a switch whose activation would stop or restart k3s, because nixie can stay down
   for minutes after it. Pass `--allow-k3s-restart` only in a planned k3s window that the owner
   approved.
-- The NixOS checks gate the switch, not the merge: the script refuses a commit that neither a green
-  `NixOS checks` run on `main` covers, nor the green `nixos` check of the merged pull request that
-  produced it when no NixOS input differs between its head and the commit. Dispatch a run with
-  `gh workflow run nixos-checks.yml --ref main` when neither covers the commit, and never switch
-  around the gate.
+- The NixOS checks gate the switch, not the merge: the script refuses a commit unless a green
+  `NixOS checks` run on `main` covers it, or the merged pull request that produced it has a green
+  `nixos` check and no NixOS input differs between that PR's head and the commit. Dispatch a run
+  with `gh workflow run nixos-checks.yml --ref main` when neither covers the commit, and never
+  switch around the gate.
 - Before a switch that changes imp, copy impd's database with
   `bash scripts/copy-impd-db.sh <label>`. It takes a `VACUUM INTO` copy inside imp-host while impd
   runs, and records its integrity check, schema migration and imp version in `COPY-INFO`. Never tar
   the live `imp.sqlite*` files: impd runs in WAL mode, so such a copy can tear.
-- A restore of impd's database is one-way, because migrations run forward only. It needs the owner's
-  approval and follows `docs/runbooks/restore-geoff-cloud.md`. The host's `/var/lib/imp` is empty:
-  `tank/imp` has a legacy mountpoint inside imp-host.
+- A restore of impd's database is one-way, because migrations run forward only. Get the owner's
+  approval first, and follow `docs/runbooks/restore-geoff-cloud.md`. The host's `/var/lib/imp` is
+  empty: `tank/imp` has a legacy mountpoint inside imp-host.
 
 ## Pulumi applies
 
-- Preview every live change first. Pulumi's `Acl` replaces the whole Tailscale policy file, so the
-  owner reviews the diff before an apply that changes it.
+- Preview every live change first. Pulumi's `Acl` replaces the whole Tailscale policy file, so get
+  the owner's review of the diff before an apply that changes it.
 - The `Deploy prod` workflow applies each merged change to a Pulumi input once CI passes on `main`,
-  bracketed by drift checks. `docs/runbooks/prod-apply.md` covers its runs. Its guard holds a run
+  bracketed by drift checks. See `docs/runbooks/prod-apply.md` for its runs. Its guard holds a run
   for any of these:
-  - any operation other than a create, an update or a refresh, such as a delete or a replace
+  - a delete, a replace, or any other operation that isn't a create, an update or a refresh, apart
+    from the one replace the next paragraph describes
   - a change to the tailnet policy, the VM, the cloud firewall, a tunnel's routes, a DNS record or
     the gateway's Access policy
   - a failed drift check, for a manual dispatch
 
   A merge that changes only `deploy/nixie/secrets.sops.yaml` applies with no manual dispatch. Its
-  plan replaces nixie's Secrets, whose names Pulumi generates, because the infra code sets no
-  `metadata.name` on them, and the guard passes a replace of such an object when only its data
-  changed. The guard holds the same change to an object whose `metadata.name` the code sets, so it
-  holds every change to `deploy/nixie/config.yaml`: nixie's backup job keeps a copy of that file in
+  plan replaces nixie's Secrets. Pulumi generates their names, because the infra code sets no
+  `metadata.name` on them. The guard passes a replace of such an object when only its data changed.
+  The guard holds the same change to an object whose `metadata.name` the code sets, so it holds
+  every change to `deploy/nixie/config.yaml`: nixie's backup job keeps a copy of that file in
   `nixie-backup-config`, a ConfigMap with a fixed name. Give such an object
-  `deleteBeforeReplace: true`, or its replacement fails on the taken name.
-  [The apply job](docs/architecture/infrastructure-as-code.md#the-apply-job) gives the reason.
+  `deleteBeforeReplace: true`, or its replacement fails on the taken name. For the reason, see
+  [the apply job](docs/architecture/infrastructure-as-code.md#the-apply-job).
 
 - Never run `bun run up` while a `Deploy prod` run is in progress.
-- An apply by hand follows the same bracket, in order: `bun run drift` from a clean checkout of the
-  `deployed/prod` tag, `bun run preview -- --refresh` from a clean `main` that shows only the
-  reviewed changes, `bun run up`, `bun run drift` again, then move the tag. Record both drift
-  results.
+- Apply by hand inside the same bracket, in this order, and record both drift results:
+  1. `bun run drift` from a clean checkout of the `deployed/prod` tag.
+  2. `bun run preview -- --refresh` from a clean `main`. Expect only the reviewed changes.
+  3. `bun run up`.
+  4. `bun run drift` again.
+  5. Move the tag.
 
 ## Choices that need the owner
 
@@ -174,5 +180,5 @@ owner's sign-off.
 - Escalate anything you doubt through the coordinating agent, which brings the owner in.
 - Before an action that costs money, deletes data or cannot be undone, state its exact effect to the
   coordinating agent. Act only on its approval of that statement, not of a summary.
-- A permission-check block needs the owner in person. Tell the coordinating agent, so it can bring
-  the owner in.
+- When a permission check blocks you, only the owner in person can clear it. Tell the coordinating
+  agent, so it can bring the owner in.

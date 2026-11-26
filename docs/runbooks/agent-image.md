@@ -13,15 +13,15 @@ The image holds binaries and two boot services for a 2 GiB imp:
 
 The swap service sizes `/swapfile` from the free space on `/`, so the swapfile never fills the disk.
 A 32 GiB agent imp gets 2 GiB. A small disk, such as a 4 GiB test imp, gets a smaller swapfile or
-none, because the service keeps room free for the session's checkout and the broker's files. The
-service prints its choice and the free space it read, which `impz logs <name> swap` shows.
+none, because the service keeps room free for the session's checkout and the broker's files. To see
+the size it chose and the free space it read, run `impz logs <name> swap`.
 `images/agent/sbin/setup-swap` holds the bounds and the reason for each.
 
-Beside them, the image holds one Claude Code hook, which [Locked packages](#locked-packages) covers.
-It holds no other configuration, no login state and no secret: atc sets up grants, placeholder
-variables, the config bundle and the seed for each session at launch. Its build runs no tool but
-Bun's install of noslop's lock, because a tool can write state when it runs (`codex --version`
-creates `~/.codex`).
+Beside them, the image holds Claude Code managed settings: one hook, which
+[Locked packages](#locked-packages) covers, and auto memory turned off. It holds no other
+configuration, no login state and no secret: atc sets up grants, placeholder variables, the config
+bundle and the seed for each session at launch. Its build runs no tool but Bun's install of noslop's
+lock, because a tool can write state when it runs (`codex --version` creates `~/.codex`).
 
 | Path                                  | Holds                                                     |
 | ------------------------------------- | --------------------------------------------------------- |
@@ -74,7 +74,7 @@ runs beside the hooks of the session's own settings. At each session start in a 
 the session runs the install itself.
 
 Claude Code reads the managed settings file only while no server-managed settings apply to the
-session. If an organization policy reaches the imp's sessions, that policy needs the same hook.
+session. If an organization policy applies to the imp's sessions, add the same hook to that policy.
 
 ## Build
 
@@ -84,15 +84,15 @@ that commit. Run the script yourself only to build another commit, or to build a
 build.
 
 Build and check in one command, from any zgeoff/cloud clone, on a machine whose `impz` CLI calls the
-geoffcloud host. The token needs `manage` scope with no imp patterns.
+geoffcloud host. The CLI's token needs `manage` scope with no imp patterns.
 
 ```sh
 bun scripts/build-agent-image.ts            # origin/main's head, after a fetch
 bun scripts/build-agent-image.ts <commit>   # or an older commit on main
 ```
 
-Name the commit that changed `images/agent`, as the timer does, so a build by hand and the timer
-make the same image name.
+To make the image the timer would make, name the newest commit that changed `images/agent`. A build
+of `origin/main`'s head gets the same name only when that head changed `images/agent`.
 
 The script builds from a `git archive` of the commit, so the clone's working tree never reaches the
 image. It names the image `agent-<short sha>`, then boots the imp `agent-check-<short sha>` from it,
@@ -145,11 +145,11 @@ without a credential, into a clone under `/var/lib/agent-image-build`. It takes 
 `main` that changes `images/agent`, and runs the build script for that commit when impd holds no
 image of its name. While impd does not answer, as when a host switch recreates imp-host, a run waits
 up to 10 minutes and then leaves the build to the next run, so the unit does not fail the switch. A
-build that fails while imp-host's container changes leaves the commit for the next run as well. It
-copies `impz` out of the imp-host container for each build, so the CLI matches the impd it calls.
-The build's token is a `manage` token with no imp patterns, so it controls every imp, grant and
-image on the host. It lives in a root-only file on the host's encrypted secrets dataset, and never
-in a GitHub secret.
+build that fails while imp-host's container changes leaves the commit for the next run as well. The
+timer copies `impz` out of the imp-host container for each build, so the CLI matches the impd it
+calls. The build's token is a `manage` token with no imp patterns, so it controls every imp, grant
+and image on the host. It lives in a root-only file on the host's encrypted secrets dataset, and
+never in a GitHub secret.
 
 Until the token file exists, systemd skips the unit. To stage the token, run this once from a
 machine that reaches the host:
@@ -171,10 +171,11 @@ ssh root@geoffcloud journalctl -u agent-image-build --since -1d | grep 'agent-im
 ```
 
 Expect `agent-image-build: agent-<short sha> <digest> check passed` after a pin merges. A failed
-build fails the unit and records its time in `/var/lib/agent-image-build/failed/<sha>`, and later
-runs skip that commit, so a broken commit is built once. Read the build's output in the journal, fix
-the cause, then remove that file: the next run builds the commit again. A failure before the build,
-such as an imp-host that does not answer, records nothing, and the next run tries again.
+build, other than one that an imp-host change interrupts, fails the unit and records its time in
+`/var/lib/agent-image-build/failed/<sha>`. Later runs skip that commit, so a broken commit is built
+once. Read the build's output in the journal, fix the cause, then remove that file: the next run
+builds the commit again. A failure before the build, such as an imp-host that does not answer,
+records nothing, and the next run tries again.
 
 ## The `agent` alias
 
@@ -215,9 +216,9 @@ The check prints one line per item and exits non-zero on any failure:
 
 `bun run test:agent-image` runs the same check on a local Docker build, before the host build. It
 then runs `scripts/agent-image-gitleaks.bats`, which scans planted files with the image's gitleaks
-to prove what the allowlist exempts and what it still reports. A finding in an upstream file that
-holds no credential goes into `scripts/agent-image-gitleaks.toml` with its reason, narrowed to that
-file or folder.
+to prove what the allowlist exempts and what it still reports. When gitleaks reports an upstream
+file that holds no credential, add it to `scripts/agent-image-gitleaks.toml` with its reason,
+narrowed to that file or folder.
 
 ## Set the `cloud` target to `agent`
 
@@ -281,8 +282,8 @@ After the pin merges, roll the release out in the order that
 
 The daemon copies its own binary into an imp whose image ships another atc, before the imp's first
 session starts, so a fleet of such imps waits on one upload per imp. A new imp on an image that
-ships the daemon's release skips the copy. So the image that ships a release reaches the `cloud`
-target before the daemon runs that release. The daemon reads its targets at startup only, so one
+ships the daemon's release skips the copy. So switch the `cloud` target to the image that ships a
+release before the daemon runs that release. The daemon reads its targets at startup only, so one
 restart brings the new release and the new image together.
 
 An imp that exists at the restart keeps the image it was created from, and takes the upload at its
@@ -421,8 +422,8 @@ entry.
 
 A rollback pins the `cloud` target to the image `agent` named before: the `agent-<short sha>` its PR
 records, `agent-1` before the first image named for a commit, or `coder` before the first agent
-image. An image without atc, such as `agent-1` or `coder`, needs `guestATC` removed from the target
-too, so the daemon copies its binary in again.
+image. For an image without atc, such as `agent-1` or `coder`, also remove `guestATC` from the
+target, so the daemon copies its binary in again.
 
 1. Check that the earlier image is still on the host: `impz image ls`.
 2. Pin the target to it with `scripts/switch-agent-image.ts`, as in

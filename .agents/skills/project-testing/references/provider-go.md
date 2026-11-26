@@ -1,8 +1,8 @@
 # provider (Go)
 
 Write the Go tests in `provider/` with testify, as the Departures of
-[project-testing](../SKILL.md#departures) say. These rules give each rule of
-[Go testing](../../testing/references/go.md) its testify form, and name the provider's stand-ins.
+[project-testing](../SKILL.md#departures) say. Follow each rule of
+[Go testing](../../testing/references/go.md) in its testify form below, and use the provider's stand-ins.
 
 - [Shape](#shape)
 - [Assertions](#assertions)
@@ -55,7 +55,7 @@ can't answer as a problem.
   `RegisterHandler` only for a state change during a request, or for a transport fault, such as a
   body shorter than its `Content-Length`.
 - Compare the whole `GetRequests()` list in each test that asserts what the client sent.
-- Observe a helper that fails a test through
+- To test a helper that fails a test, pass it the `testing.TB` from
   [`BuildStubTB`](../../../../provider/internal/onideltest/build_stub_tb.go).
 
 ## Time

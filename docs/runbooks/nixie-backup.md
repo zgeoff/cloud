@@ -1,7 +1,7 @@
 # nixie's backup
 
 Use this runbook to back up nixie now, read its backup repositories, purge a forgotten item from old
-snapshots, and test a restore. [nixie](./nixie.md) covers the service itself and a real restore.
+snapshots, and test a restore. For the service itself and a real restore, read [nixie](./nixie.md).
 
 nixie keeps its records in `nixie.db` and each record's key in `keys.db`, on its data volume. nixie
 writes a backup set, a copy of both databases, into the `backup` folder of that volume once per
@@ -12,36 +12,35 @@ file named `complete` into it last.
 The `nixie-backup` CronJob runs every night at 04:00 Melbourne time. Each run uploads every complete
 set with restic, which encrypts it in the pod, to two repositories in R2:
 
-| Repository | Path                                         | Holds      | Retention                                            |
-| ---------- | -------------------------------------------- | ---------- | ---------------------------------------------------- |
-| data       | `s3:<endpoint>/geoff-cloud-nixie/nixie`      | `nixie.db` | 24 hourly, 7 daily, 4 weekly and 6 monthly snapshots |
-| key        | `s3:<endpoint>/geoff-cloud-nixie/nixie-keys` | `keys.db`  | the newest set's snapshot only                       |
+| Repository | Path                                         | Holds                                                         | Retention                                            |
+| ---------- | -------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------- |
+| data       | `s3:<endpoint>/geoff-cloud-nixie/nixie`      | `nixie.db`; older snapshots tagged `nixie` hold `keys.db` too | 24 hourly, 7 daily, 4 weekly and 6 monthly snapshots |
+| key        | `s3:<endpoint>/geoff-cloud-nixie/nixie-keys` | `keys.db`                                                     | the newest set's snapshot only                       |
 
 After each upload to the key repository, the run prunes it with `--max-unused 0`, so restic deletes
 the older sets' `keys.db` data at once. The run then writes a receipt, a file that records the
 snapshots and each step's result, into each set, and deletes the set's two database copies. nixie
-checks its `backup` folder on a poll, records each receipt it finds and deletes that set's folder.
-nixie writes no new hourly set while a set waits for its receipt, so a set can wait up to a day for
-the nightly run.
+checks its `backup` folder on a poll, records each receipt it finds and deletes that set's folder. A
+set can wait up to a day for the nightly run, and nixie writes no new set while one waits for its
+receipt.
 
 A failed upload gives the set a failed receipt and fails the run's Job. Kubernetes never retries the
 Job: a second run skips each set that holds a receipt and exits 0, so a retry would turn the failed
 Job into a success. A run that stops before it writes a receipt leaves the set to the next night's
 run.
 
-The key repository holds only the newest set's `keys.db`. Once the CronJob uploads the set that
-nixie writes after it forgets an item, the key repository holds that item's key no longer. The data
-repository's old snapshots tagged `nixie` are the exception, until you purge them as
-[Purge a forgotten item from old snapshots](#purge-a-forgotten-item-from-old-snapshots) describes.
+The key repository holds only the newest set's `keys.db`, so once the CronJob uploads the set that
+nixie writes after it forgets an item, the key repository no longer holds that item's key. The data
+repository's old snapshots tagged `nixie` still hold it until you purge them, as
+[Purge a forgotten item from old snapshots](#purge-a-forgotten-item-from-old-snapshots) says.
 
 The CronJob runs the `nixie-backup` image from the same nixie release as `nixie.image`, pinned as
 `nixie.backupImage` in `infra/Pulumi.prod.yaml`. The restore Job has two containers. Its `fetch`
 container runs `deploy/nixie/backup/restore.sh` in the `nixie-backup` image, which restores
 `keys.db` from the key repository and the `nixie.db` of the same set from the data repository. Its
 `restore` container then runs `nixie restore` in nixie's own image, which replaces nixie's databases
-with them.
-[nixie's backups doc](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/backups.md)
-gives the design of the sets, the receipts and the two repositories.
+with them. For the design of the sets, the receipts and the two repositories, read
+[nixie's backups doc](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/backups.md).
 
 | Item in the `cloud` vault | Holds                                                |
 | ------------------------- | ---------------------------------------------------- |
@@ -133,7 +132,7 @@ the next section covers.
 
 Each data snapshot tagged `nixie` holds both databases, `keys.db` included. The CronJob writes none
 of them, and data retention deletes each one as it ages out. restic cannot delete one item from a
-snapshot, so you delete each `nixie` snapshot taken before nixie forgot the item.
+snapshot, so delete each `nixie` snapshot taken before nixie forgot the item.
 
 **CAUTION:** restic's `forget` and `prune` cannot be undone. They delete every restore point in the
 snapshots you name, not only the forgotten item.
@@ -166,11 +165,10 @@ snapshots you name, not only the forgotten item.
 
 ## Test a restore
 
-The test restores the newest set into a scratch claim and starts a second nixie on it, while the
-live nixie keeps running. The second nixie gets a config whose impd URL points at a dead port,
-because the second nixie would otherwise reach impd and remove the live nixie's sandboxes at its
-start. The second nixie opens both databases, runs its migrations and integrity check, and listens,
-but never turns ready.
+Restore the newest set into a scratch claim and start a second nixie on it, while the live nixie
+keeps running. Give the second nixie a config whose impd URL points at a dead port, because at its
+start it would otherwise reach impd and remove the live nixie's sandboxes. The second nixie opens
+both databases, runs its migrations and integrity check, and listens, but never turns ready.
 
 1. Create the scratch claim:
 
@@ -197,15 +195,15 @@ but never turns ready.
    ssh root@geoffcloud k3s kubectl -n nixie logs job/<job_name> -c restore
    ```
 
-   Expect the log to end with `nixie restored nixie.db and keys.db from /tmp/nixie-backup`. A backup
-   run during the test can remove the key snapshot that the `fetch` container picked, once it
-   publishes a newer set. The container then picks that set, so its log can hold one restic
+   Expect the log to end with `nixie restored nixie.db and keys.db from /tmp/nixie-backup`. When a
+   backup run publishes a newer set during the test, it can remove the key snapshot that the `fetch`
+   container picked. The container then picks the newer set, so its log can hold one restic
    `no snapshot found` line before the restore.
 
 4. Copy the live config into the ConfigMap `nixie-restore-check`, with impd's URL pointed at a dead
-   port. `deploy/nixie/config.yaml` lacks the `imp` section, which infra adds from
-   `packages/topology`, so the step copies the live ConfigMap. ssh joins its arguments into one
-   remote command, so a command whose remote part holds JSONPath quotes that whole part:
+   port. Copy the live ConfigMap, because `deploy/nixie/config.yaml` lacks the `imp` section, which
+   infra adds from `packages/topology`. ssh joins its arguments into one remote command, so quote
+   the whole remote part of each command that holds JSONPath:
 
    ```bash
    config=$(ssh root@geoffcloud 'k3s kubectl -n nixie get pod nixie-0 -o "jsonpath={.spec.volumes[?(@.name==\"config\")].configMap.name}"')

@@ -3,8 +3,9 @@
 The values that geoff.cloud's host, Pulumi program, scripts and image builds share live here, in
 `constants.json`: the VM's ID and public addresses, the tailnet's range, tags and node addresses,
 k3s's ranges and ports, Podman's bridge that imp-host runs on, and the ports and addresses of atc,
-impd and 1Password Connect. Each value has one written source, so a change to one is a change to
-this file, and every reader picks it up from the same commit.
+impd and 1Password Connect. Each value has one written source: change it in this file, and every
+reader that can read the file picks up the change from the same commit. The few copies that cannot
+read it are listed below, with the check that holds them to the file.
 
 ## Readers
 
@@ -29,17 +30,16 @@ config file holds no copy, because infra builds its `imp` section from the const
 `bun run check:topology` compares each copy with the constants and fails on a mismatch. It runs in
 CI and before a push.
 
-Version pins are not topology: each keeps its own pin file, which its bump tooling rewrites. Other
-data that the host, infra and the scripts all read belongs in this package as its own file beside
-`constants.json`. So does a schema for data that infra hands to a script, such as the payload of the
-Job that adds nixie's sandbox images, so that the producer and the parser share one type.
+Keep version pins out of this package: each keeps its own pin file, which its bump tooling rewrites.
+Put other data that the host, infra and the scripts all read in this package, as its own file beside
+`constants.json`. Put a schema here too for data that infra hands to a script, such as the payload
+of the Job that adds nixie's sandbox images, so the producer and the parser share one type.
 
 ## The exposure registry
 
-`exposure.json` lists every public route and port, and each port the host keeps to the tailnet or to
+`exposure.json` holds every public route and port, and each port the host keeps to the tailnet or to
 itself, with its scope and its reason. The package exports it parsed as `exposure`, and fails to
 load when one of its ports differs from the same port in the constants. The host reads it through
 `nixos/exposure.nix`, nixie's ingress takes its port from it, and `bun run docs:exposure` writes its
-table into `docs/reference/exposure.md`.
-[Firewalls](../../docs/architecture/network/firewalls.md#the-exposure-registry) covers the checks
-that hold it to the code.
+table into `docs/reference/exposure.md`. For the checks that hold it to the code, see
+[Firewalls](../../docs/architecture/network/firewalls.md#the-exposure-registry).

@@ -1,16 +1,16 @@
 # The model gateway
 
 nixie's model gateway runs on the host as the `model-gateway` unit, from the release binary that
-[`nixos/packages/model-gateway.nix`](../../nixos/packages/model-gateway.nix) pins. Every model
-request of production nixie passes it: imp-host's broker sends each request of a nixie sandbox to
-the gateway's model listener, the gateway counts the reply's dollars and tokens in a day and a month
-that reset at midnight in nixie's time zone, and it refuses every request once a count reaches the
-limit nixie set. nixie sets its limits on the control listener, and the gateway refuses any limit
-above the caps in its own config.
-[nixie's model gateway](https://github.com/zgeoff/nixie/blob/main/docs/architecture/policy/model-gateway.md)
-describes the gateway, and
-[`nixos/modules/model-gateway.nix`](../../nixos/modules/model-gateway.nix) describes the unit, its
-listeners and their firewall paths.
+[`nixos/packages/model-gateway.nix`](../../nixos/packages/model-gateway.nix) pins. Once
+[Send nixie's model requests through the gateway](#send-nixies-model-requests-through-the-gateway)
+has run, every model request of production nixie passes through it. imp-host's broker sends each
+request of a nixie sandbox to the gateway's model listener. The gateway counts the reply's dollars
+and tokens in a day and a month that reset at midnight in nixie's time zone, and refuses every
+request once a count reaches the limit nixie set. nixie sets its limits on the control listener, and
+the gateway refuses any limit above the caps in its own config. For how the gateway works, read
+[nixie's model gateway](https://github.com/zgeoff/nixie/blob/main/docs/architecture/policy/model-gateway.md).
+For the unit, its listeners and their firewall paths, read
+[`nixos/modules/model-gateway.nix`](../../nixos/modules/model-gateway.nix).
 
 **CAUTION:** The gateway fails closed. While it is stopped, while its store is unreadable, and while
 the lost mark stands, every model request of nixie fails. Never stop the unit while nixie works,
@@ -130,7 +130,7 @@ config.
 
 impd treats the upstream as part of a secret's binding, so the change needs `--replace --rebind`. A
 rebind drops every grant on the secret, and the token's list from before the rebind no longer covers
-it, so the token's list is set again after it
+it, so set the token's list again after the rebind
 ([imp's rotate or rebind](https://github.com/zgeoff/impz/blob/main/docs/guides/connectors.md#rotate-or-rebind)).
 
 **CAUTION:** Model calls fail from the rebind until the new pod grants its sandboxes again, about a
@@ -138,7 +138,7 @@ minute. Run this when no task works, and never send a test turn to production ni
 
 1. Set the helpers and `model_secrets` and `secrets`, as
    [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) step 1 does.
-2. Write the rebind as a function, to run at the right moment:
+2. Define the rebind as a function, to run later:
 
    ```bash
    rebind_model_secrets() { # $1: the upstream, or empty for none
@@ -151,8 +151,8 @@ minute. Run this when no task works, and never send a test turn to production ni
    }
    ```
 
-3. Merge the PR that sets `spendStop`. The `Deploy prod` run holds it, because it changes
-   `deploy/nixie/config.yaml`. Read the held plan, as
+3. Merge the PR that sets `spendStop`. The PR changes `deploy/nixie/config.yaml`, so its
+   `Deploy prod` run holds for your answer. Read the held plan, as
    [Answer a held run](./prod-apply.md#answer-a-held-run) describes: expect nixie's ConfigMap and
    Secret replaced and the StatefulSet updated, and nothing else.
 4. Dispatch the run, and watch `nixie-0`:
@@ -173,9 +173,9 @@ minute. Run this when no task works, and never send a test turn to production ni
 
 ## Roll back the spending stop
 
-- **nixie lost model access, with no pause:** revert the PR that set `spendStop`, merge it, and
-  dispatch its held run. Without `spendStop`, nixie keeps each sandbox it has and never grants it
-  again, so the rollback restores the grants that the rebind drops:
+- **When nixie lost model access but did not pause,** revert the PR that set `spendStop`, merge it,
+  and dispatch its held run. Without `spendStop`, nixie keeps each sandbox it has and never grants
+  it again, so restore the grants that the rebind drops:
   1. Before the rollout, save each sandbox's model grants:
 
      ```bash
@@ -194,11 +194,11 @@ minute. Run this when no task works, and never send a test turn to production ni
      ```
 
      Expect `host_imp secret ls` to list each saved imp under its secret again.
-- **nixie came up paused with the cause `spending`:** fix the cause first. `unreachable` means nixie
-  cannot reach the control relay: check the relay's socket, the firewall admission and nixie's
+- **When nixie came up paused with the cause `spending`,** fix the cause first. `unreachable` means
+  nixie cannot reach the control relay: check the relay's socket, the firewall admission and nixie's
   network policy. A limit trip at the start means a limit or a zone that differs from the gateway's.
-  A revert does not end the pause: with no `spendStop`, nothing clears it. After a revert, the pause
-  stands until the owner resumes nixie, from the client or with `nixie resume` on the host.
+  A revert does not end the pause: without `spendStop`, the pause stands until the owner resumes
+  nixie, from the client or with `nixie resume` on the host.
 
 **CAUTION:** Never roll nixie's image back while a pause with the cause `spending` stands. The older
 release refuses to open the database.
@@ -217,11 +217,12 @@ they differ. Rotate both in one window:
        <(op item get model-gateway-control --vault cloud --format json)) > /dev/null
    ```
 
-2. Install it on the host, as step 2 there does, and restart the unit:
-   `ssh root@geoffcloud systemctl restart model-gateway < /dev/null`.
+2. Install it on the host, as step 2 of [Set up the control token](#set-up-the-control-token) does,
+   and restart the unit: `ssh root@geoffcloud systemctl restart model-gateway < /dev/null`. This
+   restart is the one stop outside a host switch: nixie pauses until step 3 ends it.
 3. Set nixie's copy, as [change a secret](./nixie.md#change-a-secret) does for the key
    `["settings"]["gateway-control"]`, and merge its PR. nixie stays paused as `unreachable` from
-   step 2 until its new pod starts, and the stop clears on its own.
+   step 2 until its new pod starts, and the pause clears on its own.
 
 ## Add a model profile
 
@@ -231,9 +232,9 @@ route's table. A profile with no route gets a 404 on every call.
 1. In one PR, add the profile to `deploy/nixie/config.yaml` and a route to `services.model-gateway`,
    with the same ID, model and prices. A model outside Claude goes through OpenRouter: its base URL
    is `https://openrouter.ai`, with no path, and its route's upstream is
-   `https://openrouter.ai/api`. Pin it to one provider endpoint: the profile's `provider_pin` and
-   the route's `providerPin` name the same endpoint tag, such as `novita/fp8`, and the prices are
-   that endpoint's own.
+   `https://openrouter.ai/api`. Pin it to one provider endpoint: set the profile's `provider_pin`
+   and the route's `providerPin` to the same endpoint tag, such as `novita/fp8`, and use that
+   endpoint's own prices.
 2. Before the merge, add the profile's model secret and set nixie's token, as
    [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) describes.
 3. After the merge, switch the host with `bun run ops:switch-host`, so the gateway has the route,
@@ -249,11 +250,11 @@ rose and holds no `lost`.
 
 The route `gpt-6-luna` runs nixie's Codex tasks on the owner's ChatGPT plan. The gateway holds the
 plan login, refreshes it and sets its access token on each request, so neither nixie nor a sandbox
-holds a plan token.
-[nixie's plan login runbook](https://github.com/zgeoff/nixie/blob/main/docs/runbooks/chatgpt-plan-login.md)
-explains the parts. A route key ties the two halves: the unit loads it as a credential, and impd's
-model secret for the profile holds the same key, so the broker sends it on each plan request. The
-gateway refuses a plan request with any other key.
+holds a plan token. For the parts, read
+[nixie's plan login runbook](https://github.com/zgeoff/nixie/blob/main/docs/runbooks/chatgpt-plan-login.md).
+A route key ties the gateway to impd: the unit loads it as a credential, and impd's model secret for
+the profile holds the same key, so the broker sends it on each plan request. The gateway refuses a
+plan request with any other key.
 
 **CAUTION:** The unit needs every route key file to start. A switch that adds a plan route before
 its key file exists stops the gateway, and with it every model call of nixie. Do steps 1 to 4 before
@@ -277,9 +278,9 @@ the switch.
    Expect `ok`. Compare the first 8 hex of each copy's SHA-256, as step 3 of
    [Set up the control token](#set-up-the-control-token) does for the token.
 
-3. Add the profile's model secret to impd with the same key. Set the helpers and `model_secrets` and
-   `secrets` first, as [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) step 1 does,
-   then:
+3. Add the profile's model secret to impd with the same key. Set the helpers, `model_secrets`,
+   `secret_names` and `secrets` first, as
+   [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) step 1 does, then:
 
    ```bash
    op read op://cloud/model-gateway-gpt-6-luna-route-key/credential | tr -d '\n' \
@@ -287,7 +288,7 @@ the switch.
        --header authorization --scheme bearer --upstream http://10.88.0.1:8789
    ```
 
-   Expect a table row for the name. nixie derives the name from the profile `gpt-6-luna`, the header
+   Expect a table row for the name. nixie derives the name from the profile `gpt-6-luna`, the scheme
    `bearer` and the host `chatgpt.com`.
 
 4. Point nixie's token at the list that holds the new name. `--grantable` takes the whole list, and

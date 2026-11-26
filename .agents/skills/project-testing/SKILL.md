@@ -22,32 +22,31 @@ metadata:
 
 | Fact          | Where                                                                                                                                                                                                                                                                                                                   |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Test commands | [`rig.config.ts`](../../../rig.config.ts) holds each test command's file suffix and per-test timeout. `bun run test:e2e` runs the journeys in `scripts/e2e/` through `rig e2e`, which builds each program that `rig.config.ts` declares first, and `bun run test` leaves them out                                                                                                                                   |
+| Test commands | [`rig.config.ts`](../../../rig.config.ts) holds each test command's file suffix and per-test timeout. `bun run test:e2e` runs the journeys in `scripts/e2e/` through `rig e2e`, which first builds each program that `rig.config.ts` declares, and `bun run test` leaves them out                                                                                                                                   |
 | Test utils    | the `src/test-utils/` folder of the package, such as [`infra/src/test-utils/`](../../../infra/src/test-utils/) or [`scripts/src/test-utils/`](../../../scripts/src/test-utils/); [`scripts/src/test-utils/shell/`](../../../scripts/src/test-utils/shell/) for a shell suite; [`nixos/checks/test-utils/`](../../../nixos/checks/test-utils/) for a NixOS check |
 
 ## Departures
 
-- Assert a Go test with testify's `assert` and `require`.
-  [Go assertions](../testing/references/go.md#assertions) asks for gotest.tools or go-cmp. Every
-  provider test uses testify, and a second library would split the suite.
+- Assert a Go test with testify's `assert` and `require`, in place of the gotest.tools or go-cmp of
+  [Go assertions](../testing/references/go.md#assertions). Every provider test uses testify, and a second library would split the suite.
 
 ## Suites in CI
 
-- Add a suite by creating a `.bats` file. `run-bats.sh` runs every `.bats` file that git tracks or
-  sees as untracked.
-- Tag each suite on the line after its shebang with `# bats file_tags=suite:<group>`. Give a suite
-  that needs no Docker the `scripts` group, which `bun run test:scripts` runs. Give a Docker suite
-  the group of the `test:*` script that runs it, such as `alert-rules` for `test:alert-rules`.
-  `run-bats.sh` skips a file with no tag.
+- Add a suite by creating a `.bats` file and tagging it, on the line after its shebang, with
+  `# bats file_tags=suite:<group>`. `run-bats.sh <group>` runs each tracked or untracked `.bats`
+  file tagged with that group, so it never runs an untagged file.
+- Give a suite that needs no Docker the `scripts` group, which `bun run test:scripts` runs. Give a
+  Docker suite the group of the `test:*` script that runs it, such as `alert-rules` for
+  `test:alert-rules`.
 - When a suite starts to read a new file, add that file's path to the suite's gate in
-  [`gates.yml`](../../../.github/gates.yml), if it has one. A gate lists the paths whose change makes
-  CI run a check. CI skips the suite when only an unlisted file changes.
+  [`gates.yml`](../../../.github/gates.yml), if it has one. CI runs a gated suite only when one of the
+  paths in its gate changes.
 - Read the `NixOS checks` result on the pull request before you merge a change to a check's inputs.
   The workflow doesn't block the merge, but
   [`switch-geoffcloud.sh`](../../../scripts/switch-geoffcloud.sh) refuses to deploy a commit unless a
   green run on main covers it.
-- Run `git config maintenance.auto false` in each git repository a test creates, a bare origin
-  included, in any language. Git's background repack can write into the repository while the cleanup removes it.
+- Run `git config maintenance.auto false` in each git repository that a test in any language
+  creates, a bare origin included. Git's background repack can write into the repository while the cleanup removes it.
 
 ## Real hosts
 
@@ -113,8 +112,8 @@ only.
 
 ## Operator scripts
 
-These rules cover the TypeScript scripts in `scripts/`, and the TypeScript tests of the bash scripts
-in `scripts/host/`.
+Follow these rules for the TypeScript scripts in `scripts/`, and for the TypeScript tests of the bash
+scripts in `scripts/host/`.
 
 - Run every subprocess through the script's injected `Runner`. In a test, pass
   [`buildStubRunner`](../../../scripts/src/test-utils/build-stub-runner.ts), which exits 97 with
@@ -125,8 +124,9 @@ in `scripts/host/`.
   [`buildRealProgramHandler`](../../../scripts/src/test-utils/build-real-program-handler.ts). Run git
   with the environment that [`createSeededGitOrigin`](../../../scripts/src/test-utils/create-seeded-git-origin.ts)
   returns.
-- Test a script in `scripts/host/`, which travels on ssh's stdin, with real bash against loopback
-  stand-ins, such as [`startStubImpd`](../../../scripts/src/test-utils/start-stub-impd.ts).
+- Test a script in `scripts/host/` with real bash against loopback stand-ins, such as
+  [`startStubImpd`](../../../scripts/src/test-utils/start-stub-impd.ts): it travels on ssh's stdin
+  and has no `Runner`.
 - Assert that no secret appears in any recorded argv, and that each secret reaches its call on
   stdin.
 
@@ -135,10 +135,11 @@ in `scripts/host/`.
 - Name each case `@test "it <words>"`. Run the cases whose title holds a phrase with
   `CASE='<phrase>' bash scripts/run-bats.sh <group>`.
 - Load [`setup.bash`](../../../scripts/src/test-utils/bats/setup.bash) from both `setup_file` and
-  `setup`, and call `stop_timeout_watchdog` first in every `teardown`, as `setup.bash` explains.
+  `setup`, and call `stop_timeout_watchdog` first in every `teardown`, for the reason in its
+  comment.
 - In `setup`, load the stand-in scripts the suite uses, set `umask 022`, and set
   `tree="$BATS_TEST_TMPDIR"`, the case tree.
-- Write one `setup_test` per suite, which each case calls first. It wires the stand-ins every case
+- Write one `setup_test` per suite, called first in each case, that wires the stand-ins every case
   needs and holds no scenario data.
 - Run the script under test with `env -i` and a `PATH`, `HOME` and `TMPDIR` in the case tree, with
   `$tree/bin`, the case's `bin` folder, first on `PATH`.

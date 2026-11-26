@@ -1,7 +1,7 @@
 ---
 name: project-code-style
 description:
-  'States that the cloud repo follows every rule of the code-style skill, replaces none and adds
+  'In the cloud repo, follow every rule of the code-style skill: cloud replaces none of them and adds
   none. Load it beside code-style before you write, review or rename TypeScript in cloud.'
 metadata:
   kind: rule-set
@@ -9,7 +9,8 @@ metadata:
 
 # cloud code style
 
-cloud follows every rule of [code-style](../code-style/SKILL.md), and adds no stricter rule.
+In cloud, follow every rule of [code-style](../code-style/SKILL.md). cloud replaces none of them and
+adds no rule of its own.
 
 ## Departures
 

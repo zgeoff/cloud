@@ -25,10 +25,10 @@ The spawn passes these settings:
   repository and the ref, and the session entry's `cwd` holds that folder.
 
 The workspace is `zgeoff/coderabbit`, a public repository of two files with no `.claude` folder. The
-session reads the clone's own Claude settings, so a repository with hooks runs them before the
-smoke's tool calls; this repository's skill gate is one such hook. atc refuses a brokered spawn into
-a clone whose Claude settings set an `apiKeyHelper` or a sign-in variable in `env`, because those
-settings would route around the broker.
+session reads the clone's own Claude settings and runs any hooks they set, such as the cloud repo's
+skill gate, before the smoke's tool calls. To keep hooks out of the smoke, it clones a repository
+with no `.claude` folder. atc refuses a brokered spawn into a clone whose Claude settings set an
+`apiKeyHelper` or a sign-in variable in `env`, because those settings would route around the broker.
 
 ## Installed agents
 
@@ -36,13 +36,13 @@ settings would route around the broker.
 that is expected. atc sets `installed` by whether the agent's binary resolves on the daemon's own
 host, and the NixOS host has neither binary. atc refuses a spawn for a missing binary only on a
 target that runs the agent on the daemon's host. The `geoffcloud` target runs the agent from the
-agent image inside an imp, so the fields that decide a spawn there are `spawnTargets`, which lists
-`geoffcloud`, and `capabilities.spawn`, which is `true`.
+agent image inside an imp, so check instead that `spawnTargets` lists `geoffcloud` and
+`capabilities.spawn` is `true`.
 
 ## Run the smoke
 
-You need a gateway client whose principal the cloud daemon's config grants the `geoffcloud` target,
-with the atc MCP tools.
+You need a gateway client with the atc MCP tools, signed in as a principal that the cloud daemon's
+config grants the `geoffcloud` target.
 
 1. Call `atc_spawn_options_get`.
 
@@ -71,7 +71,7 @@ with the atc MCP tools.
    ssh root@geoffcloud podman exec imp-host impz ls < /dev/null | grep harness-
    ```
 
-   Expect one new imp on the image that the `geoffcloud` target names in
+   Expect one new imp on the image set for the `geoffcloud` target in
    `nixos/hosts/geoffcloud/configuration.nix`. atc names it `harness-` plus the session ID.
 
 4. Check which atc runs the session's hooks:
@@ -90,8 +90,9 @@ with the atc MCP tools.
 
 6. Call `atc_session_forget` with the session's ID and `"stop": true`.
 
-   Forgetting a session on an imp destroys the imp, so this first call changes nothing. Expect a
-   `confirmToken`, which is valid for 60 seconds. atc refuses a live session without `stop: true`.
+   Forgetting a session on an imp destroys the imp, so atc asks you to confirm, and this first call
+   changes nothing. Expect a `confirmToken`, which is valid for 60 seconds. atc refuses a live
+   session without `stop: true`.
 
 7. Call `atc_session_forget` again within those 60 seconds, with the session's ID, `"stop": true`
    and the `confirmToken`.
@@ -107,8 +108,9 @@ with the atc MCP tools.
 
 - The refusal `trustClonedWorkspace requires a workspace source` means the call left out
   `workspace`. Add the git source from step 2.
-- A refusal with the code `auth_target_unsupported` that names a settings file means the
+- A refusal with the code `auth_target_unsupported` and a settings file in its message means the
   repository's Claude settings would override the broker's sign-in. Use a repository without those
   settings.
-- A session that shows the folder-trust dialog means the call left out `trustClonedWorkspace` or set
-  it to `false`. Forget the session and spawn again with it set to `true`.
+- A session that shows the folder-trust dialog means the call left out `trustClonedWorkspace`, set
+  it to `false`, or set a `cwd` outside the clone's root. Forget the session and spawn again with
+  `trustClonedWorkspace: true` and no `cwd`, as in step 2.

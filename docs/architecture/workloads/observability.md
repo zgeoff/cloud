@@ -1,11 +1,11 @@
 # Observability
 
 The estate watches itself from two places. A monitoring stack in k3s collects metrics and logs from
-the cluster and the host, evaluates the alert rules and sends alerts to Discord. A Cloudflare Worker
-probes the public route from Cloudflare's edge, because monitoring on the host cannot report that
-the host is down. Every rule that rests on one probe's metric fires when that metric is missing as
-well as when it is bad, so a probe, an exporter or a timer that stops reporting raises an alert
-instead of reading as healthy.
+the cluster and the host, evaluates the alert rules and, while Discord alerts are on, sends alerts
+to Discord. A Cloudflare Worker probes the public route from Cloudflare's edge, because monitoring
+on the host cannot report that the host is down. Every rule that rests on one probe's metric fires
+when that metric is missing as well as when it is bad, so a probe, an exporter or a timer that stops
+reporting raises an alert instead of reading as healthy.
 
 ## The stack in the cluster
 
@@ -17,29 +17,29 @@ The stack runs in the `observability` namespace:
   kubelet's endpoints, so Prometheus keeps the control plane's series from the API server alone.
 - **Loki** stores logs on a filesystem volume as a single binary. Loki retains logs by time only,
   and local-path does not enforce the volume's request, so Loki's ingestion rate limit bounds its
-  disk use: the most it accepts over the time a log line stays on disk, compressed at a quarter of
+  disk use. The most Loki accepts over the time a log line stays on disk, compressed to a quarter of
   its size, fits below that request. Loki's chunks compressed about 40:1 on the volume in November
   2026, so the quarter leaves room for logs that repeat less.
 - **Alloy** runs on the node and ships every pod's logs and the host's systemd journal to Loki. It
   reads each container's log files on the node, and labels each line with the pod's namespace, pod
   and container. impd logs to the journal through its container's unit, so impd's logs reach Loki
   the same way. Alloy drops the gateway's OAuth approval lines before they reach Loki, because each
-  holds the code that approves a client's sign-in, so it stays in the pod's own log, which only a
-  cluster admin reads. Alloy keeps its read position in each log on a directory of the node, so a
+  holds the code that approves a client's sign-in. That code stays in the pod's own log, which only
+  a cluster admin reads. Alloy keeps its read position in each log on a directory of the node, so a
   restart resumes where it stopped. It reads a log file with no saved position from its first line,
   so a new container's first lines reach Loki. Alloy's container runs a script before each Alloy
   start. With no saved positions, the script records every pod log file at its current size, and
   Alloy takes those as its positions, so a start with an empty position store sends Loki no history.
-  With saved positions, the script resets each position past its file's size, which a log the
-  kubelet replaced while Alloy was stopped leaves, so Alloy reads the new file from its first line.
-  Alloy drops the lines older than the hour Loki still accepts, because each line Loki rejects first
-  counts against Loki's ingestion rate limit. Alloy also counts the gateway's sign-in events for
-  Prometheus, which scrapes Alloy ([sign-in alerts](#sign-in-alerts)). Alloy reads the journal
-  through sd-journal, which maps the journal files in windows and keeps many of them mapped before
-  it reuses one. Alloy's memory limit, set with the measured window total in Alloy's Helm values in
-  `infra/observability/`, holds that page cache beside its `GOMEMLIMIT`. Under a smaller limit, the
-  kernel evicts the window pages that Alloy faults in, Alloy faults them in again, and its readiness
-  probe times out. Each fault reads only the host's root disk read-ahead
+  A log that the kubelet replaced while Alloy was stopped can be shorter than its saved position.
+  With saved positions, the script resets each position past its file's size, so Alloy reads the new
+  file from its first line. Alloy drops the lines older than the hour Loki still accepts, because
+  each line Loki rejects first counts against Loki's ingestion rate limit. Alloy also counts the
+  gateway's sign-in events for Prometheus, which scrapes Alloy ([sign-in alerts](#sign-in-alerts)).
+  Alloy reads the journal through sd-journal, which maps the journal files in windows and keeps many
+  of them mapped before it reuses one. Alloy's memory limit, set with the measured window total in
+  Alloy's Helm values in `infra/observability/`, holds that page cache beside its `GOMEMLIMIT`.
+  Under a smaller limit, the kernel evicts the window pages that Alloy faults in, Alloy faults them
+  in again, and its readiness probe times out. Each fault reads only the host's root disk read-ahead
   ([disk read-ahead](../host/host.md#disk-read-ahead)).
 - **Three blackbox exporters** run the probes that need a network path: one opens a TCP connection
   to each atc daemon on the gateway's path to it, one fetches impd's health over HTTPS on the
@@ -54,13 +54,13 @@ token into the `credential` field of the `grafana-mcp` item in the `zgeoff` vaul
 server's launcher reads it at each connect
 ([the apply job](../infrastructure-as-code.md#the-apply-job)). Metrics and logs sit on cluster
 volumes with no backup, because losing them loses history and never service. Grafana's database sits
-on a cluster volume with no backup too, so the account and its token outlive a pod restart. The
-volume's class keeps it when its claim is deleted. The database is one SQLite file, which two
-Grafana processes can corrupt when they write it at once. A rollout stops the old pod before it
-starts the new one, so only one pod writes the file. If the volume is lost, `mcp-viewer` and its
-token are gone until an [apply by hand](../../runbooks/workflows.md#apply-by-hand) with a refresh:
-the refresh finds the account missing, so Pulumi makes a new account and token and copies the token
-into the `grafana-mcp` item.
+on a cluster volume with no backup too, and the volume lets the account and its token outlive a pod
+restart. The volume's class keeps it when its claim is deleted. The database is one SQLite file,
+which two Grafana processes can corrupt when they write it at once. A rollout stops the old pod
+before it starts the new one, so only one pod writes the file. If the volume is lost, `mcp-viewer`
+and its token are gone until an [apply by hand](../../runbooks/workflows.md#apply-by-hand) with a
+refresh: the refresh finds the account missing, so Pulumi makes a new account and token and copies
+the token into the `grafana-mcp` item.
 
 ## Probes of impd
 
@@ -103,7 +103,7 @@ dashboard charts the kernel time beside the time of each top-level cgroup.
 
 This repo's rules live in one PrometheusRule, built in code, and each rule that rests on one probe's
 metric fires on its absence too. A rule over many targets, such as the one for scrape targets, fires
-only on a bad value, because a target that vanishes is no longer a target. They cover:
+only on a bad value, because a target that vanishes is no longer a target. The rules cover:
 
 - impd's loopback health, and the age of its last probe;
 - impd's health over HTTPS on the tailnet;
@@ -136,22 +136,23 @@ only on a bad value, because a target that vanishes is no longer a target. They 
 
 ## Delivery
 
-Alertmanager sends every alert to a Discord webhook once the stack config turns Discord alerts on,
-and the webhook reaches it as a mounted Secret file, so the URL never appears in Alertmanager's
-config. Two alerts never send: the chart's always-firing watchdog and its inhibition helper. With
-Discord alerts off, every alert goes to a receiver that sends nothing, and alerts show only in
+Once the stack config turns Discord alerts on, Alertmanager sends each alert to a Discord webhook,
+except the chart's always-firing watchdog and its inhibition helper, which never send. The webhook
+reaches Alertmanager as a mounted Secret file, so the URL never appears in Alertmanager's config.
+With Discord alerts off, every alert goes to a receiver that sends nothing, and alerts show only in
 Prometheus and Alertmanager. Alertmanager keeps silences and notification state in memory-backed
-storage, so a restart forgets them. Grafana does no alerting. The sign-in alerts take a route of
-their own to the same webhook ([sign-in alerts](#sign-in-alerts)).
+storage, so a restart forgets them. Grafana does no alerting. While Discord alerts are on, the
+sign-in alerts take a route of their own to the same webhook ([sign-in alerts](#sign-in-alerts)).
 
-A critical alert reaches Discord twice: once as every alert does, and once in a message that
-mentions the owner's Discord user, so the owner's phone gets a push. The mention goes with a firing
-alert only, and the resolved message comes without it. The user's ID reaches Alertmanager as a
-template file in the webhook's Secret, so the ID never appears in the repo or in Alertmanager's
-config. Alertmanager reads a template only when it loads its config, so a change to the Secret
-restarts Alertmanager through a checksum of the Secret on its pod. Each message's title holds the
-status, the alert name and the namespace, each cut to a length that keeps the title within Discord's
-title limit. The sign-in alerts keep Alertmanager's default title, which lists their labels.
+While Discord alerts are on, a critical alert reaches Discord twice: once as every alert does, and
+once in a message that mentions the owner's Discord user, so the owner's phone gets a push. The
+mention goes with a firing alert only, and the resolved message comes without it. The user's ID
+reaches Alertmanager as a template file in the webhook's Secret, so the ID never appears in the repo
+or in Alertmanager's config. Alertmanager reads a template only when it loads its config, so a
+change to the Secret restarts Alertmanager through a checksum of the Secret on its pod. Each
+message's title holds the status, the alert name and the namespace, each cut to a length that keeps
+the title within Discord's title limit. The sign-in alerts keep Alertmanager's default title, which
+lists their labels.
 
 ## Sign-in alerts
 
@@ -166,17 +167,17 @@ flowchart LR
 The atc gateway writes each sign-in outcome to stderr as one security event: a line that starts
 `atc security ` and holds a JSON object, under the security-event contract in atc's OAuth docs.
 Alloy turns the events into counters, Prometheus alerts on the counters, and Alertmanager sends each
-category of alert to Discord as one message. No event line and no field of one reaches Discord: each
-alert holds only values that the contract lists.
+category of alert to Discord as one message. No event line reaches Discord whole, and a field
+reaches it only as a label whose value the contract lists.
 
 Alloy reads the gateway container's log files on the node, not the Kubernetes log API, because the
 API joins stdout and stderr and the contract puts the events on stderr alone. It counts a stderr
-line only when the line starts with the event prefix, and it never counts stdout, where atc printed
-approval codes before passkey sign-in. This pipeline reads each log file from its start, so a new
-pod's first events count even when they land before Alloy finds the file. It drops each event older
-than a cutoff longer than that search takes, so a start without saved read positions raises no alert
-for history. The pipeline forwards no line: the gateway's logs reach Loki through the pod-log path
-that every pod's logs take.
+line only when the line starts with the event prefix, and it never counts stdout. This pipeline
+keeps no seeded positions, unlike the pod-log path above, and reads each log file from its start, so
+a new pod's first events count even when they land before Alloy finds the file. It drops each event
+older than a cutoff longer than Alloy takes to find a new file, so a start without saved read
+positions raises no alert for history. The pipeline forwards no line: the gateway's logs reach Loki
+through the pod-log path that every pod's logs take.
 
 Alloy labels each count with the event's kind, outcome, reason, route and method, and checks each
 value against the contract. A kind and an outcome pass only as a pair that the contract lists, and
@@ -213,20 +214,20 @@ The owner's own activity takes `notice`, not `info`, because the chart's info-in
 silences an `info` alert whenever no warning fires beside it, and an owner sign-in alone must still
 reach Discord.
 
-Two categories have no source. Cloudflare Access refuses a request at the edge before it reaches the
-tunnel, so the gateway writes no event for an edge denial, and no alert covers one. atc's rate limit
-counts every client together, so a rate-limit alert holds no source.
+Two refusals carry nothing that names a client. Cloudflare Access refuses a request at the edge
+before it reaches the tunnel, so the gateway writes no event for an edge denial, and no alert covers
+one. atc's rate limit counts every client together, so a rate-limit alert names no client.
 
-Three layers bound the messages a flood sends. atc caps the events of each kind in a window and
-reports the rest as one `suppressed` event, whose count raises its own alert. Each rule sums its
-window's events per label set, so a burst becomes one alert whose value is the count. Alertmanager
-groups the sign-in alerts by name, so each category arrives as one message, a flood of one category
-never buries another, and a category that keeps firing sends again only at the route's repeat
-interval. An alert ends once its window passes with no event, and the route sends no resolved
-message, because the end of a window is no news. Alloy creates each counter at its first event with
-that event counted, and a restarted Alloy can count a new event back to the value its counter held
-before. Prometheus's increase sees no rise in either, so each rule counts a series younger than its
-window, or one from an Alloy that started inside it, whole.
+atc, the rules and Alertmanager each bound the messages a flood sends. atc caps the events of each
+kind in a window and reports the rest as one `suppressed` event, whose count raises its own alert.
+Each rule sums its window's events per label set, so a burst becomes one alert whose value is the
+count. Alertmanager groups the sign-in alerts by name, so each category arrives as one message, a
+flood of one category never buries another, and a category that keeps firing sends again only at the
+route's repeat interval. An alert ends once its window passes with no event, and the route sends no
+resolved message, because the end of a window is no news. Alloy creates each counter at its first
+event with that event counted, and a restarted Alloy can count a new event back to the value its
+counter held before. Prometheus's increase sees no rise in either, so each rule counts a series
+younger than its window, or one from an Alloy that started inside it, whole.
 
 A failed post to Discord shows without the webhook's URL: Alertmanager logs the attempt with the
 alert group's name, and counts it in its failed-notification metrics, on which the chart's
@@ -241,9 +242,9 @@ A Cloudflare Worker runs on a schedule and fetches the gateway's OAuth metadata 
 route. It classifies the answer by its status: a tunnel error means the tunnel or the host is down,
 a bad-gateway or gateway-timeout status means the gateway is down, a failed fetch means the route is
 unreachable, and any other answer counts as up. The Worker keeps each target's last state in R2 and
-acts only on a change, the recovery included, so it logs the change and posts it to the same webhook
-Alertmanager uses, and a long outage sends one alert, not one per run. Pulumi bundles the Worker
-with Bun at deploy time and uploads it with its bindings, so the Worker has no deploy of its own.
-The Worker is its own workspace package, and its contract export names the bindings, the shape of
-the targets and the entry module. Pulumi builds the bindings from that contract, so a renamed
-binding fails the type check instead of the deployed Worker.
+acts only on a change, the recovery included: it logs the change and posts it to the same webhook
+Alertmanager uses. A long outage sends one alert, not one per run. Pulumi bundles the Worker with
+Bun at deploy time and uploads it with its bindings, so the Worker has no deploy of its own. The
+Worker is its own workspace package, and its contract export names the bindings, the shape of the
+targets and the entry module. Pulumi builds the bindings from that contract, so a renamed binding
+fails the type check instead of the deployed Worker.

@@ -1,19 +1,19 @@
 # The scheduled drift check
 
 A systemd timer on geoffcloud checks prod for drift every day, and posts to Discord when it finds
-drift or the run fails. The check runs a refresh that only previews, so it compares each resource's
-live state with the state file and changes neither. It leaves out the Onidel and Kubernetes
-resources. It reads a root-only credentials file on the host, whose values come from the 1Password
-vault `cloud`, and no GitHub workflow reads that vault.
-[Infrastructure as code](../architecture/infrastructure-as-code.md#state-and-drift) describes what
-the check covers and why it runs on the host. This runbook sets the check up, runs it by hand, reads
-a run, and answers drift.
+drift or the run fails. The check runs a preview-only refresh, which compares each resource's live
+state with the state file and changes neither. It leaves out the Onidel and Kubernetes resources. It
+reads a root-only credentials file on the host, filled from the 1Password vault `cloud`. No GitHub
+workflow reads that vault. For what the check covers and why it runs on the host, see
+[Infrastructure as code](../architecture/infrastructure-as-code.md#state-and-drift). Use this
+runbook to set the check up, run it by hand, read a run, answer drift and rotate the check's
+credentials.
 
 ## What holds what
 
 | Where                                                      | Holds                                                                          |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| the 1Password vault `cloud`                                | the items [Create the items](#create-the-items) lists                          |
+| the 1Password vault `cloud`                                | the items in [Create the items](#create-the-items)                             |
 | `/var/lib/tank-cloud/host-secrets/drift-check/credentials` | the check's nine values, mode 0400 root, on the encrypted host-secrets dataset |
 | `drift-check.timer`                                        | the daily start time, which the host's NixOS module sets                       |
 | `drift-check.service`                                      | one run: the wait for the prod lock, the refresh and the alert                 |
@@ -27,27 +27,28 @@ generated. Never copy the file off the host, and never print it.
 The service runs as a dynamic user, with no capabilities, and reads the file through systemd's
 credentials. The check gets every value but the webhook in its environment, and the alert gets only
 the webhook. systemd mounts a dynamic user's state directory with noexec, so the unit lists that
-directory in `ExecPaths=`, and the plugins it downloads there can start. Until the file exists,
-systemd skips the service, so a run before the setup leaves nothing in Discord.
+directory in `ExecPaths=` to let the plugins downloaded there start. Until the file exists, systemd
+skips the service, so a run before the setup leaves nothing in Discord.
 
 The check and the Deploy prod job share the prod lock, the Lease `cloud-prod-state` in k3s's
 `kube-system` namespace, so neither uses the state while the other does
-([State and drift](../architecture/infrastructure-as-code.md#state-and-drift) gives the reasons).
-The dynamic user cannot read k3s's admin kubeconfig, so systemd takes the lock as root before the
-check and releases it as root after. While a Deploy prod run holds the lock, the run waits; when the
-run cannot take the lock, it skips the check and posts the failed alert, never the drift alert. To
+([State and drift](../architecture/infrastructure-as-code.md#state-and-drift) has the reasons). The
+dynamic user cannot read k3s's admin kubeconfig, so systemd takes the lock as root before the check
+and releases it as root after. While a Deploy prod run holds the lock, a drift-check run waits. When
+it cannot take the lock, it skips the check and posts the failed alert, never the drift alert. To
 see who holds the lock:
 
 ```bash
 ssh -o BatchMode=yes root@geoffcloud kubectl --namespace kube-system get lease cloud-prod-state --output yaml
 ```
 
-`spec.holderIdentity` names the holder, as `drift-check <invocation_id>` or `deploy-prod <run_id>`,
-and has no value when no one holds the lock.
+`spec.holderIdentity` is `drift-check <invocation_id>` or `deploy-prod <run_id>` while one of them
+holds the lock, and has no value when no one does.
 
 ## Create the items
 
-The install script reads these items in `cloud` by their exact item and field names.
+Create these items in `cloud` with these exact item and field names: the install script reads them
+by name.
 
 | Item                   | Fields                                              | What it is, and its scope                                                                                                |
 | ---------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -57,7 +58,7 @@ The install script reads these items in `cloud` by their exact item and field na
 | `tailscale-read`       | `client-id`, `client-secret`, `tailnet`             | a Tailscale OAuth client with only the scopes `policy_file:read` and `auth_keys:read`, and no tags                       |
 | `alert-webhook`        | `credential`                                        | the Discord webhook, the item `.env` reads                                                                               |
 
-The Cloudflare token holds these permission groups, and no edit group:
+Give the Cloudflare token these permission groups, and no edit group:
 
 - Account, for the account that holds the zone: Cloudflare Tunnel Read; Access: Apps and Policies
   Read; Access: Organizations, Identity Providers, and Groups Read; Workers Scripts Read; Workers R2
@@ -65,7 +66,8 @@ The Cloudflare token holds these permission groups, and no edit group:
 - Zone, for `geoff.cloud` only: Zone Read; DNS Read; Zone Settings Read.
 
 The file holds no Onidel key. A refresh that does not run the program configures each provider from
-the state, so the check leaves out every Onidel resource and never calls Onidel's API.
+the state, where the Onidel provider's config holds the full-account API key. To keep that key
+unused, the check leaves out every Onidel resource and never calls Onidel's API.
 
 ## Set up the check
 
@@ -107,8 +109,8 @@ Do these once, in order.
    ssh -o BatchMode=yes root@geoffcloud journalctl -u drift-check.service -n 200 --no-pager
    ```
 
-   Expect its last line from the check to be `run-host-drift-check: no drift`.
-   [Read a run](#read-a-run) covers every other ending.
+   Expect its last line from the check to be `run-host-drift-check: no drift`. For every other
+   ending, see [Read a run](#read-a-run).
 
 ## Read a run
 
@@ -122,7 +124,7 @@ when the timer last ran and runs next:
 ssh -o BatchMode=yes root@geoffcloud systemctl list-timers drift-check.timer --no-pager
 ```
 
-The refresh's plan in the log shows each resource that differs. A run ends in one of five ways:
+The refresh's plan in the log shows each resource that differs. A run ends in one of these ways:
 
 - It passes, with `run-host-drift-check: no drift`: the live state matches the state file for every
   resource the check reads.
@@ -145,8 +147,8 @@ The refresh's plan in the log shows each resource that differs. A run ends in on
 
 ## Answer drift
 
-1. Find what changed. From a clean checkout of `main`, run the check by hand with the `cloud` vault,
-   which also reads the resources the scheduled check leaves out:
+1. Find what changed. From a clean checkout of `main` on your own machine, run the full drift check
+   with the `cloud` vault, which also reads the resources the scheduled check leaves out:
 
    ```bash
    bun run drift
@@ -160,10 +162,10 @@ The refresh's plan in the log shows each resource that differs. A run ends in on
    dispatch it, as [Answer a held run](./prod-apply.md#answer-a-held-run) describes. Its apply
    refreshes first, so it writes the live value into the state. Until then, every scheduled check
    reports the same drift.
-4. Run the check by hand again, as [Run the check by hand](#run-the-check-by-hand) describes, and
-   expect it to pass.
+4. Run the scheduled check by hand again on the host, as
+   [Run the check by hand](#run-the-check-by-hand) describes, and expect it to pass.
 
-A drift that the prod apply job finds first holds its run, as
+When the prod apply job finds a drift first, it holds its run, as
 [the prod apply job](./prod-apply.md#answer-a-held-run) describes.
 
 ## Rotate the check's credentials

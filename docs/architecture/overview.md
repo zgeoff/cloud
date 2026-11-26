@@ -7,8 +7,8 @@ repo holds the whole estate and a change to it is a reviewed PR before it is a l
 first workload is an agent platform: [atc](https://github.com/zgeoff/atc) manages agent sessions,
 and [imp](https://github.com/zgeoff/impz) runs each one in a Firecracker microVM. An assistant such
 as ChatGPT reaches two public MCP endpoints: atc's, through a Cloudflare tunnel, and imp's, through
-a TLS front on the host. A few other routes are public, each for a reason the exposure registry
-records, and everything else stays on the host or on the tailnet.
+a TLS front on the host. A few other routes are public, each with a reason stated in its PR and
+recorded in the exposure registry, and everything else stays on the host or on the tailnet.
 
 ## The path of a public call
 
@@ -63,10 +63,10 @@ approved runs each host switch.
 
 ## Topology
 
-The VM holds three kinds of workload, and one placement rule decides where each runs. Host-level
-work, which needs the kernel, the disks or the host's own network, runs on NixOS or beside it on the
-host. A containerised app runs on k3s, because a Helm chart or a manifest describes it there and
-Pulumi deploys it with the rest of the estate.
+Each workload runs in one of three places: k3s, the imp-host container, or a NixOS service on the
+host. An app that a Helm chart or a manifest describes runs on k3s, so Pulumi deploys it with the
+rest of the estate. Work that needs the kernel, the disks or the host's own network runs on the host
+instead: imp in its container, and the rest as NixOS services.
 
 ```mermaid
 flowchart TB
@@ -92,7 +92,7 @@ flowchart TB
 ```
 
 - **k3s** runs every workload that a Helm chart or a manifest describes: cloudflared, the gateway,
-  1Password Connect, nixie and the monitoring stack. It is chosen for that tooling, since a single
+  1Password Connect, nixie and the monitoring stack. It is there for that tooling alone: a single
   node needs no scheduler.
 - **imp** runs as imp ships it, in one container under the host's rootful Podman, outside k3s,
   because impd schedules its own microVMs and needs KVM and a ZFS pool on the host
@@ -110,42 +110,45 @@ but Tailscale's own port and the HTTPS port of the host's TLS front
 
 ## Data
 
-The estate keeps state in five places, and each has its own backup or none:
+The estate keeps state in these places, each with its own backup or none:
 
 - **Pulumi state** sits in a Cloudflare R2 bucket, encrypted with a passphrase, and holds every
   secret Pulumi generated, such as Grafana's admin password
   ([infrastructure as code](./infrastructure-as-code.md)).
 - **impd's state** sits on its own encrypted ZFS dataset on the VM's second disk: its SQLite
-  database, its tokens and its secrets. impd backs the imps up to R2 itself, and an operator copies
-  the database before each imp upgrade ([imp on the host](./host/imp.md)).
+  database, its tokens and its secrets. impd backs the imps up to R2 itself. Copy the database
+  before each imp upgrade ([imp on the host](./host/imp.md)).
 - **The gateway's state**, two SQLite files with every OAuth client and grant, sits on a cluster
   volume that outlives its claim, and a nightly job backs it up to R2. nixie's databases sit on a
   volume of the same kind, with their own nightly backup
   ([the atc gateway](./workloads/atc-gateway.md#state-and-backup)).
+- **The atc daemon's state** sits in plain form on the root disk, which each Onidel snapshot copies
+  whole ([the host](./host/host.md#disks)).
 - **Metrics and logs** sit on cluster volumes with no backup, because losing them loses history,
   never service ([observability](./workloads/observability.md)).
-- **Deployment inputs** live in the owner's 1Password vault `cloud`, which the repo names only by
-  reference ([secrets](./secrets.md)).
+- **Deployment inputs** live in the owner's 1Password vault `cloud`, and the repo holds only
+  references to them ([secrets](./secrets.md)).
 
-The data sits on the second disk and its key on the root disk, so neither disk alone exposes the
-data. ZFS encrypts two dataset trees there: impd's dataset, and `tank/cloud`, which holds k3s's data
-directory, the host's secret files and the copies of impd's database. k3s's data directory holds the
-cluster's datastore and every cluster volume. Every Onidel snapshot copies the root disk, which
-keeps only the key, the host's tailnet identity, its SSH host keys and the atc daemon's state in
-plain form. Onidel never snapshots the second disk, so its data relies on each system's own backup
-([protection at rest](./secrets.md#protection-at-rest)).
+The pool's data sits on the second disk and its key on the root disk, so neither disk alone exposes
+the pool's data. ZFS encrypts two dataset trees there: impd's dataset, and `tank/cloud`, which holds
+k3s's data directory, the host's secret files and the copies of impd's database. k3s's data
+directory holds the cluster's datastore and every cluster volume. Every Onidel snapshot copies the
+root disk, which keeps only the key, the host's tailnet identity, its SSH host keys and the atc
+daemon's state in plain form. Onidel never snapshots the second disk, so its data relies on each
+system's own backup ([protection at rest](./secrets.md#protection-at-rest)).
 
 ## Cross-cutting
 
 - **Public by exception.** A new service stays on the host or on the tailnet. A public route needs
-  its own reason in its PR and an auth layer named in the exposure registry, and it enters through a
-  Cloudflare tunnel or the host's TLS front ([public ingress](./network/public-ingress.md)).
+  its own reason, stated in its PR and recorded in the exposure registry with its auth layer, and it
+  enters through a Cloudflare tunnel or the host's TLS front
+  ([public ingress](./network/public-ingress.md)).
 - **Secrets never in the repo.** The repo is public. Every secret reaches its user through
   1Password, Pulumi's encrypted state or a root-only file on the host, and never through a command
   line, because the host's journal records each SSH command line ([secrets](./secrets.md)).
 - **A missing metric alerts.** Every rule built on a probe fires when the probe's metric is absent
-  as well as when it is bad, so a probe that stops reporting never reads as healthy, and a check
-  from Cloudflare's edge covers the case where the host itself is down
+  as well as when it is bad, so a probe that stops reporting never reads as healthy. A check from
+  Cloudflare's edge covers the case where the host itself is down
   ([observability](./workloads/observability.md)).
 - **Pod Security at baseline.** Every namespace in k3s except three exempt ones carries Pod
   Security's `baseline` level in its enforce, warn and audit modes, so the API server refuses a pod
@@ -154,8 +157,7 @@ plain form. Onidel never snapshots the second disk, so its data relies on each s
   kind of pod that needs the host: observability holds node-exporter, which reads the host's
   network, nixie-ingress holds nixie's Traefik, which holds a host port, and kube-system holds the
   local-path provisioner's helper pods, which mount a hostPath for each new volume. The program's
-  namespace registry lists every namespace with its level, and Pulumi patches the labels onto the
+  namespace registry holds every namespace with its level, and Pulumi patches the labels onto the
   namespaces that k3s creates.
 - **Guards fail the preview.** An input that would make Pulumi plan to delete a whole subsystem
-  fails the run instead of planning the delete
-  ([infrastructure as code](./infrastructure-as-code.md#guards)).
+  fails the run ([infrastructure as code](./infrastructure-as-code.md#guards)).

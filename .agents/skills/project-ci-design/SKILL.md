@@ -19,25 +19,27 @@ metadata:
 
 ## Departures
 
-- Write each check as a job in cloud's own [`ci.yml`](../../../.github/workflows/ci.yml). The Jobs
-  section of [ci-design](../ci-design/SKILL.md) asks for a call to `bun-checks.yml` instead.
+- Write each check as a job in cloud's own [`ci.yml`](../../../.github/workflows/ci.yml). Skip
+  the call to `bun-checks.yml` that the Jobs section of [ci-design](../ci-design/SKILL.md) gives.
   `bun-checks.yml` has no input to set up Go, the Pulumi CLI or the backup and gateway images that
   the fixture suites run, and it can't skip a check whose files a change leaves alone.
 - Skip a job through its gate in [`gates.yml`](../../../.github/gates.yml), which the `decide` job
-  reads. The Path filters section of [ci-design](../ci-design/SKILL.md) asks for a `changes` job
-  that calls `paths-changed.yml` instead. One `decide` job decides every gate in one run. On a push
-  to main, it compares the push with main's last green commit, so it still runs the checks that a
-  cancelled run skipped.
+  reads. Skip the `changes` job that calls `paths-changed.yml`, which the Path filters section of
+  [ci-design](../ci-design/SKILL.md) gives. One `decide` job decides every gate in one run. On a push
+  to main, it compares the push with main's last green commit, so the checks that a cancelled run
+  skipped still run.
 
 ## The required check
 
 The `main` ruleset requires one check: `pr / checks`, the `checks` job in
-[`ci.yml`](../../../.github/workflows/ci.yml). It needs every other job, always runs, and passes only
-when each job passed or its gate skipped it.
+[`ci.yml`](../../../.github/workflows/ci.yml). It needs every other job and always runs.
 
-While cloud is public, each check runs as its own job. When cloud is private, GitHub bills each job
-at least a minute, so the other jobs skip and `checks` runs every check as a step. To add a gated
-check:
+- While cloud is public, each check runs as its own job, and `checks` passes only when each job
+  passed or its gate skipped it.
+- While cloud is private, the other jobs skip, because GitHub bills each job at least a minute.
+  `checks` runs every check as a step of its own, and skips the test of the other jobs' results.
+
+To add a gated check:
 
 1. Add the gate to [`gates.yml`](../../../.github/gates.yml).
 2. Name the gate in both calls of `ci:decide-ci-gates`
@@ -50,7 +52,6 @@ check:
    `steps.decide.outputs.<gate> != 'false'`. Reuse the setup steps in `checks`.
 
 For a check with no gate, skip steps 1 and 2. In step 5, use
-`steps.decide.outputs.reused != 'true'` in place of the gate, as the `Format` step does, because
-`checks` skips its install when a green run has checked the same tree.
+`steps.decide.outputs.reused != 'true'` in place of the gate, as the `Format` step does, because `checks` skips its install when a green run has checked the same tree.
 
 Never make the `NixOS checks` workflow a required check. It blocks only the deploy to the host.

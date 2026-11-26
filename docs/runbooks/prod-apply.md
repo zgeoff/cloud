@@ -3,42 +3,42 @@
 The `Deploy prod` workflow applies each merged change to a Pulumi input once CI passes on `main`,
 unless its guard holds the plan for a person.
 [Infrastructure as code](../architecture/infrastructure-as-code.md#the-apply-job) describes how it
-decides, what the guard holds, and why. This runbook sets the job up, reads a run, and answers a
+decides, what the guard holds, and why. Use this runbook to set the job up, read a run, and answer a
 held one.
 
 **CAUTION:** An apply changes the live estate. Read every held plan in full before you dispatch it.
 
 ## What holds what
 
-| Where                                         | Holds                                                                                        |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| the 1Password vault `cloud-deploy`            | a copy of each item `.env` references, under the same item and field names                   |
-| a 1Password service account                   | read access to `cloud-deploy` only                                                           |
-| the GitHub environment `prod`                 | the branch policy `main`; the secret `OP_SERVICE_ACCOUNT_TOKEN`, the account's token         |
-| the `prod` environment's variables            | `TS_DEPLOY_CLIENT_ID` and `TS_DEPLOY_AUDIENCE`, the federated identity's two values          |
-| a Tailscale federated identity (made by hand) | scope Auth Keys (write), tag `tag:cloud-deploy`, trusted for the `prod` environment          |
-| the tailnet policy (Pulumi)                   | the tag `tag:cloud-deploy`, owned by admins and itself; its grants, to k3s's API and Grafana |
-| the tag `deployed/prod`                       | the last revision applied, lightweight, moved only by the job after it passes                |
+| Where                                         | Holds                                                                                                          |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| the 1Password vault `cloud-deploy`            | a copy of each item `.env` references, under the same item and field names                                     |
+| a 1Password service account                   | read access to `cloud-deploy` only                                                                             |
+| the GitHub environment `prod`                 | the branch policy `main`; the secret `OP_SERVICE_ACCOUNT_TOKEN`, the account's token                           |
+| the `prod` environment's variables            | `TS_DEPLOY_CLIENT_ID` and `TS_DEPLOY_AUDIENCE`, the federated identity's two values                            |
+| a Tailscale federated identity (made by hand) | scope Auth Keys (write), tag `tag:cloud-deploy`, trusted for the `prod` environment                            |
+| the tailnet policy (Pulumi)                   | the tag `tag:cloud-deploy`, owned by admins and itself; its grants, to k3s's API and Grafana                   |
+| the tag `deployed/prod`                       | the last revision applied, lightweight, set once by hand in step 5, then moved only by the job after it passes |
 
 ## Set up the job
 
 Do these once, in order. Steps 1 to 3 need no change to the repo.
 
 1. In 1Password, create the vault `cloud-deploy`. Copy into it each item that `.env` references,
-   with the same item name and field names. This lists them:
+   with the same item name and field names. List them with:
 
    ```bash
    grep -o 'op://cloud/[^/]*' .env | sort -u
    ```
 
-   The vault holds nothing else.
+   Put nothing else in the vault.
 
 2. Create a service account with read access to `cloud-deploy` and no other vault. In GitHub, create
    the environment `prod` under the repo's settings. Limit its deployment branches to `main`, and
    add the account's token as the environment secret `OP_SERVICE_ACCOUNT_TOKEN`. Never paste the
    token into a terminal command line.
 3. Apply the tailnet policy that adds `tag:cloud-deploy`, by hand, as
-   [workflows](./workflows.md#apply-by-hand) describes. The owner reviews its policy diff first.
+   [workflows](./workflows.md#apply-by-hand) describes. Have the owner review its policy diff first.
 4. In the Tailscale admin console's
    [trust credentials](https://console.tailscale.com/admin/settings/trust-credentials), add a
    credential of type OpenID Connect: issuer GitHub, subject `repo:<owner>/<repo>:environment:prod`
@@ -52,10 +52,10 @@ fails at its decision with `fatal: Needed a single revision`.
 
 ## Set deployed/prod once
 
-The job needs a baseline before its first run: the last revision anyone applied. Every later move is
-the job's own.
+The job needs a baseline before its first run: the last revision anyone applied. After that, the job
+moves the tag, and so does each [apply by hand](./workflows.md#apply-by-hand).
 
-1. Find the revision of the last apply by hand. Its PR or issue records it with its drift results.
+1. Find the revision of the last apply by hand, with its drift results, on that apply's PR or issue.
 2. From a clean checkout of that revision, check that it is still the live state:
 
    ```bash
@@ -99,8 +99,8 @@ holds the lock, the step `Take the prod lock` logs
 `hold-prod-lock: drift-check <invocation_id> holds the prod lock until <time>; asking again in 30s`
 and waits. A run whose check never released the lock fails that step with
 `hold-prod-lock: drift-check <invocation_id> still holds the prod lock after 3300s` and posts
-`The prod apply failed`. [The drift check runbook](./drift-check.md) shows how to see the holder;
-dispatch the run again once the check ends.
+`The prod apply failed`. To see the holder, follow [the drift check runbook](./drift-check.md).
+Dispatch the run again once the check ends.
 
 A run that applied and whose `check` job failed posts
 `The prod apply passed, but a check of nixie after it failed`. The `check` job's step
@@ -144,8 +144,8 @@ The step `Apply` shows `run-sandbox-image-job: started job.batch/<job_name>`, th
 the update of `kubernetes:apps/v1:StatefulSet nixie`. When the Job fails, the step logs
 `run-sandbox-image-job: job.batch/<job_name> failed (<reason>), so nixie's sandbox images are not all in impd and nixie does not roll`,
 the apply fails with nixie still on its old release, and the run posts `The prod apply failed`. Fix
-the cause that the Job's log names, as [nixie's runbook](./nixie.md#failures) describes, then
-dispatch the run again.
+the cause given in the Job's log, as [nixie's runbook](./nixie.md#failures) describes, then dispatch
+the run again.
 
 A run whose apply job ended cancelled before its first step found the queue full: GitHub keeps at
 most 100 waiting runs and cancels any more. It still posts `The prod apply failed` to Discord. Check
@@ -157,8 +157,8 @@ the lock that step left on the prod stack's state. The step `Cancel this run's P
 When the step logs
 `cancel-deploy-prod-update: the job does not hold the prod lock, so it leaves the Pulumi lock to its holder`,
 or a runner died and ran no step at all, the next run fails on `the stack is currently locked`.
-Clear that lock with `bun run ops:cancel-prod-lock`, whose preconditions
-[the operator verbs](./ops.md#bun-run-opscancel-prod-lock) list.
+Clear that lock with `bun run ops:cancel-prod-lock`, after you check its preconditions in
+[the operator verbs](./ops.md#bun-run-opscancel-prod-lock).
 
 ## Answer a held run
 
@@ -201,6 +201,6 @@ the `cloud` vault and writes the vault that the plan writes.
 
 ## Rotate the job's credentials
 
-A rotation of an item `.env` references updates the item in `cloud` and its copy in `cloud-deploy`,
-or the job reads the old value. The service account's token has no expiry. To replace the token,
-make a new account, replace the environment secret, then delete the old account.
+When you rotate an item that `.env` references, update both the item in `cloud` and its copy in
+`cloud-deploy`, or the job reads the old value. The service account's token has no expiry. To
+replace the token, make a new account, replace the environment secret, then delete the old account.

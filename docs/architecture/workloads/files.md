@@ -2,16 +2,16 @@
 
 The files service holds the screenshots and other files that agents link from pull requests, at
 `files.geoff.cloud`. An agent uploads a file with a role token and gets back a URL of the form
-`https://files.geoff.cloud/<id>/<filename>`. Anyone with that URL can read the file until it
-expires, and then the service answers 404 for it. GitHub's image proxy fetches each image in a pull
-request without signing in, and imps cannot reach the tailnet, so the service sits on a public route
-rather than the tailnet ([public ingress](../network/public-ingress.md)). The service runs in k3s as
-one pod with its own volume, and a nightly job backs that volume up to R2 once the backup is
-configured.
+`https://files.geoff.cloud/<id>/<filename>`. Anyone with that URL can read the file until it expires
+or someone removes it, and from then on the service answers 404 for it. GitHub's image proxy fetches
+each image in a pull request without signing in, and imps cannot reach the tailnet, so the service
+sits on a public route rather than the tailnet ([public ingress](../network/public-ingress.md)). The
+service runs in k3s as one pod with its own volume, and a nightly job backs that volume up to R2
+once the backup is configured.
 
 ## Uploads and roles
 
-The service knows two roles, `agent` and `owner`. The `owner` role has one bearer token. The `agent`
+The service has two roles, `agent` and `owner`. The `owner` role has one bearer token. The `agent`
 role takes several, one for each repo's agents. The service holds only the SHA-256 hash of each
 token, so the cluster never holds a token itself. Pulumi hashes the owner token from 1Password,
 takes each repo's digest from stack config `files.agentTokenDigests`, and puts the hashes in a
@@ -27,9 +27,9 @@ write without a token, or with one whose hash matches no token, gets 401.
 | Remove              | `agent` uploads only                     | yes          |
 
 Every agent token maps to the one `agent` role, so the service cannot tell one agent from another,
-and every agent sees and removes the uploads of the others. An `owner` upload is invisible to the
-`agent` token: the service answers 404 for it rather than 403, so the agent token cannot learn that
-the upload exists.
+and every agent can see and remove the uploads of the others. An `owner` upload is invisible to the
+`agent` token: the service answers 404 for it rather than 403, so an agent cannot learn that the
+upload exists.
 
 The service sets each upload's ID, size, SHA-256, upload time, uploader and content type itself. The
 uploader is the role. The client sets the filename, an optional label and link, and the expiry,
@@ -69,12 +69,11 @@ full gets 507 as well.
 
 The service stops serving an expired or removed upload at once, because each read checks the row and
 the expiry. The service marks every response, a 404 included, `Cache-Control: no-store`, so neither
-Cloudflare nor a browser keeps a copy, and the service returns 404 at the plain URL from the moment
-of the removal or the expiry. Cloudflare's zone settings stretch any short public lifetime to hours,
-so a public lifetime would leave a removed file public for those hours. An in-process sweep runs
-when the service starts and then every hour. It removes each expired file first and its row second,
-so a crash between the two leaves a row whose file is gone, which reads as 404, never a file that
-nothing lists.
+Cloudflare nor a browser keeps a copy. Cloudflare's zone settings stretch any short public lifetime
+to hours, so a public lifetime would leave a removed file public for those hours. An in-process
+sweep runs when the service starts and then every hour. It removes each expired file first and its
+row second, so a crash between the two leaves a row whose file is gone, which reads as 404, never a
+file that nothing lists.
 
 ## Backup and restore
 
@@ -91,6 +90,6 @@ and removes each file that the restored database does not list.
 ## Deployment
 
 The `files image` workflow builds the service into one binary on a distroless base and publishes it
-from `main` to GHCR. The Pulumi program deploys it only when stack config `files` names the image by
+from `main` to GHCR. The Pulumi program deploys it only when stack config `files` holds the image's
 digest and the public hostname, so the deploy needs the owner's change to stack config. The pod runs
 as a nonroot user on a read-only root filesystem with every capability dropped.

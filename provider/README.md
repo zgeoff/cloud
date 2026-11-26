@@ -1,10 +1,10 @@
 # Onidel Pulumi provider
 
-A partial Pulumi provider for the [Onidel](https://onidel.com) cloud API, written in Go with pulumi-go-provider's `infer` package. No Pulumi or Terraform provider for Onidel exists, so this one covers only what the repo uses: VMs, and firewall groups with their rules. Pulumi generates its TypeScript SDK into `sdk/onidel/` as the workspace package `@zgeoff/pulumi-onidel`, which `infra/` imports ([infrastructure as code](../docs/architecture/infrastructure-as-code.md)).
+A partial Pulumi provider for the [Onidel](https://onidel.com) cloud API, written in Go with pulumi-go-provider's `infer` package. No Pulumi or Terraform provider for Onidel exists. This one covers only what the repo uses: VMs, and firewall groups with their rules. Pulumi generates its TypeScript SDK into `sdk/onidel/` as the workspace package `@zgeoff/pulumi-onidel`, which `infra/` imports ([infrastructure as code](../docs/architecture/infrastructure-as-code.md)).
 
-`spec/onidel.yaml` is Onidel's OpenAPI spec as published, and `spec/onidel.overlay.yaml` is an OpenAPI Overlay of the changes the client needs, each with its source. oapi-codegen generates the client in `internal/onidelapi` from both, for the operations its config lists. `internal/client` puts the policy on top: retries, the waits for a VM to settle, and error mapping. `internal/onidel` holds the resources, with each resource's update and replace rules beside its schema. `cmd/onidel` runs one-off actions on the same client, such as the snapshot before a risky host change.
+`spec/onidel.yaml` is Onidel's OpenAPI spec as published, and `spec/onidel.overlay.yaml` is an OpenAPI Overlay of the changes the client needs, each with its source. oapi-codegen generates the client in `internal/onidelapi` from both, for only the operations in its config. `internal/client` wraps that client with retries, waits for a VM to settle, and error mapping. `internal/onidel` holds the resources, with each resource's update and replace rules beside its schema. `cmd/onidel` runs one-off actions on the same client, such as the snapshot before a risky host change.
 
-The provider is frozen: a change to it is a version bump of a dependency and nothing else, so it gains no resource and no API call. Replacing it waits on whether the estate needs a second VM ([infrastructure as code](../docs/architecture/infrastructure-as-code.md)).
+The provider is frozen: add no resource and no API call. Change it only to bump a dependency, or to fix the overlay or the config of a call it already makes, then regenerate as below. Replacing it waits on whether the estate needs a second VM ([infrastructure as code](../docs/architecture/infrastructure-as-code.md)).
 
 ## Build and regenerate
 
@@ -19,25 +19,25 @@ bun run check:sdk        # fails when the committed SDK differs from a fresh sdk
 bun run check:onidel-vendor   # fails when nixos/packages/onidel-provider.nix's vendorHash is stale
 ```
 
-`provider:check` runs golangci-lint with staticcheck and unused, and deadcode with the tests as roots, so code that nothing reaches fails the check. Both linters are Go tools pinned in `tools.mod`, apart from the provider's own `go.mod`.
+`provider:check` runs golangci-lint with staticcheck and unused, and deadcode with the tests as roots, so code that nothing reaches fails the check. Both linters are Go tools pinned in `tools.mod`, separate from the provider's own `go.mod`.
 
-Never edit `internal/onidelapi/onidelapi.gen.go` by hand: change the overlay or the config, run `go generate ./internal/onidelapi` in `provider/`, and commit the result. `provider:check` fails on a stale copy. Never edit `sdk/onidel/` by hand. Regenerate it after any schema change and commit the result. The SDK takes its version from the schema, which carries the provider's `Version` in `cmd/pulumi-resource-onidel/main.go`. Its package name and dev dependencies come from the schema's language settings in `internal/onidel/provider.go`. Its `@pulumi/pulumi` dependency is the pin in `infra/package.json`, which `sdk:gen` copies in, so the repo pins Pulumi once; `check:pulumi-pins` fails when the two differ. The provider is not published: `infra/Pulumi.yaml` loads the local binary from `../provider/bin`.
+Never edit `internal/onidelapi/onidelapi.gen.go` by hand: change the overlay or the config, run `go generate ./internal/onidelapi` in `provider/`, and commit the result. `provider:check` fails on a stale copy. Never edit `sdk/onidel/` by hand. Regenerate it after any schema change and commit the result. The SDK takes its version from the schema, which carries the provider's `Version` in `cmd/pulumi-resource-onidel/main.go`. Its package name and dev dependencies come from the schema's language settings in `internal/onidel/provider.go`. Its `@pulumi/pulumi` dependency is the pin in `infra/package.json`, which `sdk:gen` copies in, so the repo pins Pulumi in one place. `check:pulumi-pins` fails when the two differ. The provider is not published: `infra/Pulumi.yaml` loads the local binary from `../provider/bin`.
 
 ## Configuration
 
-The provider reads its API key from `onidel:apiKey`, or from `ONIDEL_API_KEY`, which `.env` resolves from 1Password through `op run`. It needs no other setting for this repo's stack.
+The provider reads its API key from `onidel:apiKey`, or from `ONIDEL_API_KEY`, which `op run` fills from 1Password through `.env`. It needs no other setting for this repo's stack.
 
 ## How it behaves
 
-- **The root password never reaches state.** Onidel returns the VM's root password in every VM object. The overlay removes the field, so no generated type has one and decoding drops it, and a test guards every generated type. Never log a VM response body.
-- **Most VM inputs replace the VM.** The API cannot resize a VM, and a changed OS replaces it too, although the API could reinstall in place, so the data loss shows in the preview. The repo's VM is protected for that reason.
+- **The root password never reaches state.** Onidel returns the VM's root password in every VM object. The overlay removes the field, so no generated type has one and decoding drops it. A test checks every generated type for it. Never log a VM response body.
+- **Most VM inputs replace the VM.** The API cannot resize a VM. A changed OS replaces the VM too, although the API could reinstall in place, so that the preview shows the data loss. The repo's VM is protected for that reason.
 - **Each update is one call per setting**, as the API requires, and the provider waits for the VM to settle before and after each one.
 - **A create finds its VM by listing** when the create call returns no body, as the spec documents.
 - **An import adopts unreported fields.** The API never reports some create-time inputs, so an imported VM takes the program's values for them without a replace.
-- **Only idempotent calls retry.** Bursts of reads get 503 answers, so GET, PUT and DELETE retry with backoff. POST and PATCH never retry, because a retried create or update could act twice.
+- **Only idempotent calls retry.** Bursts of reads get 503 responses, so GET, PUT and DELETE retry with backoff. POST and PATCH never retry, because a retried create or update could act twice.
 
 ## Known API gaps
 
 - No block volume calls, so the host's second disk is a manual step.
 - No VM start, so the provider never stops a VM.
-- A preview can omit a change whose input is still unknown, such as the firewall group of a group created in the same update. The update itself applies it.
+- A preview can omit a change whose input is still unknown, such as a VM's firewall group when that group is created in the same update. The update itself applies it.

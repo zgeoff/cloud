@@ -1,22 +1,21 @@
 # pepys: first deploy and release bump
 
 Deploy [pepys](../architecture/workloads/pepys.md), the owner's data hub, to the cluster the first
-time, and move the cluster to a later pepys release. [Deploy the first time](#deploy-the-first-time)
-is for a cluster whose [stack config](./workflows.md#change-stack-config) holds no `pepys` object.
-[Bump the pepys release](#bump-the-pepys-release) is for each pepys release after that. Other
-runbooks cover the rest of what an operator does by hand:
-[telemetry from sessions](./pepys-telemetry.md),
+time, and move the cluster to a later pepys release. Follow
+[Deploy the first time](#deploy-the-first-time) when the cluster's
+[stack config](./workflows.md#change-stack-config) holds no `pepys` object, and
+[Bump the pepys release](#bump-the-pepys-release) for each pepys release after that. For the rest of
+what an operator does by hand, see the runbooks for [telemetry from sessions](./pepys-telemetry.md),
 [the API's public route and its clients](./pepys-api.md), and [the backup](./pepys-backup.md).
 
 ## Deploy the first time
 
 The Pulumi program deploys pepys only when the stack config holds a `pepys` object: the key
-`geoff-cloud:pepys` in `infra/Pulumi.prod.yaml`. Without the object, the pepys code on `main`
-changes nothing in prod.
+`geoff-cloud:pepys` in `infra/Pulumi.prod.yaml`.
 
 **CAUTION:** These steps add a public route. The `Deploy prod` run of the merge in step 4 holds at
-the tunnel route change, and step 5 answers the held run. Get the owner's approval before you answer
-it, as [the prod apply job](./prod-apply.md) describes.
+the tunnel route change, and you answer the held run in step 5. Get the owner's approval before you
+answer it, as [the prod apply job](./prod-apply.md) describes.
 
 1. Read the image's tag and digest in the summary of the newest
    [`pepys image`](../../.github/workflows/pepys-image.yml) run on `main`. The workflow publishes
@@ -34,13 +33,13 @@ it, as [the prod apply job](./prod-apply.md) describes.
      impIdentityAudience: pepys.imp.internal
    ```
 
-3. Run `bun run preview` from the repo root, as [First preview](./development.md#first-preview) sets
-   up. Expect the preview to add the `pepys` namespace, its network policies, Secrets, Services and
-   workloads. Expect it to add the rule of
+3. Run `bun run preview` from the repo root, after the setup in
+   [First preview](./development.md#first-preview). Expect the preview to add the `pepys` namespace,
+   its network policies, Secrets, Services and workloads. Expect it to add the rule of
    [the shared tunnel](../architecture/network/public-ingress.md#the-shared-tunnel) and the proxied
    record for `pepys-webhook.geoff.cloud`. Expect no other change. The preview adds the backup
-   CronJob only when `.env` names
-   [the backup variables](./pepys-backup.md#give-the-backup-its-garage-key).
+   CronJob only when you set
+   [the backup variables](./pepys-backup.md#give-the-backup-its-garage-key) in `.env`.
 4. Merge the pull request.
 5. Once the plan of the held `Deploy prod` run matches the preview, answer the run, as
    [Answer a held run](./prod-apply.md#answer-a-held-run) says.
@@ -65,12 +64,12 @@ it, as [the prod apply job](./prod-apply.md) describes.
 
 ## Bump the pepys release
 
-The `cloud-pepys` image holds the pepys host, a binary that the pepys release publishes, beside
-ingest, the API and the consumer modules, which the image build compiles from the `@pepys/*`
+The `cloud-pepys` image holds the pepys host, a binary that the pepys release publishes. Beside it
+are ingest, the API and the consumer modules, which the image build compiles from the `@pepys/*`
 packages in `deploy/pepys`. [Processes](../architecture/workloads/pepys.md#processes) and
 [The image](../architecture/workloads/pepys.md#the-image) explain the host, its consumers and the
-fact log. The binary and the packages must come from one release, so a bump changes `PEPYS_RELEASE`
-and the package versions in one pull request.
+fact log. The binary and the packages must come from one release, so change `PEPYS_RELEASE` and the
+package versions in one pull request.
 [`collect-pepys-version-mismatches.test.ts`](../../scripts/collect-pepys-version-mismatches.test.ts)
 fails when the release and a package version differ.
 
@@ -79,17 +78,17 @@ fails when the release and a package version differ.
    `pepys-host-linux-x64` in the release's `SHA256SUMS`, and the image build stops on a checksum of
    another release. After an edit by hand, run `bun scripts/release/check-release-pins.ts --write`,
    which copies both values into `scripts/release/release-pins.json`, or CI's release-pin check
-   fails. The bump pull request that [the release check](./release-check.md) opens on the branch
-   `release-check/pepys` writes all three.
+   fails. In the bump pull request that [the release check](./release-check.md) opens on the branch
+   `release-check/pepys`, all three are set.
 2. Set each `@pepys/*` version in `deploy/pepys/package.json` to that release, by hand.
 3. Check that `@boxxy/pepys`, the boxxy plug-in in `deploy/pepys/package.json`, admits the release.
-   The plug-in's own `package.json` gives its range on `@pepys/kit` under `peerDependencies`. When
+   Find its range on `@pepys/kit` under `peerDependencies` in the plug-in's own `package.json`. When
    the range leaves the release out, set `@boxxy/pepys` to a version whose range admits it.
    `@boxxy/pepys` carries boxxy's own version.
 4. Run `bun install` in `deploy/pepys` to write its lock again. Then run
    `bun run check:pepys-deployment` from the repo root. Expect exit 0.
-5. Merge the pull request. Its `pepys image` run on `main` publishes the image of the release, and
-   the run summary gives the image's tag and digest.
+5. Merge the pull request. Its `pepys image` run on `main` publishes the image of the release. Read
+   the image's tag and digest in the run summary.
 6. Open a second pull request that sets `image` in the `geoff-cloud:pepys` object of
    `infra/Pulumi.prod.yaml` to that tag and digest. Merge it. The `Deploy prod` workflow applies it
    once CI passes on `main`.
@@ -111,4 +110,5 @@ fails when the release and a package version differ.
    consumer's rows again from the fact log. When the fact log refuses the connection at start, the
    host logs `pepys: up <consumer> retries in <n> ms after a store error` and tries again, up to 10
    times, so the lines above follow the retry lines. When the host exits after the last retry, the
-   pod starts the host again. When the starts keep failing, check `deployment/pepys-s2`.
+   pod starts the host again. When the starts keep failing, check `deployment/pepys-s2`, which
+   serves the fact log.

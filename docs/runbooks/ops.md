@@ -3,16 +3,15 @@
 Each `bun run ops:<verb>` script is the stable name of one action that an operator or an agent
 session takes on cloud: switch the host, dispatch a workflow, preview or apply the prod stack,
 switch the agent image, run a root step on the host, clear a stale prod stack lock, or store the
-kubeconfig of nixie's prod check. A caller names the verb and never the script, workflow file or
-address behind it, so a change to those changes [`scripts/ops.sh`](../../scripts/ops.sh) and leaves
-the callers alone.
+kubeconfig of nixie's prod check. Call the verb, never the script, workflow file or address behind
+it, so that when one of those changes, you edit only [`scripts/ops.sh`](../../scripts/ops.sh).
 
 A verb runs the command it wraps unchanged and passes its exit code through. Every check the wrapped
-script makes still runs, and this page lists the preconditions that no script checks. Two verbs add
-one check of their own: `up` and `cancel-prod-lock` refuse with exit 1, and name each run, while a
-`Deploy prod` run is queued or in progress, since either would fight that run for the prod stack.
-The check asks GitHub for each status that a run holds before it completes: in progress, queued,
-waiting, pending and requested. A usage error exits 2.
+script makes still runs. No script checks the preconditions listed under each verb, so check them
+yourself. While a `Deploy prod` run is queued or in progress, `up` and `cancel-prod-lock` exit 1 and
+name each such run, since either verb would fight that run for the prod stack. The check counts each
+run that GitHub shows in a status before completion: in progress, queued, waiting, pending or
+requested. A verb exits 2 on a usage error, such as a wrong number of arguments or a malformed one.
 
 **CAUTION:** Every verb but a dry run acts on the live estate or on GitHub. Read the preconditions
 of a verb before you run it.
@@ -46,13 +45,13 @@ bun run ops:switch-host -- --stop-ordinary-page-imps  # switch in the hugetlb po
 
 - Wraps `bash scripts/switch-geoffcloud.sh`, which reaches the host in `GEOFFCLOUD_HOST`, or
   `root@geoffcloud`.
-- The script checks a clean `main` that matches `origin/main`, a green `NixOS checks` run that
-  covers the commit, the atc daemon and gateway majors, the impd majors nixie accepts, the secret
-  kinds impd stores against those the atc daemon accepts, a k3s restart, and nixie's readiness,
-  impd's image folders and the hugetlb pool after the switch.
-  [Switch the host](./workflows.md#switch-the-host) explains each refusal.
+- Before the switch, the script checks for a clean `main` that matches `origin/main`, a green
+  `NixOS checks` run that covers the commit, the atc daemon and gateway majors, the impd majors
+  nixie accepts, the secret kinds impd stores against those the atc daemon accepts, and a k3s
+  restart. After the switch, it checks nixie's readiness, impd's image folders and the hugetlb pool.
+  Look up a refusal in [Switch the host](./workflows.md#switch-the-host).
 - After every check passes, the script pushes the tag `deployed/host` on `origin` to the switched
-  commit, so the caller needs push access to `zgeoff/cloud`.
+  commit, so you need push access to `zgeoff/cloud`.
 - Before a switch that changes imp, copy impd's database with
   `bash scripts/copy-impd-db.sh <label>`.
 - Pass `--allow-k3s-restart` only in a planned k3s window that the owner approved.
@@ -70,7 +69,7 @@ bun run ops:deploy-prod -- <full commit of main's tip>
 - Wraps `gh workflow run deploy-prod.yml -R zgeoff/cloud --ref main -f revision=<commit>`.
 - The verb refuses a commit that is not 40 lowercase hex characters. The workflow refuses a revision
   that is not `main`'s tip or that has no green CI run.
-- Read the held plan in full first. [The prod apply job](./prod-apply.md) covers a held run.
+- Read the held plan in full first. For a held run, see [the prod apply job](./prod-apply.md).
 
 ## `bun run ops:nixos-checks`
 
@@ -84,8 +83,8 @@ bun run ops:nixos-checks -- --force         # on main, building even a covered c
 
 - Wraps `gh workflow run nixos-checks.yml -R zgeoff/cloud --ref <branch>`, with `-f force=true` for
   `--force`.
-- A run skips the build when an earlier run covers the commit or built the same derivations, as
-  [Check the host before a switch](./workflows.md#check-the-host-before-a-switch) describes.
+- A run skips the build when an earlier run covers the commit or built the same derivations. See
+  [Check the host before a switch](./workflows.md#check-the-host-before-a-switch).
 - A host switch reads only a green run on `main`. A run on a branch checks the change and gates
   nothing.
 
@@ -99,7 +98,7 @@ bun run ops:preview -- --refresh
 ```
 
 - Wraps `bun run preview` from the checkout's root, with the flags you pass after `--`.
-- It needs `op` signed in to the `cloud` vault, because `.env` holds `op://` references.
+- Sign `op` in to the `cloud` vault first, because `.env` holds `op://` references.
 
 ## `bun run ops:up`
 
@@ -142,7 +141,7 @@ printf '%s\n' "$value" | bun run ops:host -- 'install -m 600 /dev/stdin /root/<f
 
 - Wraps `ssh -o BatchMode=yes root@geoffcloud '<command>'`, or the host in `GEOFFCLOUD_HOST`. Your
   stdin reaches the command.
-- The verb takes exactly one argument: the whole remote command, quoted.
+- The verb takes exactly one argument after any `--dry-run`: the whole remote command, quoted.
 
 **WARNING:** Tailscale SSH logs each session's full command line, and Alloy ships that log to Loki.
 Never put a secret in the command. Send the secret on stdin, as the second example does.
@@ -151,7 +150,7 @@ Never put a secret in the command. Send the secret on stdin, as the second examp
 
 Clears a stale lock on the prod stack's Pulumi state, which an apply or a refresh leaves when it
 dies before it finishes. A preview takes no lock. A `Deploy prod` run that is cancelled or times out
-during its refresh or apply clears its own lock, so this verb is for a lock that a run's runner left
+during its refresh or apply clears its own lock. Use this verb for a lock that a run's runner left
 when it died, or that a command run by hand left.
 
 ```bash

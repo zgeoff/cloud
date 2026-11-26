@@ -1,20 +1,21 @@
 # Reinstall geoffcloud as NixOS
 
-This runbook replaces Ubuntu on `geoffcloud` with the flake in `nixos/`. It wipes `vda` only. `vdb`
-holds the ZFS pool `tank`, with every encrypted dataset, and NixOS imports it and unlocks it with
-the key that step 3 stages. When `vdb` is lost too, follow
-[Lose both disks](./lost-disk.md#lose-both-disks), which runs this runbook first.
+Follow this runbook to replace Ubuntu on `geoffcloud` with the flake in `nixos/`. The reinstall
+wipes only `vda`. NixOS imports the ZFS pool `tank` on `vdb`, with every encrypted dataset, and
+unlocks it with the key you stage in step 3. When `vdb` is lost too, follow
+[Lose both disks](./lost-disk.md#lose-both-disks) instead: it starts with this runbook.
 
 ## Before you start
 
-- The imp session agrees on the time. imp's node and microVMs go down.
+- Agree the time with the imp session: imp's node and microVMs go down.
 - imp's bootstrap has created the pool `tank` on `vdb`. NixOS imports it through imp's module
   (`services.imp.zfs.pool`).
 - A Tailscale auth key for `tag:cloud` exists: the `hostAuthKey` stack output (Pulumi `TailnetKey`).
 
 **CAUTION:** The reinstall erases the root disk. Take an Onidel snapshot first, so that you can
-restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<team>` with the body
-`{"name": "...", "team_id": "<team>"}`. Wait until `GET /snapshots` shows it as `available`.
+restore the Ubuntu host. To take it through the API, send `POST /vm/<vm-id>/snapshot?team_id=<team>`
+with the body `{"name": "...", "team_id": "<team>"}`. Wait until `GET /snapshots` shows it as
+`available`.
 
 ## Steps
 
@@ -60,8 +61,8 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 
    The pool `tank` keeps `tank/cloud`, which holds the live copies of the imp files and of the atc
    daemon's tokens ([tank/cloud](./tank-cloud.md)). The install puts the staged imp files on `vda`
-   in the clear, and a bind mount from `tank/cloud` shadows them without removing them. Step 8 moves
-   them into `tank/cloud` or deletes them, and the reinstall is not complete before it.
+   in the clear, and a bind mount from `tank/cloud` shadows them without removing them. In step 8,
+   move them into `tank/cloud` or delete them: the reinstall is not complete until you do.
 
    Stage the key of the encryption root `tank/cloud` too. `--no-newline` keeps the file at exactly
    the key's 64 hex characters, so the length check catches a wrong item before the install:
@@ -73,8 +74,8 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    test "$(wc -c < $x/var/lib/zfs-keys/tank.key)" -eq 64 && echo ok
    ```
 
-   The key directory and file never exist with a mode another account can read. A `umask` around the
-   whole staging block would not do: `--extra-files` copies each directory's mode, so `/var` and
+   The key directory and file never exist with a mode another account can read. Don't wrap the whole
+   staging block in a `umask` instead: `--extra-files` copies each directory's mode, so `/var` and
    `/var/lib` would land as `0700` on the host.
 
    Expect `ok`. Without it, check the item and stage the key again before you go on.
@@ -91,7 +92,7 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    If the export reports the pool as busy, find the process that holds it, stop it, and export
    again. Do not skip the export.
 
-5. Install. `nixos-anywhere` runs from any machine with Nix:
+5. Install from any machine with Nix:
 
    ```sh
    nix run github:nix-community/nixos-anywhere -- \
@@ -120,9 +121,9 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    findmnt -n -o SOURCE,FSTYPE --mountpoint /var/lib/imp-host/secrets
    ```
 
-   With `tank/cloud/host-secrets[/imp-host] zfs`, the pool held the live copies and the bind shadows
-   the staged ones: delete them through a bind of `/` that shows the root disk, and keep what the
-   pool holds:
+   When it prints `tank/cloud/host-secrets[/imp-host] zfs`, the pool holds the live copies and the
+   bind shadows the staged ones. Delete the staged copies through a bind of `/`, which shows the
+   root disk, and leave the pool's copies alone:
 
    ```sh
    d=$(mktemp -d /run/staged.XXXXXX) && mount --bind / "$d" &&
@@ -156,18 +157,23 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    ```
 
    Expect `tank/cloud/host-secrets[/imp-host] zfs`, then `removed`. Without `removed`, the block
-   stopped at the failed step, and the staged copies stay on the root disk. Run
-   `bash scripts/install-imp-dns-token.sh` from this machine to restore the DNS token, which the
-   reinstall does not stage. The script refuses to write while the bind is not mounted.
+   stopped at the failed step, and the staged copies stay on the root disk.
+
+   Then, on every reinstall, run `bash scripts/install-imp-dns-token.sh` from this machine to
+   restore the DNS token, which the reinstall does not stage. The script refuses to write while the
+   bind is not mounted.
 
 9. Remove the stale Ubuntu-era Tailscale nodes in the admin console.
 
 ## Connect Pulumi to k3s
 
-The stack config `cluster` says whether Pulumi manages k3s. With `none`, the program leaves every
+The stack config `cluster` sets whether Pulumi manages k3s. With `none`, the program leaves every
 k3s workload out. With `managed` (the `prod` setting), a run without `K3S_KUBECONFIG` fails before
-any resource registers. Keep `cluster: none` until step 1 has stored the kubeconfig, then set
-`pulumi config set cluster managed`.
+any resource registers. `.env` already refers to the stored kubeconfig, and the cluster's
+certificate authority lives on the `rancher` zvol on `vdb`, so the stored copy still opens the
+cluster after a reinstall. Never set `cluster` to `none` on `prod`: with `none`, the program plans
+to delete every cluster resource. Run step 1 when the stored kubeconfig no longer opens the cluster,
+such as after a new cluster.
 
 1. Run `bash scripts/connect-k3s.sh`. It stores the kubeconfig as the document
    `op://cloud/k3s-kubeconfig/kubeconfig.yaml`, with the server set to `https://geoffcloud:6443`,
@@ -180,8 +186,8 @@ any resource registers. Keep `cluster: none` until step 1 has stored the kubecon
 
 Do this only after `ssh root@geoffcloud` works over the tailnet.
 
-**CAUTION:** Onidel's firewall semantics are not tested: if it drops reply traffic, the host can
-lose its public network. Take an Onidel snapshot first, and keep the noVNC console at hand.
+**CAUTION:** Nobody has tested how Onidel's firewall behaves: if it drops reply traffic, the host
+can lose its public network. Take an Onidel snapshot first, and keep the noVNC console at hand.
 
 1. `cd infra && op run --env-file=../.env -- pulumi config set --stack prod hostOnTailnet true`
 2. `bun run up -- --yes`. It attaches the `edge` firewall to the VM and removes its SSH rules.

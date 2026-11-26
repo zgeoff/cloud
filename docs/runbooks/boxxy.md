@@ -2,8 +2,8 @@
 
 The boxxy server runs as the `boxxy` StatefulSet in k3s, on a retained local-path volume that holds
 its SQLite store. The `boxxy-backup` CronJob backs the store up every night with restic to a `boxxy`
-repository in R2. Setting the stack config `boxxy` approves the deploy, and leaving it unset keeps
-the server out of the cluster. [The workload doc](../architecture/workloads/boxxy.md) covers the
+repository in R2. Set the stack config `boxxy` to deploy the server; while it is unset, the server
+stays out of the cluster. [The workload doc](../architecture/workloads/boxxy.md) covers the
 listeners, the configuration and the caller proof.
 
 ## What holds what
@@ -19,16 +19,17 @@ listeners, the configuration and the caller proof.
 | `boxxy-github-token`      | the read-only clone token                                 | the atc daemon, impd  |
 | `boxxy-github-app`        | the boxxy App's keys, for every GitHub call of the server | Pulumi                |
 
-The prod apply job reads the same items from the `cloud-deploy` vault, so each item has a copy there
-under the same name. A `.env` line whose item is missing fails every preview and apply, so create
-the items, with their copies, before the PR that adds the lines merges.
+The prod apply job reads the same items from the `cloud-deploy` vault, so copy each item there under
+the same name. A `.env` line whose item is missing fails every preview and apply, so create the
+items, with their copies, before the PR that adds the lines merges.
 
 ## Deploy the first time
 
 1. Merge the server. The `boxxy image` workflow publishes `ghcr.io/zgeoff/cloud-boxxy:<commit>` from
-   `main`, and its run summary gives the digest.
-2. Create the four items in the `cloud` vault, then copy each into `cloud-deploy`. Mint the worker
-   token as 32 random bytes in hex:
+   `main`. Take the digest from its run summary.
+2. Create four items of the table in the `cloud` vault: `boxxy-worker-token`, `boxxy-atc-token`, and
+   `boxxy-restic` and `r2-boxxy-backup` when you want the backup now. Copy each into `cloud-deploy`.
+   Mint the worker token as 32 random bytes in hex:
 
    ```bash
    openssl rand -hex 32
@@ -76,16 +77,16 @@ the items, with their copies, before the PR that adds the lines merges.
    Check that the diff of `infra/Pulumi.prod.yaml` adds only a `secure:` value under
    `geoff-cloud:boxxySpawnRepos`. Each imp is a fresh machine, so each repo is a git source. The atc
    daemon clones it, with the token that its `credentialRef` names for a private repo, so the URL
-   carries no credential, and the server skips the trusted-folder check for a git source.
+   carries no credential. The server skips the trusted-folder check for a git source.
 
    The image must hold a server that calls atc over MCP. Leave out the `BOXXY_RESTIC_*` and
    `BOXXY_R2_*` lines until both of their items exist: the backup takes all five variables or none,
    and one alone fails the preview.
 
    Run `bun run preview` and check that it adds the `boxxy` namespace, its Secrets, both ConfigMaps,
-   both Services, both NetworkPolicies, the StatefulSet, and the backup Secret and CronJob, and
-   changes nothing else. Without the `BOXXY_RESTIC_*` and `BOXXY_R2_*` variables, the server deploys
-   with no backup.
+   both Services, both NetworkPolicies, the StatefulSet, and, with the backup variables, the backup
+   Secret and CronJob, and changes nothing else. Without the `BOXXY_RESTIC_*` and `BOXXY_R2_*`
+   variables, the server deploys with no backup.
 
 4. Merge the PR. `Deploy prod` applies it, since every step is a create.
 5. Check that the pod is up and its listeners started:
@@ -130,8 +131,8 @@ section and does not start.
    the Secret `boxxy-door-tunnel-token`. Expect it to replace the ConfigMap `boxxy-config` and
    update the StatefulSet, and to change nothing else.
 
-2. Merge it. The guard of `Deploy prod` holds the plan, because it creates a tunnel's routes, a DNS
-   record and an Access application. Read the held plan and dispatch it, as
+2. Merge it. The guard of `Deploy prod` holds the plan, because the plan creates a tunnel's routes,
+   a DNS record and an Access application. Read the held plan and dispatch it, as
    [the prod apply runbook](./prod-apply.md#answer-a-held-run) says.
 3. Check the route from any machine:
 
@@ -158,9 +159,9 @@ section and does not start.
    BOXXY_URL=http://localhost:8090 boxxy auth clients add <client_name> --redirect-uri <redirect_uri>
    ```
 
-   `<client_name>` is the name the consent page shows, and `<redirect_uri>` is the callback URL the
-   client's OAuth settings give. Expect `Added <client_name>. Its client ID is <client_id>`, and
-   give the client that ID with `https://boxxy.geoff.cloud/mcp` as its server URL.
+   `<client_name>` is the name the consent page shows, and `<redirect_uri>` is the callback URL in
+   the client's OAuth settings. Expect `Added <client_name>. Its client ID is <client_id>`, and give
+   the client that ID with `https://boxxy.geoff.cloud/mcp` as its server URL.
 
 `boxxy auth clients` and `boxxy auth grants` list and remove clients and grants. The backup copies
 the door's auth database with the store, and a restore puts both back.
@@ -205,7 +206,7 @@ A worker session in an imp reaches the worker listener at `https://boxxy.imp.int
 host in the shared constants. The atc daemon's `boxxy` agent loads the boxxy hook plug-in and its
 `boxxy` auth profile sets `BOXXY_URL` in the session. The broker adds the worker token and an imp
 identity token, and forwards the request to the boxxy relay on the host's address on Podman's
-bridge, which dials the `boxxy-worker` Service. These steps follow the host switch that adds the
+bridge, which dials the `boxxy-worker` Service. Do these steps after the host switch that adds the
 relay and the daemon's new config.
 
 1. Add the worker token to impd. Send it on stdin, and never put it on a command line. The upstream
@@ -223,8 +224,8 @@ relay and the daemon's new config.
    the secret travels over SSH's stdin into `impz` in the container. Never put it on the SSH command
    line, because the host's journal records that line. Expect `impz secret ls` to show
    `boxxy.imp.internal -> http://10.88.0.1:18084 (identity)`. Impd signs identity tokens only with
-   `IMP_IDENTITY_ISSUER` set, which the host's config sets to `geoffcloud`. Replacing the token of a
-   secret that exists takes `--replace`, and a change of host, upstream or `--identity` takes
+   `IMP_IDENTITY_ISSUER` set, which the host's config sets to `geoffcloud`. To replace the token of
+   an existing secret, add `--replace`. To change its host, upstream or `--identity`, add
    `--replace --rebind`, which drops the secret's grants.
 
 2. List `boxxy` and `pepys-telemetry` in the grantable list of the atc daemon's impd token, so the
@@ -251,8 +252,8 @@ secret, which every Claude and Codex session uses.
 The boxxy server signs in to the atc gateway with a service token, which the gateway reads from a
 file at start (`atc-gateway --service-token-file`, atc 7.14.0 and later). Pulumi builds the file
 from `BOXXY_ATC_TOKEN` and the gateway's public URL, puts it in a Secret with no fixed name, and
-passes the flag. The server calls atc as the principal `service:boxxy`, which the daemon's
-`principals` lists with the target `geoffcloud`.
+passes the flag. The server calls atc as the principal `service:boxxy`, which has the target
+`geoffcloud` in the daemon's `principals`.
 
 - Mint the token as `atcs_` and 64 hex characters, and put it in the item `boxxy-atc-token` in
   `cloud` and in its `cloud-deploy` copy:
@@ -286,7 +287,7 @@ ref. Without the variable, a spawn of a private repo fails with `clone_failed` a
 - The host keeps it in `/var/lib/atc-daemon-secrets/git-clone-token`, mode 0400, owned by root. The
   NixOS option `services.atc-daemon.environmentCredentials` passes the file in as a systemd
   credential and sets the variable in the daemon's process only. atc withholds the variable from
-  every harness it starts. A check unit names a missing or empty file before the daemon starts.
+  every harness it starts. Before the daemon starts, a check unit reports a missing or empty file.
 - Install or refresh the file with the repo name that the token must read, which stays out of the
   repo:
 
@@ -315,7 +316,7 @@ needs its token in `.env`, and the program stops with the name of the variable w
 
 1. For pepys, check that stack config `pepys` is set and that pepys ingest and the pepys API admit
    the boxxy server's pod, as [the pepys workload doc](../architecture/workloads/pepys.md) says. Add
-   the line that reads the item pepys ingest reads too:
+   the line for the item that pepys ingest also reads:
 
    ```bash
    BOXXY_PEPYS_SIGNING_SECRET=op://cloud/boxxy-pepys-signing/credential
@@ -358,11 +359,11 @@ close-out, and each item holds at review after two sessions.
 1. Copy the item `noslop-github-app` into `cloud` and `cloud-deploy`, with the fields `app-id`,
    `private-key` and `installation-id`. Install the noslop App on every repo in `boxxySpawnRepos`.
 2. Give impd the read-only clone token as the secret `boxxy-github-token`, of kind `github`, from
-   the item of the same name. Send it as step 1 of
-   [Let sessions reach the server](#let-sessions-reach-the-server) sends `boxxy`: `op read` on your
-   machine, piped over SSH's stdin into `impz secret add boxxy-github-token --kind github` in
-   imp-host. Then set the daemon token's grantable list from `scripts/atc-cloud-grantable.ts`, which
-   names `boxxy-github-token`, with the `impz token set atc-cloud` command of that section.
+   the item of the same name. Send it as you sent `boxxy` in step 1 of
+   [Let sessions reach the server](#let-sessions-reach-the-server): `op read` on your machine, piped
+   over SSH's stdin into `impz secret add boxxy-github-token --kind github` in imp-host. Then set
+   the daemon token's grantable list from `scripts/atc-cloud-grantable.ts`, which includes
+   `boxxy-github-token`, with the `impz token set atc-cloud` command of that section.
 3. Switch the host, so the atc daemon offers the `boxxy-review` agent and its `github-review`
    profile.
 4. Add the lines to `.env`:
@@ -415,7 +416,7 @@ notice sent without sending it.
    [upgrade the server](#upgrade-the-server) first.
 
 2. Mint the notice token into the item `boxxy-atc-notice-token`, field `credential`, in `cloud`, and
-   into its `cloud-deploy` copy. The token goes to `op` on stdin, never on the command line:
+   into its `cloud-deploy` copy. Pass the token to `op` on stdin, never on the command line:
 
    ```bash
    token="atcs_$(openssl rand -hex 32)"
@@ -484,10 +485,10 @@ no restart of the server. A rename keeps the session's ID, so it needs no new re
    `cloud` and in its `cloud-deploy` copy. For the worker token, also replace impd's `boxxy` secret.
 2. [Apply by hand](./workflows.md#apply-by-hand) from `main`. The `Deploy prod` job applies only a
    new commit, so it never runs for a change in 1Password alone. Both drift checks and the preview
-   show one change: Pulumi replaces the Secret `boxxy-tokens`. Expect nothing else.
-3. The new Secret rolls `boxxy-0`, and the old token stops working once the new pod is ready. A new
-   atc token also replaces the gateway's `atc-gateway-service-tokens` Secret, which rolls the
-   gateway.
+   show one change for the worker token: Pulumi replaces the Secret `boxxy-tokens`. A new atc token
+   also replaces the gateway's `atc-gateway-service-tokens` Secret. Expect nothing else.
+3. The new Secret rolls `boxxy-0`, and the old token stops working once the new pod is ready. The
+   gateway's new Secret rolls the gateway.
 
 ## Back up now
 

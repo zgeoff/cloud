@@ -1,12 +1,13 @@
 # The agent image
 
 The agent image is the imp image an agent session runs on: imp's base image plus the tools a session
-uses, each at a pinned version whose download is checked against a published checksum. It holds
-binaries only, with no configuration, no login state and no secret, because atc sets each session up
-at launch with its grants, placeholder variables and config. The image is built on impd's host from
-a commit of this repo, and each build gets a new image name, so the image that ran before stays on
-the host for a rollback. [The atc gateway](./atc-gateway.md) covers the daemons whose sessions run
-on it.
+uses. Each tool is at a pinned version that the build verifies before it installs it, as
+[what the image holds](#what-the-image-holds) explains for each kind of download. It holds the
+tools, with the few wrapper scripts and boot services they need, and no session's configuration,
+login state or secret, because atc sets each session up at launch with its grants, placeholder
+variables and config. The image is built on impd's host from a commit of this repo and named after
+that commit, so a new build never overwrites an earlier commit's image, which stays on the host for
+a rollback. [The atc gateway](./atc-gateway.md) covers the daemons whose sessions run on it.
 
 ## What the image holds
 
@@ -20,17 +21,18 @@ Chrome download stays under the speed floor that the Chrome step of the Dockerfi
 `images/agent/` sets with `--speed-limit` and `--speed-time`, the build step opens a new one that
 goes on from the last byte, so a slow build network still finishes the download. apt resolves the
 Ubuntu packages and their dependencies against Ubuntu's snapshot archive at a fixed moment, so a
-build installs the same versions after Ubuntu replaces one in its live archive. apt fetches each
-package file from the live archive when it still holds that version, and from the snapshot archive
-otherwise. The build step fetches again after a wait when either archive answers with an error,
-because apt does not retry an HTTP error by itself.
+build installs the same versions after Ubuntu replaces one in its live archive. apt checks each
+package against the archive's signed index, as it does on any Ubuntu host. apt fetches each package
+file from the live archive when it still holds that version, and from the snapshot archive
+otherwise. The build step fetches again after a wait when either archive returns an error, because
+apt does not retry an HTTP error by itself.
 
 The tools are the coding agents, atc, boxxy's CLI with its hook plug-in, auto-mode with its mod, the
 noslop reviewer, GitHub's CLI, the language toolchains, 1Password's CLI, gitleaks, the shell and
 workflow linters, and Chrome for a repo's browser lanes. Chrome refuses to start as root without
-`--no-sandbox`, and a session runs as root, so `BUN_CHROME_PATH` names a script that adds the flag
-for root. Claude Code is installed with its own updates turned off, so a session runs the version
-the image pins.
+`--no-sandbox`, and a session runs as root, so `BUN_CHROME_PATH` points to a script that adds the
+flag for root. Claude Code is installed with its own updates turned off, so a session runs the
+version the image pins.
 
 The build runs no tool, because a tool can write state the first time it runs: a version check alone
 can create a tool's config directory. That keeps the image free of anything a session could inherit
@@ -40,24 +42,25 @@ same build step removes. A Bun bundle runs on the Bun that the image's `bun` shi
 nearest `.bun-version`, so the `noslop` command runs the bundle on the image's default Bun instead.
 
 Two boot services adapt a small imp to the tools. One sets the kernel's memory overcommit, so a tool
-whose allocator reserves large buffers can start. The other sizes a swapfile from the free space on
-the imp's disk when the imp first boots, so a command that needs more memory than the imp holds
-pages out and slows down instead of stopping the imp, and a small disk keeps room for the session's
-checkout.
+whose allocator reserves large buffers can start. The other creates a swapfile when the imp first
+boots, so a command that needs more memory than the imp holds pages out and slows down instead of
+stopping the imp. It sizes the swapfile from the free space on the imp's disk, so a small disk keeps
+room for the session's checkout.
 
 ## Build and check
 
-The image is built by impd, not by CI: the build script sends a `git archive` of a commit on `main`
-to the imp host, and impd builds it into an image named after that commit. The script then checks
-the new image in a fresh imp and removes a failed image unless told to keep it, so the host holds
-only images that passed.
+impd builds every image that sessions run on. CI builds the image with Docker only to check it, and
+that copy runs nowhere. The build script sends a `git archive` of a commit on `main` to the imp
+host, and impd builds it into an image named after that commit. The script then checks the new image
+in a fresh imp and removes it when the check fails. An operator can tell the script to keep a failed
+image, and otherwise the host holds only images that passed.
 
-A timer on the host runs that script for the newest commit on `main` that changes the image, once
-impd holds no image of that commit's name, so a merged pin reaches an image without a person. The
-timer fetches the public repository with no credential. Its impd token can manage every imp, grant
-and image on the host, so it stays in a root-only file on the host and never reaches the public
-repository's CI. A failed build records its commit, and the timer skips that commit until an
-operator clears the record, so a broken commit is not built again at every run
+A timer on the host runs that script for the newest commit on `main` that changes the image, when
+impd holds no image named after that commit, so a merged pin gets built without anyone starting it.
+The timer fetches the public repository with no credential. Its impd token can manage every imp,
+grant and image on the host, so it stays in a root-only file on the host and never reaches the
+public repository's CI. When a build fails, its commit is recorded, and the timer skips that commit
+until an operator clears the record, so a broken commit is not built again at every run
 ([the agent image runbook](../../runbooks/agent-image.md#the-hosts-build)).
 
 The check runs the same way in CI against a Docker build of the image, and on the host against a
@@ -71,16 +74,17 @@ build before any session can run on it.
 The [release check](../../runbooks/release-check.md) opens the bump pull requests that move the
 image's pins to new releases: atc, together with the host's daemon and the gateway images, the imp
 base image, boxxy's CLI with its hook plug-in, noslop, and auto-mode, the CLI and mod that gateway
-sessions load. atc's own release knows nothing about this repo. A later release replaces its
-dependency's branch and turns the old auto-merge off first, so a newer pin always waits for its own
-checks, and a pin never moves backwards. Every other pin change is an ordinary reviewed PR.
+sessions load. atc's own release has no reference to this repo. The bump for a later release
+replaces the earlier bump's branch and turns its auto-merge off first, so a newer pin always waits
+for its own checks, and a pin never moves backwards. Every other pin change is an ordinary reviewed
+PR.
 
 ## How a daemon uses the image
 
-An atc daemon names the image in the config of its imp execution target, outside this repo. The
-image switch script rewrites that one target's image in the daemon's config on the machine that runs
-it, after it copies the config aside, and points the target's session hooks at the atc inside the
-image, so the daemon never uploads its own binary into a fresh imp. A daemon reads its targets only
-at start, so a switch takes effect at the daemon's next restart, which the script never runs itself.
-A switch changes new imps only; an imp keeps the image it was created from
+An atc daemon's config, which lives outside this repo, sets the image of its imp execution target.
+On the machine that runs the daemon, the image switch script copies the daemon's config aside, then
+rewrites that one target's image in it. It also points the target's session hooks at the atc inside
+the image, so the daemon never uploads its own binary into a fresh imp. A daemon reads its targets
+only at start, so a switch takes effect at the daemon's next restart. The script never restarts the
+daemon itself. A switch changes new imps only; an imp keeps the image it was created from
 ([the agent image runbook](../../runbooks/agent-image.md)).

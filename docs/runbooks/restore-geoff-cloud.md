@@ -1,8 +1,7 @@
 # Restore geoff.cloud
 
 How to recover each part of geoff.cloud (#9). Each step says whether it was tested, and where.
-Untested steps are marked **untested**. A restore on the live host is a consequential operation: get
-approval for it first.
+Untested steps are marked **untested**. Get approval before any restore on the live host.
 
 Pick the section for what you lost. Each section says what it restores, what it needs and how to
 check the result.
@@ -47,18 +46,19 @@ template.
 
 ## 2. Roll impd's database back
 
-Every imp upgrade takes a copy first with `bash scripts/copy-impd-db.sh <label>`. The copy is one
+Before every imp upgrade, take a copy with `bash scripts/copy-impd-db.sh <label>`. The copy is one
 `imp.sqlite` file in `/root/imp-db-backups/<label>-<UTC time>/`, with `COPY-INFO` beside it: `path`,
 `sizeBytes`, `lastMigration`, `impVersion`, `createdAt` and `integrity`, the names
 `impz db copy --json` returns (imp #171), plus `image`, which impd cannot know. Copies from before
 those names say `imp` and `migration`; the restore script reads both. `restore-impd-db` puts a copy
-back. The host's NixOS config puts it and the copy's host side on the host's PATH, with the sqlite3
-of the flake's pinned nixpkgs, so a fix to either reaches the host only with a host switch.
+back. The host's NixOS config puts `restore-impd-db` and `copy-impd-db-host` on the host's PATH,
+with the sqlite3 of the flake's pinned nixpkgs, so a fix to either script reaches the host only when
+you switch the host.
 
-**CAUTION:** A restore discards every change impd made after the copy. It is one-way: impd runs
-migrations forward only, and an older binary refuses a newer database. Disks and checkpoints made
-after the copy stay on the pool as orphans: impd may log them at start, keeps them, and
-`impz gc --dry-run` lists them. That log is expected, not a failure. Those imps leave `impz ls`
+**CAUTION:** A restore discards every change impd made to its database after the copy. It is
+one-way: impd runs migrations forward only, and an older binary refuses a newer database. Disks and
+checkpoints made after the copy stay on the pool as orphans: impd may log them at start, keeps them,
+and `impz gc --dry-run` lists them. That log is expected, not a failure. Those imps leave `impz ls`
 until someone repairs them by hand. Tokens follow the database too: a token minted after the copy
 stops working, and a token revoked after it works again. The root `token` file, `broker/` and `tls/`
 are not in the database and stay valid. Re-mint any token minted after the copy, such as
@@ -90,8 +90,8 @@ stopped, and switch after.
    ```
 
    The copy's newest migration must be at or below the newest migration of the image that starts; a
-   newer copy fails at start. Matching the image in `COPY-INFO` to the generation's image meets
-   that.
+   newer copy fails at start. To meet that, pick the generation whose image matches the `image` in
+   `COPY-INFO`.
 
    It fails closed. Before it changes anything it checks the copy (integrity, `COPY-INFO`, its
    migration), reads imp-host's state and requires `inactive` or `failed`, checks that no `imp-host`
@@ -146,8 +146,9 @@ for how far it got, and the saved directory. Before the saved files are flushed,
 database is untouched. After the WAL files are removed but before the rename, `db/imp.sqlite` is the
 original without its last WAL writes, beside a staged `imp.sqlite.restore`; the full original is in
 the saved directory. After the rename, the copy is in place, and a newer image migrates it forward.
-In every case, stop impd and rerun from step 1; to return to the original, restore the saved
-directory's files the same way.
+In every case, stop impd and rerun from step 1; to return to the original, copy the saved
+directory's files back by hand with impd stopped. The script restores only a copy with `COPY-INFO`,
+and the saved directory holds none.
 
 **Evidence.** Synthetic only, 2026-10-04: an isolated bun:sqlite WAL writer in Docker gave five
 consistent copies while it wrote. The restore script ran in a privileged throwaway container with a
@@ -165,7 +166,7 @@ Rehearsed in a KVM NixOS VM, 2026-10-04, and again on 2026-10-07 under imp's own
 and pulled from a registry inside the VM: the real ZFS mount of the module's legacy `tank/imp`
 holding a WAL database and secrets, and a real generation switch. A restore to an older generation
 saved the database, its WAL files and the secrets root-only, put the copy in place, unmounted,
-switched, and started imp-host on the copy's digest-pinned image, which `docker inspect` reported as
+switched, and started imp-host on the copy's digest-pinned image, which `podman inspect` reported as
 the same `tag@sha256:…` string the unit names. A restore to the running generation skipped the
 switch; a database without WAL files and a dataset without secrets restored too.
 
@@ -196,9 +197,10 @@ Restored away from the host, 2026-10-16: the copy `imp-1.6.0-pre-2.0.3-20261015T
 scratch VM in 1.24 s ([the restore drill](./restore-drill.md#results)).
 
 Checked read-only on geoffcloud, 2026-10-04: the image the script reads from a generation's
-`imp-host.service` and the one `docker inspect` reports for the running imp-host are the same
-digest-pinned string (`imp-host:0.29.0@sha256:4e6f0cf6…`), and so is the `image` line of the copy
-`imp-0.29.0-consistent-20261003T181942`. **Untested:** any restore on geoffcloud.
+`imp-host.service` and the one `docker inspect` reported for the running imp-host, which then ran
+under Docker, are the same digest-pinned string (`imp-host:0.29.0@sha256:4e6f0cf6…`), and so is the
+`image` line of the copy `imp-0.29.0-consistent-20261003T181942`. **Untested:** any restore on
+geoffcloud.
 
 **CAUTION:** Only copies with `COPY-INFO` are restorable. The copy taken before the 0.29.0 upgrade,
 `imp-0.27.0-pre-0.29.0-20261003T171605`, is a tar copy without one, so the script refuses it and no
@@ -222,11 +224,11 @@ ssh root@geoffcloud 'nix-env -p /nix/var/nix/profiles/system --switch-generation
 `<generation>` is the number before the `(current)` one. `nixos-rebuild switch --rollback` fails on
 the host, which has no `nixos-config` to evaluate.
 
-Exception: imp 0.29.1 adds no migration to 0.29.0, so a rollback from 0.29.1 to the 0.29.0
-generation needs no database restore. **CAUTION:** 0.29.0 holds the image.json flaw that 0.29.1
-fixes (imp #196): a crafted imported image can overwrite host files. Before rolling back to 0.29.0,
-stop all image imports and builds (`impz image add`, `impz image build`, templates from a new image,
-BuildKit), and keep them stopped until a fixed imp runs again.
+imp 0.29.1 adds no migration to 0.29.0, so a rollback from 0.29.1 to the 0.29.0 generation needs no
+database restore. **CAUTION:** 0.29.0 holds the image.json flaw that 0.29.1 fixes (imp #196): a
+crafted imported image can overwrite host files. Before rolling back to 0.29.0, stop all image
+imports and builds (`impz image add`, `impz image build`, templates from a new image, BuildKit), and
+keep them stopped until a fixed imp runs again.
 
 A rollback from 0.30.0 needs a database restore: 0.30.0 adds the migration
 `021_add_broker_sessions`, and 0.29.1 refuses a database that holds it. Restore the copy
@@ -236,12 +238,13 @@ grant and token change impd made after 03:04Z on 2026-10-04 (UTC). It does not r
 checkpoints or images on the pool or the engine: those made later stay, and may need the
 reconciliation that section 2's caution describes.
 
-`nix-env -p /nix/var/nix/profiles/system --list-generations` lists the generations. If imp's version
-changes, restore the matching database copy too (section 2).
+`nix-env -p /nix/var/nix/profiles/system --list-generations` lists the generations. When the
+rollback crosses a release that added a migration, restore the matching database copy too (section
+2).
 
 ## 4. Recover a lost disk
 
-Follow [Recover a lost disk](./lost-disk.md). It holds three scenarios:
+Follow [Recover a lost disk](./lost-disk.md), which covers these cases:
 
 - **Lose `vda`:** restore an Onidel snapshot, or reinstall with the key from the 1Password item
   `zfs-tank-key` and the host's tailnet key in `--extra-files`. Everything on the pool survives.
@@ -252,8 +255,8 @@ Follow [Recover a lost disk](./lost-disk.md). It holds three scenarios:
 
 ## 5. Rebuild the cluster
 
-Recovery design (option C, accepted 2026-10-04): rebuild k3s, then let Pulumi recreate every object.
-Nothing snapshots the k3s datastore.
+Rebuild k3s, then let Pulumi recreate every object (recovery design accepted 2026-10-04). Nothing
+snapshots the k3s datastore.
 
 **What is lost:** Loki's logs and Prometheus's metrics (both volumes start empty), and every object
 that only lived in the cluster. **What survives:** imps (ZFS on `vdb`, outside k3s), Pulumi state

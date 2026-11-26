@@ -4,13 +4,13 @@ A preview is one pull request's code running in its own imp, so the owner and th
 change live without touching production. The preview service, a NixOS service on the host, posts one
 comment on each pull request of an opted-in repository with a tailnet link. Opening the link boots
 the pull request's head commit from its `preview/` folder, or wakes the imp that already runs it,
-and closing the pull request destroys the imp. The service knows nothing about any project: a
-repository opts in with a Compose file, a seed step that loads invented data, and a health path. A
-pull request that changes the Agent SDK's pin in a repository the service lists for it also gets a
-commit status from a run of that repository's SDK contract suite, in an imp of its own.
-[imp on the host](../host/imp.md) covers impd, which runs each preview's imp, and
-[the preview runbook](../../runbooks/preview.md) gives the steps to set the service up, opt a
-repository in and check it live.
+and closing the pull request destroys the imp. The service knows nothing about any project. A
+repository gets previews when the App is installed on it, the service lists it, and the head
+commit's `preview/` folder holds a Compose file, a seed step that loads invented data, and a health
+path. A pull request that changes the Agent SDK's pin in a repository the service lists for it also
+gets a commit status from a run of that repository's SDK contract suite, in an imp of its own. For
+impd, which runs each preview's imp, read [imp on the host](../host/imp.md). To set the service up,
+opt a repository in and check it live, follow [the preview runbook](../../runbooks/preview.md).
 
 ```mermaid
 flowchart LR
@@ -49,13 +49,14 @@ neither push to it nor reach a repository the service does not list.
 ## GitHub access
 
 The service reaches GitHub as the preview GitHub App, and an install of the App on a repository is
-that repository's opt-in: GitHub sends the App's deliveries only for the repositories it is
-installed on, and the comments post as the App's bot. The service holds the App's private key and no
-GitHub token. For each call, such as one comment update, it signs a short-lived JWT with the key,
-looks up the App's installation on the repository, and mints an installation token scoped to that
-one repository, which it drops when the call ends. A leaked installation token reaches one
-repository, and it expires at the end of the lifetime that GitHub fixes for it. The App is private
-to the owner's account, so no other account can install it and send the service deliveries.
+the first part of that repository's opt-in: GitHub sends the App's deliveries only for the
+repositories it is installed on, and the comments post as the App's bot. The service holds the App's
+private key and no GitHub token. For each call, such as one comment update, it signs a short-lived
+JWT with the key, looks up the App's installation on the repository, and mints an installation token
+scoped to that one repository, which it drops when the call ends. A leaked installation token
+reaches one repository, and it expires at the end of the lifetime that GitHub fixes for it. The App
+is private to the owner's account, so no other account can install it and send the service
+deliveries.
 
 ## A pull request's preview
 
@@ -86,14 +87,14 @@ sweep of interrupted boots all follow the same rule.
 
 - **opened, reopened or synchronize.** The service reads `preview/compose.yaml` at the head commit.
   A commit without the file has not opted in, and the service does nothing. Otherwise it records the
-  head commit and posts the pull request's comment, or edits it in place: a marker in the comment
-  body and the App's bot login tell the service's comment from every other. A synchronize never
-  brings an ended preview back; only an open or a reopen does.
+  head commit and posts the pull request's comment, or edits it in place. The service tells its
+  comment from every other by a marker in the comment body and the App's bot login. A synchronize
+  never brings an ended preview back; only an open or a reopen does.
 - **The link opens.** A ready preview whose built commit is the head wakes if it sleeps, and the
   link redirects to the imp's own HTTPS name, which impd's wake proxy serves on the tailnet. A wake
   that restores the imp's memory brings its containers back as they were, but a cold boot starts
-  dockerd alone, so a woken preview must answer its health path within a short grace before the
-  redirect, and otherwise boots again. Any other preview starts a boot and answers with a page that
+  dockerd alone. A woken preview must therefore answer its health path within a short grace before
+  the redirect, or it boots again. Any other preview starts a boot and answers with a page that
   reloads until the boot settles. A failed preview shows the tail of its build output and a retry
   link instead of booting again on every reload.
 - **closed, merged or not.** The service marks the preview ended, destroys its imp, and edits the
@@ -105,20 +106,20 @@ sweep of interrupted boots all follow the same rule.
 The service handles one delivery at a time, in the order they arrive, so an older push that still
 waits on GitHub never stores its head after a newer one.
 
-A phase change names the phases it may leave, and the store makes it only from one of them. Two
-opens at once therefore start one boot, and a boot that settles after its pull request closed leaves
-the preview ended. A boot's failure belongs to the head it built, so when a push moved the head
-during the boot, the preview waits for its next open instead of failing. The pages that reload while
-a boot runs load the link without its query, so one click on the retry link starts one boot.
+The store makes each phase change only from a phase that change may leave. Two opens at once
+therefore start one boot, and a boot that settles after its pull request closed leaves the preview
+ended. A boot's failure belongs to the head it built, so when a push moved the head during the boot,
+the preview waits for its next open instead of failing. The pages that reload while a boot runs load
+the link without its query, so one click on the retry link starts one boot.
 
 ## A boot
 
 A boot runs after the link answers, so a slow build never holds a request open.
 
-Every preview imp boots from one impd image, which the service names apart from impd's default image
-so that an operator who points the default elsewhere leaves previews alone. A oneshot unit on the
-host adds that image from imp's base image, pinned by digest, whenever a switch changes the pin or
-imp-host restarts, and the service starts after it. The unit waits until impd's health endpoint
+Every preview imp boots from one impd image, which the service names separately from impd's default
+image, so that an operator who points the default elsewhere leaves previews alone. A oneshot unit on
+the host adds that image from imp's base image, pinned by digest, whenever a switch changes the pin
+or imp-host restarts, and the service starts after it. The unit waits until impd's health endpoint
 reports it ready before its first call to impd, then retries a refused call. A start whose wait runs
 out starts again, up to the unit's start limit. A switch therefore never leaves the service booting
 from an image impd lacks. The unit pins the image's name in impd too, so impd's image eviction keeps
@@ -159,7 +160,7 @@ With the spend cap on, each preview's model calls pass through a counting proxy 
 runaway preview stops at a small limit instead of using up the shared model credential. The cap sits
 outside the preview's imp, because the code under test runs its tools with no security boundary and
 could change anything inside the imp. The counting proxy is nixie's own program, a release binary
-that the host pins, and nixie's architecture docs own how it prices and counts a reply.
+that the host pins. For how it prices and counts a reply, read nixie's architecture docs.
 
 The broker sends every preview's model calls to one listener of the service on Podman's bridge,
 because an impd secret has one upstream for all the imps it is granted to. The first segment of each
@@ -173,11 +174,11 @@ no model call.
 Only the broker reaches the listener. imp-host masquerades each guest's traffic to its own address
 on the bridge, so neither the host's firewall nor the listener can tell a guest from the broker.
 impd's `public` egress policy, which every imp of the service runs under, refuses the guest every
-private address, the bridge included. An imp keeps the policy it was created with, so the service
-sets it on every imp at each start, and tries again until every imp has it. The listener opens only
-after that, so no guest outside the policy finds it open. The service also sets the policy on an
-existing imp before a boot or an open wakes it. The broker dials from imp-host itself, outside that
-policy, so the guest's model calls still go out through the broker.
+private address, the bridge included. impd never moves an imp to a new policy by itself, so the
+service sets it on every imp at each start, and tries again until every imp has it. The listener
+opens only after that, so no guest outside the policy finds it open. The service also sets the
+policy on an existing imp before a boot or an open wakes it. The broker dials from imp-host itself,
+outside that policy, so the guest's model calls still go out through the broker.
 
 Each proxy counts in a file of its own in the service's state, and the count lasts for the pull
 request's life. A proxy with no reply under way that went unused for the sleep time stops and keeps
@@ -193,22 +194,23 @@ Each preview imp and each contract run's imp boots elastic, at a boot size that 
 pressure, both from the host module's settings. An elastic imp runs on base pages, so it stays off
 the host's huge page pool.
 
-The service runs at most a set number of previews at once, one by default, because each preview's
-imp holds memory from impd's budget while it runs. Before a preview boots or wakes, the service
-lists the running preview imps and puts the least recently used to sleep until the opening one fits.
-A sleeping imp keeps its memory on disk, so its next open resumes it where it stopped. A sweep on a
-timer puts every preview to sleep that nobody used for the idle timeout. A preview's last use is the
-last request through impd's wake proxy, which impd returns as `lastRequestAt` and keeps current
-while a proxied stream or WebSocket stays open. impd's `lastActiveAt` also moves while a preview's
-own stack holds connections and CPU in the guest, so it stays current while nobody uses the preview.
-The service reads `lastActiveAt` only for an imp with no `lastRequestAt`. An impd before 6.4.0
-returns no `lastRequestAt`, and on a newer impd the boot's health probe through the proxy sets it.
+The service runs at most a set number of imps at once, one by default, and a contract run's imp
+takes a slot as a preview's does, because each imp holds memory from impd's budget while it runs.
+Before a preview boots or wakes, the service lists its running imps and puts the least recently used
+previews to sleep until the opening one fits. A sleeping imp keeps its memory on disk, so its next
+open resumes it where it stopped, unless the wake falls back to a cold boot as "The link opens"
+above says. A sweep on a timer puts every preview to sleep that nobody used for the idle timeout. A
+preview's last use is the last request through impd's wake proxy, which impd returns as
+`lastRequestAt` and keeps current while a proxied stream or WebSocket stays open. impd's
+`lastActiveAt` also moves while a preview's own stack holds connections and CPU in the guest, so it
+stays current while nobody uses the preview. The service reads `lastActiveAt` only for an imp with
+no `lastRequestAt`. An impd before 6.4.0 returns no `lastRequestAt`, and on a newer impd the boot's
+health probe through the proxy sets it.
 
 The slot rule runs under one lock, so two opens at once never both find a free slot. A boot holds
 the lock until it settles, because its build's guest commands would wake an imp that another open
 put to sleep while it ran. Boots therefore run one at a time, and a ready preview opened while
-another boots gets a page that reloads until the boot settles, rather than a request held open for
-the length of a build.
+another boots gets a page that reloads until the boot settles.
 
 impd confines the service's token to the imps whose names start with the preview prefix, so the slot
 rule and the sweep never sleep another imp, and a mistake in the service cannot reach the agents'
@@ -244,17 +246,17 @@ runs the suite once however many deliveries name it, and each push to a new head
    with the suite's pass and fail counts. A failure to start the imp sets an error status instead.
    The record keeps the result until impd removes the imp and GitHub takes the status, and the
    sweep's timer retries either step that fails. A leftover imp therefore never holds a slot for
-   good. One exception: a refusal of the status that a retry would meet again, such as a missing
-   permission, ends the run at once, and the record keeps the refusal beside the result. A rate
-   limit, a timeout or a server error leaves the run for the next retry.
+   good. A refusal of the status that a retry would meet again, such as a missing permission, ends
+   the run at once instead, and the record keeps the refusal beside the result. A rate limit, a
+   timeout or a server error leaves the run for the next retry.
 
 The guest's `timeout` bounds the whole run, and a deadline on the host backs it for a guest that
 never reports an exit. Either way the status reports failure at the time limit, and the imp goes. A
 run's imp holds a slot like a preview's, but neither the slot rule nor the idle sweep puts it to
-sleep, because its suite would stop halfway, so a preview that opens meanwhile runs beside it. A run
-that a stopped service left behind starts over at the next start's first retry, on a fresh imp. A
-service started without contract settings runs no suite, so the retry ends each run it still holds
-with an error status and removes its imp.
+sleep, because its suite would stop halfway. A preview that opens while a run holds the last slot
+therefore runs beside it, one past the cap. A run that a stopped service left behind starts over at
+the next start's first retry, on a fresh imp. A service started without contract settings runs no
+suite, so the retry ends each run it still holds with an error status and removes its imp.
 
 The store holds a run's moves in a transition table of their own. A run waits for a slot, runs, and
 settles, and a stopped service's next start queues a running run again. A settled run passes or

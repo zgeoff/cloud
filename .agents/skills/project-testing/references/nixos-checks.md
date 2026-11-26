@@ -11,15 +11,15 @@ These rules add to [NixOS testing](../../testing/references/nixos.md) for the ch
 ## Module checks
 
 - When a check starts to read a file outside `nixos/`, add the file's path to the `nixos` gate of
-  [`gates.yml`](../../../../.github/gates.yml). Otherwise a change to that file starts no run of
-  the checks. For a shell helper from `scripts/src/test-utils/shell/`, add it to
+  [`gates.yml`](../../../../.github/gates.yml). Otherwise CI doesn't run the checks when that file
+  changes. For a shell helper from `scripts/src/test-utils/shell/`, add it to
   [`build-shell-lib-source.nix`](../../../../nixos/checks/test-utils/build-shell-lib-source.nix)
   too.
 - Render a module check's cases through
   [`render-cases.nix`](../../../../nixos/checks/test-utils/render-cases.nix) into the `.bats` file
   that the check runs with bats, as [`preview.nix`](../../../../nixos/checks/preview.nix) does.
-  Give each case a `title` and a `script`. Each script runs in a subshell of its own, with errexit,
-  nounset and pipefail, so it may set an EXIT trap.
+  Give each case a `title` and a `script`. Each script runs in a subshell of its own, so it may set
+  an EXIT trap. The subshell runs with errexit, nounset and pipefail.
 - Put a shared Nix helper or stand-in in
   [`nixos/checks/test-utils/`](../../../../nixos/checks/test-utils/), one export per file, with a
   test in [`test-utils-check.nix`](../../../../nixos/checks/test-utils-check.nix). Import that check
