@@ -20,8 +20,8 @@ gateway pin and nixie's image come from the same nixie release: nixie refuses th
 gateway, and pauses.
 
 **CAUTION:** The gateway fails closed. While it is stopped, while its store is unreadable, and while
-the lost mark stands, every model request of nixie fails. Never stop the unit while nixie works,
-outside a host switch.
+the lost mark stands, every model request of nixie fails. Stop or restart the unit only in a host
+switch, or in a step below that tells you to: clearing the lost mark, or rotating the control token.
 
 ## What holds what
 
@@ -300,9 +300,9 @@ the switch.
    Expect `ok`. Compare the first 8 hex of each copy's SHA-256, as step 3 of
    [Set up the control token](#set-up-the-control-token) does for the token.
 
-3. Add the profile's model secret to impd with the same key. Set the helpers and `model_secrets` and
-   `secrets` first, as [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) step 1 does,
-   then:
+3. Add the profile's model secret to impd with the same key. Set the helpers, `model_secrets`,
+   `secret_names` and `secrets` first, as
+   [nixie's runbook](./nixie.md#add-nixies-model-secrets-to-impd) step 1 does, then:
 
    ```bash
    op read op://cloud/model-gateway-gpt-6-luna-route-key/credential | tr -d '\n' \
