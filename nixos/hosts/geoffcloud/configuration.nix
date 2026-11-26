@@ -745,17 +745,24 @@ in
   # host-secrets, staged by the runbook; until it exists, the unit is skipped.
   services.model-gateway =
     let
-      # each route's own day and month limits, in US dollars: the day and month dollar limits that
-      # nixie's config set for all its spend before nixie 0.120.0 moved the limits to each route.
-      # dayCap is left at the gateway's default of twice the day, the $120 day cap from before
-      limits = {
-        day = 60;
-        month = 600;
+      # each route's day and month limits, in US dollars: a subscription route, which is every
+      # Anthropic route and the ChatGPT plan route, gets the first, and an OpenRouter route the
+      # second. dayCap is left at the gateway's default of twice the day
+      subscriptionLimits = {
+        day = 200;
+        month = 3000;
+      };
+      openrouterLimits = {
+        day = 5;
+        month = 50;
       };
       # Anthropic's list prices, in dollars per million tokens, from the model pricing table of
       # https://platform.claude.com/docs/en/about-claude/pricing (read 17 Nov 2026), the same
       # prices deploy/nixie/config.yaml gives each profile
-      anthropic = model: prices: { inherit model prices limits; };
+      anthropic = model: prices: {
+        inherit model prices;
+        limits = subscriptionLimits;
+      };
       # a model outside Claude through OpenRouter's Messages endpoint, at /api/v1/messages, pinned to
       # one provider: the profile's provider_pin and the route's providerPin name the same endpoint.
       # Each price is the highest of the endpoints the pin matches, from
@@ -766,8 +773,8 @@ in
           model
           providerPin
           prices
-          limits
           ;
+        limits = openrouterLimits;
         upstream = "https://openrouter.ai/api";
       };
       fable52 = {
@@ -998,7 +1005,7 @@ in
           upstream = "https://chatgpt.com/backend-api/codex";
           model = "gpt-6-luna";
           maxOutputTokens = 128000;
-          inherit limits;
+          limits = subscriptionLimits;
           prices = {
             input = 0.1;
             cache_write = 0.125;
