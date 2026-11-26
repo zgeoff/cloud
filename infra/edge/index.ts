@@ -4,6 +4,7 @@ import { exposure, topology } from '@zgeoff/cloud-topology';
 import { FirewallGroup, FirewallRule, Vm } from '@zgeoff/pulumi-onidel';
 import { buildEdgeRules } from './build-edge-rules.ts';
 import { buildFrontRouteRecords } from './build-front-route-records.ts';
+import { buildMailRecords } from './build-mail-records.ts';
 
 interface EdgeInputs {
   readonly accountID: string;
@@ -21,6 +22,7 @@ interface EdgeOutputs {
 }
 
 const domain = 'geoff.cloud';
+const nixMailDomain = 'nixwashere.com';
 
 export function createEdge(inputs: EdgeInputs): EdgeOutputs {
   const zone = getZoneOutput({ filter: { name: domain } });
@@ -41,6 +43,13 @@ export function createEdge(inputs: EdgeInputs): EdgeOutputs {
     ipv6: topology.vm.publicIPv6,
   })) {
     frontRouteRecords.push(new DnsRecord(record.name, record.args));
+  }
+
+  const mailZone = getZoneOutput({ filter: { name: nixMailDomain } });
+  const mailRecords: DnsRecord[] = [];
+
+  for (const record of buildMailRecords({ domain: nixMailDomain, zoneID: mailZone.zoneId })) {
+    mailRecords.push(new DnsRecord(record.name, record.args));
   }
 
   // Redirect plain http to https on every hostname: a misconfigured client must not send

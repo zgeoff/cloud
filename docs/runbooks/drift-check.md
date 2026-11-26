@@ -62,7 +62,7 @@ The Cloudflare token holds these permission groups, and no edit group:
 - Account, for the account that holds the zone: Cloudflare Tunnel Read; Access: Apps and Policies
   Read; Access: Organizations, Identity Providers, and Groups Read; Workers Scripts Read; Workers R2
   Storage Read.
-- Zone, for `geoff.cloud` only: Zone Read; DNS Read; Zone Settings Read.
+- Zone, for `geoff.cloud` and `nixwashere.com` only: Zone Read; DNS Read; Zone Settings Read.
 
 The file holds no Onidel key. A refresh that does not run the program configures each provider from
 the state, so the check leaves out every Onidel resource and never calls Onidel's API.

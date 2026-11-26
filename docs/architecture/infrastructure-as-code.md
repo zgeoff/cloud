@@ -11,19 +11,20 @@ not drive.
 ## What the program owns
 
 The program's root module reads the inputs once and composes the estate from groups, each a folder
-with one entry module: the inputs, the edge (the VM, its cloud firewall, the zone and the backups
-bucket), the tailnet, public ingress, the cluster's workloads, and observability. The root module
-builds the cluster's Kubernetes provider and passes it to each group that runs a workload, so no
-group creates another group's resources. A lint rule keeps that shape: it fails an import from one
-group into a group above it or past another group's entry module, and a relative import into another
-workspace package. Each provider manages its own part of the estate:
+with one entry module: the inputs, the edge (the VM, its cloud firewall, the zone, the backups
+bucket, and the Fastmail records of `nixwashere.com`, the domain of Nix's mailbox), the tailnet,
+public ingress, the cluster's workloads, and observability. The root module builds the cluster's
+Kubernetes provider and passes it to each group that runs a workload, so no group creates another
+group's resources. A lint rule keeps that shape: it fails an import from one group into a group
+above it or past another group's entry module, and a relative import into another workspace package.
+Each provider manages its own part of the estate:
 
-| Provider                | Manages                                                                    |
-| ----------------------- | -------------------------------------------------------------------------- |
-| Onidel, this repo's own | the VM and the cloud firewall outside it                                   |
-| Cloudflare              | the tunnel and its routes, the zone's HTTPS redirect, the Worker, R2       |
-| Tailscale               | the whole tailnet policy file, and the auth keys that tagged nodes join by |
-| Kubernetes              | every workload in k3s, through the cluster's API on the tailnet            |
+| Provider                | Manages                                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------- |
+| Onidel, this repo's own | the VM and the cloud firewall outside it                                                             |
+| Cloudflare              | the tunnel and its routes, DNS records in both zones, `geoff.cloud`'s HTTPS redirect, the Worker, R2 |
+| Tailscale               | the whole tailnet policy file, and the auth keys that tagged nodes join by                           |
+| Kubernetes              | every workload in k3s, through the cluster's API on the tailnet                                      |
 
 One Pulumi preview covers all four, so a change to a route, a grant and the workload behind them
 reviews as one diff.
