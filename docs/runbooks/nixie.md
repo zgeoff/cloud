@@ -319,8 +319,10 @@ When the pod's age identity changes, put its public half in `deploy/nixie/.sops.
    changes ([Release check](./release-check.md)).
 
    When the release changes `apps/model-gateway` in nixie, also pin the gateway in
-   `nixos/packages/model-gateway.nix` to the same release, and switch the host before the apply.
-   nixie refuses the status of an older gateway and pauses with the cause `spending`.
+   `nixos/packages/model-gateway.nix` to the same release, in the same PR. The `Deploy prod`
+   workflow applies the new image on its own after the merge, so switch the host with
+   `bun run ops:switch-host` as soon as that run ends. Until the switch, nixie refuses the older
+   gateway's status and stays paused with the cause `spending`, and the switch clears the pause.
 
 2. Preview, then apply:
 
