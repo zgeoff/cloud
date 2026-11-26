@@ -239,8 +239,8 @@ they differ. Rotate both in one window:
 2. Install it on the host, as step 2 there does, and restart the unit:
    `ssh root@geoffcloud systemctl restart model-gateway < /dev/null`.
 3. Set nixie's copy, as [change a secret](./nixie.md#change-a-secret) does for the key
-   `["settings"]["gateway-control"]`, and merge its PR. nixie stays paused as `unreachable` from
-   step 2 until its new pod starts, and the stop clears on its own.
+   `["settings"]["gateway-control"]`, and merge its PR. With `spendStop` set, nixie stays paused as
+   `unreachable` from step 2 until its new pod starts, and the stop clears on its own.
 
 ## Add a model profile
 
