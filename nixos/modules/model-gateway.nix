@@ -1,8 +1,9 @@
 # nixie's model gateway (docs/runbooks/model-gateway.md): one process on the host that
-# every model request of production nixie passes. It counts each route's day and month in
-# periods.zone, in US dollars, and refuses a route's requests past that route's own limits, which
-# only this config holds. A raise from nixie on the control listener lifts a route's day no higher
-# than its dayCap. It listens twice:
+# every model request of production nixie passes. It counts each provider's and each route's day
+# and month in periods.zone, in US dollars. Every route names its provider, and the gateway refuses
+# a route's requests once its provider's limits, or the route's own limits when it sets any, are
+# reached. Only this config holds them. A raise from nixie on the control listener lifts a
+# provider's or a route's day no higher than its dayCap. It listens twice:
 #
 # - the model listener on imp-host's bridge, where imp-host's broker sends each nixie sandbox's
 #   model requests (the impd model secrets' upstream). inet cloud_host admits the bridge's subnet
@@ -47,6 +48,33 @@ let
     }
   );
   dollarsType = lib.types.either lib.types.ints.positive lib.types.float;
+
+  # a provider's or a route's day and month limits, in US dollars
+  limitsType = lib.types.submodule {
+    options = {
+      day = lib.mkOption {
+        type = dollarsType;
+        description = "The dollars the day may reach.";
+      };
+      month = lib.mkOption {
+        type = dollarsType;
+        description = "The dollars the month may reach.";
+      };
+      dayCap = lib.mkOption {
+        type = lib.types.nullOr dollarsType;
+        default = null;
+        description = "The most a raise from nixie may lift the day to; null for the gateway's default, twice day.";
+      };
+    };
+  };
+  renderLimits = limits: lib.filterAttrs (_: dollars: dollars != null) limits;
+
+  providerType = lib.types.submodule {
+    options.limits = lib.mkOption {
+      type = limitsType;
+      description = "The provider's day and month limits, in US dollars, which hold every route that names the provider.";
+    };
+  };
 
   routeType = lib.types.submodule {
     options = {
@@ -101,25 +129,15 @@ let
         default = null;
         description = "The ChatGPT plan login the route holds, which makes it a plan route; null for none.";
       };
+      provider = lib.mkOption {
+        type = lib.types.str;
+        example = "anthropic";
+        description = "The key of providers whose limits hold the route; the route's spend counts in its provider's day and month too.";
+      };
       limits = lib.mkOption {
-        type = lib.types.submodule {
-          options = {
-            day = lib.mkOption {
-              type = dollarsType;
-              description = "The dollars the route's day may reach.";
-            };
-            month = lib.mkOption {
-              type = dollarsType;
-              description = "The dollars the route's month may reach.";
-            };
-            dayCap = lib.mkOption {
-              type = lib.types.nullOr dollarsType;
-              default = null;
-              description = "The most a raise from nixie may lift the route's day to; null for the gateway's default, twice day.";
-            };
-          };
-        };
-        description = "The route's own day and month limits, in US dollars; the gateway refuses every request on a route with none, and no limit spans routes.";
+        type = lib.types.nullOr limitsType;
+        default = null;
+        description = "The route's own day and month limits, in US dollars, beneath its provider's; null for none, so the provider's limits alone hold the route.";
       };
       prices = lib.mkOption {
         type = lib.types.submodule {
@@ -151,10 +169,10 @@ let
   renderRoute =
     id: route:
     {
-      inherit (route) model upstream;
+      inherit (route) model upstream provider;
       prices = lib.filterAttrs (_: rates: rates != null) route.prices;
-      limits = lib.filterAttrs (_: dollars: dollars != null) route.limits;
     }
+    // lib.optionalAttrs (route.limits != null) { limits = renderLimits route.limits; }
     // lib.optionalAttrs (route.providerPin != null) { inherit (route) providerPin; }
     // lib.optionalAttrs (route.api != null) { inherit (route) api; }
     // lib.optionalAttrs (route.maxOutputTokens != null) { inherit (route) maxOutputTokens; }
@@ -183,6 +201,7 @@ let
       };
       countBySandbox = true;
       override = "${stateDirectory}/override.json";
+      providers = lib.mapAttrs (_: provider: { limits = renderLimits provider.limits; }) cfg.providers;
       routes = lib.mapAttrs renderRoute cfg.routes;
     }
   );
@@ -272,6 +291,12 @@ in
       };
     };
 
+    providers = lib.mkOption {
+      type = lib.types.attrsOf providerType;
+      example = lib.literalExpression "{ anthropic.limits = { day = 200; month = 3000; }; }";
+      description = "Each place the routes send to, such as one model API or one plan, keyed by a lowercase slug, with the limits that hold all its routes together.";
+    };
+
     routes = lib.mkOption {
       type = lib.types.attrsOf routeType;
       description = "One route per nixie model profile, keyed by the profile's ID.";
@@ -283,6 +308,14 @@ in
       {
         assertion = cfg.routes != { };
         message = "services.model-gateway.routes names no route, and the gateway needs one.";
+      }
+      {
+        assertion = cfg.providers != { };
+        message = "services.model-gateway.providers names no provider, and every route needs one.";
+      }
+      {
+        assertion = lib.all (route: lib.hasAttr route.provider cfg.providers) (lib.attrValues cfg.routes);
+        message = "services.model-gateway.routes: each route's provider is a key of services.model-gateway.providers.";
       }
       {
         assertion = cfg.controlRelay.port != cfg.control.port;

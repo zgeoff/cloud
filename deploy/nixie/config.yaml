@@ -14,9 +14,11 @@ models:
   profiles:
     # A profile's ID names its model and, when a role needs another effort, that effort. Each profile
     # needs its own model secret in impd, whose name hashes the ID and the base URL's host
-    # (docs/runbooks/nixie.md). A selectable model's profile needs prices, in dollars per million
-    # tokens, from the Claude API pricing page for a Claude model. Each profile names its harness,
-    # the loop that runs its turns, with no default: agent-sdk, or codex for gpt-6-luna below.
+    # (docs/runbooks/nixie.md). A profile holds no prices: with spendStop set, nixie refuses them,
+    # and the model gateway prices each reply with the table of the route that has the profile's ID
+    # (services.model-gateway in nixos/hosts/geoffcloud/configuration.nix). Each profile names its
+    # harness, the loop that runs its turns, with no default: agent-sdk, or codex for gpt-6-luna
+    # below.
     #
     # the conversation's profile, also selectable for a task
     fable-5-2:
@@ -31,7 +33,6 @@ models:
       # keep the cached prompt for an hour, for the conversation and for a task on this model; a
       # profile without cache_ttl keeps the 5m default
       cache_ttl: 1h
-      prices: { input: 8, cache_write: 10, cache_write_1h: 16, cached_input: 0.2, output: 40 }
     # selectable for a task, compacted at 400k tokens with a 1-hour cache
     opus-5-5:
       base_url: https://api.anthropic.com
@@ -42,7 +43,6 @@ models:
       harness: agent-sdk
       context_tokens: 400000
       cache_ttl: 1h
-      prices: { input: 4, cache_write: 5, cache_write_1h: 8, cached_input: 0.2, output: 20 }
     # Haiku at low effort; no role uses it since nixie 0.73.0 deleted the memory writer
     haiku-5-5-low:
       base_url: https://api.anthropic.com
@@ -66,20 +66,6 @@ models:
       model: claude-haiku-5-5
       effort: medium
       harness: agent-sdk
-      prices:
-        input: 0.1
-        cache_write: 0.125
-        cache_write_1h: 0.2
-        cached_input: 0.01
-        output: 0.5
-        # Haiku 5.5 prices a whole request at these rates once its prompt passes 100k tokens
-        long_prompt:
-          over_tokens: 100000
-          input: 0.5
-          cache_write: 0.625
-          cache_write_1h: 1
-          cached_input: 0.05
-          output: 2.5
     sonnet-5-5:
       base_url: https://api.anthropic.com
       credential: deployment:anthropic
@@ -87,7 +73,6 @@ models:
       model: claude-sonnet-5-5
       effort: medium
       harness: agent-sdk
-      prices: { input: 2, cache_write: 2.5, cache_write_1h: 4, cached_input: 0.1, output: 10 }
     opus-4-5:
       base_url: https://api.anthropic.com
       credential: deployment:anthropic
@@ -95,7 +80,6 @@ models:
       model: claude-opus-4-5
       effort: medium
       harness: agent-sdk
-      prices: { input: 5, cache_write: 6.25, cache_write_1h: 10, cached_input: 0.5, output: 25 }
     opus-4-6:
       base_url: https://api.anthropic.com
       credential: deployment:anthropic
@@ -103,7 +87,6 @@ models:
       model: claude-opus-4-6
       effort: medium
       harness: agent-sdk
-      prices: { input: 5, cache_write: 6.25, cache_write_1h: 10, cached_input: 0.5, output: 25 }
     fable-5-1:
       base_url: https://api.anthropic.com
       credential: deployment:anthropic
@@ -111,25 +94,25 @@ models:
       model: claude-fable-5-1
       effort: medium
       harness: agent-sdk
-      prices: { input: 10, cache_write: 12.5, cache_write_1h: 20, cached_input: 0.25, output: 50 }
     # Models outside Claude, through OpenRouter's Messages endpoint. The model gateway's route of
     # each profile sends to https://openrouter.ai/api, since nixie refuses a base URL with a path
     # while spendStop is set. Each profile's model secret holds the OpenRouter key from vault cloud,
     # item nixie-openrouter-credential, for the host openrouter.ai (docs/runbooks/nixie.md).
     # Each profile pins one provider endpoint with fallbacks off, so OpenRouter never bills another
-    # provider's price: a standard tier, never a fast, priority or flex one, at full or fp8 precision
-    # where the model has such an endpoint, with full recent uptime. The gateway route's providerPin
-    # names the same endpoint. For glm-5-3, kimi-k3-1-pro, mistral-large-4, inkling-2-small and
-    # deepseek-v4-1-flash, the pin is the fastest endpoint by measured output speed (3 streamed
-    # replies of 560 tokens each, 18 Nov 2026) among those within about 3x the cheapest one's price,
-    # with 1-day uptime of at least 99.5%. A pin also matches the endpoints under it, such as another
-    # region, and an open-weight model's priority endpoint (OpenRouter's provider selection guide),
-    # so each price is the highest of the endpoints the pin matches, from
-    # https://openrouter.ai/api/v1/models/<model>/endpoints (read 18 Nov 2026). An endpoint that lists
-    # no cache write price bills cache writes as input, and a Gemini cache write costs the input price
-    # plus the listed storage price. The cap of 200,000 tokens is the window the
-    # Claude CLI assumes for a model outside its catalog. gryphe/mythomax-l2-13b stays out: its
-    # 8,192-token window is below the 100,000-token floor of context_tokens, and it has no tool calls.
+    # provider's price: a standard tier, never a fast, priority or flex one, at full or fp8
+    # precision where the model has such an endpoint, with full recent uptime. The gateway route's
+    # providerPin names the same endpoint, and the route's prices are that endpoint's. For glm-5-3,
+    # kimi-k3-1-pro, mistral-large-4, inkling-2-small and deepseek-v4-1-flash, the pin is the
+    # fastest endpoint by measured output speed (3 streamed replies of 560 tokens each, 18 Nov 2026)
+    # among those within about 3x the cheapest one's price, with 1-day uptime of at least 99.5%. A
+    # pin also matches the endpoints under it, such as another region, and an open-weight model's
+    # priority endpoint (OpenRouter's provider selection guide), so each price is the highest of the
+    # endpoints the pin matches, from https://openrouter.ai/api/v1/models/<model>/endpoints (read 18
+    # Nov 2026). An endpoint that lists no cache write price bills cache writes as input, and a
+    # Gemini cache write costs the input price plus the listed storage price. The cap of 200,000
+    # tokens is the window the Claude CLI assumes for a model outside its catalog.
+    # gryphe/mythomax-l2-13b stays out: its 8,192-token window is below the 100,000-token floor of
+    # context_tokens, and it has no tool calls.
     # Google AI Studio, at the same price as Vertex's global endpoint, which ran below full uptime
     gemini-4-carbon:
       base_url: https://openrouter.ai
@@ -141,12 +124,6 @@ models:
       outside_claude: true
       provider_pin: google-ai-studio
       context_tokens: 200000
-      prices:
-        input: 2
-        cache_write: 2.1875
-        cache_write_1h: 2.1875
-        cached_input: 0.1
-        output: 10
     gpt-6-2-sol:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -157,19 +134,6 @@ models:
       outside_claude: true
       provider_pin: openai
       context_tokens: 200000
-      prices:
-        input: 2
-        cache_write: 2.5
-        cache_write_1h: 2.5
-        cached_input: 0.1
-        output: 10
-        long_prompt:
-          over_tokens: 272000
-          input: 4
-          cache_write: 5
-          cache_write_1h: 5
-          cached_input: 0.2
-          output: 15
     # Fireworks, at Moonshot AI's own price: Moonshot AI serves the model only at mxfp4 precision
     kimi-k3-1-pro:
       base_url: https://openrouter.ai
@@ -181,12 +145,6 @@ models:
       outside_claude: true
       provider_pin: fireworks
       context_tokens: 200000
-      prices:
-        input: 2
-        cache_write: 2
-        cache_write_1h: 2
-        cached_input: 0.2
-        output: 10
     glm-5-3:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -197,12 +155,6 @@ models:
       outside_claude: true
       provider_pin: tenstorrent/fp8
       context_tokens: 200000
-      prices:
-        input: 0.6
-        cache_write: 0.6
-        cache_write_1h: 0.6
-        cached_input: 0.1
-        output: 2.5
     grok-4-7:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -213,19 +165,6 @@ models:
       outside_claude: true
       provider_pin: xai
       context_tokens: 200000
-      prices:
-        input: 2.2
-        cache_write: 2.2
-        cache_write_1h: 2.2
-        cached_input: 0.55
-        output: 6.6
-        long_prompt:
-          over_tokens: 200000
-          input: 4.4
-          cache_write: 4.4
-          cache_write_1h: 4.4
-          cached_input: 1.1
-          output: 13.2
     qwen4-max:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -236,12 +175,6 @@ models:
       outside_claude: true
       provider_pin: alibaba
       context_tokens: 200000
-      prices:
-        input: 1.425
-        cache_write: 1.78125
-        cache_write_1h: 1.78125
-        cached_input: 0.07125
-        output: 4.275
     mistral-large-4:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -252,12 +185,6 @@ models:
       outside_claude: true
       provider_pin: mistral/zdr
       context_tokens: 200000
-      prices:
-        input: 0.7
-        cache_write: 0.7
-        cache_write_1h: 0.7
-        cached_input: 0.07
-        output: 2.1
     inkling-2-small:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -268,12 +195,6 @@ models:
       outside_claude: true
       provider_pin: together
       context_tokens: 200000
-      prices:
-        input: 0.3
-        cache_write: 0.3
-        cache_write_1h: 0.3
-        cached_input: 0.03
-        output: 1
     deepseek-v4-1-flash:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -284,12 +205,6 @@ models:
       outside_claude: true
       provider_pin: nebius/fp8
       context_tokens: 200000
-      prices:
-        input: 0.12
-        cache_write: 0.12
-        cache_write_1h: 0.12
-        cached_input: 0.0024
-        output: 0.48
     gpt-6-2-astra:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -300,19 +215,6 @@ models:
       outside_claude: true
       provider_pin: openai
       context_tokens: 200000
-      prices:
-        input: 8
-        cache_write: 10
-        cache_write_1h: 10
-        cached_input: 0.4
-        output: 40
-        long_prompt:
-          over_tokens: 272000
-          input: 16
-          cache_write: 20
-          cache_write_1h: 20
-          cached_input: 0.8
-          output: 60
     gemini-4-hydrogen:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -323,12 +225,6 @@ models:
       outside_claude: true
       provider_pin: google-ai-studio
       context_tokens: 200000
-      prices:
-        input: 1.5
-        cache_write: 1.583333
-        cache_write_1h: 1.583333
-        cached_input: 0.075
-        output: 7.5
     muse-wonder:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -339,12 +235,6 @@ models:
       outside_claude: true
       provider_pin: meta
       context_tokens: 200000
-      prices:
-        input: 4
-        cache_write: 4
-        cache_write_1h: 4
-        cached_input: 0.2
-        output: 20
     # Tencent's fp4 endpoint is the model's only one
     hy4:
       base_url: https://openrouter.ai
@@ -356,12 +246,6 @@ models:
       outside_claude: true
       provider_pin: tencent/fp4
       context_tokens: 200000
-      prices:
-        input: 0.417
-        cache_write: 0.417
-        cache_write_1h: 0.417
-        cached_input: 0.021
-        output: 1.2505
     pareto-26-10:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -372,12 +256,6 @@ models:
       outside_claude: true
       provider_pin: unbiased
       context_tokens: 200000
-      prices:
-        input: 0.8
-        cache_write: 0.8
-        cache_write_1h: 0.8
-        cached_input: 0.03
-        output: 3.2
     aion-3-5:
       base_url: https://openrouter.ai
       credential: deployment:openrouter
@@ -388,18 +266,12 @@ models:
       outside_claude: true
       provider_pin: aion-labs
       context_tokens: 200000
-      prices:
-        input: 3
-        cache_write: 3
-        cache_write_1h: 3
-        cached_input: 0.75
-        output: 6
     # Codex tasks on the owner's ChatGPT plan login, selectable for a task. Its requests go through
     # the model gateway's plan route of the same ID (services.model-gateway in
     # nixos/hosts/geoffcloud/configuration.nix), which holds the login and sets its token on each
     # request. Its model secret in impd holds the route key, not a model credential
-    # (docs/runbooks/model-gateway.md#add-the-chatgpt-plan-route). The prices equal the route's:
-    # OpenAI's API prices for the model, which the spending stop counts.
+    # (docs/runbooks/model-gateway.md#add-the-chatgpt-plan-route). The route's prices are OpenAI's
+    # API prices for the model, which the spending stop counts.
     gpt-6-luna:
       harness: codex
       base_url: https://chatgpt.com
@@ -407,23 +279,10 @@ models:
       chatgpt_login: true
       model: gpt-6-luna
       effort: medium
-      prices:
-        input: 0.1
-        cache_write: 0.125
-        cache_write_1h: 0.125
-        cached_input: 0.01
-        output: 0.5
-        long_prompt:
-          over_tokens: 272000
-          input: 0.2
-          cache_write: 0.25
-          cache_write_1h: 0.25
-          cached_input: 0.02
-          output: 0.75
   roles:
     conversation: fable-5-2
     checker: sonnet-5-5-high
-    # the profile that runs a worker.run; it needs prices, because a worker run counts its cost
+    # the profile that runs a worker.run, whose cost the gateway's count of its sandbox holds
     # against its dollar limit. The worker run limits keep nixie's defaults (10 minutes, $2)
     worker: sonnet-5-5
   # the models a started task can choose in place of the task role's profile; the conversation sees

@@ -60,8 +60,13 @@ let
       port = 8791;
       allowedSubnet = "10.42.0.0/16";
     };
+    providers.anthropic.limits = {
+      day = 20;
+      month = 200;
+    };
     routes.sonnet = {
       model = "claude-sonnet-fixture";
+      provider = "anthropic";
       inherit prices limits;
     };
   };
@@ -223,9 +228,14 @@ let
             };
             countBySandbox = true;
             override = "/var/lib/model-gateway/override.json";
+            providers.anthropic.limits = {
+              day = 20;
+              month = 200;
+            };
             routes.sonnet = {
               model = "claude-sonnet-fixture";
               upstream = "https://api.anthropic.com";
+              provider = "anthropic";
               inherit prices limits;
             };
           }}
@@ -320,14 +330,22 @@ let
         '';
     }
     {
-      title = "it refuses a config with no route, or with the relay on the control port";
+      title = "it refuses a config with no route, no provider, a route whose provider the config lacks, or the relay on the control port";
       script =
         let
           system = buildModuleSystem ../modules/model-gateway.nix (withNftables {
             services.model-gateway = settings // {
               routes = { };
+              providers = { };
               controlRelay = settings.controlRelay // {
                 port = 8790;
+              };
+            };
+          });
+          unknownProvider = buildModuleSystem ../modules/model-gateway.nix (withNftables {
+            services.model-gateway = settings // {
+              routes.sonnet = settings.routes.sonnet // {
+                provider = "openrouter";
               };
             };
           });
@@ -336,17 +354,19 @@ let
           jq . > expected <<'EOF'
           ${builtins.toJSON [
             "services.model-gateway.routes names no route, and the gateway needs one."
+            "services.model-gateway.providers names no provider, and every route needs one."
             "services.model-gateway.controlRelay.port must differ from control.port: cloud_host drops the loopback's packets to an admitted port."
+            "services.model-gateway.routes: each route's provider is a key of services.model-gateway.providers."
           ]}
           EOF
           jq . > actual <<'EOF'
-          ${builtins.toJSON (collectFailedAssertions system)}
+          ${builtins.toJSON (collectFailedAssertions system ++ collectFailedAssertions unknownProvider)}
           EOF
           diff -u expected actual
         '';
     }
     {
-      title = "it loads each plan route key as a credential, renders the api, largest output, limits and login of the route, and refuses a login on another api or outside the state directory";
+      title = "it loads each plan route key as a credential, renders the api, largest output, provider, limits and login of the route, and refuses a login on another api or outside the state directory";
       script =
         let
           planRoute = {
@@ -354,6 +374,7 @@ let
             upstream = "https://chatgpt.com/backend-api/codex";
             model = "gpt-fixture";
             maxOutputTokens = 1000;
+            provider = "plan";
             inherit prices;
             limits = {
               day = 5;
@@ -365,8 +386,15 @@ let
               routeKeyFile = "/run/fixture/plan-route-key";
             };
           };
+          planProviders = settings.providers // {
+            plan.limits = {
+              day = 10;
+              month = 100;
+            };
+          };
           system = buildModuleSystem ../modules/model-gateway.nix (withNftables {
             services.model-gateway = settings // {
+              providers = planProviders;
               routes = settings.routes // {
                 plan = planRoute;
               };
@@ -374,6 +402,7 @@ let
           });
           refused = buildModuleSystem ../modules/model-gateway.nix (withNftables {
             services.model-gateway = settings // {
+              providers = planProviders;
               routes = settings.routes // {
                 plan = planRoute // {
                   api = null;
@@ -396,6 +425,7 @@ let
               sonnet = {
                 model = "claude-sonnet-fixture";
                 upstream = "https://api.anthropic.com";
+                provider = "anthropic";
                 inherit prices limits;
               };
               plan = {
@@ -403,6 +433,7 @@ let
                 upstream = "https://chatgpt.com/backend-api/codex";
                 model = "gpt-fixture";
                 maxOutputTokens = 1000;
+                provider = "plan";
                 inherit prices;
                 limits = {
                   day = 5;
@@ -434,7 +465,7 @@ let
         '';
     }
     {
-      title = "it renders the geoffcloud config with the nixie zone, a loopback control listener and a priced route per nixie profile, each with a day limit of 200 and a month limit of 3000 dollars on an Anthropic route and the plan route, and 5 and 50 on an OpenRouter route";
+      title = "it renders the geoffcloud config with the nixie zone, a loopback control listener, day and month limits of 200 and 3000 dollars on the providers anthropic and chatgpt-plan and 10 and 100 on openrouter, and a priced route per nixie profile that names its provider, with its own limits of 5 and 50 on an OpenRouter route only";
       script =
         let
           fable52 = {
@@ -487,24 +518,21 @@ let
               output = 2.5;
             };
           };
-          # the limits of every Anthropic route and the plan route, and of every OpenRouter route
-          subscriptionLimits = {
-            day = 200;
-            month = 3000;
-          };
-          openrouterLimits = {
-            day = 5;
-            month = 50;
-          };
+          # an Anthropic route, which its provider's limits alone hold
           route = model: prices: {
             inherit model prices;
-            limits = subscriptionLimits;
+            provider = "anthropic";
             upstream = "https://api.anthropic.com";
           };
-          # each model's pinned OpenRouter endpoint and its price, as the host config gives them
+          # each model's pinned OpenRouter endpoint and its price, as the host config gives them, with
+          # the route's own limits beneath its provider's
           openrouterRoute = model: providerPin: prices: {
             inherit model providerPin prices;
-            limits = openrouterLimits;
+            provider = "openrouter";
+            limits = {
+              day = 5;
+              month = 50;
+            };
             upstream = "https://openrouter.ai/api";
           };
         in
@@ -526,6 +554,20 @@ let
             };
             countBySandbox = true;
             override = "/var/lib/model-gateway/override.json";
+            providers = {
+              anthropic.limits = {
+                day = 200;
+                month = 3000;
+              };
+              chatgpt-plan.limits = {
+                day = 200;
+                month = 3000;
+              };
+              openrouter.limits = {
+                day = 10;
+                month = 100;
+              };
+            };
             routes = {
               fable-5-2 = route "claude-fable-5-2" fable52;
               fable-5-1 = route "claude-fable-5-1" fable51;
@@ -671,7 +713,7 @@ let
                 upstream = "https://chatgpt.com/backend-api/codex";
                 model = "gpt-6-luna";
                 maxOutputTokens = 128000;
-                limits = subscriptionLimits;
+                provider = "chatgpt-plan";
                 prices = {
                   input = 0.1;
                   cache_write = 0.125;
@@ -700,7 +742,7 @@ let
         '';
     }
     {
-      title = "it answers the geoffcloud control listener only with the token, in the nixie zone, with the limits of each route, and refuses a raise above the day cap of a route";
+      title = "it answers the geoffcloud control listener only with the token, in the nixie zone, with the limits of each provider and route and each route's provider, and refuses a raise above a provider's day cap or of a route with no limit of its own";
       script = ''
         mkdir home tmp
         start_stub_server ${./test-utils/run-stub-model-api.py} /v1/messages ${lib.escapeShellArg fableReply} "$PWD/requests"
@@ -708,27 +750,50 @@ let
 
         curl -s -o unauthorized -w '%{http_code}' "$control/status" > unauthorized-status
         curl -s -o status -w '%{http_code}' -H @auth-header "$control/status" > status-status
-        day_start=$(jq -r '.routes["fable-5-2"].day.start' status)
+        day_start=$(jq -r '.providers.anthropic.day.start' status)
         curl -s -o above-cap -w '%{http_code}' -X POST -H @auth-header \
-          -d "{\"route\":\"fable-5-2\",\"start\":\"$day_start\",\"dollars\":401}" \
+          -d "{\"provider\":\"anthropic\",\"start\":\"$day_start\",\"dollars\":401}" \
           "$control/raise" > above-cap-status
+        curl -s -o no-route-limit -w '%{http_code}' -X POST -H @auth-header \
+          -d "{\"route\":\"fable-5-2\",\"start\":\"$day_start\",\"dollars\":10}" \
+          "$control/raise" > no-route-limit-status
 
         # the tokenless status's code
         assert_equal "$(cat unauthorized-status)" 401
         # the status's code
         assert_equal "$(cat status-status)" 200
         # the status
-        assert_equal "$(jq -c '{zone, lost, fable: (.routes["fable-5-2"] | {day: (.day | {dollars, limit, cap, tripped}), month: (.month | {dollars, limit, tripped})})}' status)" '{"zone":"Australia/Sydney","lost":false,"fable":{"day":{"dollars":0,"limit":200,"cap":400,"tripped":false},"month":{"dollars":0,"limit":3000,"tripped":false}}}'
-        # each route's own limits: the subscription limits on an Anthropic route and the plan route, the lower ones on an OpenRouter route
-        assert_equal "$(jq -cS '[.routes | to_entries[] | {key, value: {day: .value.day.limit, month: .value.month.limit}}] | from_entries' status)" ${
+        assert_equal "$(jq -c '{zone, lost, anthropic: (.providers.anthropic | {day: (.day | {dollars, limit, cap, tripped}), month: (.month | {dollars, limit, tripped})}), fable: (.routes["fable-5-2"] | {provider, day: (.day | {dollars, limit, cap, tripped}), month: (.month | {dollars, limit, tripped})})}' status)" '{"zone":"Australia/Sydney","lost":false,"anthropic":{"day":{"dollars":0,"limit":200,"cap":400,"tripped":false},"month":{"dollars":0,"limit":3000,"tripped":false}},"fable":{"provider":"anthropic","day":{"dollars":0,"limit":null,"cap":null,"tripped":false},"month":{"dollars":0,"limit":null,"tripped":false}}}'
+        # each provider's limits
+        assert_equal "$(jq -cS '[.providers | to_entries[] | {key, value: {day: .value.day.limit, month: .value.month.limit}}] | from_entries' status)" ${
           lib.escapeShellArg (
-            builtins.toJSON (lib.mapAttrs (_: route: { inherit (route.limits) day month; }) gateway.routes)
+            builtins.toJSON (
+              lib.mapAttrs (_: provider: { inherit (provider.limits) day month; }) gateway.providers
+            )
           )
         }
-        # the above-cap limit's code
+        # each route's provider and own limits: none on an Anthropic route or the plan route, the OpenRouter ones on an OpenRouter route
+        assert_equal "$(jq -cS '[.routes | to_entries[] | {key, value: {provider: .value.provider, day: .value.day.limit, month: .value.month.limit}}] | from_entries' status)" ${
+          lib.escapeShellArg (
+            builtins.toJSON (
+              lib.mapAttrs (_: route: {
+                inherit (route) provider;
+                day = if route.limits == null then null else route.limits.day;
+                month = if route.limits == null then null else route.limits.month;
+              }) gateway.routes
+            )
+          )
+        }
+        # the tripped periods
+        assert_equal "$(jq -c '[(.providers, .routes) | to_entries[] | .value | (.day, .month) | select(.tripped)]' status)" '[]'
+        # the above-cap raise's code
         assert_equal "$(cat above-cap-status)" 409
         # the refusal
-        assert_equal "$(jq -c . above-cap)" '{"error":"above_cap","route":"fable-5-2","cap":400}'
+        assert_equal "$(jq -c . above-cap)" '{"error":"above_cap","route":null,"provider":"anthropic","cap":400}'
+        # the code of a raise of a route with no limit of its own
+        assert_equal "$(cat no-route-limit-status)" 409
+        # the refusal
+        assert_equal "$(jq -c . no-route-limit)" '{"error":"no_route_limit","route":"fable-5-2"}'
         diff -u /dev/null gateway.err
       '';
     }
@@ -752,7 +817,7 @@ let
       '';
     }
     {
-      title = "it counts a Fable 5.2 request of a registered sandbox at the Fable 5.2 prices in the day and month of its route and in the sandbox";
+      title = "it counts a Fable 5.2 request of a registered sandbox at the Fable 5.2 prices in the day and month of its route and its provider and in the sandbox";
       script = ''
         mkdir home tmp
         start_stub_server ${./test-utils/run-stub-model-api.py} /v1/messages ${lib.escapeShellArg fableReply} "$PWD/requests"
@@ -768,8 +833,10 @@ let
         # 1,000 input tokens at $8 and 100 output tokens at $40 per million
         # the count
         assert_equal "$(jq -c '{day: .routes["fable-5-2"].day.micros, month: .routes["fable-5-2"].month.micros, sandbox: (.sandboxes["nixie-0a1b2c"] | {micros, tokens})}' store.json)" '{"day":12000,"month":12000,"sandbox":{"micros":12000,"tokens":1100}}'
-        # another route's count
-        assert_equal "$(jq -c '.routes["opus-5-5"] | {day: .day.micros, month: .month.micros}' store.json)" '{"day":0,"month":0}'
+        # the provider's count
+        assert_equal "$(jq -c '.providers.anthropic | {day: .day.micros, month: .month.micros}' store.json)" '{"day":12000,"month":12000}'
+        # another route's count, and another provider's
+        assert_equal "$(jq -c '{opus: (.routes["opus-5-5"] | {day: .day.micros, month: .month.micros}), openrouter: (.providers.openrouter | {day: .day.micros, month: .month.micros})}' store.json)" '{"opus":{"day":0,"month":0},"openrouter":{"day":0,"month":0}}'
         # the stand-in's requests
         assert_equal "$(cat requests)" "POST /v1/messages"
         diff -u /dev/null gateway.err

@@ -7,12 +7,12 @@ address. nixie reaches impd over the tailnet with a token limited to its own imp
 adds nixie's model credential to impd by hand before nixie starts. The prod apply adds each
 release's sandbox images to impd before nixie rolls, so the new pod finds them in place. Every model
 request of nixie's sandboxes passes the [model gateway](../../runbooks/model-gateway.md) on the
-host, which counts a day and a month and refuses past nixie's limits, so nixie pauses at its
-spending stop instead of spending past it. nixie sets those limits through the gateway's control
-relay on the host's tailnet address, which its network policy lets the pod reach.
-[The tailnet](../network/tailnet.md) covers the grants on the route in and out, and
-[the nixie runbook](../../runbooks/nixie.md) gives the steps for a deploy, an upgrade and a
-rotation.
+host, which counts each provider's and each route's day and month and refuses past the limits in the
+host config, so nixie pauses at its spending stop instead of spending past it. nixie reads the
+counts, and raises a day within its cap, through the gateway's control relay on the host's tailnet
+address, which its network policy lets the pod reach. [The tailnet](../network/tailnet.md) covers
+the grants on the route in and out, and [the nixie runbook](../../runbooks/nixie.md) gives the steps
+for a deploy, an upgrade and a rotation.
 
 ```mermaid
 flowchart LR

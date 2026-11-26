@@ -741,40 +741,36 @@ in
 
   # nixie's model gateway (docs/runbooks/model-gateway.md): every model request of
   # production nixie passes it, through the impd model secrets' upstream, and it refuses a route's
-  # requests past that route's own day and month dollar limits below. The control token sits on
-  # host-secrets, staged by the runbook; until it exists, the unit is skipped.
+  # requests past its provider's day and month dollar limits below, or past the route's own where
+  # it sets them. The control token sits on host-secrets, staged by the runbook; until it exists,
+  # the unit is skipped.
   services.model-gateway =
     let
-      # each route's day and month limits, in US dollars: a subscription route, which is every
-      # Anthropic route and the ChatGPT plan route, gets the first, and an OpenRouter route the
-      # second. dayCap is left at the gateway's default of twice the day
-      subscriptionLimits = {
-        day = 200;
-        month = 3000;
-      };
-      openrouterLimits = {
-        day = 5;
-        month = 50;
-      };
       # Anthropic's list prices, in dollars per million tokens, from the model pricing table of
-      # https://platform.claude.com/docs/en/about-claude/pricing (read 17 Nov 2026), the same
-      # prices deploy/nixie/config.yaml gives each profile
+      # https://platform.claude.com/docs/en/about-claude/pricing (read 17 Nov 2026). The gateway
+      # prices each reply with its route's table, and nixie's profiles hold no prices beside it.
+      # Every Anthropic route counts against the provider anthropic, with no limits of its own
       anthropic = model: prices: {
         inherit model prices;
-        limits = subscriptionLimits;
+        provider = "anthropic";
       };
       # a model outside Claude through OpenRouter's Messages endpoint, at /api/v1/messages, pinned to
       # one provider: the profile's provider_pin and the route's providerPin name the same endpoint.
       # Each price is the highest of the endpoints the pin matches, from
       # https://openrouter.ai/api/v1/models/<model>/endpoints (read 18 Nov 2026); deploy/nixie/config.yaml
-      # gives each profile the same prices and pin, and says why
+      # gives each profile the same pin, and says why. Each route keeps its own limits of 5 and 50
+      # dollars beneath the provider openrouter's
       openrouter = model: providerPin: prices: {
         inherit
           model
           providerPin
           prices
           ;
-        limits = openrouterLimits;
+        provider = "openrouter";
+        limits = {
+          day = 5;
+          month = 50;
+        };
         upstream = "https://openrouter.ai/api";
       };
       fable52 = {
@@ -850,6 +846,23 @@ in
         inherit (modelGatewayControlRelayExposure) port interface;
         address = topology.tailnet.nodes.geoffcloud.address;
         allowedSubnet = k3sPodCIDR;
+      };
+      # the day and month limits, in US dollars, of each place the routes send to; each holds all
+      # its routes together. dayCap is left at the gateway's default of twice the day
+      providers = {
+        anthropic.limits = {
+          day = 200;
+          month = 3000;
+        };
+        # the owner's ChatGPT plan, which the route gpt-6-luna spends
+        chatgpt-plan.limits = {
+          day = 200;
+          month = 3000;
+        };
+        openrouter.limits = {
+          day = 10;
+          month = 100;
+        };
       };
       # one route per profile in deploy/nixie/config.yaml, keyed by the profile's ID, which nixie
       # puts in each request's path
@@ -1005,7 +1018,7 @@ in
           upstream = "https://chatgpt.com/backend-api/codex";
           model = "gpt-6-luna";
           maxOutputTokens = 128000;
-          limits = subscriptionLimits;
+          provider = "chatgpt-plan";
           prices = {
             input = 0.1;
             cache_write = 0.125;
