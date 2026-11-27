@@ -484,6 +484,10 @@ images:
 computer: {}
 code: {}
 
+# Google's connections, tools and Gmail arrival source: since nixie 0.123.0 they run only when this
+# section is here, and the empty section keeps nixie's defaults, such as a Gmail poll every 2m
+google: {}
+
 # voice calls through GPT-Live: the key is the sops file's connector_credentials entry speech. The
 # price per minute lives in zgeoff/nixie-definitions' voice/voice.yaml, and calls spend against
 # nixie's built-in call budgets ($5 a day, $50 a month)
