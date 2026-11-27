@@ -1,5 +1,5 @@
-// the service clients of the atc gateway's /mcp, each with the scopes its token holds. nixie
-// holds no spawn: a spawn can send any variable of the daemon's environment to a clone URL's host
+// the service clients of the atc gateway's /mcp, each with the scopes its token holds; nixie
+// holds no spawn until GEO-2884 lands
 export const atcGatewayServiceClients = ['boxxy', 'boxxy-notices', 'nixie'] as const;
 
 export type ATCGatewayServiceClient = (typeof atcGatewayServiceClients)[number];

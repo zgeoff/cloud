@@ -113,8 +113,7 @@ config lives on the PC, outside this repo
 ([send notices to the owner](../../runbooks/boxxy.md#send-notices-to-the-owner)).
 
 nixie's token holds no `spawn`, so the gateway refuses nixie a new session and a line typed into
-one. atc lets a spawn name any variable of the daemon's environment as a clone credential, so the
-scope waits until atc limits those names. The token sits in 1Password as `nixie-atc-token`, in
+one. The scope waits for an atc fix (GEO-2884). The token sits in 1Password as `nixie-atc-token`, in
 vaults `cloud` and `cloud-deploy`, and in nixie's secrets file as `atc_token`, so a rotation changes
 all three ([nixie's coding sessions](./nixie.md#coding-sessions)).
 
