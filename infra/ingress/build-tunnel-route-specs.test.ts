@@ -42,6 +42,11 @@ test("it points the gateway's CNAME at the atc tunnel and leaves the shared tunn
           path: String.raw`^(?:/|/mcp|/oauth2/token|/oauth2/revoke|/\.well-known/oauth-authorization-server|/\.well-known/oauth-protected-resource|/\.well-known/oauth-protected-resource/mcp)$`,
           service: 'http://127.0.0.1:8414',
         },
+        {
+          hostname: 'atc.geoff.cloud',
+          path: '^/rpc(?:/[A-Za-z0-9_-]+)+$',
+          service: 'http://127.0.0.1:8414',
+        },
         { service: 'http_status:404' },
       ],
       record: { hostname: 'atc.geoff.cloud', tunnelID: atcTunnelID },

@@ -159,9 +159,10 @@ sessions ([service tokens](./atc-gateway.md#service-tokens)). The `coding.atc` s
 `config.yaml` lists the targets nixie uses: the owner's PC's `local` and `cloud` targets, and
 geoffcloud's one target. Its default target is the PC's `cloud` target, an imp sandbox.
 
-nixie calls the gateway's public URL, `https://atc.geoff.cloud/mcp`, through the tunnel, because it
-accepts only an `https://` gateway URL. The namespace's egress deny refuses only the tailnet range
-and Podman's subnet, so the call needs no egress allow. Each daemon's own config must also grant
+nixie calls the gateway's typed fleet API under its public URL, at `https://atc.geoff.cloud/rpc`,
+through the tunnel, because it accepts only an `https://` gateway URL. Since nixie 0.124.0 it drops
+the `/mcp` that `config.yaml` names. The namespace's egress deny refuses only the tailnet range and
+Podman's subnet, so the call needs no egress allow. Each daemon's own config must also grant
 `service:nixie` its targets: a daemon refuses a principal its `principals` does not list. The PC
 daemon's config lives on the PC, and it reads a change only at a restart.
 

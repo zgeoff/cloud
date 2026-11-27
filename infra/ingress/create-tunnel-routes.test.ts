@@ -50,6 +50,11 @@ test("it renders the gateway's loopback rules on the atc tunnel and points its C
           path: String.raw`^(?:/|/mcp|/oauth2/token|/oauth2/revoke|/\.well-known/oauth-authorization-server|/\.well-known/oauth-protected-resource|/\.well-known/oauth-protected-resource/mcp)$`,
           service: 'http://127.0.0.1:8414',
         },
+        {
+          hostname: 'atc.geoff.cloud',
+          path: '^/rpc(?:/[A-Za-z0-9_-]+)+$',
+          service: 'http://127.0.0.1:8414',
+        },
         { service: 'http_status:404' },
       ],
     },
