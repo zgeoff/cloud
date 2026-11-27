@@ -112,14 +112,11 @@ its token holds no `read`, `spawn` or `kill`, and the cloud daemon never lists i
 config lives on the PC, outside this repo
 ([send notices to the owner](../../runbooks/boxxy.md#send-notices-to-the-owner)).
 
-nixie's coding feature calls the public URL with its token, because nixie accepts only an `https://`
-gateway URL. The same value sits in 1Password as `nixie-atc-token`, in vaults `cloud` and
-`cloud-deploy`, and in nixie's secrets file as `atc_token`, so a rotation changes all three. The
-token holds no `spawn`, so the gateway refuses nixie a new session and a line typed into one, and
-nixie lists, joins, reads, messages and stops sessions. atc's `spawn` lets a caller name any
-variable of the daemon's environment as a clone credential, so the scope waits until atc limits
-those names. nixie's config lists the targets it uses
-([nixie's coding sessions](./nixie.md#coding-sessions)).
+nixie's token holds no `spawn`, so the gateway refuses nixie a new session and a line typed into
+one. atc lets a spawn name any variable of the daemon's environment as a clone credential, so the
+scope waits until atc limits those names. The token sits in 1Password as `nixie-atc-token`, in
+vaults `cloud` and `cloud-deploy`, and in nixie's secrets file as `atc_token`, so a rotation changes
+all three ([nixie's coding sessions](./nixie.md#coding-sessions)).
 
 A read-only client outside the cluster signs in with a secret instead, through the OAuth
 `client_credentials` grant (atc 7.16.0 and later). Stack config `atcGateway.serviceClientDigests`
