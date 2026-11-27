@@ -112,9 +112,9 @@ its token holds no `read`, `spawn` or `kill`, and the cloud daemon never lists i
 config lives on the PC, outside this repo
 ([send notices to the owner](../../runbooks/boxxy.md#send-notices-to-the-owner)).
 
-nixie's token holds `spawn`, so nixie can start a coding session and steer one, on atc 8.0.0 or
-later (GEO-2884). The token sits in 1Password as `nixie-atc-token`, in vaults `cloud` and
-`cloud-deploy`, and in nixie's secrets file as `atc_token`, so a rotation changes all three
+nixie's `spawn` scope needs atc 8.0.0 or later on the gateway and each daemon. The token sits in
+1Password as `nixie-atc-token`, in vaults `cloud` and `cloud-deploy`, and in nixie's secrets file as
+`atc_token`, so a rotation changes all three
 ([nixie's coding sessions](./nixie.md#coding-sessions)).
 
 A read-only client outside the cluster signs in with a secret instead, through the OAuth

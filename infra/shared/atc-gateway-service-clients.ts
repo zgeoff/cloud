@@ -1,4 +1,3 @@
-// the service clients of the atc gateway's /mcp, each with the scopes its token holds
 export const atcGatewayServiceClients = ['boxxy', 'boxxy-notices', 'nixie'] as const;
 
 export type ATCGatewayServiceClient = (typeof atcGatewayServiceClients)[number];
