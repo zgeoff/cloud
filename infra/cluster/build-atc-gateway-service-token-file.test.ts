@@ -53,6 +53,23 @@ test('#buildATCGatewayServiceTokenFile gives the boxxy-notices client the messag
   });
 });
 
+test('#buildATCGatewayServiceTokenFile gives the nixie client the read, spawn, message and kill scopes and its one token', () => {
+  const nixieToken = `atcs_${'x'.repeat(40)}`;
+
+  expect(
+    JSON.parse(
+      buildATCGatewayServiceTokenFile({
+        publicURL: 'https://atc.geoff.cloud',
+        tokens: { nixie: nixieToken },
+        secretDigests: {},
+      }),
+    ),
+  ).toStrictEqual({
+    resource: 'https://atc.geoff.cloud/mcp',
+    clients: { nixie: { scopes: ['read', 'spawn', 'message', 'kill'], tokens: [nixieToken] } },
+  });
+});
+
 test('#buildATCGatewayServiceTokenFile gives each client of a secret digest the read scope alone and its one digest, beside the token clients', () => {
   const token = `atcs_${'a'.repeat(40)}`;
   const firstDigest = '1'.repeat(64);

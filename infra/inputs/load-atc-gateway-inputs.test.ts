@@ -425,6 +425,41 @@ test('it carries the notice token as the boxxy-notices client, as a secret, besi
   expect(value).toBe(noticeToken);
 });
 
+test('it carries the nixie token as the nixie client, as a secret, beside the boxxy tokens', async () => {
+  const nixieToken = `atcs_${'x'.repeat(40)}`;
+
+  const serviceTokens = loadATCGatewayInputs(
+    buildMockATCGatewayStackConfig(),
+    buildMockATCGatewayEnvironment({
+      BOXXY_ATC_TOKEN: `atcs_${'b'.repeat(40)}`,
+      BOXXY_ATC_NOTICE_TOKEN: `atcs_${'n'.repeat(40)}`,
+      NIXIE_ATC_TOKEN: nixieToken,
+    }),
+    { readRelease: () => '7.14.0', warn: () => {} },
+  ).atcGateway?.secrets.serviceTokens;
+
+  invariant(serviceTokens?.['nixie'] !== undefined, 'expected the nixie token');
+
+  const marked = await isSecret(serviceTokens['nixie']);
+  const value = await resolveOutput(serviceTokens['nixie']);
+
+  expect(Object.keys(serviceTokens)).toStrictEqual(['boxxy', 'boxxy-notices', 'nixie']);
+  expect(marked).toBe(true);
+  expect(value).toBe(nixieToken);
+});
+
+test('it refuses a NIXIE_ATC_TOKEN equal to BOXXY_ATC_TOKEN, which the gateway would refuse at start', () => {
+  const token = `atcs_${'b'.repeat(40)}`;
+
+  expect(() =>
+    loadATCGatewayInputs(
+      buildMockATCGatewayStackConfig(),
+      buildMockATCGatewayEnvironment({ BOXXY_ATC_TOKEN: token, NIXIE_ATC_TOKEN: token }),
+      { readRelease: () => '7.14.0', warn: () => {} },
+    ),
+  ).toThrowWithMessage(Error, 'BOXXY_ATC_TOKEN and NIXIE_ATC_TOKEN must differ');
+});
+
 test('it leaves both tokens out, with one warning for each, while the pinned release lacks the flag', () => {
   const warnings: string[] = [];
 

@@ -9,10 +9,12 @@ import type { Environment } from './types.ts';
 // the first atc release whose atc-gateway takes --service-token-file
 const serviceTokenRelease = '7.14.0';
 
-// the variable each client's token comes from, which the boxxy server also reads
+// the variable each client's token comes from: the boxxy server also reads its two, and nixie
+// reads its copy from its own secrets file
 const variables = {
   boxxy: 'BOXXY_ATC_TOKEN',
   'boxxy-notices': 'BOXXY_ATC_NOTICE_TOKEN',
+  nixie: 'NIXIE_ATC_TOKEN',
 } as const satisfies Record<ATCGatewayServiceClient, string>;
 
 // atc's own rule: `atcs_` and 32 or more of A-Z, a-z, 0-9, _ and -
@@ -28,7 +30,7 @@ export interface ATCGatewayServiceTokenOptions {
 
 type ServiceTokens = Readonly<Partial<Record<ATCGatewayServiceClient, Output<string>>>>;
 
-// The boxxy server's tokens for the gateway, from the variables the server also reads. Unless both
+// The service clients' tokens for the gateway, from the variables their clients also read. Unless both
 // the source pin and the deployed image are 7.14.0 or later, the tokens are left out with one
 // warning for each, and the variables need not hold the shape atc takes.
 export function loadATCGatewayServiceTokens(

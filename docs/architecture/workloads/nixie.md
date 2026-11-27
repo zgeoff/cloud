@@ -110,8 +110,9 @@ The file is `deploy/nixie/secrets.sops.yaml`, encrypted with sops to two age rec
 key, which the pod holds, and the recovery key, which stays in 1Password and off the host. The repo
 holds only the public halves, in the sops config beside the file. The file holds the deployment key
 that wraps every record key, nixie's impd token, the token nixie opens a pull request in the
-definitions repo with for each skill it writes, and the owner's name under `settings`, which the
-configuration names as `deployment:owner_name` so the name stays out of this public repo.
+definitions repo with for each skill it writes, the atc gateway's service token under `atc_token`,
+and the owner's name under `settings`, which the configuration names as `deployment:owner_name` so
+the name stays out of this public repo.
 
 Pulumi puts the encrypted file and the host's age identity into one Secret, and only the nixie
 container mounts it. The Job that adds nixie's sandbox images reads a copy of that Secret
@@ -148,6 +149,20 @@ The reads use an API token that nixie answers only read procedures for. `config.
 token's SHA-256 under `api.read_only_token_hashes`, and the token itself stays in vault `nixie`, so
 the public repo holds no credential. The deploy job runs no read, because the conversation and the
 task list are the owner's data.
+
+## Coding sessions
+
+nixie starts, joins and messages coding sessions through the atc gateway, as the service client
+`service:nixie` ([service tokens](./atc-gateway.md#service-tokens)). The `coding.atc` section of
+`config.yaml` lists the targets nixie uses: the owner's PC's `local` and `cloud` targets, and
+geoffcloud's one target. A start that names no target runs on the PC's `cloud` target, an imp
+sandbox, so nothing lands on the owner's machine unless the start asks for it.
+
+nixie calls the gateway's public URL, `https://atc.geoff.cloud/mcp`, through the tunnel, because it
+accepts only an `https://` gateway URL. The namespace's egress deny refuses only the tailnet range
+and Podman's subnet, so the call needs no egress allow. Each daemon's own config must also grant
+`service:nixie` its targets: a daemon refuses a principal its `principals` does not list. The PC
+daemon's config lives on the PC, and it reads a change only at a restart.
 
 ## Reaching impd
 

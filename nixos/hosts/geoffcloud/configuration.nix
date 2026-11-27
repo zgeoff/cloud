@@ -680,6 +680,9 @@ in
         # atc's verify read client, which holds the read scope alone
         # (docs/architecture/workloads/atc-gateway.md#service-tokens)
         "service:wringer-ro".targets = [ "geoffcloud" ];
+        # nixie's coding client at the atc gateway, which starts, joins and messages coding
+        # sessions (docs/architecture/workloads/atc-gateway.md#service-tokens)
+        "service:nixie".targets = [ "geoffcloud" ];
       };
     };
 

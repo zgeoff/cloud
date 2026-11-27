@@ -96,20 +96,27 @@ with its claim and Secret and in its image.
 
 A service in the cluster that cannot sign in with a browser calls `/mcp` with a fixed bearer token,
 which the gateway reads from a file at start (`--service-token-file`, atc 7.14.0 and later). The
-boxxy server holds the two such clients. Pulumi builds the file from the stack's `BOXXY_ATC_TOKEN`,
-its `BOXXY_ATC_NOTICE_TOKEN` and the public URL: the resource is the public URL's origin and `/mcp`,
-and the gateway refuses to start when the file names another.
+boxxy server holds two such clients and nixie holds one. Pulumi builds the file from the stack's
+`BOXXY_ATC_TOKEN`, `BOXXY_ATC_NOTICE_TOKEN` and `NIXIE_ATC_TOKEN` and the public URL: the resource
+is the public URL's origin and `/mcp`, and the gateway refuses to start when the file names another.
 
-| Client          | Variable                 | Scopes                             | Granted by                       |
-| --------------- | ------------------------ | ---------------------------------- | -------------------------------- |
-| `boxxy`         | `BOXXY_ATC_TOKEN`        | `read`, `spawn`, `message`, `kill` | the cloud daemon, its one target |
-| `boxxy-notices` | `BOXXY_ATC_NOTICE_TOKEN` | `message`                          | the PC daemon, target `local`    |
+| Client          | Variable                 | Scopes                             | Granted by                                                                   |
+| --------------- | ------------------------ | ---------------------------------- | ---------------------------------------------------------------------------- |
+| `boxxy`         | `BOXXY_ATC_TOKEN`        | `read`, `spawn`, `message`, `kill` | the cloud daemon, its one target                                             |
+| `boxxy-notices` | `BOXXY_ATC_NOTICE_TOKEN` | `message`                          | the PC daemon, target `local`                                                |
+| `nixie`         | `NIXIE_ATC_TOKEN`        | `read`, `spawn`, `message`, `kill` | the PC daemon, targets `local` and `cloud`; the cloud daemon, its one target |
 
 The gateway acts as `service:<client>` at each daemon, and a daemon refuses a principal its
 `principals` does not list. The notice client can message any session on the PC's `local` target, so
 its token holds no `read`, `spawn` or `kill`, and the cloud daemon never lists it. The PC daemon's
 config lives on the PC, outside this repo
 ([send notices to the owner](../../runbooks/boxxy.md#send-notices-to-the-owner)).
+
+nixie's coding feature calls the public URL with its token, because nixie accepts only an `https://`
+gateway URL. The same value sits in 1Password as `nixie-atc-token`, in vaults `cloud` and
+`cloud-deploy`, and in nixie's secrets file as `atc_token`, so a rotation changes all three. The
+token's `spawn` scope also covers typing into a session. nixie's config lists the targets it uses
+([nixie's coding sessions](./nixie.md#coding-sessions)).
 
 A read-only client outside the cluster signs in with a secret instead, through the OAuth
 `client_credentials` grant (atc 7.16.0 and later). Stack config `atcGateway.serviceClientDigests`
@@ -204,8 +211,8 @@ the grantable list of the daemon's impd token (`scripts/atc-cloud-grantable.ts`)
 changes by hand ([the boxxy runbook](../../runbooks/boxxy.md#let-sessions-reach-the-server)).
 
 The daemon's `principals` lists the OAuth clients of the gateway, the boxxy server's service token
-as `service:boxxy`, and atc's verify read client as `service:wringer-ro`
-([service tokens](#service-tokens)). Each is granted the target `geoffcloud`.
+as `service:boxxy`, nixie's coding client as `service:nixie`, and atc's verify read client as
+`service:wringer-ro` ([service tokens](#service-tokens)). Each is granted the target `geoffcloud`.
 
 A Claude session runs its prompt only in a folder that Claude Code trusts, and the imp's Claude
 config trusts only the root of a workspace that the spawn cloned with trust opted in. The daemon

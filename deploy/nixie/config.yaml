@@ -488,6 +488,23 @@ code: {}
 # section is here, and the empty section keeps nixie's defaults, such as a Gmail poll every 2m
 google: {}
 
+# coding sessions through the atc gateway, as its service client service:nixie
+# (docs/architecture/workloads/atc-gateway.md#service-tokens). The token is the sops file's
+# atc_token entry. Each daemon's own config grants the client these targets: the owner's PC
+# (home-pc) its local machine and its imp sandboxes, and geoffcloud its imps. A start that names no
+# target runs in an imp sandbox from the PC, the safer default.
+coding:
+  atc:
+    url: https://atc.geoff.cloud/mcp
+    principal: service:nixie
+    token: deployment:atc_token
+    targets:
+      - { daemon: home-pc, target: local }
+      - { daemon: home-pc, target: cloud }
+      - { daemon: geoffcloud, target: geoffcloud }
+    defaultTarget: home-pc/cloud
+    agent: claude
+
 # voice calls through GPT-Live: the key is the sops file's connector_credentials entry speech. The
 # price per minute lives in zgeoff/nixie-definitions' voice/voice.yaml, and calls spend against
 # nixie's built-in call budgets ($5 a day, $50 a month)
