@@ -544,7 +544,7 @@ in
         # the agent image (docs/runbooks/agent-image.md). Hooks run the image's atc at guestATC
         # while it prints the daemon's release; when the image ships another release, each new imp
         # takes a copy of the daemon's binary (packages/atc.nix)
-        image = "agent-6106be2d";
+        image = "agent-8729e33a";
         guestATC = "/usr/local/bin/atc";
         # each new harness imp boots elastic at 1024 MiB on ordinary pages and grows to 2048 MiB
         # under pressure, so the agents leave the huge page pool to nixie's sandboxes. A session

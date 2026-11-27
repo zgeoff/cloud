@@ -597,7 +597,7 @@ let
           "targets": {
             "geoffcloud": {
               "guestATC": "/usr/local/bin/atc",
-              "image": "agent-6106be2d",
+              "image": "agent-8729e33a",
               "impPrefix": "harness-",
               "maxMemoryMib": 2048,
               "memoryMib": 1024,
