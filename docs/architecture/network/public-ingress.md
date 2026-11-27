@@ -139,7 +139,9 @@ states who authenticates its calls before it can go public.
 
 The atc gateway's routes split by caller. The split follows the route table of atc's MCP HTTP
 server, and the tunnel and the Access application both read it from one list in the Pulumi program.
-A route atc adds later reaches nothing until it joins that list.
+A route atc adds later reaches nothing until it joins that list. The typed fleet API at `/rpc`,
+which nixie calls with its service token, takes a pattern beside the list: `/rpc` and then one or
+more segments of letters, digits, `_` and `-`, such as `/rpc/session/list`.
 
 | Path                                        | Methods atc serves | Caller            | At the edge  |
 | ------------------------------------------- | ------------------ | ----------------- | ------------ |
@@ -154,6 +156,7 @@ A route atc adds later reaches nothing until it joins that list.
 | `/.well-known/oauth-authorization-server`   | GET                | an MCP client     | straight in  |
 | `/.well-known/oauth-protected-resource`     | GET                | an MCP client     | straight in  |
 | `/.well-known/oauth-protected-resource/mcp` | GET                | an MCP client     | straight in  |
+| `/rpc/<procedure path>`                     | POST               | a program         | straight in  |
 | any other path                              | none               | none              | tunnel 404   |
 
 The gateway's liveness and readiness probes are in no row, because the kubelet calls them inside the

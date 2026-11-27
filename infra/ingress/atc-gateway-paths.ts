@@ -11,3 +11,8 @@ export const atcGatewayPaths = {
     '/.well-known/oauth-protected-resource/mcp',
   ],
 } as const;
+
+// The gateway's typed fleet API, which a program such as nixie calls at `/rpc/<procedure path>`,
+// such as `/rpc/session/list`, with a bearer that the gateway checks as it does at `/mcp`. Each
+// segment holds only letters, digits, `_` and `-`, so no dot segment reaches past `/rpc`.
+export const atcGatewayRPCPathPattern = '^/rpc(?:/[A-Za-z0-9_-]+)+$';
