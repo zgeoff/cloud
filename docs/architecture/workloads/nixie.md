@@ -10,9 +10,10 @@ request of nixie's sandboxes passes the [model gateway](../../runbooks/model-gat
 host. The gateway counts each provider's and each route's day and month and refuses requests past
 the limits in the host config, and nixie pauses at its spending stop. nixie reads the counts, and
 raises a day within its cap, through the gateway's control relay on the host's tailnet address; its
-network policy admits the pod to that address. [The tailnet](../network/tailnet.md) covers the
-grants on the route in and out, and [the nixie runbook](../../runbooks/nixie.md) gives the steps for
-a deploy, an upgrade and a rotation.
+network policy admits the pod to that address. nixie reaches the atc gateway for coding sessions at
+its public URL, outside the tailnet. [The tailnet](../network/tailnet.md) covers the grants on the
+route in and out, and [the nixie runbook](../../runbooks/nixie.md) gives the steps for a deploy, an
+upgrade and a rotation.
 
 ```mermaid
 flowchart LR

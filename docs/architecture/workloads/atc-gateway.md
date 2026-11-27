@@ -140,14 +140,14 @@ An init container in the backup image, running as the gateway's user, copies the
 volume with mode 0600, and the gateway mounts that volume read-only. The Secret has no fixed name,
 so a new token rolls the Deployment.
 
-Each input is optional. While both variables and `serviceClientDigests` are unset, the pod has no
-Secret, no init container, no mount and no flag, and the file leaves out each client whose variable
-is unset. Pulumi refuses `serviceClientDigests` while the stack's `atcGateway.image` is older than
-7.16.0, because that gateway refuses the file and exits at start. While
+Each input is optional. While the three token variables and `serviceClientDigests` are unset, the
+pod has no Secret, no init container, no mount and no flag, and the file leaves out each client
+whose variable is unset. Pulumi refuses `serviceClientDigests` while the stack's `atcGateway.image`
+is older than 7.16.0, because that gateway refuses the file and exits at start. While
 `images/atc-gateway/versions.env` pins an atc release older than 7.14.0, or the stack's
-`atcGateway.image` is older than 7.14.0, the image has no such flag. Pulumi then leaves them out and
-prints one warning for each variable that is set, so a deploy never starts a gateway that cannot
-read its arguments
+`atcGateway.image` is older than 7.14.0, the image has no such flag. Pulumi then leaves the tokens
+out and prints one warning for each token variable that is set, so a deploy never starts a gateway
+that cannot read its arguments
 ([the boxxy runbook](../../runbooks/boxxy.md#the-service-token-at-the-atc-gateway)).
 
 ## The cloud daemon
