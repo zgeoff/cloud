@@ -53,7 +53,7 @@ test('#buildATCGatewayServiceTokenFile gives the boxxy-notices client the messag
   });
 });
 
-test('#buildATCGatewayServiceTokenFile gives the nixie client the read, spawn, message and kill scopes and its one token', () => {
+test('#buildATCGatewayServiceTokenFile gives the nixie client the read, message and kill scopes, with no spawn, and its one token', () => {
   const nixieToken = `atcs_${'x'.repeat(40)}`;
 
   expect(
@@ -66,7 +66,7 @@ test('#buildATCGatewayServiceTokenFile gives the nixie client the read, spawn, m
     ),
   ).toStrictEqual({
     resource: 'https://atc.geoff.cloud/mcp',
-    clients: { nixie: { scopes: ['read', 'spawn', 'message', 'kill'], tokens: [nixieToken] } },
+    clients: { nixie: { scopes: ['read', 'message', 'kill'], tokens: [nixieToken] } },
   });
 });
 

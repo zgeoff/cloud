@@ -104,7 +104,7 @@ is the public URL's origin and `/mcp`, and the gateway refuses to start when the
 | --------------- | ------------------------ | ---------------------------------- | ---------------------------------------------------------------------------- |
 | `boxxy`         | `BOXXY_ATC_TOKEN`        | `read`, `spawn`, `message`, `kill` | the cloud daemon, its one target                                             |
 | `boxxy-notices` | `BOXXY_ATC_NOTICE_TOKEN` | `message`                          | the PC daemon, target `local`                                                |
-| `nixie`         | `NIXIE_ATC_TOKEN`        | `read`, `spawn`, `message`, `kill` | the PC daemon, targets `local` and `cloud`; the cloud daemon, its one target |
+| `nixie`         | `NIXIE_ATC_TOKEN`        | `read`, `message`, `kill`          | the PC daemon, targets `local` and `cloud`; the cloud daemon, its one target |
 
 The gateway acts as `service:<client>` at each daemon, and a daemon refuses a principal its
 `principals` does not list. The notice client can message any session on the PC's `local` target, so
@@ -115,7 +115,10 @@ config lives on the PC, outside this repo
 nixie's coding feature calls the public URL with its token, because nixie accepts only an `https://`
 gateway URL. The same value sits in 1Password as `nixie-atc-token`, in vaults `cloud` and
 `cloud-deploy`, and in nixie's secrets file as `atc_token`, so a rotation changes all three. The
-token's `spawn` scope also covers typing into a session. nixie's config lists the targets it uses
+token holds no `spawn`, so the gateway refuses nixie a new session and a line typed into one, and
+nixie lists, joins, reads, messages and stops sessions. atc's `spawn` lets a caller name any
+variable of the daemon's environment as a clone credential, so the scope waits until atc limits
+those names. nixie's config lists the targets it uses
 ([nixie's coding sessions](./nixie.md#coding-sessions)).
 
 A read-only client outside the cluster signs in with a secret instead, through the OAuth

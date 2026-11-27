@@ -152,11 +152,11 @@ task list are the owner's data.
 
 ## Coding sessions
 
-nixie starts, joins and messages coding sessions through the atc gateway, as the service client
-`service:nixie` ([service tokens](./atc-gateway.md#service-tokens)). The `coding.atc` section of
+nixie lists, joins, reads, messages and stops coding sessions through the atc gateway, as the
+service client `service:nixie`. Its token holds no `spawn` scope, so the gateway refuses it a start
+and a steer ([service tokens](./atc-gateway.md#service-tokens)). The `coding.atc` section of
 `config.yaml` lists the targets nixie uses: the owner's PC's `local` and `cloud` targets, and
-geoffcloud's one target. A start that names no target runs on the PC's `cloud` target, an imp
-sandbox, so nothing lands on the owner's machine unless the start asks for it.
+geoffcloud's one target. Its default target is the PC's `cloud` target, an imp sandbox.
 
 nixie calls the gateway's public URL, `https://atc.geoff.cloud/mcp`, through the tunnel, because it
 accepts only an `https://` gateway URL. The namespace's egress deny refuses only the tailnet range
