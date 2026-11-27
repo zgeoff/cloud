@@ -196,6 +196,24 @@ let
         '';
     }
     {
+      title = "it rejects a clone credential that no environment credential sets";
+      script =
+        let
+          system = buildDaemonSystem {
+            workspaces.gitCredentials.FIXTURE_CLONE_TOKEN.hosts = [ "github.com" ];
+          };
+        in
+        ''
+          assert_equal ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "services.atc-daemon.workspaces.gitCredentials lists variables that services.atc-daemon.environmentCredentials does not set: FIXTURE_CLONE_TOKEN"
+              ]
+            )
+          }
+        '';
+    }
+    {
       title = "it puts git on the service PATH, which atc runs to resolve the ref of a git workspace";
       script =
         let
@@ -220,7 +238,7 @@ let
         '';
     }
     {
-      title = "it links a config.json of the targets, principals, default target, agents and auth profiles where atc reads it";
+      title = "it links a config.json of the targets, principals, default target, agents, auth profiles and workspaces where atc reads it";
       script =
         let
           system = buildDaemonSystem {
@@ -235,6 +253,8 @@ let
                 "gpt-5"
               ];
             };
+            environmentCredentials.FIXTURE_CLONE_TOKEN = "/run/fixture/clone-token";
+            workspaces.gitCredentials.FIXTURE_CLONE_TOKEN.hosts = [ "github.com" ];
           };
         in
         ''
@@ -261,7 +281,8 @@ let
                 "tokenFile": "/run/credentials/atc-daemon.service/imp-token",
                 "url": "http://127.0.0.1:7070"
               }
-            }
+            },
+            "workspaces": { "gitCredentials": { "FIXTURE_CLONE_TOKEN": { "hosts": ["github.com"] } } }
           }
           EOF
 
@@ -326,7 +347,7 @@ let
         '';
     }
     {
-      title = "it leaves defaultTarget, agents and authProfiles out of config.json, and fails no assertion, when they are unset";
+      title = "it leaves defaultTarget, agents, authProfiles and workspaces out of config.json, and fails no assertion, when they are unset";
       script =
         let
           system = buildDaemonSystem { defaultTarget = null; };
@@ -585,7 +606,8 @@ let
               "tokenFile": "/run/credentials/atc-daemon.service/imp-token",
               "url": "http://127.0.0.1:7070"
             }
-          }
+          },
+          "workspaces": { "gitCredentials": { "ATC_GIT_CLONE_TOKEN": { "hosts": ["github.com"] } } }
         }
         EOF
 

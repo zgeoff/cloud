@@ -15,7 +15,7 @@ let
   home = "/var/lib/atc-daemon";
 
   # atc reads $HOME/.config/atc/config.json; this daemon sets only its targets, principals,
-  # agents and auth profiles there
+  # agents, auth profiles and workspaces there
   configFile = json.generate "atc-daemon-config.json" (
     {
       inherit (cfg) targets;
@@ -24,6 +24,7 @@ let
     // lib.optionalAttrs (cfg.defaultTarget != null) { inherit (cfg) defaultTarget; }
     // lib.optionalAttrs (cfg.agents != null) { inherit (cfg) agents; }
     // lib.optionalAttrs (cfg.authProfiles != { }) { inherit (cfg) authProfiles; }
+    // lib.optionalAttrs (cfg.workspaces != { }) { inherit (cfg) workspaces; }
   );
 
   # links the store's config where atc looks; atc writes a default config only when
@@ -89,6 +90,12 @@ let
       )
     }exit "$status"
   '';
+
+  # each clone credential the workspaces settings list that no environment credential sets, so
+  # atc would allow a variable the daemon never holds
+  unsetGitCredentials = lib.filter (name: !(cfg.environmentCredentials ? ${name})) (
+    lib.attrNames (cfg.workspaces.gitCredentials or { })
+  );
 
   # each auth profile that an agent or one of its MCP servers selects and the config does not
   # define
@@ -243,6 +250,20 @@ in
       '';
     };
 
+    workspaces = lib.mkOption {
+      type = json.type;
+      default = { };
+      example = {
+        gitCredentials.ATC_GIT_CLONE_TOKEN.hosts = [ "github.com" ];
+      };
+      description = ''
+        The workspaces settings, as config.json's `workspaces` takes them. `gitCredentials` lists
+        each variable of environmentCredentials that a spawn's credentialRef may name, with the
+        hosts its value may go to; atc refuses a credentialRef it does not list. `{ }` leaves the
+        key out.
+      '';
+    };
+
     principals = lib.mkOption {
       type = lib.types.attrsOf (
         lib.types.submodule {
@@ -276,6 +297,10 @@ in
       {
         assertion = unknownProfiles == [ ];
         message = "services.atc-daemon.agents select auth profiles that services.atc-daemon.authProfiles does not define: ${lib.concatStringsSep ", " unknownProfiles}";
+      }
+      {
+        assertion = unsetGitCredentials == [ ];
+        message = "services.atc-daemon.workspaces.gitCredentials lists variables that services.atc-daemon.environmentCredentials does not set: ${lib.concatStringsSep ", " unsetGitCredentials}";
       }
       {
         assertion = cfg.defaultTarget == null || cfg.targets ? ${cfg.defaultTarget};

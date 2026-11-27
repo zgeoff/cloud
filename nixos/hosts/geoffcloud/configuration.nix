@@ -534,6 +534,8 @@ in
       # session's GitHub broker profile does not apply. A private repo's clone and ref lookup use
       # this token, which is read-only: contents and pull requests read on the boxxy repos.
       environmentCredentials.ATC_GIT_CLONE_TOKEN = "/var/lib/atc-daemon-secrets/git-clone-token";
+      # atc sends a spawn's clone token only to the hosts listed here; every boxxy repo is on GitHub
+      workspaces.gitCredentials.ATC_GIT_CLONE_TOKEN.hosts = [ "github.com" ];
       targets.geoffcloud = {
         provider = "imp";
         url = impdLoopbackURL;
