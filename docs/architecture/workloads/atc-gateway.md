@@ -104,7 +104,7 @@ is the public URL's origin and `/mcp`, and the gateway refuses to start when the
 | --------------- | ------------------------ | ---------------------------------- | ---------------------------------------------------------------------------- |
 | `boxxy`         | `BOXXY_ATC_TOKEN`        | `read`, `spawn`, `message`, `kill` | the cloud daemon, its one target                                             |
 | `boxxy-notices` | `BOXXY_ATC_NOTICE_TOKEN` | `message`                          | the PC daemon, target `local`                                                |
-| `nixie`         | `NIXIE_ATC_TOKEN`        | `read`, `message`, `kill`          | the PC daemon, targets `local` and `cloud`; the cloud daemon, its one target |
+| `nixie`         | `NIXIE_ATC_TOKEN`        | `read`, `spawn`, `message`, `kill` | the PC daemon, targets `local` and `cloud`; the cloud daemon, its one target |
 
 The gateway acts as `service:<client>` at each daemon, and a daemon refuses a principal its
 `principals` does not list. The notice client can message any session on the PC's `local` target, so
@@ -112,10 +112,10 @@ its token holds no `read`, `spawn` or `kill`, and the cloud daemon never lists i
 config lives on the PC, outside this repo
 ([send notices to the owner](../../runbooks/boxxy.md#send-notices-to-the-owner)).
 
-nixie's token holds no `spawn`, so the gateway refuses nixie a new session and a line typed into
-one. The scope waits for an atc fix (GEO-2884). The token sits in 1Password as `nixie-atc-token`, in
-vaults `cloud` and `cloud-deploy`, and in nixie's secrets file as `atc_token`, so a rotation changes
-all three ([nixie's coding sessions](./nixie.md#coding-sessions)).
+nixie's token holds `spawn`, so nixie can start a coding session and steer one, on atc 8.0.0 or
+later (GEO-2884). The token sits in 1Password as `nixie-atc-token`, in vaults `cloud` and
+`cloud-deploy`, and in nixie's secrets file as `atc_token`, so a rotation changes all three
+([nixie's coding sessions](./nixie.md#coding-sessions)).
 
 A read-only client outside the cluster signs in with a secret instead, through the OAuth
 `client_credentials` grant (atc 7.16.0 and later). Stack config `atcGateway.serviceClientDigests`

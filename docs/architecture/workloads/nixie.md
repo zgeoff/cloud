@@ -154,8 +154,8 @@ task list are the owner's data.
 ## Coding sessions
 
 nixie lists, joins, reads, messages and stops coding sessions through the atc gateway, as the
-service client `service:nixie`. Its token holds no `spawn` scope, so the gateway refuses it a start
-and a steer ([service tokens](./atc-gateway.md#service-tokens)). The `coding.atc` section of
+service client `service:nixie`. Its token holds the `spawn` scope, so it can start and steer
+sessions ([service tokens](./atc-gateway.md#service-tokens)). The `coding.atc` section of
 `config.yaml` lists the targets nixie uses: the owner's PC's `local` and `cloud` targets, and
 geoffcloud's one target. Its default target is the PC's `cloud` target, an imp sandbox.
 
