@@ -220,7 +220,7 @@ let
         '';
     }
     {
-      title = "it links a config.json of the targets, principals, default target, agents and auth profiles where atc reads it";
+      title = "it links a config.json of the targets, principals, default target, agents, auth profiles and workspaces where atc reads it";
       script =
         let
           system = buildDaemonSystem {
@@ -235,6 +235,7 @@ let
                 "gpt-5"
               ];
             };
+            workspaces.gitCredentials.FIXTURE_CLONE_TOKEN.hosts = [ "github.com" ];
           };
         in
         ''
@@ -261,7 +262,8 @@ let
                 "tokenFile": "/run/credentials/atc-daemon.service/imp-token",
                 "url": "http://127.0.0.1:7070"
               }
-            }
+            },
+            "workspaces": { "gitCredentials": { "FIXTURE_CLONE_TOKEN": { "hosts": ["github.com"] } } }
           }
           EOF
 
@@ -326,7 +328,7 @@ let
         '';
     }
     {
-      title = "it leaves defaultTarget, agents and authProfiles out of config.json, and fails no assertion, when they are unset";
+      title = "it leaves defaultTarget, agents, authProfiles and workspaces out of config.json, and fails no assertion, when they are unset";
       script =
         let
           system = buildDaemonSystem { defaultTarget = null; };

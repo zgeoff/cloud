@@ -66,7 +66,8 @@ the items, with their copies, before the PR that adds the lines merges.
 
    For a private repo, add `"credentialRef": { "name": "ATC_GIT_CLONE_TOKEN" }` to its git source.
    It names the atc daemon's environment variable that holds a read-only clone token, never the
-   token itself, and it needs a server that takes `credentialRef`.
+   token itself, and it needs a server that takes `credentialRef`. The repo must be on `github.com`,
+   the one host that the daemon's `workspaces.gitCredentials` allows the token to go to.
 
    ```bash
    cd infra
@@ -279,7 +280,9 @@ the session's GitHub broker profile does not apply. For a private repo it reads 
 the environment variable that the spawn's `source.credentialRef.name` names. The boxxy server sends
 `ATC_GIT_CLONE_TOKEN`, and atc runs `git ls-remote` on the host with the same token to resolve the
 ref. Without the variable, a spawn of a private repo fails with `clone_failed` and git's
-`could not read Username` message.
+`could not read Username` message. atc uses the variable only because geoffcloud's
+`services.atc-daemon.workspaces.gitCredentials` lists it for `github.com`. atc refuses a spawn that
+names another variable, or that would send the token to another host, with `bad_args`.
 
 - The token is a read-only fine-grained GitHub token (Contents and Pull requests read on the boxxy
   repos) in the item `boxxy-github-token`, field `credential`, in the `cloud` vault.

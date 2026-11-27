@@ -15,7 +15,7 @@ let
   home = "/var/lib/atc-daemon";
 
   # atc reads $HOME/.config/atc/config.json; this daemon sets only its targets, principals,
-  # agents and auth profiles there
+  # agents, auth profiles and workspaces there
   configFile = json.generate "atc-daemon-config.json" (
     {
       inherit (cfg) targets;
@@ -24,6 +24,7 @@ let
     // lib.optionalAttrs (cfg.defaultTarget != null) { inherit (cfg) defaultTarget; }
     // lib.optionalAttrs (cfg.agents != null) { inherit (cfg) agents; }
     // lib.optionalAttrs (cfg.authProfiles != { }) { inherit (cfg) authProfiles; }
+    // lib.optionalAttrs (cfg.workspaces != { }) { inherit (cfg) workspaces; }
   );
 
   # links the store's config where atc looks; atc writes a default config only when
@@ -240,6 +241,20 @@ in
         `authProfiles` takes them. Each names a secret that impd holds, never its value, and impd's
         broker adds the credential on the way out of the imp. The daemon's impd token must list each
         secret as grantable. `{ }` leaves the key out.
+      '';
+    };
+
+    workspaces = lib.mkOption {
+      type = json.type;
+      default = { };
+      example = {
+        gitCredentials.ATC_GIT_CLONE_TOKEN.hosts = [ "github.com" ];
+      };
+      description = ''
+        The workspaces settings, as config.json's `workspaces` takes them. `gitCredentials` lists
+        each variable of environmentCredentials that a spawn's credentialRef may name, with the
+        hosts its value may go to; atc refuses a credentialRef it does not list. `{ }` leaves the
+        key out.
       '';
     };
 
