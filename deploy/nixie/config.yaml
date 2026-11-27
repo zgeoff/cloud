@@ -488,11 +488,9 @@ code: {}
 # section is here, and the empty section keeps nixie's defaults, such as a Gmail poll every 2m
 google: {}
 
-# coding sessions through the atc gateway, as its service client service:nixie
-# (docs/architecture/workloads/atc-gateway.md#service-tokens). The token is the sops file's
-# atc_token entry. Each daemon's own config grants the client these targets: the owner's PC
-# (home-pc) its local machine and its imp sandboxes, and geoffcloud its imps. A start that names no
-# target runs in an imp sandbox from the PC, the safer default.
+# coding sessions through the atc gateway as service:nixie, with the sops file's atc_token; each
+# daemon grants these targets itself (docs/architecture/workloads/nixie.md#coding-sessions), and a
+# start that names no target runs in an imp sandbox from the PC, the safer default
 coding:
   atc:
     url: https://atc.geoff.cloud/mcp

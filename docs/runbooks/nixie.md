@@ -302,8 +302,10 @@ When the pod's age identity changes, put its public half in `deploy/nixie/.sops.
 
 ## Deploy or upgrade
 
-1. For the first deploy, once the secrets file holds `impd_token`, add the stack config `nixie` in
-   one PR. Setting it approves the deploy, and the program creates nothing for nixie without it:
+1. For the first deploy, once the secrets file holds `impd_token` and `atc_token`, add the stack
+   config `nixie` in one PR. nixie refuses to start while `config.yaml` sets `coding.atc` and the
+   secrets file has no `atc_token`. Setting it approves the deploy, and the program creates nothing
+   for nixie without it:
 
    ```yaml
    geoff-cloud:nixie:
