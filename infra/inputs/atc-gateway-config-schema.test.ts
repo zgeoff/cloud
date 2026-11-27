@@ -530,7 +530,7 @@ test.each([
   [
     'the name of a token client',
     { boxxy: '2'.repeat(64) },
-    'must not name a client that signs in with a token (boxxy, boxxy-notices)',
+    'must not name a client that signs in with a token (boxxy, boxxy-notices, nixie)',
   ],
   [
     'one digest for two clients',

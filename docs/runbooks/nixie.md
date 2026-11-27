@@ -11,22 +11,23 @@ secret the file ever held. Never print a decrypted value, and never put one on a
 
 ## What holds what
 
-| Where                                                | Holds                                                                                                                                                 |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| vault `cloud`, item `nixie-age-host`                 | the age identity that the pod holds; its public half is in `deploy/nixie/.sops.yaml`                                                                  |
-| vault `cloud`, item `nixie-age-recovery`             | the age identity that stays off the host; restores need only it                                                                                       |
-| vault `cloud`, item `nixie-deployment-key`           | the deployment key, 32 random bytes in base64                                                                                                         |
-| vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind every profile on `api.anthropic.com`; impd's model secrets hold copies of it                                            |
-| vault `cloud`, item `nixie-openrouter-credential`    | the OpenRouter key behind every profile on `openrouter.ai`; impd's model secrets hold copies of it                                                    |
-| vault `cloud`, item `nixie-definitions-deploy-key`   | git-sync's read-only deploy key for `zgeoff/nixie-definitions`                                                                                        |
-| vault `nixie`, item `nixie-definitions-export-token` | the token nixie opens skill pull requests in `zgeoff/nixie-definitions` with                                                                          |
-| vault `nixie`, item `nixie-prod-read-token`          | the API token that nixie answers only read procedures for; `config.yaml` lists its SHA-256                                                            |
-| vault `nixie`, item `nixie-prod-kubeconfig`          | a kubeconfig for the `nixie-verify` account, whose token lasts 90 days                                                                                |
-| vault `cloud`, item `nixie-restic`                   | the restic password of nixie's backup data repository                                                                                                 |
-| vault `cloud`, item `nixie-key-restic`               | the restic password of nixie's backup key repository                                                                                                  |
-| vault `cloud`, item `r2-nixie-backup`                | the R2 key, endpoint and bucket of both of nixie's backup repositories                                                                                |
-| `deploy/nixie/secrets.sops.yaml`                     | the deployment key, nixie's impd token, the definitions export token, the owner's settings, the model gateway's control token and the Kagi search key |
-| impd                                                 | the token `nixie`, one model secret per profile, sent to the model gateway, and nixie's sandbox images                                                |
+| Where                                                     | Holds                                                                                                                                                                                  |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| vault `cloud`, item `nixie-age-host`                      | the age identity that the pod holds; its public half is in `deploy/nixie/.sops.yaml`                                                                                                   |
+| vault `cloud`, item `nixie-age-recovery`                  | the age identity that stays off the host; restores need only it                                                                                                                        |
+| vault `cloud`, item `nixie-deployment-key`                | the deployment key, 32 random bytes in base64                                                                                                                                          |
+| vault `cloud`, item `nixie-model-credential`              | the Claude setup token behind every profile on `api.anthropic.com`; impd's model secrets hold copies of it                                                                             |
+| vault `cloud`, item `nixie-openrouter-credential`         | the OpenRouter key behind every profile on `openrouter.ai`; impd's model secrets hold copies of it                                                                                     |
+| vault `cloud`, item `nixie-definitions-deploy-key`        | git-sync's read-only deploy key for `zgeoff/nixie-definitions`                                                                                                                         |
+| vault `nixie`, item `nixie-definitions-export-token`      | the token nixie opens skill pull requests in `zgeoff/nixie-definitions` with                                                                                                           |
+| vault `nixie`, item `nixie-prod-read-token`               | the API token that nixie answers only read procedures for; `config.yaml` lists its SHA-256                                                                                             |
+| vault `nixie`, item `nixie-prod-kubeconfig`               | a kubeconfig for the `nixie-verify` account, whose token lasts 90 days                                                                                                                 |
+| vault `cloud`, item `nixie-restic`                        | the restic password of nixie's backup data repository                                                                                                                                  |
+| vault `cloud`, item `nixie-key-restic`                    | the restic password of nixie's backup key repository                                                                                                                                   |
+| vault `cloud`, item `r2-nixie-backup`                     | the R2 key, endpoint and bucket of both of nixie's backup repositories                                                                                                                 |
+| vaults `cloud` and `cloud-deploy`, item `nixie-atc-token` | nixie's service token at the atc gateway, also in the secrets file as `atc_token`                                                                                                      |
+| `deploy/nixie/secrets.sops.yaml`                          | the deployment key, nixie's impd token, the definitions export token, the owner's settings, the model gateway's control token, the Kagi search key and the atc gateway's service token |
+| impd                                                      | the token `nixie`, one model secret per profile, sent to the model gateway, and nixie's sandbox images                                                                                 |
 
 ## Set up the helpers
 
@@ -291,7 +292,7 @@ secrets file.
    ```
 
    Expect
-   `["connector_credentials","definitions_export_app_key","deployment_key","impd_token","settings"]`.
+   `["atc_token","connector_credentials","definitions_export_app_key","deployment_key","impd_token","settings"]`.
 
 3. Commit the file through a PR. Once CI passes on `main`, the `Deploy prod` workflow applies it
    ([prod apply](./prod-apply.md)).
@@ -301,8 +302,10 @@ When the pod's age identity changes, put its public half in `deploy/nixie/.sops.
 
 ## Deploy or upgrade
 
-1. For the first deploy, once the secrets file holds `impd_token`, add the stack config `nixie` in
-   one PR. Setting it approves the deploy, and the program creates nothing for nixie without it:
+1. For the first deploy, once the secrets file holds `impd_token` and `atc_token`, add the stack
+   config `nixie` in one PR. nixie refuses to start while `config.yaml` sets `coding.atc` and the
+   secrets file has no `atc_token`. Setting it approves the deploy, and the program creates nothing
+   for nixie without it:
 
    ```yaml
    geoff-cloud:nixie:
