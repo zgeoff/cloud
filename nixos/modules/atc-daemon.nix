@@ -91,6 +91,12 @@ let
     }exit "$status"
   '';
 
+  # each clone credential the workspaces settings list that no environment credential sets, so
+  # atc would allow a variable the daemon never holds
+  unsetGitCredentials = lib.filter (name: !(cfg.environmentCredentials ? ${name})) (
+    lib.attrNames (cfg.workspaces.gitCredentials or { })
+  );
+
   # each auth profile that an agent or one of its MCP servers selects and the config does not
   # define
   unknownProfiles = lib.concatLists (
@@ -291,6 +297,10 @@ in
       {
         assertion = unknownProfiles == [ ];
         message = "services.atc-daemon.agents select auth profiles that services.atc-daemon.authProfiles does not define: ${lib.concatStringsSep ", " unknownProfiles}";
+      }
+      {
+        assertion = unsetGitCredentials == [ ];
+        message = "services.atc-daemon.workspaces.gitCredentials lists variables that services.atc-daemon.environmentCredentials does not set: ${lib.concatStringsSep ", " unsetGitCredentials}";
       }
       {
         assertion = cfg.defaultTarget == null || cfg.targets ? ${cfg.defaultTarget};
