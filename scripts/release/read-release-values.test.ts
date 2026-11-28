@@ -168,6 +168,34 @@ test('it reads each asset sum from the release digests for an asset-digests sour
   });
 });
 
+test('it fails without values when the release lists no digest for a pinned asset', async () => {
+  const stub = buildStubRunner(
+    buildStubReleaseGH({
+      releases: {
+        'openai/codex': [
+          {
+            tag: 'rust-v0.172.0',
+            digests: { 'codex-package-x86_64-unknown-linux-musl.tar.gz': null },
+          },
+        ],
+      },
+    }),
+  );
+
+  const read = await readReleaseValues({
+    record: getReleaseRecord('codex'),
+    version: '0.172.0',
+    pinned: ['0.160.1'],
+    run: stub.run,
+  });
+
+  expect(read).toStrictEqual(
+    new Error(
+      'the release lists no sha256 digest for codex-package-x86_64-unknown-linux-musl.tar.gz',
+    ),
+  );
+});
+
 test('it fails without values when the asset-digests release is missing', async () => {
   const stub = buildStubRunner(buildStubReleaseGH({ releases: { 'openai/codex': [] } }));
 

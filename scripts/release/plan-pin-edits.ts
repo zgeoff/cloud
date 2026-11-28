@@ -177,7 +177,8 @@ function resolveSum(asset: Extract<PinPart, { kind: 'sum' }>['asset'], input: Pi
 function findSum(values: ReleaseValues, asset: string) {
   return values.assetSums === undefined
     ? findAssetSum(values.sha256sums ?? '', asset)
-    : (values.assetSums[asset] ?? new Error(`the release lists no sha256 digest for ${asset}`));
+    : ((Object.hasOwn(values.assetSums, asset) ? values.assetSums[asset] : undefined) ??
+        new Error(`the release lists no sha256 digest for ${asset}`));
 }
 
 // a pin may hold the sums of two assets of one release, so a sum named by its asset keys apart

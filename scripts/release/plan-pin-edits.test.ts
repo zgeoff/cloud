@@ -493,3 +493,16 @@ test('it refuses a codex release that lists no digest for the asset', () => {
     ),
   );
 });
+
+test('it refuses an asset that only the object prototype names', () => {
+  const edits = planPinEdits({
+    record: getRecord('pepys'),
+    version: '0.9.0',
+    values: { assetSums: {} },
+    files: {
+      'images/pepys/versions.env': `PEPYS_RELEASE=v0.8.0\nPEPYS_HOST_ASSET=constructor\nPEPYS_HOST_ASSET_SHA256=${'1'.repeat(64)}\n`,
+    },
+  });
+
+  expect(edits).toStrictEqual(new Error('the release lists no sha256 digest for constructor'));
+});

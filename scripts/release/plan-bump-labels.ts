@@ -30,8 +30,7 @@ export function planBumpLabels(
     return new Error(`no pinned version is older than ${version}`);
   }
 
-  // from 1.0 on, patch and minor updates merge on their own; a 0.x minor release is the breaking
-  // one, unless the record says its 0.x minors merge too
+  // from 1.0 on, patch and minor updates merge on their own; a 0.x minor release is the breaking one
   const review =
     update === 'major' ||
     (update === 'minor' && target.major === 0 && options.mergeZeroMinors !== true) ||
