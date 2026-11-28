@@ -21,7 +21,7 @@
     "@mswjs/interceptors": "0.45.12",
     "@types/bun": "1.4.4",
     "@zgeoff/bun-test-extended": "0.2.4",
-    "@zgeoff/testing": "0.4.2",
+    "@zgeoff/testing": "0.4.3",
     "msw": "3.0.6"
   }
 }
