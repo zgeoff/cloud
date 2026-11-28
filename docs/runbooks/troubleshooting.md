@@ -112,6 +112,13 @@ Check `ssh root@geoffcloud systemctl status host-build-lag.service` and its jour
 GitHub's API without a token, so GitHub's rate limit for anonymous requests from the host's address
 can fail it.
 
+### `AgentImageBuildFailed` fires
+
+The host's build of the newest agent image failed, so the `agent` alias, which the `geoffcloud`
+target boots, is still on the previous image. Read `journalctl -u agent-image-build` on the host,
+fix the cause, and remove `/var/lib/agent-image-build/failed/<sha>` so the next run builds the
+commit again, as [`AgentImageBuildFailed`](./agent-image.md#agentimagebuildfailed) describes.
+
 ### `CloudflaredNoConnections` fires
 
 No cloudflared pod holds a tunnel connection, or Prometheus cannot scrape cloudflared's metrics.
