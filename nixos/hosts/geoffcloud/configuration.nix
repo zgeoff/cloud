@@ -514,7 +514,16 @@ in
           profile = "linear";
         };
       };
-      claudeEnv = {
+      # Every Claude entry turns the built-in Artifact tool off, which saves about 14k tokens of
+      # context per session. They go on the entry because the daemon host has no ~/.claude to
+      # copy, and atc's copy of one drops these keys. An entry's settings and env reach the
+      # session's generated --settings file whatever the host holds.
+      noArtifactSettings = {
+        enableArtifact = false;
+        permissions.deny = [ "Artifact" ];
+      };
+      noArtifactEnv.CLAUDE_CODE_DISABLE_ARTIFACT = "1";
+      claudeEnv = noArtifactEnv // {
         CLOUD_FILES_URL = "https://${filesExposure.hostname}/api/files";
         CLOUD_FILES_TOKEN_REF = "op://imp/files-upload-token/credential";
       };
@@ -626,6 +635,7 @@ in
           auth = claudeAuth // {
             profiles = claudeProfiles;
           };
+          settings = noArtifactSettings;
           env = claudeEnv;
         };
         # a worker session of the boxxy server (docs/architecture/workloads/boxxy.md): a Claude
@@ -643,6 +653,7 @@ in
           };
           # a worker image has no git config, so a build session's commit fails without these:
           # the session commits as the owner's GitHub login
+          settings = noArtifactSettings;
           env = claudeEnv // {
             GIT_AUTHOR_NAME = "zgeoff";
             GIT_AUTHOR_EMAIL = "3013783+zgeoff@users.noreply.github.com";
@@ -664,6 +675,8 @@ in
             "pepys-telemetry"
             "boxxy"
           ];
+          settings = noArtifactSettings;
+          env = noArtifactEnv;
         };
         # a Codex session signs in with the ChatGPT subscription through the codex profile, and
         # sends its log records to pepys through the pepys-telemetry profile
