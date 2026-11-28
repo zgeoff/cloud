@@ -38,7 +38,7 @@ test('it finds nothing when every pin holds its newest release', async () => {
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\nARG CODEX_VERSION=0.172.0\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
@@ -73,6 +73,7 @@ test('it finds nothing when every pin holds its newest release', async () => {
         'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
         'zgeoff/noslop': [{ tag: '@noslop/cli@0.4.0' }],
+        'openai/codex': [{ tag: 'rust-v0.172.0' }],
       },
     }),
   );
@@ -89,6 +90,7 @@ test('it finds nothing when every pin holds its newest release', async () => {
     ['gh', 'release', 'list', '-R', 'zgeoff/boxxy'],
     ['gh', 'release', 'list', '-R', 'zgeoff/auto-mode'],
     ['gh', 'release', 'list', '-R', 'zgeoff/noslop'],
+    ['gh', 'release', 'list', '-R', 'openai/codex'],
   ]);
 });
 
@@ -97,7 +99,7 @@ test('it finds the atc line with every pinned version when one pin is older', as
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\nARG CODEX_VERSION=0.172.0\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "2.26.2";\n');
@@ -132,6 +134,7 @@ test('it finds the atc line with every pinned version when one pin is older', as
         'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
         'zgeoff/noslop': [{ tag: '@noslop/cli@0.4.0' }],
+        'openai/codex': [{ tag: 'rust-v0.172.0' }],
       },
     }),
   );
@@ -146,7 +149,7 @@ test('it finds the imp and nixie lines when their pins are older', async () => {
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:0.33.0@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:0.33.0@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\nARG CODEX_VERSION=0.172.0\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
@@ -181,6 +184,7 @@ test('it finds the imp and nixie lines when their pins are older', async () => {
         'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
         'zgeoff/noslop': [{ tag: '@noslop/cli@0.4.0' }],
+        'openai/codex': [{ tag: 'rust-v0.172.0' }],
       },
     }),
   );
@@ -195,7 +199,7 @@ test('it finds the auto-mode line when the agent image pin is older', async () =
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.17.0\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.17.0\nARG CODEX_VERSION=0.172.0\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
@@ -230,6 +234,7 @@ test('it finds the auto-mode line when the agent image pin is older', async () =
         'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
         'zgeoff/noslop': [{ tag: '@noslop/cli@0.4.0' }],
+        'openai/codex': [{ tag: 'rust-v0.172.0' }],
       },
     }),
   );
@@ -244,7 +249,7 @@ test('it finds the noslop line when its image and package pins are older', async
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.3.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.3.0\nARG AUTO_MODE_VERSION=0.19.3\nARG CODEX_VERSION=0.172.0\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
@@ -284,6 +289,7 @@ test('it finds the noslop line when its image and package pins are older', async
         'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
         'zgeoff/noslop': [{ tag: '@noslop/cli@0.4.0' }],
+        'openai/codex': [{ tag: 'rust-v0.172.0' }],
       },
     }),
   );
@@ -298,7 +304,7 @@ test('it finds the boxxy CLI line behind more than 30 newer releases of other bo
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\nARG CODEX_VERSION=0.172.0\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
@@ -338,6 +344,7 @@ test('it finds the boxxy CLI line behind more than 30 newer releases of other bo
         'zgeoff/boxxy': [...servers, { tag: '@boxxy/cli@0.3.0' }, { tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
         'zgeoff/noslop': [{ tag: '@noslop/cli@0.4.0' }],
+        'openai/codex': [{ tag: 'rust-v0.172.0' }],
       },
     }),
   );
@@ -358,6 +365,7 @@ test('it finds the boxxy CLI line behind more than 30 newer releases of other bo
     ['zgeoff/boxxy', '300'],
     ['zgeoff/auto-mode', '30'],
     ['zgeoff/noslop', '30'],
+    ['openai/codex', '30'],
   ]);
 });
 
@@ -366,7 +374,7 @@ test('it takes the highest version among the tags of the dependency own form', a
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.2.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.2.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\nARG CODEX_VERSION=0.172.0\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.2.0";\n');
@@ -406,6 +414,7 @@ test('it takes the highest version among the tags of the dependency own form', a
         'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
         'zgeoff/noslop': [{ tag: '@noslop/cli@0.4.0' }],
+        'openai/codex': [{ tag: 'rust-v0.172.0' }],
       },
     }),
   );
@@ -420,7 +429,7 @@ test('it finds nothing for a pin newer than the newest release', async () => {
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.4.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.4.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\nARG CODEX_VERSION=0.172.0\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
@@ -455,6 +464,7 @@ test('it finds nothing for a pin newer than the newest release', async () => {
         'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
         'zgeoff/noslop': [{ tag: '@noslop/cli@0.4.0' }],
+        'openai/codex': [{ tag: 'rust-v0.172.0' }],
       },
     }),
   );
@@ -512,7 +522,7 @@ test('it fails on a doubled pin', async () => {
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\nARG CODEX_VERSION=0.172.0\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
@@ -557,7 +567,7 @@ test('it fails when a repository has no release of its form', async () => {
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\nARG CODEX_VERSION=0.172.0\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
@@ -601,7 +611,7 @@ test('it gives the gh error when a release list fails', async () => {
 
   await writeFile(
     join(ctx.root, 'images/agent/Dockerfile'),
-    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\nARG CODEX_VERSION=0.172.0\n`,
   );
 
   await writeFile(join(ctx.root, 'nixos/packages/atc.nix'), '  version = "4.3.0";\n');
