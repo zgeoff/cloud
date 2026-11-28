@@ -142,6 +142,7 @@ checkout of `main`.
    bash scripts/install-imp-dns-token.sh
    (cd infra && op run --env-file=../.env -- pulumi stack output --stack prod --show-secrets impdMCPTunnelToken) \
      | tr -d '\n' | put impd-mcp-tunnel-token
+   ssh root@geoffcloud systemctl restart cloudflared-impz
    ```
 
    Expect `ok` three times, then the script's `installed:` line, then `ok` again. The pasted key

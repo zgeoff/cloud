@@ -331,13 +331,15 @@ host, because the daemon reads copies of the token files made when it starts
 
 The `cloudflared-impz` service on the host connects the tunnel that carries `impz.geoff.cloud`, and
 reads the tunnel's token from `/var/lib/imp-host/secrets/impd-mcp-tunnel-token`. The token is the
-`impdMCPTunnelToken` stack output, which only a new tunnel changes. Install it after the first apply
-of the tunnel, after a replace of the tunnel and after a host reinstall. The token goes from the
-stack output to the host on SSH's stdin, so it never reaches a terminal or a command line:
+`impdMCPTunnelToken` stack output, which only a new tunnel changes. If you rotate the token in
+Cloudflare, run `bun run ops:preview -- --refresh` first, so that the output holds the new token.
+Install it after the first apply of the tunnel, after a replace of the tunnel and after a host
+reinstall. The token goes from the stack output to the host on SSH's stdin, so it never reaches a
+terminal or a command line. The host writes the file only when the token is not empty:
 
 ```bash
 (cd infra && op run --env-file=../.env -- pulumi stack output --stack prod --show-secrets impdMCPTunnelToken) \
-  | bun run ops:host -- 'mountpoint -q /var/lib/imp-host/secrets && tr -d "\n" | install -m 400 /dev/stdin /var/lib/imp-host/secrets/impd-mcp-tunnel-token && systemctl restart cloudflared-impz && systemctl is-active cloudflared-impz'
+  | bun run ops:host -- 'mountpoint -q /var/lib/imp-host/secrets && t=$(tr -d "\n") && [ -n "$t" ] && printf %s "$t" | install -m 400 /dev/stdin /var/lib/imp-host/secrets/impd-mcp-tunnel-token && systemctl restart cloudflared-impz && systemctl is-active cloudflared-impz'
 ```
 
 Expect `active`. The unit is skipped while the file is missing, so a host switch before the install
