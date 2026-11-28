@@ -185,7 +185,7 @@ pkgs.testers.runNixOSTest {
             "${mountPoint "rancher"}": ["data", "etc-rancher", "k3s-started", "lost+found"],
             "/var/lib/atc-daemon-secrets": ["atc-daemon-started"],
             "/etc/rancher": ["k3s-started"],
-            "/var/lib/imp-host/secrets": ["imp-host-dns-token-started", "imp-host-started"],
+            "/var/lib/imp-host/secrets": ["cloudflared-impz-started", "imp-host-dns-token-started", "imp-host-started"],
             "/root/imp-db-backups": ["data"],
         }, f"the datasets hold {listing}"
 
