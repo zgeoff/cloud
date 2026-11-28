@@ -504,9 +504,10 @@ coding:
     agent: claude
 
 # outside MCP servers, each through its public door (docs/reference/exposure.md: boxxy-door,
-# pepys-api). Each client ID is a public client that `boxxy auth clients add` and `pepys-api clients
-# add` made for nixie, with nixie's one OAuth return as its redirect URI. A new server waits on Geoff's
-# approval in Proposals, then a sign-in from Settings → MCP servers, then an approval of each tool
+# pepys-api, impd-mcp). Each client ID is a public client that `boxxy auth clients add`,
+# `pepys-api clients add` and `impz oauth client add` made for nixie, with nixie's one OAuth return
+# as its redirect URI. A new server waits on Geoff's approval in Proposals, then a sign-in from
+# Settings → MCP servers, then an approval of each tool
 mcp:
   servers:
     boxxy:
@@ -517,6 +518,10 @@ mcp:
       url: https://pepys.geoff.cloud/mcp
       clientID: mizWGGRbQIZVD6puahvNdlL7C8TUpCaB
       scope: read offline_access
+    impz:
+      url: https://imp.geoff.cloud/mcp
+      clientID: urJ7Gpl3pvMkdahwLyevyeJk2CpU9Whs
+      scope: manage offline_access
 
 # voice calls through GPT-Live: the key is the sops file's connector_credentials entry speech. The
 # price per minute lives in zgeoff/nixie-definitions' voice/voice.yaml, and calls spend against
