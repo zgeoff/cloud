@@ -584,9 +584,11 @@ test.each([
 ])('it leaves the checkout alone when the codex release lists %s', async (_title, digest) => {
   const ctx = await setupTest();
 
+  const dockerfile = `ARG CODEX_VERSION=0.160.1\nARG CODEX_SHA256=${'1'.repeat(64)}\n`;
+
   const checkout = await createCloudCheckout({
     'scripts/release/release-pins.json': '{}\n',
-    'images/agent/Dockerfile': `ARG CODEX_VERSION=0.160.1\nARG CODEX_SHA256=${'1'.repeat(64)}\n`,
+    'images/agent/Dockerfile': dockerfile,
   });
 
   const stub = buildStubRunner(
@@ -615,6 +617,17 @@ test.each([
   ]);
 
   expect(stub.calls.filter((call) => call.argv[0] === 'git')).toStrictEqual([]);
+
+  const changes = await checkout.git(['-C', checkout.clone, 'status', '--porcelain']);
+  const dockerfileAfter = await Bun.file(join(checkout.clone, 'images/agent/Dockerfile')).text();
+
+  const pinsAfter = await Bun.file(
+    join(checkout.clone, 'scripts/release/release-pins.json'),
+  ).text();
+
+  expect(changes).toBe('');
+  expect(dockerfileAfter).toBe(dockerfile);
+  expect(pinsAfter).toBe('{}\n');
 });
 
 test('it refuses a dependency it does not know', async () => {
