@@ -502,7 +502,7 @@ let
         '';
     }
     {
-      title = "it links geoffcloud a config.json whose target names the agent image and its atc, boots each imp elastic at 1024 MiB up to 2048 MiB, and rebinds a session whose profiles changed, whose claude and boxxy sign in through the broker profiles, whose pepys-telemetry profile alone turns on telemetry and sets no variable, whose entries set no OpenTelemetry variable, whose boxxy loads the hook plug-in, the boxxy profile and the codex sign-in and commits as the owner, whose codex signs in through the ChatGPT subscription and selects the pepys-telemetry profile, whose boxxy-review loads the plug-in and takes the read-only clone token as its one GitHub profile, whose boxxy and nixie service clients may use the target, and which gets the verify upload address and the op:// reference of the upload token";
+      title = "it links geoffcloud a config.json whose target names the agent image and its atc, boots each imp elastic at 1024 MiB up to 2048 MiB, and rebinds a session whose profiles changed, whose claude and boxxy sign in through the broker profiles, whose pepys-telemetry profile alone turns on telemetry and sets no variable, whose entries set no OpenTelemetry variable, whose boxxy loads the hook plug-in, the boxxy profile and the codex sign-in and commits as the owner, whose codex signs in through the ChatGPT subscription and selects the pepys-telemetry profile, whose claude, boxxy and boxxy-review turn the Artifact tool off in settings and env, whose boxxy-review loads the plug-in and takes the read-only clone token as its one GitHub profile, whose boxxy and nixie service clients may use the target, and which gets the verify upload address and the op:// reference of the upload token";
       script = ''
         jq -S . > expected <<'EOF'
         {
@@ -514,6 +514,7 @@ let
                 "profiles": ["claude", "github", "linear", "op-connect", "pepys-telemetry", "boxxy", "codex"]
               },
               "env": {
+                "CLAUDE_CODE_DISABLE_ARTIFACT": "1",
                 "CLOUD_FILES_TOKEN_REF": "op://imp/files-upload-token/credential",
                 "CLOUD_FILES_URL": "https://files.geoff.cloud/api/files",
                 "GIT_AUTHOR_EMAIL": "3013783+zgeoff@users.noreply.github.com",
@@ -521,12 +522,15 @@ let
                 "GIT_COMMITTER_EMAIL": "3013783+zgeoff@users.noreply.github.com",
                 "GIT_COMMITTER_NAME": "zgeoff"
               },
-              "kind": "claude"
+              "kind": "claude",
+              "settings": { "enableArtifact": false, "permissions": { "deny": ["Artifact"] } }
             },
             "boxxy-review": {
               "args": ["--plugin-dir", "/opt/boxxy/hook-plugin"],
               "auth": { "profiles": ["claude", "github-review", "pepys-telemetry", "boxxy"] },
-              "kind": "claude"
+              "env": { "CLAUDE_CODE_DISABLE_ARTIFACT": "1" },
+              "kind": "claude",
+              "settings": { "enableArtifact": false, "permissions": { "deny": ["Artifact"] } }
             },
             "claude": {
               "auth": {
@@ -534,9 +538,11 @@ let
                 "profiles": ["claude", "github", "linear", "op-connect", "pepys-telemetry"]
               },
               "env": {
+                "CLAUDE_CODE_DISABLE_ARTIFACT": "1",
                 "CLOUD_FILES_TOKEN_REF": "op://imp/files-upload-token/credential",
                 "CLOUD_FILES_URL": "https://files.geoff.cloud/api/files"
-              }
+              },
+              "settings": { "enableArtifact": false, "permissions": { "deny": ["Artifact"] } }
             },
             "codex": { "auth": { "profiles": ["codex", "github", "pepys-telemetry"] } }
           },
