@@ -329,8 +329,8 @@ in
     # none of it kept in the ordinary-page budget: nixie's sandboxes run on the pool, and a kept
     # 3072 MiB there would only take room from the elastic agent imps
     settings.IMP_PRIORITY_ORDINARY_RAM_MIB = 0;
-    # image builders boot elastic on ordinary pages, off the pool: 1024 MiB at boot, growing to
-    # 2048 MiB, which fits the 16384 MiB of the budget past the pool. impd admits a builder at its max
+    # image builders boot elastic in the ordinary-page budget, off the pool. impd admits a builder
+    # at its max, which fits the 16384 MiB of the budget past the pool
     settings.IMP_BUILD_MEMORY_MIB = 1024;
     settings.IMP_BUILD_MAX_MEMORY_MIB = 2048;
     # the name of this impd in each imp identity token that its broker signs. A service stores the
@@ -556,9 +556,9 @@ in
         # release, each new imp takes a copy of the daemon's binary (packages/atc.nix)
         image = "agent";
         guestATC = "/usr/local/bin/atc";
-        # each new harness imp boots elastic at 1024 MiB on ordinary pages and grows to 2048 MiB
-        # under pressure, so the agents leave the huge page pool to nixie's sandboxes. A session
-        # made before the change keeps its imp's memory
+        # harness imps boot elastic, off the huge page pool, so the agents leave the pool to nixie's
+        # sandboxes. When the host supports them, impd asks for transparent huge pages at an elastic
+        # imp's cold boot, and drops that hint at a wake. An imp keeps the memory it was created with
         memoryMib = 1024;
         maxMemoryMib = 2048;
         # a change to an agent's profiles in this file is the owner's, so a session made before
