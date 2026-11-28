@@ -31,14 +31,14 @@ daemon.
 The release registry in `scripts/release/` holds one record per dependency: its repository, its tag
 form, what its releases publish, and each pin's lines in the files. The bump reads each value it
 writes from the release itself: the atc and boxxy CLI pins take their sums from the release's
-SHA256SUMS, the Codex pin takes its sum from the digest that GitHub's release API lists for the
-asset, since Codex releases ship no SHA256SUMS, the nixie pins take their digests from the release
-notes' `## Images` list, the imp pins take the tag's commit and the images' digests from GitHub and
-GHCR, and the auto-mode pin takes its sum from the npm tarball, which it checks against npm's
-integrity hash and the release's version. The noslop pin holds only a version: the bump waits until
-npm lists the release, and the lock it writes holds each package's integrity hash. Before it writes
-anything, it checks every pin line of the dependency, so a pin at the release with another sum fails
-the bump and changes no file. The bump never moves a pin back to an older release. The check finds a
+SHA256SUMS, the nixie pins take their digests from the release notes' `## Images` list, the imp pins
+take the tag's commit and the images' digests from GitHub and GHCR, and the auto-mode pin takes its
+sum from the npm tarball, which it checks against npm's integrity hash and the release's version.
+Codex releases ship no SHA256SUMS, so the Codex pin takes its sum from the digest that GitHub's
+release API lists for the asset. The noslop pin holds only a version: the bump waits until npm lists
+the release, and the lock it writes holds each package's integrity hash. Before it writes anything,
+it checks every pin line of the dependency, so a pin at the release with another sum fails the bump
+and changes no file. The bump never moves a pin back to an older release. The check finds a
 dependency's newest release among the newest 30 releases of its repository. The boxxy CLI record
 reads 300, because boxxy publishes other packages' releases beside the CLI's.
 
@@ -119,8 +119,8 @@ it `needs-review` when any of these holds:
 
 - The update is major.
 - The update is minor and the new release is 0.x, because a 0.x minor release is the breaking one.
-  The Codex record is the exception: Codex releases a 0.x minor version every few days, so its minor
-  bumps merge on their own, and its major bumps still wait for review.
+  Codex's minor bumps merge on their own, because Codex releases a 0.x minor version every few days.
+  Its major bumps still wait for review.
 - A nixie release in the bump adds migrations (label `migrations`). nixie's migrations run forward
   only, so a revert does not undo them.
 
