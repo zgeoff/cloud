@@ -16,7 +16,10 @@
 # Each run that learns the outcome for the newest commit writes it to node-exporter's textfile
 # collector, in $TEXTFILE_DIR/agent_image_build.prom: agent_image_build_failed{commit="<sha>"} is 1
 # while a failed record for that commit stops its build, and 0 once impd holds the image, or the
-# build passes. A newer commit has no record, so the metric follows the newest commit and the
+# build passes. A run that starts a build, or the move of the alias, writes 0 first, so a retry
+# that passes never holds the alert up, and a run whose script fails after the alias moved to the
+# image leaves no record and writes 0, because the alias is on the newest commit's image. A newer
+# commit has no record, so the metric follows the newest commit and the
 # AgentImageBuildFailed alert resolves on its own once a build passes. A run that exits before it
 # knows the outcome leaves the file as it was.
 #
@@ -41,12 +44,15 @@ impz_in_container=/usr/local/bin/impz
 pause="${SLEEP:-sleep}"
 tries="${AGENT_IMAGE_WAIT_TRIES:-120}"
 
-# write_metric <0 or 1>: records whether the build of the newest commit has failed. A write that
-# fails prints a warning and leaves the run's outcome alone.
+# write_metric <0 or 1>: records whether the build of the newest commit has failed. The file is
+# written in $STATE_DIR, which only root can write, and moved into $TEXTFILE_DIR in one rename:
+# $TEXTFILE_DIR belongs to another account, which could swap a file there between its creation and
+# a write that opens it again by name. A write that fails prints a warning and leaves the run's
+# outcome alone.
 write_metric() {
   local tmp
-  if ! tmp=$(mktemp -p "$TEXTFILE_DIR" .agent_image_build.XXXXXX 2> /dev/null); then
-    echo "agent-image-build: warning: cannot write the metric to $TEXTFILE_DIR" >&2
+  if ! tmp=$(mktemp -p "$STATE_DIR" .agent_image_build.XXXXXX 2> /dev/null); then
+    echo "agent-image-build: warning: cannot write the metric under $STATE_DIR" >&2
     return 0
   fi
   cat > "$tmp" << EOF
@@ -55,7 +61,10 @@ write_metric() {
 agent_image_build_failed{commit="$sha"} $1
 EOF
   chmod 0644 "$tmp"
-  mv "$tmp" "$TEXTFILE_DIR/agent_image_build.prom"
+  if ! mv -T "$tmp" "$TEXTFILE_DIR/agent_image_build.prom" 2> /dev/null; then
+    rm -f "$tmp"
+    echo "agent-image-build: warning: cannot write the metric to $TEXTFILE_DIR" >&2
+  fi
 }
 
 clone="$STATE_DIR/cloud"
@@ -164,12 +173,23 @@ else
   script=(scripts/build-agent-image.ts "$sha")
 fi
 
+# a failed record for this commit is gone, or the commit is new, so the metric stops saying the
+# commit failed while the build runs, and a retry that passes never holds the alert up
+write_metric 0
 echo "agent-image-build: $doing"
 status=0
 result=$(cd "$clone" && PATH="$STATE_DIR/bin:$PATH" IMP_URL="$IMP_URL" IMP_TOKEN="$token" \
   "$BUN" "${script[@]}") || status=$?
 if [ "$status" -ne 0 ]; then
   leave_if_imp_host_changed "$what failed with status $status"
+  # A failure after the alias moved, such as the unpinning of old images, leaves the agent alias on
+  # this image: no build is left to retry, so the run keeps no record and reports no failed build.
+  if after=$("$PODMAN" exec -e HOME=/root imp-host impz image ls --json 2> /dev/null) &&
+    [ "$(jq -r --arg name "$image" '[.[] | select(.name == $name and ((.aliases // []) | index("agent")) != null)] | length' <<< "$after" 2> /dev/null)" = 1 ]; then
+    write_metric 0
+    echo "agent-image-build: $what failed with status $status after the agent alias moved to $image: $result" >&2
+    exit 1
+  fi
   mkdir -p "$STATE_DIR/failed"
   date -u +%Y-%m-%dT%H:%M:%SZ > "$failed"
   write_metric 1

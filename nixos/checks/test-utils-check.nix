@@ -2202,6 +2202,27 @@ let
       '';
     }
     {
+      title = "it buildStubAgentImageBun copies the file its observe file names when the call starts, and its images-after file over the images of impd when the call ends";
+      script = ''
+        mkdir home tmp build impd
+        echo before > watched
+        echo "$PWD/watched" > build/observe
+        echo '[1]' > impd/images.json
+        echo '[2]' > build/images-after
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" BUILD_STATE="$PWD/build" IMPD_STATE="$PWD/impd" \
+          ${stubAgentImageBun} scripts/build-agent-image.ts 0123abc > out 2> err || status=$?
+
+        assert_equal "$status" 0
+        diff -u /dev/null err
+        # the observed file
+        assert_equal "$(cat build/observed)" before
+        # impd's images
+        assert_equal "$(cat impd/images.json)" '[2]'
+      '';
+    }
+    {
       title = "it buildStubAgentImageBun fails another call as unexpected, and records none";
       script = ''
         mkdir home tmp build

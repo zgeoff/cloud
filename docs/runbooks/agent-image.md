@@ -229,8 +229,10 @@ The alert fires when the build of the newest commit that changes `images/agent` 
 failure has stood for 15 minutes. `agent` is then still on the previous image, so sessions boot an
 image without that commit's change. The build writes `agent_image_build_failed{commit="<sha>"}` to
 node-exporter's textfile collector: 1 while the commit has a record in
-`/var/lib/agent-image-build/failed/<sha>`, 0 once impd holds its image or a build passes. A newer
-commit takes the series over, so the alert resolves by itself once a build passes.
+`/var/lib/agent-image-build/failed/<sha>`, 0 once impd holds its image, a build starts or a build
+passes. A script that fails after it moved the alias, as when it cannot unpin old images, leaves no
+record and the metric at 0. A newer commit takes the series over, so the alert resolves by itself
+once a build passes.
 
 Read the build's output, fix the cause, and remove the record so the next run builds the commit
 again:

@@ -488,9 +488,8 @@ let
         # the failed builds
         assert [ ! -e state/failed ]
         assert [ ! -L state/failed ]
-        # the textfile metric
-        assert [ ! -e textfile/agent_image_build.prom ]
-        assert [ ! -L textfile/agent_image_build.prom ]
+        # the textfile metric: no record stops the commit, so the build that started wrote 0
+        assert_metric "$pin" 0
       '';
     }
     {
@@ -520,9 +519,8 @@ let
         # the failed builds
         assert [ ! -e state/failed ]
         assert [ ! -L state/failed ]
-        # the textfile metric
-        assert [ ! -e textfile/agent_image_build.prom ]
-        assert [ ! -L textfile/agent_image_build.prom ]
+        # the textfile metric: no record stops the commit, so the build that started wrote 0
+        assert_metric "$pin" 0
       '';
     }
     {
@@ -750,6 +748,73 @@ let
 
         run_build
 
+        assert_equal "$status" 0
+        assert_metric "$pin" 0
+      '';
+    }
+    {
+      title = "it reports a commit whose record was removed as not failed while its retry builds, and as not failed once the retry passes";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container/usr/local/bin
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        echo '[]' > impd/images.json
+        printf '#!/bin/sh\n' > impd/container/usr/local/bin/impz
+        echo c0ffee01 > impd/container-ids
+        printf 'imp_fixture_build_token' > credentials/imp-token
+        echo "check failed" > build/stdout
+        echo 1 > build/status
+        run_build
+        assert_equal "$status" 1
+        assert_metric "$pin" 1
+
+        # the retry reads the metric while its build runs
+        rm "state/failed/$pin"
+        echo "$PWD/textfile/agent_image_build.prom" > build/observe
+        echo "$image imp-build-aa check passed" > build/stdout
+        echo 0 > build/status
+
+        run_build
+
+        assert_equal "$status" 0
+        # what the textfile held while the build ran
+        assert_equal "$(grep '^agent_image_build_failed' build/observed)" "agent_image_build_failed{commit=\"$pin\"} 0"
+        assert_metric "$pin" 0
+      '';
+    }
+    {
+      title = "it leaves no record and reports no failed build when the script fails after the agent alias moved to the image";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container/usr/local/bin
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        echo '[]' > impd/images.json
+        printf '#!/bin/sh\n' > impd/container/usr/local/bin/impz
+        echo c0ffee01 > impd/container-ids
+        printf 'imp_fixture_build_token' > credentials/imp-token
+        # the script moves the alias, then fails to unpin the old images
+        jq -n --arg name "$image" \
+          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true, aliases: ["agent"]}]' > build/images-after
+        echo "could not unpin an old image" > build/stdout
+        echo 1 > build/status
+
+        run_build
+
+        assert_equal "$status" 1
+        assert_equal "$(cat stderr)" "agent-image-build: the build of $image from $pin failed with status 1 after the agent alias moved to $image: could not unpin an old image"
+        # the failed builds
+        assert [ ! -e state/failed ]
+        assert [ ! -L state/failed ]
+        assert_metric "$pin" 0
+
+        # a later run finds the image aliased
+        run_build
         assert_equal "$status" 0
         assert_metric "$pin" 0
       '';
