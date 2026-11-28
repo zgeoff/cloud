@@ -640,13 +640,39 @@ let
         assert_equal "$(cat stdout)" "agent-image-build: the build of $image from $pin failed at 2026-01-02T03:04:05Z; remove $PWD/state/failed/$pin to build it again"
         diff -u /dev/null stderr
         # the podman calls
-        assert [ ! -e impd/calls ]
-        assert [ ! -L impd/calls ]
+        assert_equal "$(cat impd/calls)" '["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]'
         # the build calls
         assert [ ! -e build/calls ]
         assert [ ! -L build/calls ]
         # the textfile metric
         assert_metric "$pin" 1
+      '';
+    }
+    {
+      title = "it reports no failed build for a commit with a failed record once the agent alias names its image";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent state/failed
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        jq -n --arg name "$image" \
+          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true, aliases: ["agent"]}]' > impd/images.json
+        printf 'imp_fixture_build_token' > credentials/imp-token
+        echo 2026-01-02T03:04:05Z > "state/failed/$pin"
+
+        run_build
+
+        assert_equal "$status" 0
+        # the script's stdout
+        assert_equal "$(cat stdout)" "agent-image-build: impd holds $image, built from $pin; nothing to build"
+        diff -u /dev/null stderr
+        # the build calls
+        assert [ ! -e build/calls ]
+        assert [ ! -L build/calls ]
+        # the textfile metric
+        assert_metric "$pin" 0
       '';
     }
     {

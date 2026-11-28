@@ -203,10 +203,12 @@ image is `agent` counts as booting the image that `agent` names when the build r
 The atc daemon's `geoffcloud` target names the image `agent` in
 `nixos/hosts/geoffcloud/configuration.nix`, so a new session boots whichever image the alias names
 at its create. After a passing build moves the alias, the next spawn boots the new image, with no
-edit to that file and no switch of the host. An atc bump therefore needs no change to the target:
-the pin's commit changes `images/agent`, the host builds and checks the image, and the sessions that
-spawn after the alias moves boot an image that ships the new atc, so none copies the daemon's
-binary. An imp keeps the image it was created from.
+edit to that file and no switch of the host. An atc bump needs no change to the target, because the
+pin's commit changes `images/agent` and the host builds and checks the image. A new session copies
+the daemon's binary only while the image's atc differs from the daemon's, which lasts from the alias
+move until the switch that brings in the new daemon. Follow
+[Roll out an atc release](#roll-out-an-atc-release) to keep that time short. An imp keeps the image
+it was created from.
 
 Roll the alias back to the previous image, when a new image breaks sessions, inside imp-host. Unpin
 the bad image first, because the host's timer moves `agent` to the newest image that holds a pin and

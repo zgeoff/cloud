@@ -15,8 +15,8 @@
 #
 # Each run that learns the outcome for the newest commit writes it to node-exporter's textfile
 # collector, in $TEXTFILE_DIR/agent_image_build.prom: agent_image_build_failed{commit="<sha>"} is 1
-# while a failed record for that commit stops its build, and 0 once impd holds the image, or the
-# build passes. A run that starts a build, or the move of the alias, writes 0 first, so a retry
+# while a failed record for that commit stops its build and the agent alias is not on its image,
+# and 0 once impd holds the image, or the build passes. A run that starts a build, or the move of the alias, writes 0 first, so a retry
 # that passes never holds the alert up, and a run whose script fails after the alias moved to the
 # image leaves no record and writes 0, because the alias is on the newest commit's image. A newer
 # commit has no record, so the metric follows the newest commit and the
@@ -60,8 +60,7 @@ write_metric() {
 # TYPE agent_image_build_failed gauge
 agent_image_build_failed{commit="$sha"} $1
 EOF
-  chmod 0644 "$tmp"
-  if ! mv -T "$tmp" "$TEXTFILE_DIR/agent_image_build.prom" 2> /dev/null; then
+  if ! { chmod 0644 "$tmp" && mv -T "$tmp" "$TEXTFILE_DIR/agent_image_build.prom" 2> /dev/null; }; then
     rm -f "$tmp"
     echo "agent-image-build: warning: cannot write the metric to $TEXTFILE_DIR" >&2
   fi
@@ -82,11 +81,6 @@ fi
 image="agent-$(git -C "$clone" rev-parse --short "$sha")"
 
 failed="$STATE_DIR/failed/$sha"
-if [ -f "$failed" ]; then
-  write_metric 1
-  echo "agent-image-build: the build of $image from $sha failed at $(cat "$failed"); remove $failed to build it again"
-  exit 0
-fi
 
 err=$(mktemp)
 trap 'rm -f "$err"' EXIT
@@ -124,7 +118,19 @@ state=$(jq -r --arg name "$image" --argjson switchOnly "$switch_only" '
   elif .[0].pinned == true and $switchOnly != null and (($switchOnly | index($name)) == null)
   then "unaliased"
   else "unchecked" end' <<< "$images")
-if [ "$state" = aliased ] || [ "$state" = unchecked ]; then
+# the alias on this commit's image outranks a failed record, which a run whose lookup of the alias
+# failed after the alias moved leaves behind
+if [ "$state" = aliased ]; then
+  write_metric 0
+  echo "agent-image-build: impd holds $image, built from $sha; nothing to build"
+  exit 0
+fi
+if [ -f "$failed" ]; then
+  write_metric 1
+  echo "agent-image-build: the build of $image from $sha failed at $(cat "$failed"); remove $failed to build it again"
+  exit 0
+fi
+if [ "$state" = unchecked ]; then
   write_metric 0
   echo "agent-image-build: impd holds $image, built from $sha; nothing to build"
   exit 0
