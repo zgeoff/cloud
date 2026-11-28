@@ -127,7 +127,7 @@ checkout of `main`.
    provider still points at the lost cluster, so an apply fails on the unreachable resources until
    step 14 rebuilds the cluster.
 6. Install imp-host's secret files from the console and 1Password, each on SSH's stdin, then install
-   the DNS token:
+   the DNS token and impd's tunnel token:
 
    ```bash
    put() { ssh root@geoffcloud "mountpoint -q /var/lib/imp-host/secrets && cd /var/lib/imp-host/secrets && (umask 077 && cat > $1) && chmod 400 $1 && echo ok"; }
@@ -144,7 +144,9 @@ checkout of `main`.
 
    Expect `ok` three times, then the script's `installed:` line. The pasted key reaches the host on
    stdin, so it stays out of the shell history and every command line. Then install impd's tunnel
-   token as [Install impd's tunnel token](./workflows.md#install-impds-tunnel-token) describes.
+   token as [Install impd's tunnel token](./workflows.md#install-impds-tunnel-token) describes, and
+   expect `active`. When that command prints nothing, the Pulumi read failed: fix it and run it
+   again.
 
 7. Start a new impd with `ssh root@geoffcloud systemctl start imp-host`. imp's node joins the
    tailnet with the key from step 5, so give `imp-geoffcloud` its tailnet address back, as

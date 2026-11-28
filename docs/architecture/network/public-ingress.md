@@ -251,8 +251,7 @@ layer, and the Pulumi program refuses a route to any other hostname. impd's tail
 `imps.geoff.cloud` never pass through a tunnel
 ([imp on the host](../host/imp.md#dns-and-certificates)).
 
-The host's TLS front, Caddy with one `front-route` entry per hostname, is a module that no host
-enables now. `impz.geoff.cloud` was its one route, and it moved to the impd tunnel above. Use it
-again for a route that cannot take a proxy's limits. Add a front-route entry to the registry with
-the hostname, upstream and paths for the front. Pulumi reads the same entry to create the DNS-only
-records.
+The host's TLS front, Caddy with one `front-route` entry per hostname, is a module that geoffcloud
+leaves off, and the registry holds no front-route entry. To serve a route that cannot take a proxy's
+limits, add a front-route entry to the registry with the hostname, upstream and paths for the front,
+and enable the module. Pulumi reads the same entry to create the DNS-only records.
