@@ -1,22 +1,35 @@
-# services.public-front on a booted VM, serving the registry's impd-mcp route
-# (packages/topology/exposure.json) with its own hostname, upstream and paths, so the check proves
-# the paths the host's front passes, the 404 it gives every other path, and that a name it serves
-# no route for gets no TLS handshake. Two settings differ from
-# the host: Caddy's local CA issues the certificate, since the VM reaches no ACME server, and the
-# rate limit is low enough for a case to pass it. The upstream is impd's public listener stand-in,
-# test-utils/run-stub-mcp-upstream.py, on the route's loopback address; its log shows each request
-# that reached it, as it arrived.
+# services.public-front on a booted VM, serving an example MCP route (geoffcloud serves no route
+# now: impd's moved to a tunnel), so the check proves the paths a front passes, the 404 it gives
+# every other path, and that a name it serves no route for gets no TLS handshake. Two settings
+# differ from a host's: Caddy's local CA issues the certificate, since the VM reaches no ACME
+# server, and the rate limit is low enough for a case to pass it. The upstream is an MCP listener
+# stand-in, test-utils/run-stub-mcp-upstream.py, on the route's loopback address; its log shows
+# each request that reached it, as it arrived.
 # It needs KVM: run `bun run test:nixos public-front-vm`.
 { nixpkgs }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
-  route = builtins.head (
-    builtins.filter (entry: entry.name == "impd-mcp") (import ../exposure.nix).entries
-  );
+  route = {
+    hostname = "mcp.example.test";
+    upstream = "127.0.0.1:7071";
+    paths = [
+      "/mcp"
+      "/.well-known/oauth-authorization-server"
+      "/.well-known/oauth-protected-resource"
+      "/.well-known/oauth-protected-resource/mcp"
+      "/oauth2/authorize"
+      "/oauth2/token"
+      "/oauth2/revoke"
+      "/login"
+      "/enroll"
+      "/consent"
+      "/error"
+    ];
+  };
   upstreamPort = pkgs.lib.last (pkgs.lib.splitString ":" route.upstream);
   events = 20;
   # a name under the zone that the front serves no route for
-  formerHostname = "mcp.geoff.cloud";
+  formerHostname = "other.example.test";
 in
 pkgs.testers.runNixOSTest {
   name = "public-front-vm";

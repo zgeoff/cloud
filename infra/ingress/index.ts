@@ -9,7 +9,7 @@ import { secret } from '@pulumi/pulumi';
 import { atcGatewayPaths } from './atc-gateway-paths.ts';
 import { boxxyDoorPaths } from './boxxy-door-paths.ts';
 import type { TunnelRoute } from './build-tunnel-ingresses.ts';
-import type { GatewayIngress, SignInIngress } from './build-tunnel-route-specs.ts';
+import type { GatewayIngress, ImpdMCPIngress, SignInIngress } from './build-tunnel-route-specs.ts';
 import { createCloudflared } from './create-cloudflared.ts';
 import { createOwnerAccess } from './create-owner-access.ts';
 import type { SidecarTunnel } from './create-sidecar-tunnel.ts';
@@ -41,6 +41,10 @@ interface IngressInputs {
   readonly boxxyDoorHostname?: string | undefined;
   readonly boxxyTunnel?: SidecarTunnel | undefined;
 
+  // impd's public MCP route and the tunnel whose connector runs on the host
+  readonly impdMCPHostname?: string | undefined;
+  readonly impdMCPTunnel?: SidecarTunnel | undefined;
+
   // set only with the files service
   readonly filesRoute: TunnelRoute | undefined;
 
@@ -58,6 +62,8 @@ interface IngressOutputs {
   readonly atcURL?: Output<string>;
   readonly boxxyDoorConfigVersion?: Output<number>;
   readonly boxxyDoorURL?: Output<string>;
+  readonly impdMCPConfigVersion?: Output<number>;
+  readonly impdMCPURL?: Output<string>;
   readonly filesURL?: Output<string>;
   readonly pepysWebhookURL?: Output<string>;
   readonly pepysAPIURL?: Output<string>;
@@ -94,6 +100,7 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
     tunnelID: tunnel.id,
     gateway: createGatewayIngress(inputs, identityProviderID),
     boxxyDoor: createBoxxyDoorIngress(inputs, identityProviderID),
+    impdMCP: createImpdMCPIngress(inputs),
     files: inputs.filesRoute,
     pepys: inputs.pepysRoute,
     pepysAPI: createPepysAPIIngress(inputs, identityProviderID),
@@ -110,6 +117,10 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
       ? {}
       : { boxxyDoorConfigVersion: routes.boxxyDoorConfigVersion }),
     ...(routes.boxxyDoorURL === undefined ? {} : { boxxyDoorURL: routes.boxxyDoorURL }),
+    ...(routes.impdMCPConfigVersion === undefined
+      ? {}
+      : { impdMCPConfigVersion: routes.impdMCPConfigVersion }),
+    ...(routes.impdMCPURL === undefined ? {} : { impdMCPURL: routes.impdMCPURL }),
     ...(routes.filesURL === undefined ? {} : { filesURL: routes.filesURL }),
     ...(routes.pepysURL === undefined ? {} : { pepysWebhookURL: routes.pepysURL }),
     ...(routes.pepysAPIURL === undefined ? {} : { pepysAPIURL: routes.pepysAPIURL }),
@@ -199,6 +210,22 @@ function createBoxxyDoorIngress(
       ownerEmail,
     }),
   };
+}
+
+// impd's route has no Access login, so the hostname and the tunnel are all it needs
+function createImpdMCPIngress(inputs: IngressInputs): ImpdMCPIngress | undefined {
+  const hostname = inputs.impdMCPHostname;
+  const impdMCPTunnel = inputs.impdMCPTunnel;
+
+  if (hostname === undefined) {
+    return undefined;
+  }
+
+  if (impdMCPTunnel === undefined) {
+    throw new Error("impd's MCP route has no tunnel");
+  }
+
+  return { hostname, tunnelID: impdMCPTunnel.tunnelID };
 }
 
 // the browser paths sign the owner in, so the route needs the owner address for their Access

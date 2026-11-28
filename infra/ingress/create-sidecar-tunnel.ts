@@ -19,8 +19,9 @@ interface SidecarTunnelNames {
 }
 
 export function createSidecarTunnel(accountID: string, names: SidecarTunnelNames): SidecarTunnel {
-  // A tunnel of its own: its connector runs as a sidecar in the workload's pod, so the workload
-  // can trust the forwarded client address on loopback, where only that connector reaches it.
+  // A tunnel of its own: its connector runs beside the workload, as a sidecar in its pod or as a
+  // service on the host, so the workload can trust the forwarded client address on loopback, where
+  // only that connector reaches it.
   const tunnel = new ZeroTrustTunnelCloudflared(names.resourceName, {
     accountId: accountID,
     name: names.tunnelName,

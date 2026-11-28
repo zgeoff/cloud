@@ -91,6 +91,10 @@
         inherit nixpkgs imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
+      checks.x86_64-linux.cloudflared-impz = import ./checks/cloudflared-impz.nix {
+        inherit nixpkgs imp;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
       checks.x86_64-linux.impd-settings = import ./checks/impd-settings.nix {
         inherit nixpkgs imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;
@@ -114,10 +118,7 @@
         inherit nixpkgs imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
-      checks.x86_64-linux.public-front = import ./checks/public-front.nix {
-        inherit nixpkgs imp;
-        geoffcloud = self.nixosConfigurations.geoffcloud;
-      };
+      checks.x86_64-linux.public-front = import ./checks/public-front.nix { inherit nixpkgs imp; };
       checks.x86_64-linux.public-front-vm = import ./checks/public-front-vm.nix { inherit nixpkgs; };
       checks.x86_64-linux.bridge-relays = import ./checks/bridge-relays.nix {
         inherit nixpkgs imp;

@@ -140,10 +140,12 @@ checkout of `main`.
      "AWS_DEFAULT_REGION=auto" \
      | put imp-host.env
    bash scripts/install-imp-dns-token.sh
+   (cd infra && op run --env-file=../.env -- pulumi stack output --stack prod --show-secrets impdMCPTunnelToken) \
+     | tr -d '\n' | put impd-mcp-tunnel-token
    ```
 
-   Expect `ok` three times, then the script's `installed:` line. The pasted key reaches the host on
-   stdin, so it stays out of the shell history and every command line.
+   Expect `ok` three times, then the script's `installed:` line, then `ok` again. The pasted key
+   reaches the host on stdin, so it stays out of the shell history and every command line.
 
 7. Start a new impd with `ssh root@geoffcloud systemctl start imp-host`. imp's node joins the
    tailnet with the key from step 5, so give `imp-geoffcloud` its tailnet address back, as

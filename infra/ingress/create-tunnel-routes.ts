@@ -4,6 +4,7 @@ import type { TunnelRoute } from './build-tunnel-ingresses.ts';
 import { buildTunnelRouteSpecs } from './build-tunnel-route-specs.ts';
 import type {
   GatewayIngress,
+  ImpdMCPIngress,
   SignInIngress,
   TunnelRecordSpec,
 } from './build-tunnel-route-specs.ts';
@@ -17,6 +18,9 @@ interface TunnelRoutesInputs {
 
   // set only with the boxxy server's public door
   readonly boxxyDoor?: GatewayIngress | undefined;
+
+  // impd's public MCP route, on a tunnel whose connector runs on the host
+  readonly impdMCP?: ImpdMCPIngress | undefined;
 
   // set only with the files service
   readonly files?: TunnelRoute | undefined;
@@ -34,6 +38,8 @@ interface TunnelRoutesOutputs {
   readonly atcURL?: Output<string>;
   readonly boxxyDoorConfigVersion?: Output<number>;
   readonly boxxyDoorURL?: Output<string>;
+  readonly impdMCPConfigVersion?: Output<number>;
+  readonly impdMCPURL?: Output<string>;
   readonly filesURL?: Output<string>;
   readonly pepysURL?: Output<string>;
   readonly pepysAPIURL?: Output<string>;
@@ -67,6 +73,18 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
             config: { ingresses: specs.boxxyDoor.ingresses },
           }),
           record: createRecord('boxxy', inputs.zoneID, specs.boxxyDoor.record),
+        };
+
+  const impdMCP =
+    specs.impdMCP === undefined
+      ? undefined
+      : {
+          config: new ZeroTrustTunnelCloudflaredConfig('impz', {
+            accountId: inputs.accountID,
+            tunnelId: specs.impdMCP.record.tunnelID,
+            config: { ingresses: specs.impdMCP.ingresses },
+          }),
+          record: createRecord('impz', inputs.zoneID, specs.impdMCP.record),
         };
 
   // after the gateway's CNAME, so a hostname the shared tunnel drops already points elsewhere; a
@@ -109,6 +127,9 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
           boxxyDoorConfigVersion: boxxyDoor.config.version,
           boxxyDoorURL: toURL(boxxyDoor.record),
         }),
+    ...(impdMCP === undefined
+      ? {}
+      : { impdMCPConfigVersion: impdMCP.config.version, impdMCPURL: toURL(impdMCP.record) }),
     ...(files === undefined ? {} : { filesURL: toURL(files) }),
     ...(pepys === undefined ? {} : { pepysURL: toURL(pepys) }),
     ...(pepysAPI === undefined ? {} : { pepysAPIURL: toURL(pepysAPI) }),

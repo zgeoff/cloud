@@ -1,6 +1,7 @@
 import type { Output } from '@pulumi/pulumi';
 import { buildATCTunnelIngresses } from './build-atc-tunnel-ingresses.ts';
 import { buildBoxxyDoorIngresses } from './build-boxxy-door-ingresses.ts';
+import { buildImpdMCPIngresses } from './build-impd-mcp-ingresses.ts';
 import { buildPepysAPIRoutes } from './build-pepys-api-routes.ts';
 import { buildPreviewWebhookRoute } from './build-preview-webhook-route.ts';
 import { buildTunnelIngresses } from './build-tunnel-ingresses.ts';
@@ -10,6 +11,12 @@ import type { OriginAccess, TunnelIngress, TunnelRoute } from './build-tunnel-in
 export interface GatewayIngress {
   readonly hostname: string;
   readonly access: OriginAccess;
+  readonly tunnelID: Output<string>;
+}
+
+// a hostname on a tunnel of its own, whose connector runs on the host
+export interface ImpdMCPIngress {
+  readonly hostname: string;
   readonly tunnelID: Output<string>;
 }
 
@@ -37,6 +44,7 @@ export interface TunnelRouteSpecs {
   readonly pepysAPIRecord?: TunnelRecordSpec;
   readonly atc?: SidecarTunnelSpec;
   readonly boxxyDoor?: SidecarTunnelSpec;
+  readonly impdMCP?: SidecarTunnelSpec;
 }
 
 // each route is unset while its service does not run
@@ -46,6 +54,7 @@ interface ServiceRoutes {
   readonly files?: TunnelRoute | undefined;
   readonly pepys?: TunnelRoute | undefined;
   readonly pepysAPI?: SignInIngress | undefined;
+  readonly impdMCP?: ImpdMCPIngress | undefined;
 }
 
 export function buildTunnelRouteSpecs(
@@ -57,6 +66,7 @@ export function buildTunnelRouteSpecs(
   const files = routes.files;
   const pepys = routes.pepys;
   const pepysAPI = routes.pepysAPI;
+  const impdMCP = routes.impdMCP;
   const previewWebhookRoute = buildPreviewWebhookRoute();
 
   return {
@@ -90,6 +100,14 @@ export function buildTunnelRouteSpecs(
           boxxyDoor: {
             ingresses: buildBoxxyDoorIngresses(boxxyDoor.hostname, boxxyDoor.access),
             record: { hostname: boxxyDoor.hostname, tunnelID: boxxyDoor.tunnelID },
+          },
+        }),
+    ...(impdMCP === undefined
+      ? {}
+      : {
+          impdMCP: {
+            ingresses: buildImpdMCPIngresses(impdMCP.hostname),
+            record: { hostname: impdMCP.hostname, tunnelID: impdMCP.tunnelID },
           },
         }),
   };

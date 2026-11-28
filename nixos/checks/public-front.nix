@@ -1,23 +1,49 @@
-# Reads the Caddyfile that geoffcloud's own config gives the TLS front (modules/public-front.nix)
-# and checks it whole, then has the front's own Caddy build, which holds the rate limit handler,
-# validate it. public-front-vm boots the front with Caddy's local CA instead, so this check is the
-# one that covers the host's ACME issuer. Each case runs on its own, in a fresh directory, as a bats test.
+# Reads the Caddyfile that the TLS front (modules/public-front.nix) renders for an example route
+# under its default ACME issuer, which geoffcloud does not enable now that impd's route moved to a
+# tunnel, and checks it whole, then has the front's own Caddy build, which holds the rate limit
+# handler, validate it. public-front-vm boots the front with Caddy's local CA instead, so this check
+# is the one that covers the ACME issuer. Each case runs on its own, in a fresh directory, as a bats test.
 # Run: bun run test:nixos public-front
-{
-  nixpkgs,
-  imp,
-  geoffcloud,
-}:
+{ nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
-  caddy = geoffcloud.config.services.caddy;
+  buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
+  caddy =
+    (buildModuleSystem ../modules/public-front.nix {
+      services.public-front = {
+        enable = true;
+        routes = [
+          {
+            hostname = "mcp.example.test";
+            upstream = "127.0.0.1:7071";
+            paths = [
+              "/mcp"
+              "/.well-known/oauth-authorization-server"
+              "/.well-known/oauth-protected-resource"
+              "/.well-known/oauth-protected-resource/mcp"
+              "/oauth2/authorize"
+              "/oauth2/token"
+              "/oauth2/revoke"
+              "/login"
+              "/enroll"
+              "/consent"
+              "/error"
+            ];
+          }
+        ];
+        rateLimit = {
+          events = 120;
+          window = "1m";
+        };
+      };
+    }).config.services.caddy;
 
   cases = [
     {
-      title = "it writes the Caddyfile of geoffcloud: the impd-mcp paths to the loopback listener of impd, a 404 for any other, and a certificate by TLS-ALPN-01 alone";
+      title = "it writes the Caddyfile of an example route: its paths to the loopback listener, a 404 for any other, and a certificate by TLS-ALPN-01 alone";
       script = ''
         diff -u - ${caddy.configFile} <<'EOF'
         {
@@ -32,7 +58,7 @@ let
         	}
         }
 
-        impz.geoff.cloud {
+        mcp.example.test {
         	tls {
         		issuer acme {
         			disable_http_challenge
@@ -61,7 +87,7 @@ let
       '';
     }
     {
-      title = "it has the Caddy build of the front validate the Caddyfile of geoffcloud";
+      title = "it has the Caddy build of the front validate that Caddyfile";
       script = ''
         mkdir home
         status=0

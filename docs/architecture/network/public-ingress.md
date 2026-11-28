@@ -1,19 +1,18 @@
 # Public ingress
 
-The estate has two ways in from the internet: three Cloudflare tunnels that cloudflared holds open
-from inside the cluster, and a TLS front on the host's public HTTPS port. The host opens no inbound
-port for the tunnels, so a tunnel route exists only as a rule in a tunnel's configuration and a DNS
-record that points at that tunnel, and Pulumi declares both. The TLS front serves
-`impz.geoff.cloud`, imp's own MCP and OAuth route, which a hosted assistant signs in to and calls
-directly at `https://impz.geoff.cloud/mcp`. Each workload behind a route brings its own
-authentication.
+The estate has one way in from the internet: Cloudflare tunnels, four of them, which a cloudflared
+connector holds open from inside the estate. The host opens no inbound port for them, so a tunnel
+route exists only as a rule in a tunnel's configuration and a proxied DNS record that points at that
+tunnel, and Pulumi declares both. Each workload behind a route brings its own authentication.
 
-The atc tunnel serves `atc.geoff.cloud`, the atc gateway, which runs its own OAuth server. The boxxy
-tunnel serves `boxxy.geoff.cloud`, the boxxy server's public door, which runs its own OAuth server
-too. The shared tunnel serves two hostnames, a third while pepys runs, and a fourth while pepys's
-API is public. `preview-webhook.geoff.cloud` reaches the preview service's webhook listener, which
-checks the signature of every GitHub delivery. `files.geoff.cloud` reaches the files service, which
-serves each file to anyone who holds its link and checks a role token on every write.
+The impd tunnel serves `impz.geoff.cloud`, imp's own MCP and OAuth route, which a hosted assistant
+signs in to and calls at `https://impz.geoff.cloud/mcp`. The atc tunnel serves `atc.geoff.cloud`,
+the atc gateway, which runs its own OAuth server. The boxxy tunnel serves `boxxy.geoff.cloud`, the
+boxxy server's public door, which runs its own OAuth server too. The shared tunnel serves two
+hostnames, a third while pepys runs, and a fourth while pepys's API is public.
+`preview-webhook.geoff.cloud` reaches the preview service's webhook listener, which checks the
+signature of every GitHub delivery. `files.geoff.cloud` reaches the files service, which serves each
+file to anyone who holds its link and checks a role token on every write.
 `pepys-webhook.geoff.cloud` reaches pepys ingest, which checks the signature of every GitHub
 delivery. `pepys.geoff.cloud` reaches pepys's API, whose own OAuth server checks every MCP call.
 Cloudflare Access adds an owner-only login in front of the sign-in pages of the gateway, the door
@@ -22,34 +21,9 @@ and pepys's API, and nowhere else. [The atc gateway](../workloads/atc-gateway.md
 [the files service](../workloads/files.md) and [pepys](../workloads/pepys.md) cover what answers
 behind each route.
 
-## The host's TLS front
-
-Caddy on the host serves each front route of the
-[exposure registry](./firewalls.md#the-exposure-registry) on the public addresses' port 443, and
-`impz.geoff.cloud` is its one route. A name it serves no route for, such as another name under the
-zone that points at the host, gets no certificate and so no TLS handshake. The hostname's A and AAAA
-records point straight at the host and are not proxied, for two reasons. Caddy gets the certificate
-itself, through Let's Encrypt's TLS-ALPN-01 challenge on port 443, so port 80 stays shut and the
-host holds no DNS credential for it. And Cloudflare's proxy would end an MCP event stream that stays
-quiet past its read timeout.
-
-The front passes only the route's listed paths, which are impd's MCP, OAuth and discovery paths, to
-impd's public listener. A path matches only as the request sends it, so a case change, a trailing
-slash or a dot segment that would resolve to a listed path gets a 404 from Caddy and never reaches
-impd. imp-host publishes the listener on the host's loopback alone, and impd's public listener
-answers no other route, the API and the dashboard included
-([imp's guide to the public route](https://github.com/zgeoff/impz/blob/main/docs/guides/mcp.md#public-route)).
-Caddy keeps the request's `Host` and `Authorization`, caches nothing and flushes each write at once,
-and it sets no timeout on a response, so the `/mcp` event stream lasts as long as the client and
-impd keep it open.
-
-impd counts its limits per client and grant, never per address, because every request reaches it
-from the front. Caddy therefore limits the requests of each client address, and of each IPv6 /64,
-and answers 429 past the limit. HTTP/3 stays off, so the front needs no UDP port.
-
 ## The tunnels
 
-Every tunnel takes its routes from Cloudflare rather than from a file in the cluster, so a route
+Every tunnel takes its routes from Cloudflare rather than from a file in the estate, so a route
 change is a Pulumi change to a tunnel's configuration, and cloudflared picks it up with no redeploy.
 A tunnel's configuration is an ordered list, and cloudflared takes the first rule that matches. Each
 list ends with a catch-all that answers 404, so a hostname with no rule of its own, or any other
@@ -57,6 +31,36 @@ name that reaches the tunnel, gets a 404 and never a workload. Each rule's patte
 paths only, so any other path, including a variant of a listed one such as `/login/` or `/LOGIN`,
 falls to the catch-all. Each hostname is a proxied CNAME to its tunnel, so it resolves to
 Cloudflare's edge and never to the host.
+
+### The impd tunnel
+
+The impd tunnel serves `impz.geoff.cloud`, which nixie requires: nixie refuses an MCP server whose
+name resolves to the host's own addresses, so a direct record on the host would never connect. The
+proxied CNAME resolves to Cloudflare's addresses, as pepys's and boxxy's names do. Its connector is
+the `cloudflared-impz` service on the host, which `nixos/hosts/geoffcloud/configuration.nix` defines
+and which reaches impd's public listener on the host's loopback address. imp-host publishes that
+listener on the loopback address alone, and impd serves no route there but its own MCP, OAuth and
+discovery paths
+([imp's guide to the public route](https://github.com/zgeoff/impz/blob/main/docs/guides/mcp.md#public-route)).
+
+The tunnel's list holds one rule for the hostname, an exact match of those paths, then the
+catch-all. A path outside the list, such as a case change, a trailing slash or a dot segment that
+would resolve to a listed path, gets the tunnel's 404 and never reaches impd. No Access login fronts
+impd's sign-in pages: impd checks the owner's passkey itself, and the pages were open to the
+internet before the tunnel. cloudflared passes the request's `Host` and `Authorization` through, so
+impd still names `https://impz.geoff.cloud` as its OAuth issuer and resource.
+
+The connector reads the tunnel's token from `impd-mcp-tunnel-token` in the host's secrets directory,
+which the `impdMCPTunnelToken` stack output holds. The unit stays skipped while that file is
+missing, so a host switch never fails on it, and the hostname answers with Cloudflare's error page
+until the connector runs. The host keeps no port 443 open, no TLS front and no certificate for the
+name.
+
+Cloudflare's proxy ends a response that stays silent past its read timeout, and an MCP event stream
+can sit quiet that long. impd's MCP transport writes a keepalive comment to every stream every 5
+seconds, so a stream stays open for as long as the client and impd keep it. The per-address rate
+limit that the host's front applied is gone: impd counts its limits per client and grant, never per
+address, and every request now reaches it from the connector.
 
 ### The shared tunnel
 
@@ -112,11 +116,10 @@ keeps its metrics on loopback, and no external health check watches the hostname
 ## HTTPS and the edge
 
 The zone redirects plain HTTP to HTTPS on every proxied hostname, so a client that names an
-`http://` URL is sent to the encrypted one. The TLS front's hostname is not proxied, and the host
-keeps port 80 shut, so a plain request to it gets no answer at all. The redirect cannot protect a
-bearer token or an authorization code in that first plain request, because the request already holds
-it by the time the edge answers. A client must therefore use `https://` URLs from the start; the
-redirect is for a client that gets it wrong once.
+`http://` URL is sent to the encrypted one. The redirect cannot protect a bearer token or an
+authorization code in that first plain request, because the request already holds it by the time the
+edge answers. A client must therefore use `https://` URLs from the start; the redirect is for a
+client that gets it wrong once.
 
 ## Authentication belongs to the workload
 
@@ -246,8 +249,11 @@ A new public route is the exception in this estate. A service stays on the host 
 unless its PR states why it must be public, and the route is then a tunnel rule ahead of the
 catch-all and a proxied record for its hostname, reviewed in the same preview. The hostname needs a
 public entry in the [exposure registry](./firewalls.md#the-exposure-registry) that names its auth
-layer, and the Pulumi program refuses a route to any other hostname. A route that must hold a stream
-open longer than Cloudflare's proxy allows goes through the host's TLS front instead, as a
-front-route entry, which gives the front its hostname, upstream and paths and Pulumi its DNS
-records. impd's tailnet names under `imps.geoff.cloud` never pass through either way in
-([imp on the host](../host/imp.md#dns-and-certificates)).
+layer, and the Pulumi program refuses a route to any other hostname. A service that sends its own
+keepalives holds a stream open through the proxy. impd's tailnet names under `imps.geoff.cloud`
+never pass through a tunnel ([imp on the host](../host/imp.md#dns-and-certificates)).
+
+The host's TLS front, Caddy with one `front-route` entry per hostname, is a module that no host
+enables now. `impz.geoff.cloud` was its one route, and it moved to the impd tunnel above. A route
+that cannot take a proxy's limits would use it again, with a front-route entry in the registry,
+which gives the front its hostname, upstream and paths and Pulumi its DNS-only records.

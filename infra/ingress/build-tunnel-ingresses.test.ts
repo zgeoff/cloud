@@ -34,12 +34,12 @@ test('it keeps each route in order and limits a route with a path to that path',
   ]);
 });
 
-test("it refuses a hostname that the exposure registry lists for the host's TLS front", () => {
+test('it refuses a hostname that the exposure registry lists for the tailnet only', () => {
   expect(() =>
-    buildTunnelIngresses([buildMockTunnelRoute({ hostname: 'impz.geoff.cloud' })]),
+    buildTunnelIngresses([buildMockTunnelRoute({ hostname: 'pepys-api.geoff.cloud' })]),
   ).toThrowWithMessage(
     Error,
-    'tunnel hostname impz.geoff.cloud is a front-route entry in packages/topology/exposure.json; a route needs a public tunnel-hostname entry',
+    'tunnel hostname pepys-api.geoff.cloud is a tailnet-hostname entry in packages/topology/exposure.json; a route needs a public tunnel-hostname entry',
   );
 });
 

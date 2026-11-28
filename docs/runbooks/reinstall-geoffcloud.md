@@ -158,7 +158,9 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    Expect `tank/cloud/host-secrets[/imp-host] zfs`, then `removed`. Without `removed`, the block
    stopped at the failed step, and the staged copies stay on the root disk. Run
    `bash scripts/install-imp-dns-token.sh` from this machine to restore the DNS token, which the
-   reinstall does not stage. The script refuses to write while the bind is not mounted.
+   reinstall does not stage. The script refuses to write while the bind is not mounted. Then install
+   impd's tunnel token, as [Install impd's tunnel token](./workflows.md#install-impds-tunnel-token)
+   describes.
 
 9. Remove the stale Ubuntu-era Tailscale nodes in the admin console.
 
