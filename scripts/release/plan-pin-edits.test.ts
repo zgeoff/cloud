@@ -455,3 +455,41 @@ test('it refuses a nixie release whose notes list no web image', () => {
     }),
   ).toStrictEqual(new Error('the release lists no nixie-web digest'));
 });
+
+test('it pins a codex release at the asset sum the release lists', () => {
+  const plan = planPinEdits({
+    record: getRecord('codex'),
+    version: '0.172.0',
+    values: {
+      assetSums: { 'codex-package-x86_64-unknown-linux-musl.tar.gz': '4'.repeat(64) },
+    },
+    files: {
+      'images/agent/Dockerfile': `ARG CODEX_VERSION=0.160.1\nARG CODEX_SHA256=${'1'.repeat(64)}\n`,
+    },
+  });
+
+  expect(plan).toStrictEqual({
+    files: {
+      'images/agent/Dockerfile': `ARG CODEX_VERSION=0.172.0\nARG CODEX_SHA256=${'4'.repeat(64)}\n`,
+    },
+    notes: ['pinned codex 0.172.0'],
+    written: getRecord('codex').pins,
+  });
+});
+
+test('it refuses a codex release that lists no digest for the asset', () => {
+  expect(
+    planPinEdits({
+      record: getRecord('codex'),
+      version: '0.172.0',
+      values: { assetSums: {} },
+      files: {
+        'images/agent/Dockerfile': `ARG CODEX_VERSION=0.160.1\nARG CODEX_SHA256=${'1'.repeat(64)}\n`,
+      },
+    }),
+  ).toStrictEqual(
+    new Error(
+      'the release lists no sha256 digest for codex-package-x86_64-unknown-linux-musl.tar.gz',
+    ),
+  );
+});

@@ -7,6 +7,9 @@ import type { Pin, PinPart, ReleaseRecord } from './release-registry.ts';
 
 export interface ReleaseValues {
   readonly sha256sums?: string;
+
+  // each asset's sha256, for a release that ships no SHA256SUMS
+  readonly assetSums?: Readonly<Record<string, string>>;
   readonly digests?: Readonly<Record<string, string>>;
   readonly commit?: string;
   readonly tarballSum?: string;
@@ -163,14 +166,18 @@ function resolvePart<Kind extends keyof PartByKind>(
 
 function resolveSum(asset: Extract<PinPart, { kind: 'sum' }>['asset'], input: PinEditsInput) {
   if (typeof asset === 'string') {
-    return findAssetSum(input.values.sha256sums ?? '', asset);
+    return findSum(input.values, asset);
   }
 
   const named = findPinMatch(input.files, asset);
 
-  return named instanceof Error
-    ? named
-    : findAssetSum(input.values.sha256sums ?? '', named.groups['asset'] ?? '');
+  return named instanceof Error ? named : findSum(input.values, named.groups['asset'] ?? '');
+}
+
+function findSum(values: ReleaseValues, asset: string) {
+  return values.assetSums === undefined
+    ? findAssetSum(values.sha256sums ?? '', asset)
+    : (values.assetSums[asset] ?? new Error(`the release lists no sha256 digest for ${asset}`));
 }
 
 // a pin may hold the sums of two assets of one release, so a sum named by its asset keys apart

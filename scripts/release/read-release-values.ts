@@ -1,5 +1,6 @@
 import type { Runner } from '../run-process.ts';
 import type { ReleaseValues } from './plan-pin-edits.ts';
+import { readAssetDigestsValues } from './read-asset-digests-values.ts';
 import { readImageDigestValues } from './read-image-digest-values.ts';
 import { readNPMPackageValues } from './read-npm-package-values.ts';
 import { readNPMTarballValues } from './read-npm-tarball-values.ts';
@@ -44,6 +45,7 @@ type SourceReaders = {
 // match
 const sourceReaders: SourceReaders = {
   sha256sums: (read) => readSHA256SumsValues(read),
+  'asset-digests': (read) => readAssetDigestsValues(read),
   'image-digests': (read, source) => readImageDigestValues(read, source.images),
   'release-notes': (read) => readReleaseNotesValues(read),
   'npm-tarball': (read, source) => readNPMTarballValues(read, source.packageName),

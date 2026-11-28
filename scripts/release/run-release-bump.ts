@@ -76,7 +76,9 @@ async function readBump(read: ReleaseRead): Promise<Bump | Error> {
     return result;
   }
 
-  const labels = planBumpLabels(read.version, read.pinned, result.flags);
+  const labels = planBumpLabels(read.version, read.pinned, result.flags, {
+    mergeZeroMinors: read.record.mergeZeroMinors,
+  });
 
   return labels instanceof Error ? labels : { values: result.values, labels };
 }
