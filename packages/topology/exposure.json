@@ -142,22 +142,13 @@
       "reason": "nixie's Traefik ingress, which holds the host port on the host's tailnet address only and serves the Ingress objects of the nixie and pepys namespaces: nixie.geoff.cloud, pepys-api.geoff.cloud and pepys-forwarder.geoff.cloud point at that address"
     },
     {
-      "name": "public-front",
-      "kind": "host-port",
-      "protocol": "tcp",
-      "port": 443,
-      "scope": "public",
-      "edge": "HTTPS to the host's TLS front for its public routes",
-      "reason": "The host's TLS front, Caddy, serves each front-route entry's hostname on the public addresses. It also gets its certificates here, by TLS-ALPN-01, so port 80 stays shut"
-    },
-    {
       "name": "impd-mcp-listener",
       "kind": "host-port",
       "protocol": "tcp",
       "port": 7071,
       "scope": "host",
       "interface": "lo",
-      "reason": "impd's public MCP listener, which imp-host publishes on the host's loopback only, so only the TLS front reaches it"
+      "reason": "impd's public MCP listener, which imp-host publishes on the host's loopback only, so only the host's own cloudflared reaches it"
     },
     {
       "name": "k3s-api",
@@ -216,6 +207,14 @@
       "auth": "The API's own OAuth 2.1 server authenticates every MCP call, and an owner-only Cloudflare Access login and the owner's passkey front its sign-in pages"
     },
     {
+      "name": "impd-mcp",
+      "kind": "tunnel-hostname",
+      "hostname": "impz.geoff.cloud",
+      "scope": "public",
+      "reason": "A hosted assistant signs in to imp over OAuth and calls imp's MCP tools. The tunnel's connector is a cloudflared service on the host, and the tunnel carries only impd's MCP, OAuth and discovery paths, to impd's public listener on the host's loopback. Nixie refuses an MCP server whose name resolves to the host's own addresses, and a proxied name resolves to Cloudflare's",
+      "auth": "impd's own OAuth 2.1 server: each MCP call needs an access token, either from a grant that the owner approved with a passkey, for a client that the operator added, or from a service client's secret, whose digest the host config holds"
+    },
+    {
       "name": "pepys-api-tailnet",
       "kind": "tailnet-hostname",
       "hostname": "pepys-api.geoff.cloud",
@@ -228,28 +227,6 @@
       "hostname": "pepys-forwarder.geoff.cloud",
       "scope": "tailnet",
       "reason": "pepys ingest's sender route /forwarded/v1/logs alone, for the telemetry forwarder on the owner's PC. nixie's Traefik serves it on the host's tailnet address and answers 404 on every other path. The route checks only the forwarder's identity token, and ingest reads a whole body before it, so the name stays off the tunnels"
-    },
-    {
-      "name": "impd-mcp",
-      "kind": "front-route",
-      "hostname": "impz.geoff.cloud",
-      "upstream": "127.0.0.1:7071",
-      "paths": [
-        "/mcp",
-        "/.well-known/oauth-authorization-server",
-        "/.well-known/oauth-protected-resource",
-        "/.well-known/oauth-protected-resource/mcp",
-        "/oauth2/authorize",
-        "/oauth2/token",
-        "/oauth2/revoke",
-        "/login",
-        "/enroll",
-        "/consent",
-        "/error"
-      ],
-      "scope": "public",
-      "reason": "A hosted assistant signs in to imp over OAuth and calls imp's MCP tools. The front passes impd's MCP, OAuth and discovery paths only, and impd's public listener answers no other route",
-      "auth": "impd's own OAuth 2.1 server: each MCP call needs an access token, either from a grant that the owner approved with a passkey, for a client that the operator added, or from a service client's secret, whose digest the host config holds"
     },
     {
       "name": "health-check-workers-dev",

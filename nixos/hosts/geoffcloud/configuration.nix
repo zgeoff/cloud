@@ -29,6 +29,8 @@ let
   impdMCPListenerExposure = getHostPort "impd-mcp-listener";
   impdMCPRouteExposure = builtins.head (builtins.filter (entry: entry.name == "impd-mcp") exposure);
   impdMCPListenerPort = toString impdMCPListenerExposure.port;
+  # the tunnel's token, on the imp-host-secrets bind below, which tank/cloud holds
+  impdTunnelTokenFile = "/var/lib/imp-host/secrets/impd-mcp-tunnel-token";
   filesExposure = builtins.head (builtins.filter (entry: entry.name == "files") exposure);
   # atc's daemon listens on the host's tailnet address; the gateway pod dials it there
   atcDaemonAddress = topology.tailnet.nodes.geoffcloud.address;
@@ -310,7 +312,7 @@ in
     ];
     # impd's public MCP route (the registry's impd-mcp entry): impd opens its public listener only
     # with this origin set, and imp-host publishes the listener on the host's loopback alone, where
-    # the TLS front below proxies the route's paths to it
+    # the cloudflared service below carries the route's paths to it
     settings.IMP_MCP_PUBLIC_URL = "https://${impdMCPRouteExposure.hostname}";
     settings.IMP_MCP_PUBLIC_PORT = impdMCPListenerExposure.port;
     publicPorts = [ "127.0.0.1:${impdMCPListenerPort}:${impdMCPListenerPort}" ];
@@ -373,15 +375,49 @@ in
     ];
   };
 
-  # the TLS front on 443 for the registry's front routes (modules/public-front.nix). A hosted MCP
-  # client signs in and calls imp's tools through it, so each address gets a limit of its own:
-  # impd counts its limits per client and grant, never per address
-  services.public-front = {
-    enable = true;
-    routes = [ { inherit (impdMCPRouteExposure) hostname upstream paths; } ];
-    rateLimit = {
-      events = 120;
-      window = "1m";
+  # the connector of impd's public MCP route (the registry's impd-mcp entry). The route's name is a
+  # proxied CNAME to this tunnel, so it resolves to Cloudflare's addresses, which nixie accepts for
+  # an MCP server where it refuses the host's own. The tunnel's rules, which pass only impd's MCP,
+  # OAuth and discovery paths to the listener on loopback, are Pulumi's: cloudflared takes them from
+  # Cloudflare. The token is the Pulumi stack output impdMCPTunnelToken, which the operator installs
+  # (docs/runbooks/workflows.md). The unit stays skipped until the file exists, so a switch before it
+  # still succeeds. Cloudflare's proxy ends a response that stays silent past its read timeout:
+  # impd's MCP stream sends a keepalive every 5 seconds.
+  systemd.services.cloudflared-impz = {
+    description = "cloudflared connector of ${impdMCPRouteExposure.hostname}";
+    wantedBy = [ "multi-user.target" ];
+    wants = [ "network-online.target" ];
+    after = [ "network-online.target" ];
+    unitConfig.ConditionPathExists = impdTunnelTokenFile;
+    serviceConfig = {
+      # root reads the file into the unit's credentials, so the service user never reads the disk
+      LoadCredential = "tunnel-token:${impdTunnelTokenFile}";
+      ExecStart = lib.concatStringsSep " " [
+        (lib.getExe pkgs.cloudflared)
+        "tunnel"
+        "--no-autoupdate"
+        # loopback, so nothing off the host reaches the metrics
+        "--metrics 127.0.0.1:20241"
+        "run"
+        "--token-file %d/tunnel-token"
+      ];
+      Restart = "always";
+      RestartSec = "5s";
+      DynamicUser = true;
+      NoNewPrivileges = true;
+      PrivateTmp = true;
+      PrivateDevices = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      ProtectKernelTunables = true;
+      ProtectControlGroups = true;
+      RestrictAddressFamilies = [
+        "AF_INET"
+        "AF_INET6"
+        "AF_NETLINK"
+        "AF_UNIX"
+      ];
+      CapabilityBoundingSet = "";
     };
   };
 
@@ -442,6 +478,7 @@ in
         "imp-host-secrets"
       ];
       imp-host-dns-token = [ "imp-host-secrets" ];
+      cloudflared-impz = [ "imp-host-secrets" ];
       atc-daemon = [ "atc-daemon-secrets" ];
       preview = [ "host-secrets" ];
       drift-check = [ "host-secrets" ];

@@ -231,3 +231,55 @@ test("it renders the boxxy door's loopback rules on its own tunnel, points its C
 
   expect(boxxyDoorURL).toBe('https://boxxy.geoff.cloud');
 });
+
+test("it renders impd's rules on its own tunnel, points its proxied CNAME there and returns its URL", async () => {
+  const stub = buildStubResourceMocks();
+
+  await runtime.setMocks(stub.mocks, 'geoff-cloud', 'test');
+
+  onTestFinished(() => {
+    stub.release();
+    runtime.resetOptions('', '', -1, '', '', false, '');
+  });
+
+  const routes = createTunnelRoutes({
+    accountID: 'account',
+    zoneID: output('zone'),
+    tunnelID: output('shared-tunnel'),
+    impdMCP: { hostname: 'impz.geoff.cloud', tunnelID: output('impz-tunnel') },
+  });
+
+  invariant(routes.impdMCPURL);
+
+  const impdMCPURL = await resolveOutput(routes.impdMCPURL);
+
+  expect(
+    stub.inputs.get(
+      'cloudflare:index/zeroTrustTunnelCloudflaredConfig:ZeroTrustTunnelCloudflaredConfig::impz',
+    ),
+  ).toStrictEqual({
+    accountId: 'account',
+    tunnelId: 'impz-tunnel',
+    config: {
+      ingresses: [
+        {
+          hostname: 'impz.geoff.cloud',
+          path: String.raw`^(?:/mcp|/\.well-known/oauth-authorization-server|/\.well-known/oauth-protected-resource|/\.well-known/oauth-protected-resource/mcp|/oauth2/authorize|/oauth2/token|/oauth2/revoke|/login|/enroll|/consent|/error)$`,
+          service: 'http://127.0.0.1:7071',
+        },
+        { service: 'http_status:404' },
+      ],
+    },
+  });
+
+  expect(stub.inputs.get('cloudflare:index/dnsRecord:DnsRecord::impz')).toStrictEqual({
+    zoneId: 'zone',
+    name: 'impz.geoff.cloud',
+    type: 'CNAME',
+    content: 'impz-tunnel.cfargotunnel.com',
+    proxied: true,
+    ttl: 1,
+  });
+
+  expect(impdMCPURL).toBe('https://impz.geoff.cloud');
+});

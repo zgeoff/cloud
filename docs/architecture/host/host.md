@@ -68,9 +68,9 @@ The pool's disk, vdb, keeps the read-ahead the kernel derives, because ZFS does 
   ([imp on the host](./imp.md)).
 - **The atc daemon** runs as a NixOS service with its own system user, sandboxed by systemd
   ([the atc gateway](../workloads/atc-gateway.md#the-cloud-daemon)).
-- **The TLS front** is Caddy on the public HTTPS port, which passes the listed paths of imp's public
-  MCP route to impd's loopback listener
-  ([the host's TLS front](../network/public-ingress.md#the-hosts-tls-front)).
+- **cloudflared** (`cloudflared-impz`) is the connector of the tunnel that carries imp's public MCP
+  route to impd's loopback listener
+  ([the impd tunnel](../network/public-ingress.md#the-impd-tunnel)).
 - **The bridge relays** are socket-activated proxies that carry imp-host's requests to three
   Services in the cluster: 1Password Connect
   ([1Password Connect](../workloads/onepassword-connect.md)), pepys ingest for the sessions'

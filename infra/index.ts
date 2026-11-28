@@ -1,4 +1,5 @@
 import { Config, secret } from '@pulumi/pulumi';
+import { exposure } from '@zgeoff/cloud-topology';
 import { createCluster, createClusterProvider } from './cluster/index.ts';
 import { createEdge } from './edge/index.ts';
 import { createIngress, createSidecarTunnel } from './ingress/index.ts';
@@ -47,6 +48,13 @@ const boxxyTunnel =
     ? undefined
     : createSidecarTunnel(accountID, { resourceName: 'boxxy', tunnelName: 'geoff-cloud-boxxy' });
 
+// impd's public MCP route has a tunnel of its own, whose connector is a service on the host, not a
+// pod: the host reads its token from the stack output, so the name resolves to Cloudflare
+const impdMCPTunnel = createSidecarTunnel(accountID, {
+  resourceName: 'impz',
+  tunnelName: 'geoff-cloud-impz',
+});
+
 const workloads =
   k3s === undefined
     ? undefined
@@ -77,6 +85,8 @@ const ingress = createIngress({
   atcTunnel,
   boxxyDoorHostname: boxxyDoor === undefined ? undefined : new URL(boxxyDoor.publicURL).hostname,
   boxxyTunnel,
+  impdMCPHostname: readImpdMCPHostname(),
+  impdMCPTunnel,
   filesRoute: workloads?.filesRoute,
   pepysRoute: workloads?.pepysRoute,
   pepysAPIRoute: workloads?.pepysAPIRoute,
@@ -88,6 +98,9 @@ export const atcTunnelConfigVersion = ingress.atcTunnelConfigVersion;
 export const atcURL = ingress.atcURL;
 export const boxxyDoorConfigVersion = ingress.boxxyDoorConfigVersion;
 export const boxxyDoorURL = ingress.boxxyDoorURL;
+export const impdMCPTunnelToken = impdMCPTunnel.tunnelToken;
+export const impdMCPConfigVersion = ingress.impdMCPConfigVersion;
+export const impdMCPURL = ingress.impdMCPURL;
 export const previewWebhookURL = ingress.previewWebhookURL;
 export const filesURL = ingress.filesURL;
 export const pepysWebhookURL = ingress.pepysWebhookURL;
@@ -116,3 +129,13 @@ const observability = await createObservability({
 export const grafanaURL = observability.grafanaURL;
 export const grafanaAdminPassword = observability.grafanaAdminPassword;
 export const healthCheckCron = observability.healthCheckCron;
+
+function readImpdMCPHostname(): string {
+  const entry = exposure.entries.find((candidate) => candidate.name === 'impd-mcp');
+
+  if (entry?.kind !== 'tunnel-hostname') {
+    throw new Error('the exposure registry has no tunnel-hostname entry named impd-mcp');
+  }
+
+  return entry.hostname;
+}

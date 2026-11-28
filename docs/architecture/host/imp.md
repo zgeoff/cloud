@@ -123,8 +123,9 @@ rereads the token file when it changes, so a rotation needs no restart.
 impd also opens a public MCP listener for `impz.geoff.cloud`, imp's MCP and OAuth route for hosted
 assistants, which names that host as its OAuth issuer and serves MCP at `/mcp`. The public name is
 `impz`, and the tailnet names sit under `imps`. imp-host publishes it on the host's loopback only,
-and the host's TLS front holds the route's name, certificate and DNS records
-([the host's TLS front](../network/public-ingress.md#the-hosts-tls-front)).
+and the `cloudflared-impz` service on the host carries the route's name through a Cloudflare tunnel,
+whose proxied record Pulumi declares
+([the impd tunnel](../network/public-ingress.md#the-impd-tunnel)).
 
 A service client signs in on the same route with a secret and no person present, through OAuth's
 `client_credentials` grant. `services.impd-service-clients` in the host config lists each client

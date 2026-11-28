@@ -195,3 +195,35 @@ test("it routes the pepys API's paths to the API on the shared tunnel, browser p
     pepysAPIRecord: { hostname: 'pepys.geoff.cloud', tunnelID: sharedTunnelID },
   });
 });
+
+test("it points impd's CNAME at its own tunnel and leaves the shared tunnel the preview webhook alone", () => {
+  const sharedTunnelID = output('11111111-1111-4111-8111-111111111111');
+  const impdTunnelID = output('33333333-3333-4333-8333-333333333333');
+
+  expect(
+    buildTunnelRouteSpecs(sharedTunnelID, {
+      impdMCP: { hostname: 'impz.geoff.cloud', tunnelID: impdTunnelID },
+    }),
+  ).toStrictEqual({
+    sharedIngresses: [
+      {
+        hostname: 'preview-webhook.geoff.cloud',
+        path: '^/webhook$',
+        service: 'http://100.69.47.33:8418',
+      },
+      { service: 'http_status:404' },
+    ],
+    previewWebhookRecord: { hostname: 'preview-webhook.geoff.cloud', tunnelID: sharedTunnelID },
+    impdMCP: {
+      ingresses: [
+        {
+          hostname: 'impz.geoff.cloud',
+          path: String.raw`^(?:/mcp|/\.well-known/oauth-authorization-server|/\.well-known/oauth-protected-resource|/\.well-known/oauth-protected-resource/mcp|/oauth2/authorize|/oauth2/token|/oauth2/revoke|/login|/enroll|/consent|/error)$`,
+          service: 'http://127.0.0.1:7071',
+        },
+        { service: 'http_status:404' },
+      ],
+      record: { hostname: 'impz.geoff.cloud', tunnelID: impdTunnelID },
+    },
+  });
+});
