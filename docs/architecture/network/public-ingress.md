@@ -3,9 +3,10 @@
 The estate has two ways in from the internet: three Cloudflare tunnels that cloudflared holds open
 from inside the cluster, and a TLS front on the host's public HTTPS port. The host opens no inbound
 port for the tunnels, so a tunnel route exists only as a rule in a tunnel's configuration and a DNS
-record that points at that tunnel, and Pulumi declares both. The TLS front serves `imp.geoff.cloud`,
-imp's own MCP and OAuth route, which a hosted assistant signs in to and calls directly at
-`https://imp.geoff.cloud/mcp`. Each workload behind a route brings its own authentication.
+record that points at that tunnel, and Pulumi declares both. The TLS front serves
+`impz.geoff.cloud`, imp's own MCP and OAuth route, which a hosted assistant signs in to and calls
+directly at `https://impz.geoff.cloud/mcp`. Each workload behind a route brings its own
+authentication.
 
 The atc tunnel serves `atc.geoff.cloud`, the atc gateway, which runs its own OAuth server. The boxxy
 tunnel serves `boxxy.geoff.cloud`, the boxxy server's public door, which runs its own OAuth server
@@ -25,7 +26,7 @@ behind each route.
 
 Caddy on the host serves each front route of the
 [exposure registry](./firewalls.md#the-exposure-registry) on the public addresses' port 443, and
-`imp.geoff.cloud` is its one route. A name it serves no route for, such as another name under the
+`impz.geoff.cloud` is its one route. A name it serves no route for, such as another name under the
 zone that points at the host, gets no certificate and so no TLS handshake. The hostname's A and AAAA
 records point straight at the host and are not proxied, for two reasons. Caddy gets the certificate
 itself, through Let's Encrypt's TLS-ALPN-01 challenge on port 443, so port 80 stays shut and the
@@ -238,8 +239,8 @@ controls the gateway's pod, Secrets and logs.
 ## Adding a route
 
 Each public service gets one host of its own, `<service>.geoff.cloud`, and a service that speaks MCP
-serves it at `/mcp` on that host, as `atc.geoff.cloud/mcp` and `imp.geoff.cloud/mcp` do. A service's
-OAuth issuer and its discovery metadata name the same host.
+serves it at `/mcp` on that host, as `atc.geoff.cloud/mcp` and `impz.geoff.cloud/mcp` do. A
+service's OAuth issuer and its discovery metadata name the same host.
 
 A new public route is the exception in this estate. A service stays on the host or the tailnet
 unless its PR states why it must be public, and the route is then a tunnel rule ahead of the

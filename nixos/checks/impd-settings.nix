@@ -106,7 +106,7 @@ let
       '';
     }
     {
-      title = "it hands impd the public MCP origin https://imp.geoff.cloud and its listener port 7071";
+      title = "it hands impd the public MCP origin https://impz.geoff.cloud and its listener port 7071";
       script = ''
         assert_equal ${toString (builtins.length envScripts)} 1
         settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
@@ -114,7 +114,7 @@ let
 
         diff -u - actual <<'EOF'
         IMP_MCP_PUBLIC_PORT=7071
-        IMP_MCP_PUBLIC_URL=https://imp.geoff.cloud
+        IMP_MCP_PUBLIC_URL=https://impz.geoff.cloud
         EOF
       '';
     }
@@ -135,7 +135,7 @@ let
               "0444"
             ];
             tokenFile = {
-              resource = "https://imp.geoff.cloud/mcp";
+              resource = "https://impz.geoff.cloud/mcp";
               clients.wringer-ro = {
                 scopes = [ "read" ];
                 secretDigests = [ "51f9e0b8220f5f07e9987a396feeb80c9c31b4b104a8e285587c86b7bc463910" ];

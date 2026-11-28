@@ -521,7 +521,7 @@ mcp:
       clientID: mizWGGRbQIZVD6puahvNdlL7C8TUpCaB
       scope: read offline_access
     impz:
-      url: https://imp.geoff.cloud/mcp
+      url: https://impz.geoff.cloud/mcp
       clientID: urJ7Gpl3pvMkdahwLyevyeJk2CpU9Whs
       scope: manage offline_access
 

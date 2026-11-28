@@ -24,7 +24,7 @@ test('it sends a Location header with a redirect status', async () => {
 test('it leaves a probe of a URL with no stored status unhandled', async () => {
   targetStatuses.set('https://atc.geoff.cloud/', 200);
 
-  const response = await getResponse(handlers, new Request('https://imp.geoff.cloud/'));
+  const response = await getResponse(handlers, new Request('https://impz.geoff.cloud/'));
 
   expect(response).toBeUndefined();
 });
