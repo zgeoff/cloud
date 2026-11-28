@@ -71,8 +71,9 @@ with the atc MCP tools.
    ssh root@geoffcloud podman exec imp-host impz ls < /dev/null | grep harness-
    ```
 
-   Expect one new imp on the image that the `geoffcloud` target names in
-   `nixos/hosts/geoffcloud/configuration.nix`. atc names it `harness-` plus the session ID.
+   Expect one new imp on the image that the `agent` alias names, which the `geoffcloud` target boots
+   (`nixos/hosts/geoffcloud/configuration.nix`); `impz image ls` shows the alias. atc names it
+   `harness-` plus the session ID.
 
 4. Check which atc runs the session's hooks:
 

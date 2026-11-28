@@ -47,6 +47,18 @@ test.each([
             annotations: { summary: 'The host build lag check has not reported for over 3 hours.' },
           },
           {
+            alert: 'AgentImageBuildFailed',
+            expr: 'agent_image_build_failed == 1',
+            for: '15m',
+            labels: { severity: 'warning' },
+            annotations: {
+              summary:
+                'The agent image build of commit {{ $labels.commit }} failed, so the agent alias is still on the previous image.',
+              description:
+                'Read journalctl -u agent-image-build on geoffcloud, fix the cause, then remove /var/lib/agent-image-build/failed/{{ $labels.commit }} so the next run builds the commit again.',
+            },
+          },
+          {
             alert: 'TargetDown',
             expr: 'up == 0',
             for: '5m',
@@ -143,6 +155,18 @@ test("it alerts on geoffcloud's daemon under the plain atc-daemon target, after 
           for: '5m',
           labels: { severity: 'warning' },
           annotations: { summary: 'The host build lag check has not reported for over 3 hours.' },
+        },
+        {
+          alert: 'AgentImageBuildFailed',
+          expr: 'agent_image_build_failed == 1',
+          for: '15m',
+          labels: { severity: 'warning' },
+          annotations: {
+            summary:
+              'The agent image build of commit {{ $labels.commit }} failed, so the agent alias is still on the previous image.',
+            description:
+              'Read journalctl -u agent-image-build on geoffcloud, fix the cause, then remove /var/lib/agent-image-build/failed/{{ $labels.commit }} so the next run builds the commit again.',
+          },
         },
         {
           alert: 'TargetDown',
@@ -256,6 +280,18 @@ test('it alerts on each daemon in order, at its own severity, any but geoffcloud
           annotations: { summary: 'The host build lag check has not reported for over 3 hours.' },
         },
         {
+          alert: 'AgentImageBuildFailed',
+          expr: 'agent_image_build_failed == 1',
+          for: '15m',
+          labels: { severity: 'warning' },
+          annotations: {
+            summary:
+              'The agent image build of commit {{ $labels.commit }} failed, so the agent alias is still on the previous image.',
+            description:
+              'Read journalctl -u agent-image-build on geoffcloud, fix the cause, then remove /var/lib/agent-image-build/failed/{{ $labels.commit }} so the next run builds the commit again.',
+          },
+        },
+        {
           alert: 'TargetDown',
           expr: 'up == 0',
           for: '5m',
@@ -363,6 +399,18 @@ test("it alerts on nixie's failing turns and on a status other than ready from t
           for: '5m',
           labels: { severity: 'warning' },
           annotations: { summary: 'The host build lag check has not reported for over 3 hours.' },
+        },
+        {
+          alert: 'AgentImageBuildFailed',
+          expr: 'agent_image_build_failed == 1',
+          for: '15m',
+          labels: { severity: 'warning' },
+          annotations: {
+            summary:
+              'The agent image build of commit {{ $labels.commit }} failed, so the agent alias is still on the previous image.',
+            description:
+              'Read journalctl -u agent-image-build on geoffcloud, fix the cause, then remove /var/lib/agent-image-build/failed/{{ $labels.commit }} so the next run builds the commit again.',
+          },
         },
         {
           alert: 'TargetDown',

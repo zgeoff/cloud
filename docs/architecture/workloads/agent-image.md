@@ -84,3 +84,7 @@ image, so the daemon never uploads its own binary into a fresh imp. A daemon rea
 at start, so a switch takes effect at the daemon's next restart, which the script never runs itself.
 A switch changes new imps only; an imp keeps the image it was created from
 ([the agent image runbook](../../runbooks/agent-image.md)).
+
+The atc daemon on geoffcloud names the image `agent`, so its sessions follow the alias that the
+host's build moves to each image that passes its check. The `AgentImageBuildFailed` alert fires when
+a build fails and the alias stays on the previous image.

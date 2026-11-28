@@ -195,8 +195,58 @@ passed check makes an image take the alias. A failed move records the commit in
 `/var/lib/agent-image-build/failed/<sha>` like a failed build, so read the journal, fix the cause,
 and remove that file to try again.
 
-Retention keeps the image that `agent` names and the previous passing image pinned. A target whose
-image is `agent` counts as booting the image that `agent` names when the build reads the targets.
+Retention keeps the newest two passing images pinned, which are the image that `agent` names and the
+one before it. A target whose image is `agent` counts as booting the image that `agent` names when
+the build reads the targets.
+
+## The geoffcloud target follows `agent`
+
+The atc daemon's `geoffcloud` target names the image `agent` in
+`nixos/hosts/geoffcloud/configuration.nix`, so a new session boots whichever image the alias names
+at its create. After a passing build moves the alias, the next spawn boots the new image, with no
+edit to that file and no switch of the host. An atc bump needs no change to the target, because the
+pin's commit changes `images/agent` and the host builds and checks the image. A new session copies
+the daemon's binary only while the image's atc differs from the daemon's, which lasts from the alias
+move until the switch that brings in the new daemon. Follow
+[Roll out an atc release](#roll-out-an-atc-release) to keep that time short. An imp keeps the image
+it was created from.
+
+Roll the alias back to the previous image, when a new image breaks sessions, inside imp-host. Unpin
+the bad image first, because the host's timer moves `agent` to the newest image that holds a pin and
+lacks the alias, within 5 minutes, and an unpinned image counts as unchecked, so the timer leaves it
+alone:
+
+```bash
+ssh root@geoffcloud podman exec imp-host impz image ls < /dev/null
+ssh root@geoffcloud podman exec imp-host impz image unpin agent-<bad sha> < /dev/null
+ssh root@geoffcloud podman exec imp-host impz image alias agent agent-<previous sha> < /dev/null
+```
+
+The first command lists the images and shows `agent` on the current one. The previous passing image
+stays pinned, because retention keeps it. The next spawn boots it. The next commit that changes
+`images/agent` builds, and when it passes, moves the alias on.
+
+### `AgentImageBuildFailed`
+
+The alert fires when the build of the newest commit that changes `images/agent` has failed, and the
+failure has stood for 15 minutes. `agent` is then still on the previous image, so sessions boot an
+image without that commit's change. The build writes `agent_image_build_failed{commit="<sha>"}` to
+node-exporter's textfile collector: 1 while the commit has a record in
+`/var/lib/agent-image-build/failed/<sha>`, 0 once impd holds its image, a build starts or a build
+passes. A script that fails after it moved the alias leaves no record and the metric at 0, because
+`agent` already names the commit's image. A newer commit takes the series over, so the alert
+resolves by itself once a build passes.
+
+Read the build's output, fix the cause, and remove the record so the next run builds the commit
+again:
+
+```bash
+ssh root@geoffcloud journalctl -u agent-image-build --since -1d < /dev/null
+ssh root@geoffcloud rm /var/lib/agent-image-build/failed/<sha> < /dev/null
+```
+
+A cause in the image itself needs a new commit that changes `images/agent`; the host builds that
+commit at its next run, and the alert resolves when it passes.
 
 ## Check
 
@@ -283,7 +333,9 @@ The daemon copies its own binary into an imp whose image ships another atc, befo
 session starts, so a fleet of such imps waits on one upload per imp. A new imp on an image that
 ships the daemon's release skips the copy. So the image that ships a release reaches the `cloud`
 target before the daemon runs that release. The daemon reads its targets at startup only, so one
-restart brings the new release and the new image together.
+restart brings the new release and the new image together. The `geoffcloud` target needs no edit,
+because it boots `agent`, as [its section](#the-geoffcloud-target-follows-agent) describes. Switch
+the host to the new daemon after the alias moves to the image that ships the release.
 
 An imp that exists at the restart keeps the image it was created from, and takes the upload at its
 next wake. Restart the daemon when few imps are live, so few wakes pay for it.
@@ -418,6 +470,9 @@ entry.
    with `impz image rm agent-<short sha>`; imp refuses to remove an image that an imp uses.
 
 ## Roll back
+
+This section rolls back the `cloud` target. Roll the `geoffcloud` target back by moving the alias,
+as [its section](#the-geoffcloud-target-follows-agent) describes.
 
 A rollback pins the `cloud` target to the image `agent` named before: the `agent-<short sha>` its PR
 records, `agent-1` before the first image named for a commit, or `coder` before the first agent

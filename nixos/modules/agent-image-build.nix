@@ -3,7 +3,8 @@
 # images/agent once impd holds no image of its name (agent-image-build.sh). The build needs an
 # impd token of manage scope with no imp patterns, which stays on the host: the unit reads it from
 # a root-only file that an operator stages, and is skipped until that file exists. Its output goes
-# to the journal.
+# to the journal, and each run that learns whether the newest commit's build failed writes it as a
+# node-exporter textfile metric, which the AgentImageBuildFailed alert fires on.
 {
   config,
   lib,
@@ -12,6 +13,7 @@
 }:
 let
   cfg = config.services.agent-image-build;
+  topology = import ../topology.nix;
 
   build = pkgs.writeShellApplication {
     name = "agent-image-build";
@@ -47,6 +49,12 @@ in
       description = "A root-only file holding impd's named token for the build (scope manage, no imp patterns).";
     };
 
+    textfileDir = lib.mkOption {
+      type = lib.types.str;
+      default = topology.nodeExporter.textfileDir;
+      description = "The directory node-exporter's textfile collector reads.";
+    };
+
     interval = lib.mkOption {
       type = lib.types.str;
       default = "5min";
@@ -74,6 +82,7 @@ in
         STATE_DIR = "/var/lib/agent-image-build";
         HOME = "/var/lib/agent-image-build";
         IMP_URL = cfg.impdURL;
+        TEXTFILE_DIR = cfg.textfileDir;
         PODMAN = lib.getExe config.virtualisation.podman.package;
         BUN = lib.getExe pkgs.bun;
         # Bun's transpiler cache would write under HOME at every build

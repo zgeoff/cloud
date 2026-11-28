@@ -4,7 +4,8 @@
 # scripts/switch-geoffcloud.sh refuses a pin of another major than the running gateway. The
 # geoffcloud target's image (hosts/geoffcloud/configuration.nix) ships an atc at its guestATC,
 # which hooks run only while it prints this release's version; after a bump here, each new imp
-# gets a copy of this binary instead, until the target names an image that ships the release.
+# gets a copy of this binary instead, until the `agent` alias, which the target boots, names an image
+# that ships the release.
 # The binary stays byte-identical to the release: an imp target copies the daemon's own
 # executable into each Ubuntu guest, so a /nix/store interpreter would break every guest.
 # It asks for /lib64/ld-linux-x86-64.so.2, which the atc-daemon module binds into the

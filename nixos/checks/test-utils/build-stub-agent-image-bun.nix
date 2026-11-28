@@ -8,7 +8,12 @@
 #
 # The state directory holds:
 #   - stdout, optional: the text the call prints on stdout, such as the build's result line;
-#   - status, optional: the exit status of the call, 0 without the file.
+#   - status, optional: the exit status of the call, 0 without the file;
+#   - images-after, optional: impd's images after the call, as the stand-in podman's images.json
+#     holds them; the call copies it to $IMPD_STATE/images.json before it exits, as a build that
+#     moves the agent alias and then fails leaves impd;
+#   - observe, optional: the path of a file to copy to $BUILD_STATE/observed when the call starts,
+#     as a read of what the host says while the build runs.
 #
 # The build script takes [--keep] and one commit on main (scripts/parse-build-agent-image-args.ts);
 # the stand-in answers the form without --keep only. It answers `bun scripts/promote-agent-image.ts
@@ -37,6 +42,12 @@ pkgs.lib.getExe (
       jq -cn --arg cwd "$PWD" --arg impz "$impz" \
         '{argv: $ARGS.positional, cwd: $cwd, impURL: env.IMP_URL, impToken: env.IMP_TOKEN, impz: (if $impz == "" then null else $impz end)}' \
         --args -- "$@" >> "$BUILD_STATE/calls"
+      if [ -f "$BUILD_STATE/observe" ]; then
+        cp "$(cat "$BUILD_STATE/observe")" "$BUILD_STATE/observed"
+      fi
+      if [ -f "$BUILD_STATE/images-after" ]; then
+        cp "$BUILD_STATE/images-after" "$IMPD_STATE/images.json"
+      fi
       if [ -f "$BUILD_STATE/stdout" ]; then
         cat "$BUILD_STATE/stdout"
       fi

@@ -32,12 +32,19 @@ let
   # run_build, which runs the script against the origin, the stand-ins and the case's state, and
   # records its exit status, stdout, stderr and the clock around it.
   setupTest = ''
-    mkdir home tmp state impd build credentials origin
+    mkdir home tmp state impd build credentials origin textfile
     export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
     export GIT_AUTHOR_NAME="Fixture Author" GIT_AUTHOR_EMAIL=author@example.com
     export GIT_COMMITTER_NAME="Fixture Author" GIT_COMMITTER_EMAIL=author@example.com
     git -C origin init -q -b main
     git -C origin config maintenance.auto false
+
+    # assert_metric <commit> <0 or 1>: the one sample the build wrote for the commit
+    assert_metric() {
+      assert_equal "$(grep '^agent_image_build_failed' textfile/agent_image_build.prom)" "agent_image_build_failed{commit=\"$1\"} $2"
+      # the temporary file the write moves into place
+      assert_equal "$(ls -A textfile)" agent_image_build.prom
+    }
 
     run_build() {
       before=$(date +%s)
@@ -46,7 +53,7 @@ let
         GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
         GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=maintenance.auto GIT_CONFIG_VALUE_0=false \
         REPO_URL="$PWD/origin" STATE_DIR="$PWD/state" IMP_URL=http://127.0.0.1:7070 \
-        CREDENTIALS_DIRECTORY="$PWD/credentials" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
+        CREDENTIALS_DIRECTORY="$PWD/credentials" TEXTFILE_DIR="$PWD/textfile" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
         BUN=${stubAgentImageBun} BUILD_STATE="$PWD/build" SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
         AGENT_IMAGE_WAIT_TRIES=3 ${build} > stdout 2> stderr || status=$?
       after=$(date +%s)
@@ -77,6 +84,7 @@ let
                 STATE_DIR = "/var/lib/agent-image-build";
                 HOME = "/var/lib/agent-image-build";
                 IMP_URL = "http://127.0.0.1:7070";
+                TEXTFILE_DIR = "/var/lib/node-exporter/textfile";
                 # the podman module wraps pkgs.podman with the system's runtimes, so the unit runs
                 # the system's own podman
                 PODMAN = "${config.virtualisation.podman.package}/bin/podman";
@@ -212,6 +220,8 @@ let
         # the failed builds
         assert [ ! -e state/failed ]
         assert [ ! -L state/failed ]
+        # the textfile metric
+        assert_metric "$pin" 0
       '';
     }
     {
@@ -244,6 +254,8 @@ let
         diff -u /dev/null stderr
         # the build's argv
         assert_equal "$(jq -c .argv build/calls)" "[\"scripts/build-agent-image.ts\",\"$pin\"]"
+        # the textfile metric
+        assert_metric "$pin" 0
       '';
     }
     {
@@ -275,6 +287,8 @@ let
         # the copied CLI
         assert [ ! -e state/bin ]
         assert [ ! -L state/bin ]
+        # the textfile metric
+        assert_metric "$pin" 0
       '';
     }
     {
@@ -306,6 +320,8 @@ let
         # the failed builds
         assert [ ! -e state/failed ]
         assert [ ! -L state/failed ]
+        # the textfile metric
+        assert_metric "$pin" 0
       '';
     }
     {
@@ -331,6 +347,8 @@ let
         # no move and no build
         assert [ ! -e build/calls ]
         assert [ ! -L build/calls ]
+        # the textfile metric
+        assert_metric "$pin" 0
       '';
     }
     {
@@ -357,6 +375,8 @@ let
         # the script's stderr
         assert_equal "$(cat stderr)" "agent-image-build: the move of the agent alias to $image from $pin failed with status 1: ; remove $PWD/state/failed/$pin to try it again"
         assert [ -f "state/failed/$pin" ]
+        # the textfile metric
+        assert_metric "$pin" 1
       '';
     }
     {
@@ -379,6 +399,8 @@ let
         # the build calls
         assert [ ! -e build/calls ]
         assert [ ! -L build/calls ]
+        # the textfile metric
+        assert_metric "$pin" 0
       '';
     }
     {
@@ -403,6 +425,9 @@ let
         # the build calls
         assert [ ! -e build/calls ]
         assert [ ! -L build/calls ]
+        # the textfile metric
+        assert [ ! -e textfile/agent_image_build.prom ]
+        assert [ ! -L textfile/agent_image_build.prom ]
       '';
     }
     {
@@ -432,6 +457,8 @@ let
         assert_within "$before" "$(date -u -d "$(cat "state/failed/$pin")" +%s)" "$after"
         # the failed builds
         assert_equal "$(ls state/failed)" "$pin"
+        # the textfile metric
+        assert_metric "$pin" 1
       '';
     }
     {
@@ -461,6 +488,8 @@ let
         # the failed builds
         assert [ ! -e state/failed ]
         assert [ ! -L state/failed ]
+        # the textfile metric: no record stops the commit, so the build that started wrote 0
+        assert_metric "$pin" 0
       '';
     }
     {
@@ -490,6 +519,8 @@ let
         # the failed builds
         assert [ ! -e state/failed ]
         assert [ ! -L state/failed ]
+        # the textfile metric: no record stops the commit, so the build that started wrote 0
+        assert_metric "$pin" 0
       '';
     }
     {
@@ -519,6 +550,9 @@ let
         # the failed builds
         assert [ ! -e state/failed ]
         assert [ ! -L state/failed ]
+        # the textfile metric
+        assert [ ! -e textfile/agent_image_build.prom ]
+        assert [ ! -L textfile/agent_image_build.prom ]
       '';
     }
     {
@@ -550,6 +584,9 @@ let
         # the failed builds
         assert [ ! -e state/failed ]
         assert [ ! -L state/failed ]
+        # the textfile metric
+        assert [ ! -e textfile/agent_image_build.prom ]
+        assert [ ! -L textfile/agent_image_build.prom ]
       '';
     }
     {
@@ -578,6 +615,9 @@ let
         # the failed builds
         assert [ ! -e state/failed ]
         assert [ ! -L state/failed ]
+        # the textfile metric
+        assert [ ! -e textfile/agent_image_build.prom ]
+        assert [ ! -L textfile/agent_image_build.prom ]
       '';
     }
     {
@@ -600,11 +640,39 @@ let
         assert_equal "$(cat stdout)" "agent-image-build: the build of $image from $pin failed at 2026-01-02T03:04:05Z; remove $PWD/state/failed/$pin to build it again"
         diff -u /dev/null stderr
         # the podman calls
-        assert [ ! -e impd/calls ]
-        assert [ ! -L impd/calls ]
+        assert_equal "$(cat impd/calls)" '["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]'
         # the build calls
         assert [ ! -e build/calls ]
         assert [ ! -L build/calls ]
+        # the textfile metric
+        assert_metric "$pin" 1
+      '';
+    }
+    {
+      title = "it reports no failed build for a commit with a failed record once the agent alias names its image";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent state/failed
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        jq -n --arg name "$image" \
+          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true, aliases: ["agent"]}]' > impd/images.json
+        printf 'imp_fixture_build_token' > credentials/imp-token
+        echo 2026-01-02T03:04:05Z > "state/failed/$pin"
+
+        run_build
+
+        assert_equal "$status" 0
+        # the script's stdout
+        assert_equal "$(cat stdout)" "agent-image-build: impd holds $image, built from $pin; nothing to build"
+        diff -u /dev/null stderr
+        # the build calls
+        assert [ ! -e build/calls ]
+        assert [ ! -L build/calls ]
+        # the textfile metric
+        assert_metric "$pin" 0
       '';
     }
     {
@@ -669,6 +737,112 @@ let
         # the failed builds
         assert [ ! -e state/failed ]
         assert [ ! -L state/failed ]
+        # the textfile metric
+        assert [ ! -e textfile/agent_image_build.prom ]
+        assert [ ! -L textfile/agent_image_build.prom ]
+      '';
+    }
+    {
+      title = "it reports a failed build until the build of a newer commit passes, and then reports that commit as not failed";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container/usr/local/bin
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        broken=$(git -C origin rev-parse HEAD)
+        echo '[]' > impd/images.json
+        printf '#!/bin/sh\n' > impd/container/usr/local/bin/impz
+        echo c0ffee01 > impd/container-ids
+        printf 'imp_fixture_build_token' > credentials/imp-token
+        echo "check failed" > build/stdout
+        echo 1 > build/status
+        run_build
+        assert_equal "$status" 1
+        assert_metric "$broken" 1
+
+        # a later run skips the broken commit and keeps reporting it
+        run_build
+        assert_equal "$status" 0
+        assert_metric "$broken" 1
+
+        echo 'ARG ATC_VERSION=1.1.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.1.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        echo "$image imp-build-cc check passed" > build/stdout
+        echo 0 > build/status
+
+        run_build
+
+        assert_equal "$status" 0
+        assert_metric "$pin" 0
+      '';
+    }
+    {
+      title = "it reports a commit whose record was removed as not failed while its retry builds, and as not failed once the retry passes";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container/usr/local/bin
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        echo '[]' > impd/images.json
+        printf '#!/bin/sh\n' > impd/container/usr/local/bin/impz
+        echo c0ffee01 > impd/container-ids
+        printf 'imp_fixture_build_token' > credentials/imp-token
+        echo "check failed" > build/stdout
+        echo 1 > build/status
+        run_build
+        assert_equal "$status" 1
+        assert_metric "$pin" 1
+
+        # the retry reads the metric while its build runs
+        rm "state/failed/$pin"
+        echo "$PWD/textfile/agent_image_build.prom" > build/observe
+        echo "$image imp-build-aa check passed" > build/stdout
+        echo 0 > build/status
+
+        run_build
+
+        assert_equal "$status" 0
+        # what the textfile held while the build ran
+        assert_equal "$(grep '^agent_image_build_failed' build/observed)" "agent_image_build_failed{commit=\"$pin\"} 0"
+        assert_metric "$pin" 0
+      '';
+    }
+    {
+      title = "it leaves no record and reports no failed build when the script fails after the agent alias moved to the image";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container/usr/local/bin
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        echo '[]' > impd/images.json
+        printf '#!/bin/sh\n' > impd/container/usr/local/bin/impz
+        echo c0ffee01 > impd/container-ids
+        printf 'imp_fixture_build_token' > credentials/imp-token
+        # the script moves the alias, then fails to unpin the old images
+        jq -n --arg name "$image" \
+          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true, aliases: ["agent"]}]' > build/images-after
+        echo "could not unpin an old image" > build/stdout
+        echo 1 > build/status
+
+        run_build
+
+        assert_equal "$status" 1
+        assert_equal "$(cat stderr)" "agent-image-build: the build of $image from $pin failed with status 1 after the agent alias moved to $image: could not unpin an old image"
+        # the failed builds
+        assert [ ! -e state/failed ]
+        assert [ ! -L state/failed ]
+        assert_metric "$pin" 0
+
+        # a later run finds the image aliased
+        run_build
+        assert_equal "$status" 0
+        assert_metric "$pin" 0
       '';
     }
   ];

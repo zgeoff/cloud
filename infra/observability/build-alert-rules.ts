@@ -16,7 +16,7 @@ export interface AlertRule {
   // notice, not info: the chart's InfoInhibitor silences an info alert while no warning fires
   // beside it
   readonly labels: { readonly severity: 'critical' | 'warning' | 'notice' };
-  readonly annotations: { readonly summary: string };
+  readonly annotations: { readonly summary: string; readonly description?: string };
 }
 
 export interface AlertRuleGroup {
@@ -73,6 +73,27 @@ const hostBuildLagRules: readonly AlertRule[] = [
     for: '5m',
     labels: { severity: 'warning' },
     annotations: { summary: 'The host build lag check has not reported for over 3 hours.' },
+  },
+];
+
+// written by the host's agent image build (nixos/modules/agent-image-build.sh): 1 for the newest
+// commit that changes images/agent while its build has a failed record, 0 once a build passes. A
+// newer commit takes the series over, so the alert resolves by itself when a build passes.
+const agentImageRules: readonly AlertRule[] = [
+  {
+    alert: 'AgentImageBuildFailed',
+    expr: 'agent_image_build_failed == 1',
+
+    // the build records a failure once and skips that commit until a person removes the record, so
+    // the hold only keeps a briefly stale series from paging
+    for: '15m',
+    labels: { severity: 'warning' },
+    annotations: {
+      summary:
+        'The agent image build of commit {{ $labels.commit }} failed, so the agent alias is still on the previous image.',
+      description:
+        'Read journalctl -u agent-image-build on geoffcloud, fix the cause, then remove /var/lib/agent-image-build/failed/{{ $labels.commit }} so the next run builds the commit again.',
+    },
   },
 ];
 
@@ -167,6 +188,7 @@ export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRul
       rules: [
         ...impdRules,
         ...hostBuildLagRules,
+        ...agentImageRules,
         targetDownRule,
         cloudflaredRule,
         ...atcRules,
