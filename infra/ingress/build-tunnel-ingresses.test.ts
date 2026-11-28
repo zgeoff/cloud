@@ -36,10 +36,10 @@ test('it keeps each route in order and limits a route with a path to that path',
 
 test("it refuses a hostname that the exposure registry lists for the host's TLS front", () => {
   expect(() =>
-    buildTunnelIngresses([buildMockTunnelRoute({ hostname: 'imp.geoff.cloud' })]),
+    buildTunnelIngresses([buildMockTunnelRoute({ hostname: 'impz.geoff.cloud' })]),
   ).toThrowWithMessage(
     Error,
-    'tunnel hostname imp.geoff.cloud is a front-route entry in packages/topology/exposure.json; a route needs a public tunnel-hostname entry',
+    'tunnel hostname impz.geoff.cloud is a front-route entry in packages/topology/exposure.json; a route needs a public tunnel-hostname entry',
   );
 });
 

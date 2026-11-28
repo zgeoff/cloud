@@ -54,7 +54,7 @@ test('it records each target under its own name', async () => {
   const ctx = setupTest();
 
   targetStatuses.set('https://atc.geoff.cloud/', 200);
-  targetStatuses.set('https://imp.geoff.cloud/', 502);
+  targetStatuses.set('https://impz.geoff.cloud/', 502);
 
   const bucket = buildStubR2Bucket();
 
@@ -62,7 +62,7 @@ test('it records each target under its own name', async () => {
     STATE: bucket,
     TARGETS: JSON.stringify([
       { name: 'atc', url: 'https://atc.geoff.cloud/' },
-      { name: 'imp', url: 'https://imp.geoff.cloud/' },
+      { name: 'imp', url: 'https://impz.geoff.cloud/' },
     ]),
   });
 

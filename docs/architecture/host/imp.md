@@ -120,9 +120,9 @@ DNS-01 challenge with a token scoped to that job. Pulumi never declares these re
 challenge record, because impd rewrites them at run time and an apply would undo its work. impd
 rereads the token file when it changes, so a rotation needs no restart.
 
-impd also opens a public MCP listener for `imp.geoff.cloud`, imp's MCP and OAuth route for hosted
+impd also opens a public MCP listener for `impz.geoff.cloud`, imp's MCP and OAuth route for hosted
 assistants, which names that host as its OAuth issuer and serves MCP at `/mcp`. The public name is
-`imp`, and the tailnet names sit under `imps`. imp-host publishes it on the host's loopback only,
+`impz`, and the tailnet names sit under `imps`. imp-host publishes it on the host's loopback only,
 and the host's TLS front holds the route's name, certificate and DNS records
 ([the host's TLS front](../network/public-ingress.md#the-hosts-tls-front)).
 
