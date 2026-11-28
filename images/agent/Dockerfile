@@ -118,8 +118,8 @@ RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/boxxy \
 # rg. The sum is the asset digest GitHub lists on the release:
 #   gh api repos/openai/codex/releases/tags/rust-v$VERSION \
 #     --jq '.assets[] | select(.name=="codex-package-x86_64-unknown-linux-musl.tar.gz") | .digest'
-ARG CODEX_VERSION=0.160.1
-ARG CODEX_SHA256=340801565906a7028f6baaa9ab6853addaef221f0016a1417a7c1ffdd96c21f0
+ARG CODEX_VERSION=0.172.0
+ARG CODEX_SHA256=63e3b00065ed7f62166d0522e17f663cb866a31d80d03e63365482ed34a1d991
 RUN curl -fsSL ${CURL_RETRY} -o /tmp/codex.tar.gz \
       "https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}/codex-package-x86_64-unknown-linux-musl.tar.gz" \
  && echo "${CODEX_SHA256}  /tmp/codex.tar.gz" | sha256sum -c - \
