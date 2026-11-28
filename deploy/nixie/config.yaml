@@ -28,8 +28,8 @@ models:
       model: claude-fable-5-2
       effort: medium
       harness: agent-sdk
-      # compact a long conversation at 400k tokens instead of near the full 1M window
-      context_tokens: 400000
+      # compact a long conversation at 600k tokens instead of near the full 1M window
+      context_tokens: 600000
       # keep the cached prompt for an hour, for the conversation and for a task on this model; a
       # profile without cache_ttl keeps the 5m default
       cache_ttl: 1h
@@ -404,8 +404,8 @@ models:
       description:
         OpenAI's GPT-6 Luna in Codex, on the owner's ChatGPT plan. A coding agent for work in code
         and files.
-  # a started task's dollar limits; nixie's defaults are $2 and $10, which Fable 5.1 spends in a few
-  # turns. The turn limits keep nixie's defaults of 25 and 100
+  # a started task's dollar limits, which Fable 5.1 spends in a few turns at nixie's old defaults of
+  # $2 and $10. No turn limit is set, because nixie sets none unless the config does
   limits:
     taskRun:
       default: { dollars: 5 }
