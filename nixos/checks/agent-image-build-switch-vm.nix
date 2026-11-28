@@ -52,7 +52,11 @@ pkgs.testers.runNixOSTest {
       ];
       ExecStart = lib.mkForce "${pkgs.bash}/bin/bash -c 'echo c0ffee02 > ${impdState}/container-ids; exec ${pkgs.coreutils}/bin/sleep infinity'";
     };
-    systemd.tmpfiles.rules = [ "d ${impdState} 0755 root root -" ];
+    systemd.tmpfiles.rules = [
+      "d ${impdState} 0755 root root -"
+      # node-exporter's textfile directory, which the host has, so the build writes its metric
+      "d ${(import ../topology.nix).nodeExporter.textfileDir} 0755 root root -"
+    ];
     environment.systemPackages = [
       pkgs.git
       pkgs.jq
