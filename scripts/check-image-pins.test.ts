@@ -497,6 +497,29 @@ test('it skips an imp agent image name, which impd holds and no registry does', 
   );
 });
 
+test('it skips the imp agent alias, which impd holds and no registry does', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, 'nixos', 'hosts', 'geoffcloud', 'configuration.nix'),
+    '      image = "agent";\n',
+  );
+
+  const exitCode = await checkImagePins({
+    args: [ctx.root],
+    run: ctx.stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(0);
+  expect(ctx.printErr).not.toHaveBeenCalled();
+
+  expect(ctx.printOut).toHaveBeenCalledExactlyOnceWith(
+    'check-image-pins: 0 pins hold: 0 release tags name their pinned digests, and 0 upstream digests are still served\n',
+  );
+});
+
 test('it skips an image placeholder that a runbook fills in before it creates the manifest', async () => {
   const ctx = await setupTest();
 

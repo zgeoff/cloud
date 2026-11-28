@@ -102,8 +102,9 @@ async function loadPins(
 const referencePattern =
   /^\s*(?:from\s+(?:--platform=\S+\s+)?|(?:-\s+)?[\w-]*image\s*[:=]\s*)["']?(?<reference>[^\s"']+)/iu;
 
-// an imp image lives in impd and no registry, so it has no digest to pin
-const agentImagePattern = /^agent-[\da-f]{7,40}$/u;
+// an imp image lives in impd and no registry, so it has no digest to pin: an agent-<short sha>
+// image, or the agent alias that impd moves to each one that passes its check
+const agentImagePattern = /^agent(?:-[\da-f]{7,40})?$/u;
 
 // a runbook fills in a placeholder before it creates the manifest, and Docker refuses an uppercase
 // image name, so a placeholder left in place never pulls an unpinned image
