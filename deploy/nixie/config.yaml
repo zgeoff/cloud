@@ -507,7 +507,9 @@ coding:
 # pepys-api, impd-mcp). Each client ID is a public client that `boxxy auth clients add`,
 # `pepys-api clients add` and `impz oauth client add` made for nixie, with nixie's one OAuth return
 # as its redirect URI. A new server waits on Geoff's approval in Proposals, then a sign-in from
-# Settings → MCP servers, then an approval of each tool
+# Settings → MCP servers. Since nixie 0.128.0 each tool is available at its first listing, and the
+# allow rules in zgeoff/nixie-definitions' rules/mcp-servers.yaml run every tool of boxxy, pepys and
+# impz without asking, because Geoff limits each server through its OAuth scopes
 mcp:
   servers:
     boxxy:
