@@ -147,7 +147,7 @@
     "@impz/testing": "catalog:",
     "@mswjs/interceptors": "0.45.12",
     "@orpc/client": "1.16.2",
-    "@stylistic/eslint-plugin": "5.10.0",
+    "@stylistic/eslint-plugin": "6.0.1",
     "@tsconfig/strictest": "2.0.9",
     "@types/bun": "1.4.4",
     "@zgeoff/agent-hooks": "0.3.3",
