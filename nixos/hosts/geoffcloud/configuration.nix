@@ -550,10 +550,11 @@ in
         url = impdLoopbackURL;
         tokenFile = "/run/credentials/atc-daemon.service/imp-token";
         impPrefix = "harness-";
-        # the agent image (docs/runbooks/agent-image.md). Hooks run the image's atc at guestATC
-        # while it prints the daemon's release; when the image ships another release, each new imp
-        # takes a copy of the daemon's binary (packages/atc.nix)
-        image = "agent-8729e33a";
+        # sessions follow the `agent` alias (docs/runbooks/agent-image.md), which the host's build
+        # moves to each agent image that passes its check, so no edit here moves them. Hooks run the
+        # image's atc at guestATC while it prints the daemon's release; when the image ships another
+        # release, each new imp takes a copy of the daemon's binary (packages/atc.nix)
+        image = "agent";
         guestATC = "/usr/local/bin/atc";
         # each new harness imp boots elastic at 1024 MiB on ordinary pages and grows to 2048 MiB
         # under pressure, so the agents leave the huge page pool to nixie's sandboxes. A session
