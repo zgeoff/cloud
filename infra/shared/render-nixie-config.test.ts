@@ -44,7 +44,7 @@ test('it renders deploy/nixie/config.yaml as YAML holding the file’s keys and 
   expect(rendered).toStrictEqual({ ...file, ...sections });
 });
 
-test('it renders the conversation on Fable 5.2 with a 400k context and a 1-hour cache, and the checker with neither', async () => {
+test('it renders the conversation on Fable 5.2 with a 600k context and a 1-hour cache, and the checker with neither', async () => {
   const text = await readFile(new URL('../../deploy/nixie/config.yaml', import.meta.url), 'utf8');
 
   const profileSchema = z.object({
@@ -71,7 +71,7 @@ test('it renders the conversation on Fable 5.2 with a 400k context and a 1-hour 
       worker: 'sonnet-5-5',
     },
     profiles: {
-      'fable-5-2': { model: 'claude-fable-5-2', context_tokens: 400_000, cache_ttl: '1h' },
+      'fable-5-2': { model: 'claude-fable-5-2', context_tokens: 600_000, cache_ttl: '1h' },
       'sonnet-5-5-high': { model: 'claude-sonnet-5-5' },
     },
   });
