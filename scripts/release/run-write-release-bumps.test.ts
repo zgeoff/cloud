@@ -28,7 +28,7 @@ test('it writes each bump as the bumps output and lists them', async () => {
   const ctx = await setupTest();
 
   const checkout = await createCloudCheckout({
-    'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\nARG CODEX_VERSION=0.172.0\n`,
     'nixos/packages/atc.nix': '  version = "4.2.0";\n',
     'images/atc-gateway/versions.env': 'ATC_RELEASE=@zgeoff/atc@4.3.0\n',
     'images/pepys/versions.env': 'PEPYS_RELEASE=v0.4.0\n',
@@ -49,6 +49,7 @@ test('it writes each bump as the bumps output and lists them', async () => {
         'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
         'zgeoff/noslop': [{ tag: '@noslop/cli@0.4.0' }],
+        'openai/codex': [{ tag: 'rust-v0.172.0' }],
       },
     }),
   );
@@ -86,7 +87,7 @@ test('it says every pin is current and writes no output', async () => {
   const ctx = await setupTest();
 
   const checkout = await createCloudCheckout({
-    'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\nARG CODEX_VERSION=0.172.0\n`,
     'nixos/packages/atc.nix': '  version = "4.3.0";\n',
     'images/atc-gateway/versions.env': 'ATC_RELEASE=@zgeoff/atc@4.3.0\n',
     'images/pepys/versions.env': 'PEPYS_RELEASE=v0.4.0\n',
@@ -107,6 +108,7 @@ test('it says every pin is current and writes no output', async () => {
         'zgeoff/boxxy': [{ tag: '@boxxy/cli@0.2.0' }],
         'zgeoff/auto-mode': [{ tag: 'auto-mode-v0.19.3' }],
         'zgeoff/noslop': [{ tag: '@noslop/cli@0.4.0' }],
+        'openai/codex': [{ tag: 'rust-v0.172.0' }],
       },
     }),
   );
@@ -135,7 +137,7 @@ test('it fails with the search error and writes nothing', async () => {
   const ctx = await setupTest();
 
   const checkout = await createCloudCheckout({
-    'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\n`,
+    'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:${'2'.repeat(64)}\nARG ATC_VERSION=4.3.0\nARG BOXXY_CLI_VERSION=0.2.0\nARG NOSLOP_VERSION=0.4.0\nARG AUTO_MODE_VERSION=0.19.3\nARG CODEX_VERSION=0.172.0\n`,
     'nixos/packages/atc.nix': '  version = "4.3.0";\n',
     'images/atc-gateway/versions.env': 'ATC_RELEASE=@zgeoff/atc@4.3.0\n',
     'images/pepys/versions.env': 'PEPYS_RELEASE=v0.4.0\n',

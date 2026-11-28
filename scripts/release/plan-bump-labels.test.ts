@@ -80,3 +80,23 @@ test('it rejects a version that is not a release version', () => {
     new Error("not a release version: 'latest'"),
   );
 });
+
+test('it lets a minor update to a 0.x release merge on its own when the record says so', () => {
+  expect(planBumpLabels('0.172.0', ['0.160.1'], [], { mergeZeroMinors: true })).toStrictEqual([
+    'update:minor',
+    'auto-merge',
+  ]);
+});
+
+test('it holds a major update for review even when the record lets 0.x minors merge', () => {
+  expect(planBumpLabels('1.0.0', ['0.9.4'], [], { mergeZeroMinors: true })).toStrictEqual([
+    'update:major',
+    'needs-review',
+  ]);
+});
+
+test('it holds a flagged 0.x minor update for review even when the record lets 0.x minors merge', () => {
+  expect(
+    planBumpLabels('0.172.0', ['0.160.1'], ['migrations'], { mergeZeroMinors: true }),
+  ).toStrictEqual(['update:minor', 'migrations', 'needs-review']);
+});

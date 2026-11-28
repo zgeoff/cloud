@@ -136,3 +136,75 @@ test('it reads the auto-mode package from the npm registry for an npm-tarball so
     new Error('the npm registry answered 404 for https://registry.npmjs.org/auto-mode/2.1.0'),
   );
 });
+
+test('it reads each asset sum from the release digests for an asset-digests source', async () => {
+  const stub = buildStubRunner(
+    buildStubReleaseGH({
+      releases: {
+        'openai/codex': [
+          {
+            tag: 'rust-v0.172.0',
+            digests: {
+              'codex-package-x86_64-unknown-linux-musl.tar.gz': `sha256:${'a'.repeat(64)}`,
+              'codex-package-source.zip': null,
+              'codex-package-bad.zip': `sha512:${'b'.repeat(64)}`,
+            },
+          },
+        ],
+      },
+    }),
+  );
+
+  const read = await readReleaseValues({
+    record: getReleaseRecord('codex'),
+    version: '0.172.0',
+    pinned: ['0.160.1'],
+    run: stub.run,
+  });
+
+  expect(read).toStrictEqual({
+    values: { assetSums: { 'codex-package-x86_64-unknown-linux-musl.tar.gz': 'a'.repeat(64) } },
+    flags: [],
+  });
+});
+
+test('it fails without values when the release lists no digest for a pinned asset', async () => {
+  const stub = buildStubRunner(
+    buildStubReleaseGH({
+      releases: {
+        'openai/codex': [
+          {
+            tag: 'rust-v0.172.0',
+            digests: { 'codex-package-x86_64-unknown-linux-musl.tar.gz': null },
+          },
+        ],
+      },
+    }),
+  );
+
+  const read = await readReleaseValues({
+    record: getReleaseRecord('codex'),
+    version: '0.172.0',
+    pinned: ['0.160.1'],
+    run: stub.run,
+  });
+
+  expect(read).toStrictEqual(
+    new Error(
+      'the release lists no sha256 digest for codex-package-x86_64-unknown-linux-musl.tar.gz',
+    ),
+  );
+});
+
+test('it fails without values when the asset-digests release is missing', async () => {
+  const stub = buildStubRunner(buildStubReleaseGH({ releases: { 'openai/codex': [] } }));
+
+  const read = await readReleaseValues({
+    record: getReleaseRecord('codex'),
+    version: '0.172.0',
+    pinned: ['0.160.1'],
+    run: stub.run,
+  });
+
+  expect(read).toStrictEqual(new Error('gh: Not Found (HTTP 404)'));
+});

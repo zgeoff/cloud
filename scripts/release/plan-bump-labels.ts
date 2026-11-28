@@ -8,6 +8,7 @@ export function planBumpLabels(
   version: string,
   pinned: readonly string[],
   flags: readonly string[],
+  options: { readonly mergeZeroMinors?: boolean | undefined } = {},
 ): readonly string[] | Error {
   const target = parseReleaseVersion(version);
   const invalid = [version, ...pinned].find((each) => parseReleaseVersion(each) === undefined);
@@ -32,7 +33,7 @@ export function planBumpLabels(
   // from 1.0 on, patch and minor updates merge on their own; a 0.x minor release is the breaking one
   const review =
     update === 'major' ||
-    (update === 'minor' && target.major === 0) ||
+    (update === 'minor' && target.major === 0 && options.mergeZeroMinors !== true) ||
     flags.some((flag) => !mergingFlags.has(flag));
 
   return [`update:${update}`, ...flags, review ? 'needs-review' : 'auto-merge'];

@@ -109,7 +109,9 @@ test('it prints its usage for a dependency the registry lacks', async () => {
   expect(ctx.printOut.mock.calls).toStrictEqual([]);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
-    ['usage: run-release-pin.ts <atc|imp|nixie|pepys|boxxy-cli|auto-mode|noslop> <version>\n'],
+    [
+      'usage: run-release-pin.ts <atc|imp|nixie|pepys|boxxy-cli|auto-mode|noslop|codex> <version>\n',
+    ],
   ]);
 
   expect(stub.calls).toStrictEqual([]);

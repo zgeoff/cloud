@@ -533,6 +533,103 @@ test('it fails without a pull request when the release lacks its sums', async ()
   ]);
 });
 
+test('it opens a codex minor bump that merges on its own, pinned at the asset digest', async () => {
+  const ctx = await setupTest();
+
+  const asset = 'codex-package-x86_64-unknown-linux-musl.tar.gz';
+
+  const checkout = await createCloudCheckout({
+    'scripts/release/release-pins.json': '{}\n',
+    'images/agent/Dockerfile': `ARG CODEX_VERSION=0.160.1\nARG CODEX_SHA256=${'1'.repeat(64)}\n`,
+  });
+
+  const stub = buildStubRunner(
+    buildStubReleaseGH({
+      releases: {
+        'openai/codex': [
+          { tag: 'rust-v0.172.0', digests: { [asset]: `sha256:${'a'.repeat(64)}` } },
+        ],
+      },
+    }),
+    buildRealProgramHandler(['git'], checkout.env),
+  );
+
+  const status = await runReleaseBump(
+    { cwd: checkout.clone, env: checkout.env, run: stub.run, ...ctx },
+    ['codex', '0.172.0', '0.160.1'],
+  );
+
+  const dockerfile = await checkout.git([
+    `--git-dir=${checkout.origin}`,
+    'show',
+    'release-check/codex:images/agent/Dockerfile',
+  ]);
+
+  expect(status).toBe(0);
+  expect(ctx.printErr.mock.calls).toStrictEqual([]);
+  expect(dockerfile).toBe(`ARG CODEX_VERSION=0.172.0\nARG CODEX_SHA256=${'a'.repeat(64)}`);
+
+  expect(
+    stub.calls
+      .filter((call) => call.argv.join(' ').startsWith('gh pr create'))
+      .map((call) => call.argv.join(' ')),
+  ).toStrictEqual([
+    'gh pr create --repo zgeoff/cloud --base main --head release-check/codex --title chore(codex): bump codex to 0.172.0 --body-file - --label update:minor,auto-merge',
+  ]);
+});
+
+test.each([
+  ['no digest', null],
+  ['a digest of another algorithm', `sha512:${'b'.repeat(64)}`],
+])('it leaves the checkout alone when the codex release lists %s', async (_title, digest) => {
+  const ctx = await setupTest();
+
+  const dockerfile = `ARG CODEX_VERSION=0.160.1\nARG CODEX_SHA256=${'1'.repeat(64)}\n`;
+
+  const checkout = await createCloudCheckout({
+    'scripts/release/release-pins.json': '{}\n',
+    'images/agent/Dockerfile': dockerfile,
+  });
+
+  const stub = buildStubRunner(
+    buildStubReleaseGH({
+      releases: {
+        'openai/codex': [
+          {
+            tag: 'rust-v0.172.0',
+            digests: { 'codex-package-x86_64-unknown-linux-musl.tar.gz': digest },
+          },
+        ],
+      },
+    }),
+    buildRealProgramHandler(['git'], checkout.env),
+  );
+
+  const status = await runReleaseBump(
+    { cwd: checkout.clone, env: checkout.env, run: stub.run, ...ctx },
+    ['codex', '0.172.0', '0.160.1'],
+  );
+
+  expect(status).toBe(1);
+
+  expect(ctx.printErr.mock.calls).toStrictEqual([
+    ['the release lists no sha256 digest for codex-package-x86_64-unknown-linux-musl.tar.gz\n'],
+  ]);
+
+  expect(stub.calls.filter((call) => call.argv[0] === 'git')).toStrictEqual([]);
+
+  const changes = await checkout.git(['-C', checkout.clone, 'status', '--porcelain']);
+  const dockerfileAfter = await Bun.file(join(checkout.clone, 'images/agent/Dockerfile')).text();
+
+  const pinsAfter = await Bun.file(
+    join(checkout.clone, 'scripts/release/release-pins.json'),
+  ).text();
+
+  expect(changes).toBe('');
+  expect(dockerfileAfter).toBe(dockerfile);
+  expect(pinsAfter).toBe('{}\n');
+});
+
 test('it refuses a dependency it does not know', async () => {
   const ctx = await setupTest();
 

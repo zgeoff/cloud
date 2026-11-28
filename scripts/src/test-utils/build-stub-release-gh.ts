@@ -7,6 +7,9 @@ interface StubRelease {
   readonly tag: string;
   readonly notes?: string;
   readonly assets?: Readonly<Record<string, string>>;
+
+  // each asset's `digest` as the release API lists it, with null for an asset it lists none for
+  readonly digests?: Readonly<Record<string, string | null>>;
   readonly commit?: string;
 }
 
@@ -75,6 +78,31 @@ const commands: readonly Command[] = [
     }
 
     return asset === undefined ? notFound : { stdout: asset };
+  },
+  (scenario, args) => {
+    const groups =
+      /^api repos\/(?<repo>[^/]+\/[^/]+)\/releases\/tags\/(?<tag>\S+) --jq \[\.assets\[\] \| \{name, digest\}\]$/u.exec(
+        args.join(' '),
+      )?.groups;
+
+    const release = findRelease(scenario, groups?.['repo'], groups?.['tag']);
+
+    if (groups === undefined) {
+      return null;
+    }
+
+    return release === undefined
+      ? {
+          exitCode: 1,
+          stdout:
+            '{"message":"Not Found","documentation_url":"https://docs.github.com/rest/releases/releases#get-a-release-by-tag-name","status":"404"}',
+          stderr: 'gh: Not Found (HTTP 404)\n',
+        }
+      : {
+          stdout: `${JSON.stringify(
+            Object.entries(release.digests ?? {}).map(([name, digest]) => ({ name, digest })),
+          )}\n`,
+        };
   },
   (scenario, args) => {
     const groups = /^api repos\/(?<repo>[^/]+\/[^/]+)\/commits\/(?<tag>\S+) --jq \.sha$/u.exec(

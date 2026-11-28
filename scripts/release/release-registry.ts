@@ -10,6 +10,9 @@ export interface PublishedImage {
 
 type ReleaseSource =
   | { readonly kind: 'sha256sums' }
+
+  // for releases that ship no SHA256SUMS: GitHub lists each asset's sha256 as its `digest`
+  | { readonly kind: 'asset-digests' }
   | { readonly kind: 'image-digests'; readonly images: readonly string[] }
   | { readonly kind: 'release-notes' }
   | { readonly kind: 'npm-tarball'; readonly packageName: string }
@@ -90,6 +93,10 @@ export interface ReleaseRecord {
   // how many of the repository's newest releases the check lists to find this record's newest one,
   // when other packages' releases share the repository; 30 when unset
   readonly releaseLimit?: number;
+
+  // lets a minor bump of a 0.x release merge on its own, as it does from 1.0 on; majors still wait
+  // for review. Unset, a 0.x minor bump waits, because most 0.x minors break.
+  readonly mergeZeroMinors?: boolean;
 }
 
 const version = { kind: 'version' } as const;
@@ -461,5 +468,34 @@ export const releaseRegistry: readonly ReleaseRecord[] = [
     ],
     rollout:
       'Rebuild the agent image (`docs/runbooks/agent-image.md`). Sessions run the new noslop once they start on the new image.',
+  },
+  {
+    name: 'codex',
+    repo: 'openai/codex',
+    tagPrefix: 'rust-v',
+    source: { kind: 'asset-digests' },
+    mergeZeroMinors: true,
+    pins: [
+      {
+        id: 'codex',
+        title: 'Codex in the agent image (`images/agent/Dockerfile`)',
+        lines: [
+          {
+            file: 'images/agent/Dockerfile',
+            pattern: String.raw`^ARG CODEX_VERSION=(?<version>\d+\.\d+\.\d+)$`,
+            parts: { version },
+          },
+          {
+            file: 'images/agent/Dockerfile',
+            pattern: String.raw`^ARG CODEX_SHA256=(?<sum>[0-9a-f]{64})$`,
+            parts: {
+              sum: { kind: 'sum', asset: 'codex-package-x86_64-unknown-linux-musl.tar.gz' },
+            },
+          },
+        ],
+      },
+    ],
+    rollout:
+      "Rebuild the agent image (`docs/runbooks/agent-image.md`). New sessions run the new Codex once the host's build moves the `agent` alias.",
   },
 ];
