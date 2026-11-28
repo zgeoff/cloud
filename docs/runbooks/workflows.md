@@ -331,21 +331,20 @@ host, because the daemon reads copies of the token files made when it starts
 
 The `cloudflared-impz` service on the host connects the tunnel that carries `impz.geoff.cloud`, and
 reads the tunnel's token from `/var/lib/imp-host/secrets/impd-mcp-tunnel-token`. The token is the
-`impdMCPTunnelToken` stack output, which only a new tunnel changes. If you rotate the token in
-Cloudflare, run `pulumi refresh --stack prod` from `infra/` under `op run --env-file=../.env` first,
-because a preview never saves what it reads, and the output keeps the old token until a refresh.
-Install it after the first apply of the tunnel, after a replace of the tunnel and after a host
-reinstall. The token goes from the stack output to the host on SSH's stdin, so it never reaches a
-terminal or a command line. The host writes the file only when the token is not empty:
+`impdMCPTunnelToken` stack output. Install it after the first apply of the tunnel, after a replace
+of the tunnel and after a host reinstall. If you rotated the token in Cloudflare, first run
+`pulumi refresh --stack prod` from `infra/` under `op run --env-file=../.env`, because a preview
+never saves what it reads and the output keeps the old token until a refresh. The command sends the
+token over SSH's stdin, so it never reaches a terminal or a command line. The host writes the file
+only when the token is not empty:
 
 ```bash
 (cd infra && op run --env-file=../.env -- pulumi stack output --stack prod --show-secrets impdMCPTunnelToken) \
   | bun run ops:host -- 'mountpoint -q /var/lib/imp-host/secrets && t=$(tr -d "\n") && [ -n "$t" ] && printf %s "$t" | install -m 400 /dev/stdin /var/lib/imp-host/secrets/impd-mcp-tunnel-token && systemctl restart cloudflared-impz && systemctl is-active cloudflared-impz'
 ```
 
-Expect `active`. The unit is skipped while the file is missing, so a host switch before the install
-still succeeds, and `impz.geoff.cloud` answers with Cloudflare's error page until the connector
-runs.
+Expect `active`. Until you install the token, `impz.geoff.cloud` answers with Cloudflare's error
+page.
 
 ## Reinstall the host
 

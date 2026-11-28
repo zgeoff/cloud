@@ -1,9 +1,9 @@
 # Public ingress
 
 The estate has one way in from the internet: Cloudflare tunnels, four of them, which a cloudflared
-connector holds open from inside the estate. The host opens no inbound port for them, so a tunnel
-route exists only as a rule in a tunnel's configuration and a proxied DNS record that points at that
-tunnel, and Pulumi declares both. Each workload behind a route brings its own authentication.
+connector holds open from inside the estate. The host opens no inbound port for them. Each route is
+a rule in a tunnel's configuration plus a proxied DNS record that points at that tunnel, and Pulumi
+declares both. Each workload behind a route brings its own authentication.
 
 The impd tunnel serves `impz.geoff.cloud`, imp's own MCP and OAuth route, which a hosted assistant
 signs in to and calls at `https://impz.geoff.cloud/mcp`. The atc tunnel serves `atc.geoff.cloud`,
@@ -34,32 +34,30 @@ Cloudflare's edge and never to the host.
 
 ### The impd tunnel
 
-The impd tunnel serves `impz.geoff.cloud`, which nixie requires: nixie refuses an MCP server whose
-name resolves to the host's own addresses, so a direct record on the host would never connect. The
-proxied CNAME resolves to Cloudflare's addresses, as pepys's and boxxy's names do. Its connector is
-the `cloudflared-impz` service on the host, which `nixos/hosts/geoffcloud/configuration.nix` defines
-and which reaches impd's public listener on the host's loopback address. imp-host publishes that
-listener on the loopback address alone, and impd serves no route there but its own MCP, OAuth and
-discovery paths
+`impz.geoff.cloud` must resolve to addresses other than the host's own, because nixie refuses an MCP
+server whose name resolves to the host's addresses. It has a proxied CNAME, which resolves to
+Cloudflare's addresses, as pepys's and boxxy's names do. Its connector is the `cloudflared-impz`
+service on the host, which `nixos/hosts/geoffcloud/configuration.nix` defines and which reaches
+impd's public listener on the host's loopback address. imp-host publishes that listener on the
+loopback address alone, and impd serves no route there but its own MCP, OAuth and discovery paths
 ([imp's guide to the public route](https://github.com/zgeoff/impz/blob/main/docs/guides/mcp.md#public-route)).
 
 The tunnel's list holds one rule for the hostname, an exact match of those paths, then the
-catch-all. A path outside the list, such as a case change, a trailing slash or a dot segment that
-would resolve to a listed path, gets the tunnel's 404 and never reaches impd. No Access login fronts
-impd's sign-in pages: impd checks the owner's passkey itself, and the pages were open to the
+catch-all. A path outside the list gets the tunnel's 404 and never reaches impd. That includes a
+case change, a trailing slash and a dot segment that would resolve to a listed path. No Access login
+fronts impd's sign-in pages: impd checks the owner's passkey itself, and the pages were open to the
 internet before the tunnel. cloudflared passes the request's `Host` and `Authorization` through, so
 impd still names `https://impz.geoff.cloud` as its OAuth issuer and resource.
 
 The connector reads the tunnel's token from `impd-mcp-tunnel-token` in the host's secrets directory,
-which the `impdMCPTunnelToken` stack output holds. The unit stays skipped while that file is
-missing, so a host switch never fails on it, and the hostname answers with Cloudflare's error page
-until the connector runs. The host keeps no port 443 open, no TLS front and no certificate for the
-name.
+which the `impdMCPTunnelToken` stack output holds. The unit is skipped while that file is missing,
+so a host switch never fails on it. Until the connector runs, the hostname answers with Cloudflare's
+error page. The host keeps no port 443 open, no TLS front and no certificate for the name.
 
 Cloudflare's proxy ends a response that stays silent past its read timeout, and an MCP event stream
 can sit quiet that long. impd's MCP transport writes a keepalive comment to every stream every 5
-seconds, so a stream stays open for as long as the client and impd keep it. The per-address rate
-limit that the host's front applied is gone: impd counts its limits per client and grant, never per
+seconds, which keeps an MCP event stream under that timeout. The per-address rate limit that the
+host's front applied does not apply now: impd counts its limits per client and grant, never per
 address, and every request now reaches it from the connector.
 
 ### The shared tunnel
@@ -249,11 +247,12 @@ A new public route is the exception in this estate. A service stays on the host 
 unless its PR states why it must be public, and the route is then a tunnel rule ahead of the
 catch-all and a proxied record for its hostname, reviewed in the same preview. The hostname needs a
 public entry in the [exposure registry](./firewalls.md#the-exposure-registry) that names its auth
-layer, and the Pulumi program refuses a route to any other hostname. A service that sends its own
-keepalives holds a stream open through the proxy. impd's tailnet names under `imps.geoff.cloud`
-never pass through a tunnel ([imp on the host](../host/imp.md#dns-and-certificates)).
+layer, and the Pulumi program refuses a route to any other hostname. impd's tailnet names under
+`imps.geoff.cloud` never pass through a tunnel
+([imp on the host](../host/imp.md#dns-and-certificates)).
 
 The host's TLS front, Caddy with one `front-route` entry per hostname, is a module that no host
-enables now. `impz.geoff.cloud` was its one route, and it moved to the impd tunnel above. A route
-that cannot take a proxy's limits would use it again, with a front-route entry in the registry,
-which gives the front its hostname, upstream and paths and Pulumi its DNS-only records.
+enables now. `impz.geoff.cloud` was its one route, and it moved to the impd tunnel above. Use it
+again for a route that cannot take a proxy's limits. Add a front-route entry to the registry with
+the hostname, upstream and paths for the front. Pulumi reads the same entry to create the DNS-only
+records.
