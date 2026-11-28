@@ -519,3 +519,12 @@ devices: {}
 # its receipt on the same daily cadence; readiness reports backups unready past twice the interval
 backup:
   interval_minutes: 1440
+
+# texts through Twilio: since nixie 0.125.0 the number and both Twilio IDs come from the settings
+# group of the sops file, and the API key's secret from its connector_credentials entry twilio
+phone:
+  number: deployment:phone_number
+  twilio:
+    account_sid: deployment:twilio_account_sid
+    api_key_sid: deployment:twilio_api_key_sid
+    credential: deployment:twilio
